@@ -1,4 +1,4 @@
-# Next.js ChatGPT 🤖💬
+# Next.js ChatGPT 🤖💬 
 
 Welcome to `nextjs-chatgpt-app`! 🎉🚀 Responsive chat application powered by OpenAI's GPT-4, with chat streaming, code
 highlighting, code execution, development presets, and more. The app is built using Next.js and TypeScript, and it's
