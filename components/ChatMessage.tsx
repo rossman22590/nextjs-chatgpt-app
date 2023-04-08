@@ -3,6 +3,9 @@ import * as React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+import { Sandpack, SandpackFiles } from '@codesandbox/sandpack-react';
+import { githubLight, monokaiPro } from '@codesandbox/sandpack-themes';
+
 import Prism from 'prismjs';
 import 'prismjs/themes/prism.css';
 import 'prismjs/components/prism-bash';
@@ -21,8 +24,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import Face6Icon from '@mui/icons-material/Face6';
 import FastForwardIcon from '@mui/icons-material/FastForward';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
+import StopOutlinedIcon from '@mui/icons-material/StopOutlined';
 
 import { DMessage } from '@/lib/store-chats';
 import { Link } from '@/components/util/Link';
@@ -119,11 +124,54 @@ const parseBlocks = (forceText: boolean, text: string): Block[] => {
 
 /// Renderers for the different types of message blocks
 
+type SandpackConfig = { files: SandpackFiles, template: 'vanilla-ts' | 'vanilla' };
+
+const runnableLanguages = ['html', 'javascript', 'typescript'];
+
+function RunnableCode({ codeBlock }: { codeBlock: CodeBlock }): JSX.Element | null {
+  const theme = useTheme();
+  let config: SandpackConfig;
+  switch (codeBlock.language) {
+    case 'html':
+      config = {
+        template: 'vanilla',
+        files: { '/index.html': codeBlock.code, '/index.js': '' },
+      };
+      break;
+    case 'javascript':
+    case 'typescript':
+      config = {
+        template: 'vanilla-ts',
+        files: { '/index.ts': codeBlock.code },
+      };
+      break;
+    default:
+      return null;
+  }
+  return (
+    <Box onDoubleClick={e => e.stopPropagation()}>
+      <Sandpack
+        {...config}
+        theme={theme.palette.mode === 'dark' ? monokaiPro : githubLight}
+        options={{ showConsole: true, showConsoleButton: true, showTabs: true, showNavigator: false }}
+      />
+    </Box>
+  );
+}
+
+
 function RenderCode({ codeBlock, sx }: { codeBlock: CodeBlock, sx?: SxProps }) {
+  const [showSandpack, setShowSandpack] = React.useState(false);
+
   const handleCopyToClipboard = (e: React.MouseEvent) => {
     e.stopPropagation();
     copyToClipboard(codeBlock.code);
   };
+
+  const handleToggleSandpack = () =>
+    setShowSandpack(!showSandpack);
+
+  const showRunIcon = codeBlock.complete && !!codeBlock.language && runnableLanguages.includes(codeBlock.language);
 
   return (
     <Box
@@ -146,6 +194,15 @@ function RenderCode({ codeBlock, sx }: { codeBlock: CodeBlock, sx?: SxProps }) {
         </IconButton>
       </Tooltip>
       <Box dangerouslySetInnerHTML={{ __html: codeBlock.content }} />
+      {/* Run button and Run widget */}
+      {showRunIcon && <>
+        <Tooltip title='Try it out' variant='solid'>
+          <IconButton variant='outlined' color={showSandpack ? 'neutral' : 'primary'} onClick={handleToggleSandpack} sx={{ position: 'absolute', top: 0, right: 50, zIndex: 10, p: 0.5, opacity: 0, transition: 'opacity 0.3s' }}>
+            {showSandpack ? <StopOutlinedIcon /> : <PlayArrowOutlinedIcon />}
+          </IconButton>
+        </Tooltip>
+        {showSandpack && <RunnableCode codeBlock={codeBlock} />}
+      </>}
     </Box>
   );
 }
