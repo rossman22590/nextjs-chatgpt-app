@@ -136,13 +136,21 @@ export function Composer(props: { disableSend: boolean; isDeveloperMode: boolean
 
 
   const onSpeechResultCallback = React.useCallback((transcript: string) => {
-    setComposeText(current => current + ' ' + transcript);
+    setComposeText(current => {
+      current = current.trim();
+      transcript = transcript.trim();
+      if ((!current || current.endsWith('.') || current.endsWith('!') || current.endsWith('?')) && transcript.length)
+        transcript = transcript[0].toUpperCase() + transcript.slice(1);
+      return current ? current + ' ' + transcript : transcript;
+    });
   }, []);
 
-  const { isSpeechEnabled, isRecordingSpeech, startRecording } = useSpeechRecognition(onSpeechResultCallback);
+  const { isSpeechEnabled, isSpeechError, isRecordingAudio, isRecordingSpeech, toggleRecording } = useSpeechRecognition(onSpeechResultCallback);
 
-  const handleMicClicked = () => startRecording();
+  const handleMicClicked = () => toggleRecording();
 
+  const micColor = isSpeechError ? 'danger' : isRecordingSpeech ? 'warning' : isRecordingAudio ? 'warning' : 'neutral';
+  const micVariant = isRecordingSpeech ? 'solid' : isRecordingAudio ? 'soft' : 'plain';
 
   async function loadAndAttachFiles(files: FileList) {
 
@@ -328,7 +336,7 @@ export function Composer(props: { disableSend: boolean; isDeveloperMode: boolean
           </Tooltip>
 
           {isSpeechEnabled && <Box sx={{ mt: { xs: 1, md: 2 }, ...hideOnDesktop }}>
-            <IconButton variant={!isRecordingSpeech ? 'plain' : 'solid'} color={!isRecordingSpeech ? 'neutral' : 'warning'} onClick={handleMicClicked}>
+            <IconButton variant={micVariant} color={micColor} onClick={handleMicClicked}>
               <MicIcon />
             </IconButton>
           </Box>}
@@ -381,7 +389,7 @@ export function Composer(props: { disableSend: boolean; isDeveloperMode: boolean
 
           {isSpeechEnabled && (
             <IconButton
-              variant={!isRecordingSpeech ? 'plain' : 'solid'} color={!isRecordingSpeech ? 'primary' : 'warning'}
+              variant={micVariant} color={micColor}
               onClick={handleMicClicked}
               sx={{
                 ...hideOnMobile,

@@ -5,8 +5,8 @@ import { Box, List } from '@mui/joy';
 import { SxProps } from '@mui/joy/styles/types';
 
 import { ChatMessage } from '@/components/ChatMessage';
-import { DMessage, useActiveConversation, useChatStore } from '@/lib/store-chats';
 import { PurposeSelector } from '@/components/util/PurposeSelector';
+import { createDMessage, DMessage, useActiveConversation, useChatStore } from '@/lib/store-chats';
 import { useSettingsStore } from '@/lib/store-settings';
 
 
@@ -33,13 +33,6 @@ export function ChatMessageList(props: { disableSend: boolean, sx?: SxProps, run
   const filteredMessages = messages
     .filter(m => m.role !== 'system' || showSystemMessages);
 
-  // when there are no messages, show the purpose selector
-  if (!filteredMessages.length) return (
-    <Box sx={props.sx || {}}>
-      <PurposeSelector />
-    </Box>
-  );
-
 
   const handleMessageDelete = (messageId: string) =>
     deleteMessage(activeConversationId, messageId);
@@ -52,14 +45,27 @@ export function ChatMessageList(props: { disableSend: boolean, sx?: SxProps, run
     props.runAssistant(activeConversationId, truncatedHistory);
   };
 
+  const handleRunExample = (example: string) =>
+    props.runAssistant(activeConversationId, [...messages, createDMessage('user', example)]);
+
+  // when there are no messages, show the purpose selector
+  if (!filteredMessages.length) return (
+    <Box sx={props.sx || {}}>
+      <PurposeSelector onRunExample={handleRunExample} />
+    </Box>
+  );
+
 
   return (
     <Box sx={props.sx || {}}>
       <List sx={{ p: 0 }}>
 
-        {filteredMessages.map(message =>
+        {filteredMessages.map((message, idx) =>
           <ChatMessage
-            key={'msg-' + message.id} message={message} disableSend={props.disableSend}
+            key={'msg-' + message.id}
+            message={message}
+            disableSend={props.disableSend}
+            lastMessage={idx === filteredMessages.length - 1}
             onDelete={() => handleMessageDelete(message.id)}
             onEdit={newText => handleMessageEdit(message.id, newText)}
             onRunAgain={() => handleMessageRunAgain(message.id)} />,
