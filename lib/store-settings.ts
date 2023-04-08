@@ -58,7 +58,7 @@ export const useSettingsStore = create<SettingsStore>()(
       renderMarkdown: false,
       setRenderMarkdown: (renderMarkdown: boolean) => set({ renderMarkdown }),
 
-      showPurposeFinder: false,
+      showPurposeFinder: true,
       setShowPurposeFinder: (showPurposeFinder: boolean) => set({ showPurposeFinder }),
 
       showSystemMessages: false,
