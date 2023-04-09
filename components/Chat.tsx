@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { Box, Stack, useTheme } from '@mui/joy';
+import { Box, useTheme } from '@mui/joy';
 import { SxProps } from '@mui/joy/styles/types';
 
 import { ApiPublishResponse } from '../pages/api/publish';
@@ -22,16 +22,15 @@ export function Chat(props: { onShowSettings: () => void, sx?: SxProps }) {
   const [clearConfirmationId, setClearConfirmationId] = React.useState<string | null>(null);
   const [publishConversationId, setPublishConversationId] = React.useState<string | null>(null);
   const [publishResponse, setPublishResponse] = React.useState<ApiPublishResponse | null>(null);
-  const [abortController, setAbortController] = React.useState<AbortController | null>(null);
 
   // external state
   const theme = useTheme();
-  const { conversationId: activeConversationId, chatModelId, systemPurposeId } = useActiveConfiguration();
+  const { assistantTyping, conversationId: activeConversationId, chatModelId, systemPurposeId } = useActiveConfiguration();
 
   const runAssistant = async (conversationId: string, history: DMessage[]) => {
 
     // reference the state editing functions
-    const { appendMessage, editMessage, setMessages } = useChatStore.getState();
+    const { startTyping, appendMessage, editMessage, setMessages } = useChatStore.getState();
 
     // update the purpose of the system message (if not manually edited), and create if needed
     {
@@ -61,22 +60,20 @@ export function Chat(props: { onShowSettings: () => void, sx?: SxProps }) {
 
     // when an abort controller is set, the UI switches to the "stop" mode
     const controller = new AbortController();
-    setAbortController(controller);
+    startTyping(conversationId, controller);
 
     const { apiKey, apiHost, apiOrganizationId, modelTemperature, modelMaxResponseTokens } = useSettingsStore.getState();
     await streamAssistantMessageEdits(conversationId, assistantMessageId, history, apiKey, apiHost, apiOrganizationId, chatModelId, modelTemperature, modelMaxResponseTokens, editMessage, controller.signal);
 
     // clear to send, again
-    setAbortController(null);
+    startTyping(conversationId, null);
   };
-
-  const handleStopGeneration = () => abortController?.abort();
 
   const findConversation = (conversationId: string) =>
     (conversationId ? useChatStore.getState().conversations.find(c => c.id === conversationId) : null) ?? null;
 
-  const handleSendMessage = async (userText: string, conversationId: string | null) => {
-    const conversation = findConversation(conversationId || activeConversationId);
+  const handleSendMessage = async (conversationId: string, userText: string) => {
+    const conversation = findConversation(conversationId);
     if (conversation)
       await runAssistant(conversation.id, [...conversation.messages, createDMessage('user', userText)]);
   };
@@ -107,7 +104,6 @@ export function Chat(props: { onShowSettings: () => void, sx?: SxProps }) {
 
   const handleConfirmedClearConversation = () => {
     if (clearConfirmationId) {
-      handleStopGeneration();
       useChatStore.getState().setMessages(clearConfirmationId, []);
       setClearConfirmationId(null);
     }
@@ -116,10 +112,9 @@ export function Chat(props: { onShowSettings: () => void, sx?: SxProps }) {
 
   return (
 
-    <Stack
+    <Box
       sx={{
-        minHeight: '100vh',
-        position: 'relative',
+        display: 'flex', flexDirection: 'column', minHeight: '100vh',
         ...(props.sx || {}),
       }}>
 
@@ -134,7 +129,7 @@ export function Chat(props: { onShowSettings: () => void, sx?: SxProps }) {
         }} />
 
       <ChatMessageList
-        disableSend={!!abortController} runAssistant={runAssistant}
+        disableSend={assistantTyping} runAssistant={runAssistant}
         sx={{
           flexGrow: 1,
           background: theme.vars.palette.background.level2,
@@ -142,19 +137,16 @@ export function Chat(props: { onShowSettings: () => void, sx?: SxProps }) {
           marginBottom: '-1px',
         }} />
 
-      <Box
+      <Composer
+        conversationId={activeConversationId} messageId={null}
+        sendMessage={handleSendMessage}
+        isDeveloperMode={systemPurposeId === 'Developer'}
         sx={{
           position: 'sticky', bottom: 0, zIndex: 21,
           background: theme.vars.palette.background.surface,
           borderTop: `1px solid ${theme.vars.palette.divider}`,
           p: { xs: 1, md: 2 },
-        }}>
-        <Composer
-          disableSend={!!abortController} isDeveloperMode={systemPurposeId === 'Developer'}
-          sendMessage={handleSendMessage} stopGeneration={handleStopGeneration}
-        />
-      </Box>
-
+        }} />
 
       {/* Confirmation for Publishing */}
       <ConfirmationModal
@@ -177,7 +169,7 @@ export function Chat(props: { onShowSettings: () => void, sx?: SxProps }) {
         confirmationText={'Are you sure you want to discard all the messages?'} positiveActionText={'Clear conversation'}
       />
 
-    </Stack>
+    </Box>
 
   );
 }

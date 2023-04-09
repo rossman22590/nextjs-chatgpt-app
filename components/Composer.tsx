@@ -2,6 +2,7 @@ import * as React from 'react';
 import { shallow } from 'zustand/shallow';
 
 import { Box, Button, Card, Grid, IconButton, ListDivider, Menu, MenuItem, Stack, Textarea, Tooltip, Typography, useTheme } from '@mui/joy';
+import { SxProps } from '@mui/joy/styles/types';
 import ContentPasteGoIcon from '@mui/icons-material/ContentPasteGo';
 import DataArrayIcon from '@mui/icons-material/DataArray';
 import FormatAlignCenterIcon from '@mui/icons-material/FormatAlignCenter';
@@ -19,7 +20,7 @@ import { TokenBadge } from '@/components/util/TokenBadge';
 import { convertHTMLTableToMarkdown } from '@/lib/markdown';
 import { countModelTokens } from '@/lib/tokens';
 import { extractPdfText } from '@/lib/pdf';
-import { useActiveConfiguration } from '@/lib/store-chats';
+import { useChatStore, useConversationPartial } from '@/lib/store-chats';
 import { useComposerStore, useSettingsStore } from '@/lib/store-settings';
 import { useSpeechRecognition } from '@/components/util/useSpeechRecognition';
 
@@ -89,7 +90,12 @@ const pasteClipboardLegend =
  * @param {(text: string, conversationId: string | null) => void} props.sendMessage - Function to send the message. conversationId is null for the Active conversation
  * @param {() => void} props.stopGeneration - Function to stop response generation
  */
-export function Composer(props: { disableSend: boolean; isDeveloperMode: boolean; sendMessage: (text: string, conversationId: string | null) => void; stopGeneration: () => void }) {
+export function Composer(props: {
+  conversationId: string; messageId: string | null;
+  sendMessage: (conversationId: string, text: string) => void;
+  isDeveloperMode: boolean;
+  sx?: SxProps;
+}) {
   // state
   const [composeText, setComposeText] = React.useState('');
   const [isDragging, setIsDragging] = React.useState(false);
@@ -100,11 +106,9 @@ export function Composer(props: { disableSend: boolean; isDeveloperMode: boolean
 
   // external state
   const theme = useTheme();
-  const { history, appendMessageToHistory } = useComposerStore(state => ({
-    history: state.history,
-    appendMessageToHistory: state.appendMessageToHistory,
-  }), shallow);
-  const { chatModelId, tokenCount: conversationTokenCount } = useActiveConfiguration();
+  const { history, appendMessageToHistory } = useComposerStore(state => ({ history: state.history, appendMessageToHistory: state.appendMessageToHistory }), shallow);
+  const { assistantTyping, chatModelId, tokenCount: conversationTokenCount } = useConversationPartial(props.conversationId);
+  const stopTyping = useChatStore(state => state.stopTyping);
   const modelMaxResponseTokens = useSettingsStore(state => state.modelMaxResponseTokens);
 
   // derived state
@@ -120,16 +124,16 @@ export function Composer(props: { disableSend: boolean; isDeveloperMode: boolean
     const text = (composeText || '').trim();
     if (text.length) {
       setComposeText('');
-      props.sendMessage(text, null);
+      props.sendMessage(props.conversationId, text);
       appendMessageToHistory(text);
     }
   };
 
-  const handleStopClicked = () => props.stopGeneration();
+  const handleStopClicked = () => stopTyping(props.conversationId);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
-      if (!props.disableSend)
+      if (!assistantTyping)
         handleSendClicked();
       e.preventDefault();
     }
@@ -300,169 +304,173 @@ export function Composer(props: { disableSend: boolean; isDeveloperMode: boolean
 
 
   return (
-    <Grid container spacing={{ xs: 1, md: 2 }}>
+    <Box sx={props.sx}>
+      <Grid container spacing={{ xs: 1, md: 2 }}>
 
-      {/* Left pane (buttons and Textarea) */}
-      <Grid xs={12} md={9}><Stack direction='row' spacing={{ xs: 1, md: 2 }}>
+        {/* Left pane (buttons and Textarea) */}
+        <Grid xs={12} md={9}><Stack direction='row' spacing={{ xs: 1, md: 2 }}>
 
-        {/* Vertical Buttons Bar */}
-        <Stack>
+          {/* Vertical Buttons Bar */}
+          <Stack>
 
-          {/*<Typography level='body3' sx={{mb: 2}}>Context</Typography>*/}
+            {/*<Typography level='body3' sx={{mb: 2}}>Context</Typography>*/}
 
-          <IconButton variant='plain' color='neutral' onClick={handleShowFilePicker} sx={{ ...hideOnDesktop }}>
-            <UploadFileIcon />
-          </IconButton>
-          <Tooltip
-            variant='solid' placement='top-start'
-            title={attachFileLegend}>
-            <Button fullWidth variant='plain' color='neutral' onClick={handleShowFilePicker} startDecorator={<UploadFileIcon />}
-                    sx={{ ...hideOnMobile, justifyContent: 'flex-start' }}>
-              Attach
-            </Button>
-          </Tooltip>
-
-          <Box sx={{ mt: { xs: 1, md: 2 } }} />
-
-          <IconButton variant='plain' color='neutral' onClick={handlePasteFromClipboard} sx={{ ...hideOnDesktop }}>
-            <ContentPasteGoIcon />
-          </IconButton>
-          <Tooltip
-            variant='solid' placement='top-start'
-            title={pasteClipboardLegend}>
-            <Button fullWidth variant='plain' color='neutral' startDecorator={<ContentPasteGoIcon />} onClick={handlePasteFromClipboard}
-                    sx={{ ...hideOnMobile, justifyContent: 'flex-start' }}>
-              {props.isDeveloperMode ? 'Paste code' : 'Paste'}
-            </Button>
-          </Tooltip>
-
-          {isSpeechEnabled && <Box sx={{ mt: { xs: 1, md: 2 }, ...hideOnDesktop }}>
-            <IconButton variant={micVariant} color={micColor} onClick={handleMicClicked}>
-              <MicIcon />
+            <IconButton variant='plain' color='neutral' onClick={handleShowFilePicker} sx={{ ...hideOnDesktop }}>
+              <UploadFileIcon />
             </IconButton>
-          </Box>}
-
-          <input type='file' multiple hidden ref={attachmentFileInputRef} onChange={handleLoadFile} />
-
-        </Stack>
-
-        {/* Edit box, with Drop overlay */}
-        <Box sx={{ flexGrow: 1, position: 'relative' }}>
-
-          <Textarea
-            variant='outlined' autoFocus placeholder={textPlaceholder}
-            minRows={4} maxRows={12}
-            onKeyDown={handleKeyPress}
-            onDragEnter={handleMessageDragEnter}
-            value={composeText} onChange={(e) => setComposeText(e.target.value)}
-            slotProps={{
-              textarea: {
-                sx: {
-                  ...(isSpeechEnabled ? { pr: { md: 5 } } : {}),
-                },
-              },
-            }}
-            sx={{
-              background: theme.vars.palette.background.level1,
-              fontSize: '16px',
-              lineHeight: 1.75,
-            }} />
-
-          <TokenBadge directTokens={directTokens} indirectTokens={indirectTokens} tokenLimit={tokenLimit} absoluteBottomRight />
-
-          <Card
-            color='primary' invertedColors variant='soft'
-            sx={{
-              display: isDragging ? 'flex' : 'none',
-              position: 'absolute', bottom: 0, left: 0, right: 0, top: 0,
-              alignItems: 'center', justifyContent: 'space-evenly',
-              border: '2px dashed',
-              zIndex: 10,
-            }}
-            onDragLeave={handleOverlayDragLeave}
-            onDragOver={handleOverlayDragOver}
-            onDrop={handleOverlayDrop}>
-            <PanToolIcon sx={{ width: 40, height: 40, pointerEvents: 'none' }} />
-            <Typography level='body2' sx={{ pointerEvents: 'none' }}>
-              I will hold on to this for you
-            </Typography>
-          </Card>
-
-          {isSpeechEnabled && (
-            <IconButton
-              variant={micVariant} color={micColor}
-              onClick={handleMicClicked}
-              sx={{
-                ...hideOnMobile,
-                position: 'absolute',
-                top: 0, right: 0,
-                margin: 1, // 8px
-              }}>
-              <MicIcon />
-            </IconButton>
-          )}
-        </Box>
-
-      </Stack></Grid>
-
-      {/* Send pane */}
-      <Grid xs={12} md={3}>
-        <Stack spacing={2}>
-
-          <Box sx={{ display: 'flex', flexDirection: 'row' }}>
-
-            {/* [mobile-only] History arrow */}
-            {history.length > 0 && (
-              <IconButton variant='plain' color='neutral' onClick={showHistory} sx={{ ...hideOnDesktop, mr: { xs: 1, md: 2 } }}>
-                <KeyboardArrowUpIcon />
-              </IconButton>
-            )}
-
-            {/* Send / Stop */}
-            <Button fullWidth variant={props.disableSend ? 'soft' : 'solid'} color='primary'
-                    onClick={props.disableSend ? handleStopClicked : handleSendClicked}
-                    endDecorator={props.disableSend ? <StopOutlinedIcon /> : <TelegramIcon />}>
-              {props.disableSend ? 'Stop' : 'Chat'}
-            </Button>
-          </Box>
-
-          {/* [desktop-only] row with History button */}
-          <Stack direction='row' spacing={1} sx={{ ...hideOnMobile, flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'flex-end' }}>
-            {history.length > 0 && (
-              <Button fullWidth variant='plain' color='neutral' startDecorator={<KeyboardArrowUpIcon />} onClick={showHistory}>
-                History
+            <Tooltip
+              variant='solid' placement='top-start'
+              title={attachFileLegend}>
+              <Button fullWidth variant='plain' color='neutral' onClick={handleShowFilePicker} startDecorator={<UploadFileIcon />}
+                      sx={{ ...hideOnMobile, justifyContent: 'flex-start' }}>
+                Attach
               </Button>
-            )}
+            </Tooltip>
+
+            <Box sx={{ mt: { xs: 1, md: 2 } }} />
+
+            <IconButton variant='plain' color='neutral' onClick={handlePasteFromClipboard} sx={{ ...hideOnDesktop }}>
+              <ContentPasteGoIcon />
+            </IconButton>
+            <Tooltip
+              variant='solid' placement='top-start'
+              title={pasteClipboardLegend}>
+              <Button fullWidth variant='plain' color='neutral' startDecorator={<ContentPasteGoIcon />} onClick={handlePasteFromClipboard}
+                      sx={{ ...hideOnMobile, justifyContent: 'flex-start' }}>
+                {props.isDeveloperMode ? 'Paste code' : 'Paste'}
+              </Button>
+            </Tooltip>
+
+            {isSpeechEnabled && <Box sx={{ mt: { xs: 1, md: 2 }, ...hideOnDesktop }}>
+              <IconButton variant={micVariant} color={micColor} onClick={handleMicClicked}>
+                <MicIcon />
+              </IconButton>
+            </Box>}
+
+            <input type='file' multiple hidden ref={attachmentFileInputRef} onChange={handleLoadFile} />
+
           </Stack>
 
-        </Stack>
+          {/* Edit box, with Drop overlay */}
+          <Box sx={{ flexGrow: 1, position: 'relative' }}>
+
+            <Textarea
+              variant='outlined' autoFocus placeholder={textPlaceholder}
+              minRows={4} maxRows={12}
+              onKeyDown={handleKeyPress}
+              onDragEnter={handleMessageDragEnter}
+              value={composeText} onChange={(e) => setComposeText(e.target.value)}
+              slotProps={{
+                textarea: {
+                  sx: {
+                    ...(isSpeechEnabled ? { pr: { md: 5 } } : {}),
+                  },
+                },
+              }}
+              sx={{
+                background: theme.vars.palette.background.level1,
+                fontSize: '16px',
+                lineHeight: 1.75,
+              }} />
+
+            <TokenBadge directTokens={directTokens} indirectTokens={indirectTokens} tokenLimit={tokenLimit} absoluteBottomRight />
+
+            <Card
+              color='primary' invertedColors variant='soft'
+              sx={{
+                display: isDragging ? 'flex' : 'none',
+                position: 'absolute', bottom: 0, left: 0, right: 0, top: 0,
+                alignItems: 'center', justifyContent: 'space-evenly',
+                border: '2px dashed',
+                zIndex: 10,
+              }}
+              onDragLeave={handleOverlayDragLeave}
+              onDragOver={handleOverlayDragOver}
+              onDrop={handleOverlayDrop}>
+              <PanToolIcon sx={{ width: 40, height: 40, pointerEvents: 'none' }} />
+              <Typography level='body2' sx={{ pointerEvents: 'none' }}>
+                I will hold on to this for you
+              </Typography>
+            </Card>
+
+            {isSpeechEnabled && (
+              <IconButton
+                variant={micVariant} color={micColor}
+                onClick={handleMicClicked}
+                sx={{
+                  ...hideOnMobile,
+                  position: 'absolute',
+                  top: 0, right: 0,
+                  margin: 1, // 8px
+                }}>
+                <MicIcon />
+              </IconButton>
+            )}
+          </Box>
+
+        </Stack></Grid>
+
+        {/* Send pane */}
+        <Grid xs={12} md={3}>
+          <Stack spacing={2}>
+
+            <Box sx={{ display: 'flex', flexDirection: 'row' }}>
+
+              {/* [mobile-only] History arrow */}
+              {history.length > 0 && (
+                <IconButton variant='plain' color='neutral' onClick={showHistory} sx={{ ...hideOnDesktop, mr: { xs: 1, md: 2 } }}>
+                  <KeyboardArrowUpIcon />
+                </IconButton>
+              )}
+
+              {/* Send / Stop */}
+              {assistantTyping
+                ? <Button fullWidth variant='soft' color='primary' onClick={handleStopClicked} endDecorator={<StopOutlinedIcon />}>
+                  Stop
+                </Button>
+                : <Button fullWidth variant='solid' color='primary' onClick={handleSendClicked} endDecorator={<TelegramIcon />}>
+                  Chat
+                </Button>}
+            </Box>
+
+            {/* [desktop-only] row with History button */}
+            <Stack direction='row' spacing={1} sx={{ ...hideOnMobile, flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'flex-end' }}>
+              {history.length > 0 && (
+                <Button fullWidth variant='plain' color='neutral' startDecorator={<KeyboardArrowUpIcon />} onClick={showHistory}>
+                  History
+                </Button>
+              )}
+            </Stack>
+
+          </Stack>
+        </Grid>
+
+        {/* History menu with all the line items (only if shown) */}
+        {!!historyAnchor && (
+          <Menu
+            variant='plain' color='neutral' size='md' placement='top-end' sx={{ minWidth: 320 }}
+            open anchorEl={historyAnchor} onClose={hideHistory}>
+            <MenuItem color='neutral' selected>Reuse messages 💬</MenuItem>
+            <ListDivider />
+            {history.map((item, index) => (
+              <MenuItem key={'compose-history-' + index} onClick={() => pasteFromHistory(item.text)}>
+                {item.count > 1 && <Typography level='body2' color='neutral' sx={{ mr: 1 }}>({item.count})</Typography>}
+                {item.text.length > 60 ? item.text.slice(0, 58) + '...' : item.text}
+              </MenuItem>
+            ))}
+            {/*<ListDivider /><MenuItem><ListItemDecorator><ClearIcon /></ListItemDecorator>Clear</MenuItem>*/}
+          </Menu>
+        )}
+
+        {/* Content reducer modal */}
+        {reducerText?.length >= 1 &&
+          <ContentReducerModal
+            initialText={reducerText} initialTokens={reducerTextTokens} tokenLimit={remainingTokens} chatModelId={chatModelId}
+            onReducedText={handleContentReducerText} onClose={handleContentReducerClose}
+          />
+        }
+
       </Grid>
-
-      {/* History menu with all the line items (only if shown) */}
-      {!!historyAnchor && (
-        <Menu
-          variant='plain' color='neutral' size='md' placement='top-end' sx={{ minWidth: 320 }}
-          open anchorEl={historyAnchor} onClose={hideHistory}>
-          <MenuItem color='neutral' selected>Reuse messages 💬</MenuItem>
-          <ListDivider />
-          {history.map((item, index) => (
-            <MenuItem key={'compose-history-' + index} onClick={() => pasteFromHistory(item.text)}>
-              {item.count > 1 && <Typography level='body2' color='neutral' sx={{ mr: 1 }}>({item.count})</Typography>}
-              {item.text.length > 60 ? item.text.slice(0, 58) + '...' : item.text}
-            </MenuItem>
-          ))}
-          {/*<ListDivider /><MenuItem><ListItemDecorator><ClearIcon /></ListItemDecorator>Clear</MenuItem>*/}
-        </Menu>
-      )}
-
-      {/* Content reducer modal */}
-      {reducerText?.length >= 1 &&
-        <ContentReducerModal
-          initialText={reducerText} initialTokens={reducerTextTokens} tokenLimit={remainingTokens} chatModelId={chatModelId}
-          onReducedText={handleContentReducerText} onClose={handleContentReducerClose}
-        />
-      }
-
-    </Grid>
+    </Box>
   );
 }
