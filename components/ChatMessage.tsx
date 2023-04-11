@@ -26,6 +26,7 @@ import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 
 import { DMessage } from '@/lib/store-chats';
 import { Link } from '@/components/util/Link';
+import { SystemPurposeId, SystemPurposes } from '@/lib/data';
 import { cssRainbowColorKeyframes } from '@/lib/theme';
 import { prettyBaseModel } from '@/lib/publish';
 import { useSettingsStore } from '@/lib/store-settings';
@@ -237,14 +238,14 @@ function explainErrorInMessage(text: string, isAssistant: boolean, modelId?: str
  * or collapsing long user messages.
  *
  */
-export function ChatMessage(props: { message: DMessage, disableSend: boolean, lastMessage: boolean, onDelete: () => void, onEdit: (text: string) => void, onRunAgain: () => void }) {
+export function ChatMessage(props: { message: DMessage, isLast: boolean, onMessageDelete: () => void, onMessageEdit: (text: string) => void, onMessageRunFrom: () => void }) {
   const {
     text: messageText,
     sender: messageSender,
     avatar: messageAvatar,
     typing: messageTyping,
     role: messageRole,
-    // purposeId: messagePurposeId,
+    purposeId: messagePurposeId,
     originLLM: messageModelId,
     // tokenCount: messageTokenCount,
     updated: messageUpdated,
@@ -283,11 +284,9 @@ export function ChatMessage(props: { message: DMessage, disableSend: boolean, la
   };
 
   const handleMenuRunAgain = (e: React.MouseEvent) => {
-    if (!props.disableSend) {
-      props.onRunAgain();
-      e.preventDefault();
-      closeOperationsMenu();
-    }
+    e.preventDefault();
+    props.onMessageRunFrom();
+    closeOperationsMenu();
   };
 
 
@@ -298,14 +297,14 @@ export function ChatMessage(props: { message: DMessage, disableSend: boolean, la
     if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       setIsEditing(false);
-      props.onEdit(editedText);
+      props.onMessageEdit(editedText);
     }
   };
 
   const handleEditBlur = () => {
     setIsEditing(false);
     if (editedText !== messageText && editedText?.trim())
-      props.onEdit(editedText);
+      props.onMessageEdit(editedText);
   };
 
 
@@ -355,12 +354,25 @@ export function ChatMessage(props: { message: DMessage, disableSend: boolean, la
                 borderRadius: 8,
               }}
             />;
+          const symbol = SystemPurposes[messagePurposeId as SystemPurposeId]?.symbol;
+          if (symbol)
+            return <Box
+              sx={{
+                fontSize: '24px',
+                textAlign: 'center',
+                width: '100%',
+                height: 40,
+                lineHeight: '40px',
+              }}
+            >
+              {symbol}
+            </Box>;
           return <SmartToyOutlinedIcon sx={{ width: 40, height: 40 }} />; // https://mui.com/static/images/avatar/2.jpg
         case 'user':
           return <Face6Icon sx={{ width: 40, height: 40 }} />;            // https://www.svgrepo.com/show/306500/openai.svg
       }
       return <Avatar alt={messageSender} />;
-    }, [messageAvatar, messageRole, messageSender, messageTyping, showAvatars],
+    }, [messageAvatar, messageRole, messagePurposeId, messageSender, messageTyping, showAvatars],
   );
 
   // text box css
@@ -494,12 +506,12 @@ export function ChatMessage(props: { message: DMessage, disableSend: boolean, la
           </MenuItem>
           <ListDivider />
           {fromUser && (
-            <MenuItem onClick={handleMenuRunAgain} disabled={props.disableSend}>
+            <MenuItem onClick={handleMenuRunAgain}>
               <ListItemDecorator><FastForwardIcon /></ListItemDecorator>
-              {props.lastMessage ? 'Run Again' : 'Restart From Here'}
+              {props.isLast ? 'Run Again' : 'Restart From Here'}
             </MenuItem>
           )}
-          <MenuItem onClick={props.onDelete} disabled={false /*fromSystem*/}>
+          <MenuItem onClick={props.onMessageDelete} disabled={false /*fromSystem*/}>
             <ListItemDecorator><ClearIcon /></ListItemDecorator>
             Delete
           </MenuItem>
