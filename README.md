@@ -56,8 +56,7 @@ was [466a36](https://github.com/enricoros/nextjs-chatgpt-app/tree/466a3667a48060
 - [x] Real-time streaming of AI responses ⚡
 - [x] Switch API hosts to track quality, including [Helicone](https://www.helicone.ai/) 📈
 - [x] Dark mode 🌙 - Wide mode ⛶
-- [ ] [~~Code execution for TypeScript, JavaScript, and
-  HTML~~](https://github.com/enricoros/nextjs-chatgpt-app/commit/f678a0d463d5e9cf0733f577e11bd612b7902d89) 🖥️
+- [x] Code execution for TypeScript, JavaScript, and HTML code blocks 🖥️
 - [ ] Add your own feature 🚀
 - [ ] Send a PR 🙌
 
