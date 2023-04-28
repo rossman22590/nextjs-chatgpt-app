@@ -11,6 +11,7 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import MicIcon from '@mui/icons-material/Mic';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import StopOutlinedIcon from '@mui/icons-material/StopOutlined';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -29,8 +30,7 @@ import { ContentReducerModal } from './ContentReducerModal';
 import { TokenBadge } from './TokenBadge';
 import { TokenProgressbar } from './TokenProgressbar';
 import { hideOnDesktop, hideOnMobile } from '@/common/theme';
-import { isValidProdiaApiKey, requireUserKeyProdia } from '@/modules/prodia/prodia.client';
-
+// import { isValidProdiaApiKey, requireUserKeyProdia } from '@/modules/prodia/prodia.client';
 
 
 /// Text template helpers
@@ -393,11 +393,13 @@ export function Composer(props: {
     console.log('Unhandled Drop event. Contents: ', e.dataTransfer.types.map(t => `${t}: ${e.dataTransfer.getData(t)}`));
   };
 
-  const prodiaApiKey = isValidProdiaApiKey(useSettingsStore(state => state.prodiaApiKey));
-  const isProdiaConfigured = !requireUserKeyProdia || prodiaApiKey;
+  // const prodiaApiKey = isValidProdiaApiKey(useSettingsStore(state => state.prodiaApiKey));
+  // const isProdiaConfigured = !requireUserKeyProdia || prodiaApiKey;
   const textPlaceholder: string = props.isDeveloperMode
-    ? 'Tell me what you need, add drop source files...'
-    : isProdiaConfigured ? 'Type, /imagine, or drop text files...' : 'Type a message, or drop text files...';
+    ? 'Tell me what you need, and drop source files...'
+    : /*isProdiaConfigured ?*/ 'Chat · /react · /imagine · drop text files...' /*: 'Chat · /react · drop text files...'*/;
+
+  const isReAct = sendModeId === 'react';
 
   return (
     <Box sx={props.sx}>
@@ -451,10 +453,12 @@ export function Composer(props: {
             <Box sx={{ position: 'relative' }}>
 
               <Textarea
-                variant='outlined' autoFocus placeholder={textPlaceholder}
+                variant='outlined' color={isReAct ? 'info' : 'neutral'}
+                autoFocus
                 minRows={4} maxRows={12}
                 onKeyDown={handleKeyPress}
                 onDragEnter={handleMessageDragEnter}
+                placeholder={textPlaceholder}
                 value={composeText} onChange={(e) => setComposeText(e.target.value)}
                 slotProps={{
                   textarea: {
@@ -515,11 +519,11 @@ export function Composer(props: {
 
               {/* Send / Stop */}
               {assistantTyping
-                ? <Button fullWidth variant='soft' color='primary' disabled={!props.conversationId} onClick={handleStopClicked} endDecorator={<StopOutlinedIcon />}>
+                ? <Button fullWidth variant='soft' color={isReAct ? 'info' : 'primary'} disabled={!props.conversationId} onClick={handleStopClicked} endDecorator={<StopOutlinedIcon />}>
                   Stop
                 </Button>
-                : <Button fullWidth variant='solid' color={sendModeId === 'react' ? 'warning' : 'primary'} disabled={!props.conversationId} onClick={handleSendClicked} onDoubleClick={handleShowSendMode} endDecorator={<TelegramIcon />}>
-                  {sendModeId === 'react' ? 'ReAct' : 'Chat'}
+                : <Button fullWidth variant='solid' color={isReAct ? 'info' : 'primary'} disabled={!props.conversationId} onClick={handleSendClicked} onDoubleClick={handleShowSendMode} endDecorator={isReAct ? <PsychologyIcon /> : <TelegramIcon />}>
+                  {isReAct ? 'ReAct' : 'Chat'}
                 </Button>}
             </Box>
 
