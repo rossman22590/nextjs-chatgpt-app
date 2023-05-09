@@ -5,7 +5,7 @@ import { OpenAI } from '@/modules/openai/openai.types';
 import { openaiPostResponse, toApiChatRequest, toWireCompletionRequest } from '@/modules/openai/openai.server';
 
 
-async function chatStreamRepeater(input: OpenAI.API.Chat.Request, signal: AbortSignal): Promise<ReadableStream> {
+async function chatStreamRepeater(api: OpenAI.API.Configuration, rest: Omit<OpenAI.API.Chat.Request, 'api'>, signal: AbortSignal): Promise<ReadableStream> {
 
   // Handle the abort event when the connection is closed by the client
   signal.addEventListener('abort', () => {
@@ -17,8 +17,8 @@ async function chatStreamRepeater(input: OpenAI.API.Chat.Request, signal: AbortS
 
   let upstreamResponse: Response;
   try {
-    const request: OpenAI.Wire.Chat.CompletionRequest = toWireCompletionRequest(input, true);
-    upstreamResponse = await openaiPostResponse(input.api, '/v1/chat/completions', request, signal);
+    const request: OpenAI.Wire.Chat.CompletionRequest = toWireCompletionRequest(rest, true);
+    upstreamResponse = await openaiPostResponse(api, '/v1/chat/completions', request, signal);
   } catch (error: any) {
     console.log(error);
     const message = '[OpenAI Issue] ' + (error?.message || typeof error === 'string' ? error : JSON.stringify(error)) + (error?.cause ? ' · ' + error.cause : '');
@@ -54,7 +54,7 @@ async function chatStreamRepeater(input: OpenAI.API.Chat.Request, signal: AbortS
         const json: OpenAI.Wire.Chat.CompletionResponseChunked = JSON.parse(event.data);
 
         // ignore any 'role' delta update
-        if (json.choices[0].delta?.role)
+        if (json.choices[0].delta?.role && !json.choices[0].delta?.content)
           return;
 
         // stringify and send the first packet as a JSON object
@@ -69,6 +69,12 @@ async function chatStreamRepeater(input: OpenAI.API.Chat.Request, signal: AbortS
         // transmit the text stream
         const text = json.choices[0].delta?.content || '';
         controller.enqueue(encoder.encode(text));
+
+        // Workaround: LocalAI doesn't send the [DONE] event, but similarly to OpenAI, it sends a "finish_reason" delta update
+        if (json.choices[0].finish_reason) {
+          controller.close();
+          return;
+        }
 
       } catch (error) {
         // maybe parse error
@@ -94,8 +100,8 @@ async function chatStreamRepeater(input: OpenAI.API.Chat.Request, signal: AbortS
 export default async function handler(req: NextRequest): Promise<Response> {
   try {
     const requestBodyJson = await req.json();
-    const chatRequest: OpenAI.API.Chat.Request = await toApiChatRequest(requestBodyJson);
-    const chatResponseStream: ReadableStream = await chatStreamRepeater(chatRequest, req.signal);
+    const { api, ...rest } = await toApiChatRequest(requestBodyJson);
+    const chatResponseStream: ReadableStream = await chatStreamRepeater(api, rest, req.signal);
     return new NextResponse(chatResponseStream);
   } catch (error: any) {
     if (error.name === 'AbortError') {
