@@ -1,4 +1,4 @@
-export type SystemPurposeId = 'Catalyst' | 'Designer' | 'ContentMode' | 'Custom' | 'Developer' | 'Executive' | 'Generic' | 'EmailAI' | 'TutorAI' | 'AssistantAI' | 'AdviceAI' | 'CareerAI' | 'Scientist' | 'Translator' | 'LegalAI' | 'FinancialAI' | 'HealthAI' | 'TravelAI' | 'CookingAI' | 'FitnessAI' | 'RelationshipAI' | 'ParentingAI' | 'MeditationAI' | 'ShoppingAI' | 'GamingAI' | 'HomeImprovementAI' | 'MusicAI' | 'MovieAI' | 'FashionAI' | 'PetCareAI' | 'GardeningAI' | 'AutomotiveAI' | 'JournalAI';
+export type SystemPurposeId = 'Catalyst' | 'Designer' | 'ContentMode' | 'Custom' | 'Developer' | 'Executive' | 'Generic' | 'EmailAI' | 'TutorAI' | 'AssistantAI' | 'AdviceAI' | 'CareerAI' | 'Scientist' | 'Translator' | 'LegalAI' | 'FinancialAI' | 'HealthAI' | 'TravelAI' | 'CookingAI' | 'FitnessAI' | 'Imagine' | 'ParentingAI' | 'MeditationAI' | 'ShoppingAI' | 'GamingAI' | 'HomeImprovementAI' | 'MusicAI' | 'MovieAI' | 'FashionAI' | 'PetCareAI' | 'GardeningAI' | 'AutomotiveAI' | 'JournalAI';
 
 export const defaultSystemPurposeId: SystemPurposeId = 'Generic';
 
@@ -119,11 +119,11 @@ export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
     symbol: '🏋️',
     examples: ['How do I start working out?', 'What is a good workout routine?', 'How can I improve my running?', 'How do I track my progress?'],
   },
-  RelationshipAI: {
-    title: 'Relationship AI',
-    description: 'Relationship advice',
-    systemMessage: 'I am a relationship advice AI, providing guidance on building and maintaining healthy relationships, resolving conflicts, and improving communication. Share your relationship concerns.',
-    symbol: '💕',
+  Imagine: {
+    title: 'Imagine',
+    description: 'Generate better prompts',
+    systemMessage: 'I want you to act as a prompt generator for Midjourneys artificial intelligence program. Your job is to provide detailed and creative descriptions that will inspire unique and interesting images from the AI. Keep in mind that the AI is capable of understanding a wide range of language and can interpret abstract concepts, so feel free to be as imaginative and descriptive as possible. For example, you could describe a scene from a futuristic city, or a surreal landscape filled with strange creatures. The more detailed and imaginative your description, the more interesting the resulting image will be. Here is your first prompt: A field of wildflowers stretches out as far as the eye can see, each one a different color and shape. In the distance, a massive tree towers over the landscape, its branches reaching up to the sky like tentacles',
+    symbol: '🚀',
     examples: ['How can I improve communication in my relationship?', 'How do I resolve conflicts?', 'What are the signs of a healthy relationship?', 'How can I build trust?'],
   },
   ParentingAI: {
