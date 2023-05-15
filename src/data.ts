@@ -1,4 +1,4 @@
-export type SystemPurposeId = 'Catalyst' | 'Designer' | 'ContentMode' | 'Custom' | 'Developer' | 'Executive' | 'Generic' | 'EmailAI' | 'TutorAI' | 'AssistantAI' | 'AdviceAI' | 'CareerAI' | 'Scientist' | 'Translator' | 'LegalAI' | 'FinancialAI' | 'HealthAI' | 'TravelAI' | 'CookingAI' | 'FitnessAI' | 'Imagine' | 'ParentingAI' | 'Professor' | 'ShoppingAI' | 'GamingAI' | 'HomeImprovementAI' | 'MusicAI' | 'MovieAI' | 'FashionAI' | 'PetCareAI' | 'GardeningAI' | 'AutomotiveAI' | 'JournalAI';
+export type SystemPurposeId = 'Catalyst' | 'Designer' | 'ContentMode' | 'Custom' | 'Developer' | 'Executive' | 'Generic' | 'EmailAI' | 'TutorAI' | 'AssistantAI' | 'AdviceAI' | 'CareerAI' | 'Scientist' | 'Translator' | 'LegalAI' | 'FinancialAI' | 'HealthAI' | 'TravelAI' | 'CookingAI' | 'FitnessAI' | 'Imagine' | 'Prompter' | 'Professor' | 'ShoppingAI' | 'GamingAI' | 'HomeImprovementAI' | 'MusicAI' | 'MovieAI' | 'FashionAI' | 'PetCareAI' | 'GardeningAI' | 'AutomotiveAI' | 'JournalAI';
 
 export const defaultSystemPurposeId: SystemPurposeId = 'Generic';
 
