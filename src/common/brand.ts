@@ -10,15 +10,15 @@ export const Brand = {
   // Name: 'big-AGI',
   // UpperName: 'BIG-AGI',
   Title: {
-    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'big-AGI',
+    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'AI Tutor+',
   },
   Meta: {
-    SiteName: 'big-AGI',
+    SiteName: 'AI Tutor+',
     Title: 'big-AGI: Personal AGI App',
     Description: 'big-AGI is a free, open-source project to build a general artificial intelligence (AGI) that can solve any problem.',
     Keywords: 'artificial general intelligence, agi, openai, gpt-4, ai personas, code execution, pdf import, voice i/o, ai chat, artificial intelligence',
     ThemeColor: '#434356',
-    TwitterSite: '@bigagienergy',
+    TwitterSite: '@tsi_org',
   },
   URIs: {
     // Slug: 'big-agi',
