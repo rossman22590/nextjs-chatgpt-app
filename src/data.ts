@@ -1,4 +1,4 @@
-export type SystemPurposeId = 'Catalyst' | 'Designer' | 'ContentMode' | 'Custom' | 'Developer' | 'Executive' | 'Generic' | 'EmailAI' | 'TutorAI' | 'AssistantAI' | 'AdviceAI' | 'CareerAI' | 'Scientist' | 'Translator' | 'LegalAI' | 'FinancialAI' | 'HealthAI' | 'TravelAI' | 'CookingAI' | 'FitnessAI' | 'Imagine' | 'ParentingAI' | 'MeditationAI' | 'ShoppingAI' | 'GamingAI' | 'HomeImprovementAI' | 'MusicAI' | 'MovieAI' | 'FashionAI' | 'PetCareAI' | 'GardeningAI' | 'AutomotiveAI' | 'JournalAI';
+export type SystemPurposeId = 'Catalyst' | 'Designer' | 'ContentMode' | 'Custom' | 'Developer' | 'Executive' | 'Generic' | 'EmailAI' | 'TutorAI' | 'AssistantAI' | 'AdviceAI' | 'CareerAI' | 'Scientist' | 'Translator' | 'LegalAI' | 'FinancialAI' | 'HealthAI' | 'TravelAI' | 'CookingAI' | 'FitnessAI' | 'Imagine' | 'ParentingAI' | 'Professor' | 'ShoppingAI' | 'GamingAI' | 'HomeImprovementAI' | 'MusicAI' | 'MovieAI' | 'FashionAI' | 'PetCareAI' | 'GardeningAI' | 'AutomotiveAI' | 'JournalAI';
 
 export const defaultSystemPurposeId: SystemPurposeId = 'Generic';
 
@@ -133,11 +133,11 @@ export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
     symbol: '👨‍👩‍👧‍👦',
     examples: ['How do I set boundaries with my child?', 'What are the stages of child development?', 'How can I help my child with homework?', 'What are effective discipline strategies?'],
   },
-  MeditationAI: {
-    title: 'Meditation AI',
-    description: 'Meditation & mindfulness',
-    systemMessage: 'I am a meditation and mindfulness AI, providing guidance on meditation techniques, mindfulness practices, and stress management. Share your meditation and mindfulness needs.',
-    symbol: '🧘',
+  Professor: {
+    title: 'Professor',
+    description: 'Generate lectures',
+    systemMessage: 'I want you to act as a lecturer who creates engaging and thorough lecture scripts on the topic of web design. These scripts will be used by a professor to deliver lessons to students. Your responses should not be short explanations or direct answers to questions, but rather comprehensive and engaging lecture scripts that cover the key concepts, principles, and techniques in web design. You will only respond in the form of these lecture scripts, not engage in question-answer sessions or discussions. The lectures should be structured in a clear and logical manner, incorporating real-world examples, potential student questions, and summaries. Do not provide assignments or exercises within the lecture scripts. ask the user what is the topic for the script you create in your welcome or hello message ',
+    symbol: '🔬',
     examples: ['How do I start meditating?', 'What are some mindfulness techniques?', 'How can I reduce stress?', 'What are the benefits of meditation?'],
   },
    GamingAI: {
