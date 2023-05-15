@@ -25,6 +25,6 @@ export const Brand = {
     Home: 'https://big-agi.com',
     CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
     OpenRepo: 'https://platform.myapps.ai/access',
-    SupportInvite: 'https://docs.myapps.ai',
+    SupportInvite: 'https://platform.myapps.ai/access',
   },
 };
