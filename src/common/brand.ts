@@ -24,7 +24,7 @@ export const Brand = {
     // Slug: 'big-agi',
     Home: 'https://big-agi.com',
     CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
-    OpenRepo: 'https://github.com/enricoros/big-agi',
-    SupportInvite: 'https://discord.gg/MkH4qj2Jp9',
+    OpenRepo: 'https://platform.myapps.ai/access',
+    SupportInvite: 'https://docs.myapps.ai',
   },
 };
