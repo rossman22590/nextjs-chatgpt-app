@@ -23,6 +23,8 @@ const HARDCODED_MODELS: Prodia.API.Models.Response = {
     { id: 'dreamshaper_5BakedVae.safetensors [a3fbf318]', label: 'Dreamshaper 5' },
     { id: 'revAnimated_v122.safetensors [3f4fefd9]', label: 'ReV Animated V1.2.2' },
     { id: 'meinamix_meinaV9.safetensors [2ec66ab0]', label: 'MeinaMix Meina V9' },
+    { id: 'lyriel_v15.safetensors [65d547c5', label: 'Lyriel' },
+    { id: 'Realistic_Vision_V2.0.safetensors [79587710]', label: 'Realistic Vision' },
   ],
 };
 
