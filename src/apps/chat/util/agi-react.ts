@@ -34,7 +34,7 @@ export const runReActUpdatingState = async (conversationId: string, question: st
 
     // react loop
     const agent = new Agent();
-    const reactResult = await agent.reAct(question, assistantModelId, 5,
+    const reactResult = await agent.reAct(question, assistantModelId, 10,
       logToEphemeral,
       (state: object) => updateEphemeralState(conversationId, ephemeral.id, state),
     );
