@@ -5,9 +5,6 @@ ENV PATH $PATH:/usr/src/app/node_modules/.bin
 
 WORKDIR /usr/src/app
 
-# Create a directory for data
-RUN mkdir -p /usr/src/app/data
-
 COPY package*.json ./
 
 # CI and release builds should use npm ci to fully respect the lockfile.
@@ -22,7 +19,7 @@ FROM test-target as build-target
 ENV NODE_ENV=production
 
 # Use build tools, installed as development packages, to produce a release build.
-RUN npm run build
+RUN npm run build -- --no-open
 
 # Reduce installed packages to production-only.
 RUN npm prune --production
