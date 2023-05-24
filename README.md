@@ -1,4 +1,4 @@
-# `BIG-AGI` 🤖💬
+# `BIG-AGI` 🤖💬 
 
 Welcome to `big-AGI`, FKA `nextjs-chatgpt-app`. 👋🎉
 Personal AGI App, powered by `OpenAI GPT-4` and beyond. Designed for smart humans and super-heroes,
