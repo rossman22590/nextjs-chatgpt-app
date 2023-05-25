@@ -54,12 +54,11 @@ async function getPineconeNamespaces() {
   console.error(`getPineconeNamespaces error: ${errorMessage}`);
   throw new Error(errorMessage);
 }
-
-async function loadAndAttachFiles(files: FileList, appendToFilesArray: File[]) {
+async function loadAndAttachFiles(files: FileList, appendToFilesArray: (newFilesArray: { name: string; text: string; type: string }[]) => void) {
   // NOTE: we tried to get the common 'root prefix' of the files here, so that we could attach files with a name that's relative
   //       to the common root, but the files[].webkitRelativePath property is not providing that information
 
-  const newFilesArray = [];
+  const newFilesArray: { name: string; text: string; type: string }[] = [];
   for (let file of files) {
     let fileText = '';
     try {
@@ -78,6 +77,7 @@ async function loadAndAttachFiles(files: FileList, appendToFilesArray: File[]) {
   }
   appendToFilesArray(newFilesArray);
 }
+
 
 const attachFileLegend = (
   <Stack sx={{ p: 1, gap: 1, fontSize: '16px', fontWeight: 400 }}>
