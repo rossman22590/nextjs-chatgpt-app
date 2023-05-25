@@ -26,7 +26,7 @@ export interface State {
 export class Agent {
 
   // NOTE: this is here for demo, but the whole loop could be moved to the caller's event loop
-  async reAct(question: string, modelId: ChatModelId, maxTurns = 10, log: (...data: any[]) => void = console.log, show: (state: object) => void): Promise<string> {
+  async reAct(question: string, modelId: ChatModelId, maxTurns = 5, log: (...data: any[]) => void = console.log, show: (state: object) => void): Promise<string> {
     let i = 0;
     // TODO: to initialize with previous chat messages to provide context.
     const S: State = await this.initialize(`Question: ${question}`);

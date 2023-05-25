@@ -5,9 +5,6 @@ ENV PATH $PATH:/usr/src/app/node_modules/.bin
 
 WORKDIR /usr/src/app
 
-# Create a directory for data
-RUN mkdir -p /usr/src/app/data
-
 COPY package*.json ./
 
 # CI and release builds should use npm ci to fully respect the lockfile.

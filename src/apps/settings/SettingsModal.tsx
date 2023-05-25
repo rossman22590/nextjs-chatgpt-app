@@ -24,6 +24,12 @@ export function SettingsModal() {
   const { settingsOpen, closeSettings } = useUIStore();
   const apiKey = useSettingsStore(state => state.apiKey);
 
+  // show the Settings Dialog at startup if the API key is required but not set
+  React.useEffect(() => {
+    if (requireUserKeyOpenAI && !isValidOpenAIApiKey(apiKey))
+      useUIStore.getState().openSettings();
+  }, [apiKey]);
+
   return (
     <Modal open={settingsOpen} onClose={closeSettings}>
       <ModalOverflow>
