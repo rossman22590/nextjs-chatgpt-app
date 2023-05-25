@@ -1,4 +1,4 @@
-# PDF Upload Proof of Concept Using Langchain JS and Pinecone Vector Storage
+# PDF Upload Proof of Concept Using Langchain JS and Pinecone Vector Storage 
 
 ## Drag and Drop PDF Files into the browser
 
