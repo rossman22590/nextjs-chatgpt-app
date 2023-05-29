@@ -27,7 +27,7 @@ const HARDCODED_MODELS: Prodia.API.Models.Response = {
     { id: 'anythingV5_PrtRE.safetensors [893e49b9]', label: 'Anything v5.0' },
     { id: 'dreamshaper_6BakedVae.safetensors [114c8abb]', label: 'Dreamshaper 6' },
     { id: 'AOM3A3_orangemixs.safetensors [9600da17]', label: 'Abyss Orange v3' },
-    { id: 'shoninsBeautiful_v10.safetensors [25d8c546]]', label: 'Shonin Beautiful People' },
+    { id: 'shoninsBeautiful_v10.safetensors [25d8c546]', label: 'Shonin Beautiful People' },
   ],
 };
 
