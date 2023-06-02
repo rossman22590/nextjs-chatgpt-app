@@ -143,7 +143,7 @@ export const useSettingsStore = create<SettingsStore>()(
       elevenLabsVoiceId: '',
       setElevenLabsVoiceId: (elevenLabsVoiceId: string) => set({ elevenLabsVoiceId }),
 
-      elevenLabsAutoSpeak: 'firstLine',
+      elevenLabsAutoSpeak: 'off',
       setElevenLabsAutoSpeak: (elevenLabsAutoSpeak: 'off' | 'firstLine') => set({ elevenLabsAutoSpeak }),
 
       // Prodia Image Generation settings
