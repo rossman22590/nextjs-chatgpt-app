@@ -57,7 +57,7 @@ export function SupportMenuItem() {
         }}>
         {Brand.Meta.SiteName}
       </Box>
-      <BringTheLove text='Discord' icon={<DiscordIcon sx={{ color: iconColor }} />} link={Brand.URIs.SupportInvite} />
+      <BringTheLove text='Dashboard' icon={<DiscordIcon sx={{ color: iconColor }} />} link={Brand.URIs.SupportInvite} />
      
     </ListItem>
   );
