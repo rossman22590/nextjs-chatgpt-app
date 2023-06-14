@@ -27,3 +27,4 @@ export const Brand = {
     OpenRepo: 'https://platform.myapps.ai/access',
     SupportInvite: 'https://platform.myapps.ai/access',
   },
+}
