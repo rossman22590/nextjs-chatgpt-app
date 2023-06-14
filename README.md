@@ -1,5 +1,5 @@
 # `BIG-AGI` 🤖💬
-
+ 
 Welcome to `big-AGI` 👋 your personal AGI application
 powered by OpenAI GPT-4 and beyond. Designed for smart humans and super-heroes,
 this responsive web app comes with Personas, Drawing, Code Execution, PDF imports, Voice support,
