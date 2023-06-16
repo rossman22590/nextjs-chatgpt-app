@@ -12,7 +12,7 @@ import { Link } from '~/common/components/Link';
 import { settingsCol1Width, settingsGap } from '~/common/theme';
 
 import { DLLM, DModelSource, DModelSourceId } from '../llm.types';
-import { LLMOptionsOpenAI, normalizeOAISetup, SourceSetupOpenAI } from './vendor';
+import { LLMOptionsOpenAI, normalizeOAISetup, SourceSetupOpenAI } from './openai.vendor';
 import { OpenAI } from './openai.types';
 import { useModelsStore, useSourceSetup } from '../store-llms';
 
@@ -38,7 +38,6 @@ export function OpenAISourceSetup(props: { sourceId: DModelSourceId }) {
   const { isFetching, refetch, isError } = apiQuery.openai.listModels.useQuery({ oaiKey, oaiHost, oaiOrg, heliKey }, {
     enabled: !hasModels && shallFetchSucceed,
     onSuccess: models => {
-      console.log('OpenAI models', models);
       const llms = source ? models.map(model => openAIModelToDLLM(model, source)) : [];
       useModelsStore.getState().addLLMs(llms);
     },
@@ -170,14 +169,15 @@ const knownBases = [
 function openAIModelToDLLM(model: OpenAI.Wire.Models.ModelDescription, source: DModelSource): DLLM & { options: LLMOptionsOpenAI } {
   const base = knownBases.find(base => model.id.startsWith(base.id)) || knownBases[knownBases.length - 1];
   const suffix = model.id.slice(base.id.length).trim();
+  const hidden = !!suffix && suffix.startsWith('-03');
   return {
     id: `${source.id}-${model.id}`,
     label: base.label + (suffix ? ` (${suffix.replaceAll('-', ' ').trim()})` : ''),
     created: model.created,
     description: base.description,
-    tags: ['stream', 'chat'],
+    tags: [], // ['stream', 'chat'],
     contextTokens: base.context,
-    hidden: !!suffix,
+    hidden,
     sId: source.id,
     _source: source,
     options: {
