@@ -22,7 +22,7 @@ export const Brand = {
   },
   URIs: {
     // Slug: 'big-agi',
-    Home: 'https://big-agi.com',
+    Home: 'https://myapps.ai',
     CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
     OpenRepo: 'https://platform.myapps.ai/access',
     SupportInvite: 'https://platform.myapps.ai/access',
