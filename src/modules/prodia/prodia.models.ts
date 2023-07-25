@@ -20,7 +20,7 @@ export const HARDCODED_MODELS: { models: ProdiaModelDescription[] } = {
     { id: 'dreamlike-diffusion-1.0.safetensors [5c9fd6e0]', label: 'Dreamlike Diffusion' },
     { id: 'dreamlike-diffusion-2.0.safetensors [fdcf65e7]', label: 'Dreamlike Diffusion 2' },
     { id: 'portrait+1.0.safetensors [1400e684]', label: 'Portrait' },
-    { id: 'riffusion-model-v1.ckpt [3aafa6fe]', label: 'Riffusion' },
+    // { id: 'riffusion-model-v1.ckpt [3aafa6fe]', label: 'Riffusion' },
     { id: 'timeless-1.0.ckpt [7c4971d4]', label: 'Timeless' },
     { id: 'dreamshaper_5BakedVae.safetensors [a3fbf318]', label: 'Dreamshaper 5' },
     { id: 'revAnimated_v122.safetensors [3f4fefd9]', label: 'ReV Animated V1.2.2' },
