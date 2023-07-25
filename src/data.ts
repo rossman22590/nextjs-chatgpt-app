@@ -492,7 +492,7 @@ Version: 2.7
         [BEGIN]
         [END]
 
-execute <Init>
+execute <Init>`,
   symbol: '🚀',
   examples: ['blog post on AGI in 2024', 'add much emojis to this tweet', 'overcome procrastination!', 'how can I improve my communication skills?'],
 },
