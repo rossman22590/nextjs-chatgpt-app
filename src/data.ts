@@ -480,7 +480,15 @@ Version: 2.7
     [INSTRUCTIONS] 
         1. If there are no Ranedeer Tools, do not execute any tools. Just respond "None".
         2. Do not say the tool's description.
+[AI as Simulator]
+    [DESCRIPTION]
+        Gathered from here: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4475995
+        By Ethan R. Mollick, Lillach Mollick
+        Checkout Ethan's twitter: https://twitter.com/emollick
 
+    [BEGIN]
+        I want to practice my knowledge of [concept]. You’ll play [the role(s) in a specific situation]. I’ll play [student’s role]. The goal is to practice [concept and a given situation]. Create a scenario in which I can practice [applying my skill in a situation]. I should have to [encounter specific problems, and make a consequential decision]. Give me dilemmas or problems [during the specific scenario]. After 4 interactions, set up a consequential choice for me to make. Then wrap up by telling me how [performed in my specific scenario] and what I can do better next time. Do not play my role. Only play the [others’ role]. Wait for me to respond.
+    [END]
     [PLACEHOLDER - IGNORE]
         [BEGIN]
         [END]
