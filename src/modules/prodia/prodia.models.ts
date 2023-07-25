@@ -30,7 +30,18 @@ export const HARDCODED_MODELS: { models: ProdiaModelDescription[] } = {
     { id: 'dreamshaper_6BakedVae.safetensors [114c8abb]', label: 'Dreamshaper 6' },
     { id: 'AOM3A3_orangemixs.safetensors [9600da17]', label: 'Abyss Orange v3' },
     { id: 'shoninsBeautiful_v10.safetensors [25d8c546]', label: 'Shonin Beautiful People' },
+    // New models added below
+    { id: 'dreamshaper_7.safetensors [5cf5ae06]', label: 'Dreamshaper 7' },
+    { id: 'EimisAnimeDiffusion_V1.ckpt [4f828a15]', label: 'Eimis Anime Diffusion' },
+    { id: 'lyriel_v16.safetensors [68fceea2]', label: 'Lyriel v16' },
+    { id: 'meinamix_meinaV11.safetensors [b56ce717]', label: 'meinamix meinaV11' },
+    { id: 'portraitplus_V1.0.safetensors [1400e684]', label: 'portraitplus V1.0' },
+    { id: 'Realistic_Vision_V1.4-pruned-fp16.safetensors [8d21810b]', label: 'Realistic Vision v1.4' },
+    { id: 'Realistic_Vision_V4.0.safetensors [29a7afaa]', label: 'Realistic Vision V4.0' },
+    { id: 'Realistic_Vision_V2.0.safetensors [79587710]', label: 'Realistic Vision V2.0' },
+    { id: 'redshift_diffusion-V10.safetensors [1400e684]', label: 'redshift diffusion V10' },
   ]
     // sort by priority
     .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0)),
 };
+
