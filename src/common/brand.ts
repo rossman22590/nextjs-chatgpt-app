@@ -8,21 +8,21 @@
  */
 export const Brand = {
   Title: {
-    Base: 'big-AGI',
-    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'big-AGI',
+    Base: 'AI Tutor',
+    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'AI Tutor',
   },
   Meta: {
-    Description: 'Leading open-source AI web interface to help you learn, think, and do. AI personas, superior privacy, advanced features, and fun UX.',
-    SiteName: 'big-AGI | Harnessing AI for You',
-    ThemeColor: '#434356',
+    Description: 'Leading AI web interface to help you learn, think, and do. AI personas, superior privacy, advanced features, and fun UX.',
+    SiteName: 'AI Tutor Plus',
+    ThemeColor: '#d923b4',
     TwitterSite: '@enricoros',
   },
   URIs: {
-    Home: 'https://big-agi.com',
+    Home: 'https://myapps.ai',
     // App: 'https://get.big-agi.com',
     CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
-    OpenRepo: 'https://github.com/enricoros/big-agi',
-    SupportInvite: 'https://discord.gg/MkH4qj2Jp9',
+    OpenRepo: 'https://platform.myapps.ai/access',
+    SupportInvite: 'https://platform.myapps.ai/access',
     // Twitter: 'https://www.twitter.com/enricoros',
   },
 };
