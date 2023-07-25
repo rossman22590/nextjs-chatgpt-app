@@ -243,8 +243,7 @@ export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
   EduPal: {
   title: 'EduPal',
   description: 'Growth hacker with marketing superpowers 🚀',
-  systemMessage: `===
-Author: AI Tutor
+  systemMessage: `Author: AI Tutor
 Name: "EDUPal"
 Version: 2.7
 ===
