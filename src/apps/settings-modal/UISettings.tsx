@@ -4,10 +4,12 @@ import { shallow } from 'zustand/shallow';
 import { Box, FormControl, FormHelperText, FormLabel, Option, Radio, RadioGroup, Select, Stack, Switch, Tooltip } from '@mui/joy';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import TelegramIcon from '@mui/icons-material/Telegram';
+import ScienceIcon from '@mui/icons-material/Science';
 import WidthNormalIcon from '@mui/icons-material/WidthNormal';
 import WidthWideIcon from '@mui/icons-material/WidthWide';
 
 import { hideOnMobile, settingsGap } from '~/common/theme';
+import { isPwa } from '~/common/util/pwaUtils';
 import { useUIPreferencesStore } from '~/common/state/store-ui';
 
 // languages is defined as a JSON file
@@ -61,13 +63,17 @@ export function UISettings() {
   // external state
   const {
     centerMode, setCenterMode,
+    doubleClickToEdit, setDoubleClickToEdit,
     enterToSend, setEnterToSend,
+    goofyLabs, setGoofyLabs,
     renderMarkdown, setRenderMarkdown,
     showPurposeFinder, setShowPurposeFinder,
     zenMode, setZenMode,
   } = useUIPreferencesStore(state => ({
     centerMode: state.centerMode, setCenterMode: state.setCenterMode,
+    doubleClickToEdit: state.doubleClickToEdit, setDoubleClickToEdit: state.setDoubleClickToEdit,
     enterToSend: state.enterToSend, setEnterToSend: state.setEnterToSend,
+    goofyLabs: state.goofyLabs, setGoofyLabs: state.setGoofyLabs,
     renderMarkdown: state.renderMarkdown, setRenderMarkdown: state.setRenderMarkdown,
     showPurposeFinder: state.showPurposeFinder, setShowPurposeFinder: state.setShowPurposeFinder,
     zenMode: state.zenMode, setZenMode: state.setZenMode,
@@ -77,9 +83,13 @@ export function UISettings() {
 
   const handleEnterToSendChange = (event: React.ChangeEvent<HTMLInputElement>) => setEnterToSend(event.target.checked);
 
+  const handleDoubleClickToEditChange = (event: React.ChangeEvent<HTMLInputElement>) => setDoubleClickToEdit(event.target.checked);
+
   const handleZenModeChange = (event: React.ChangeEvent<HTMLInputElement>) => setZenMode(event.target.value as 'clean' | 'cleaner');
 
   const handleRenderMarkdownChange = (event: React.ChangeEvent<HTMLInputElement>) => setRenderMarkdown(event.target.checked);
+
+  const handleGoofyLabsChange = (event: React.ChangeEvent<HTMLInputElement>) => setGoofyLabs(event.target.checked);
 
   const handleShowSearchBarChange = (event: React.ChangeEvent<HTMLInputElement>) => setShowPurposeFinder(event.target.checked);
 
@@ -87,7 +97,7 @@ export function UISettings() {
 
     <Stack direction='column' sx={{ gap: settingsGap }}>
 
-      <FormControl orientation='horizontal' sx={{ ...hideOnMobile, alignItems: 'center', justifyContent: 'space-between' }}>
+      {!isPwa() && <FormControl orientation='horizontal' sx={{ ...hideOnMobile, alignItems: 'center', justifyContent: 'space-between' }}>
         <Box>
           <FormLabel>Centering</FormLabel>
           <FormHelperText>{centerMode === 'full' ? 'Full screen chat' : centerMode === 'narrow' ? 'Narrow chat' : 'Wide'}</FormHelperText>
@@ -97,7 +107,7 @@ export function UISettings() {
           <Radio value='wide' label={<WidthWideIcon sx={{ width: 25, height: 24, mt: -0.25 }} />} />
           <Radio value='full' label='Full' />
         </RadioGroup>
-      </FormControl>
+      </FormControl>}
 
       <FormControl orientation='horizontal' sx={{ justifyContent: 'space-between' }}>
         <Box>
@@ -106,6 +116,16 @@ export function UISettings() {
         </Box>
         <Switch checked={enterToSend} onChange={handleEnterToSendChange}
                 endDecorator={enterToSend ? 'On' : 'Off'}
+                slotProps={{ endDecorator: { sx: { minWidth: 26 } } }} />
+      </FormControl>
+
+      <FormControl orientation='horizontal' sx={{ justifyContent: 'space-between' }}>
+        <Box>
+          <FormLabel>Double click to edit</FormLabel>
+          <FormHelperText>{doubleClickToEdit ? 'Double click' : 'Three dots'}</FormHelperText>
+        </Box>
+        <Switch checked={doubleClickToEdit} onChange={handleDoubleClickToEditChange}
+                endDecorator={doubleClickToEdit ? 'On' : 'Off'}
                 slotProps={{ endDecorator: { sx: { minWidth: 26 } } }} />
       </FormControl>
 
@@ -149,10 +169,20 @@ export function UISettings() {
             </FormLabel>
           </Tooltip>
           <FormHelperText>
-            ASR 🎙️ and TTS 📢
+            ASR 🎙️ &amp; TTS 📢
           </FormHelperText>
         </Box>
         <LanguageSelect />
+      </FormControl>
+
+      <FormControl orientation='horizontal' sx={{ justifyContent: 'space-between' }}>
+        <Box>
+          <FormLabel>Goofy labs</FormLabel>
+          <FormHelperText>{goofyLabs ? <>Experiment<ScienceIcon /></> : 'Disabled'}</FormHelperText>
+        </Box>
+        <Switch checked={goofyLabs} onChange={handleGoofyLabsChange}
+                endDecorator={goofyLabs ? 'On' : 'Off'}
+                slotProps={{ endDecorator: { sx: { minWidth: 26 } } }} />
       </FormControl>
 
     </Stack>

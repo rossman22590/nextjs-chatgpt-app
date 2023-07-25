@@ -172,9 +172,10 @@ export function ChatMessage(props: { message: DMessage, isBottom: boolean, onMes
 
   // external state
   const theme = useTheme();
-  const { showAvatars, renderMarkdown: _renderMarkdown } = useUIPreferencesStore(state => ({
+  const { showAvatars, renderMarkdown: _renderMarkdown, doubleClickToEdit } = useUIPreferencesStore(state => ({
     showAvatars: state.zenMode !== 'cleaner',
     renderMarkdown: state.renderMarkdown,
+    doubleClickToEdit: state.doubleClickToEdit,
   }), shallow);
   const renderMarkdown = _renderMarkdown && !fromSystem;
   const isImaginable = canUseProdia();
@@ -268,7 +269,7 @@ export function ChatMessage(props: { message: DMessage, isBottom: boolean, onMes
   return (
     <ListItem sx={{
       display: 'flex', flexDirection: !fromAssistant ? 'row-reverse' : 'row', alignItems: 'flex-start',
-      gap: 1, px: { xs: 1, md: 2 }, py: 2,
+      gap: { xs: 0, md: 1}, px: { xs: 1, md: 2 }, py: 2,
       background,
       borderBottom: `1px solid ${theme.vars.palette.divider}`,
       // borderBottomColor: `rgba(${theme.vars.palette.neutral.mainChannel} / 0.2)`,
@@ -279,7 +280,7 @@ export function ChatMessage(props: { message: DMessage, isBottom: boolean, onMes
 
       {/* Avatar */}
       {showAvatars && <Stack
-        sx={{ alignItems: 'center', minWidth: { xs: 50, md: 64 }, textAlign: 'center' }}
+        sx={{ alignItems: 'center', minWidth: { xs: 50, md: 64 }, maxWidth: 80, textAlign: 'center' }}
         onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}
         onClick={event => setMenuAnchor(event.currentTarget)}>
 
@@ -293,10 +294,11 @@ export function ChatMessage(props: { message: DMessage, isBottom: boolean, onMes
 
         {fromAssistant && (
           <Tooltip title={messageOriginLLM || 'unk-model'} variant='solid'>
-            <Typography level='body2' sx={messageTyping
-              ? { animation: `${cssRainbowColorKeyframes} 5s linear infinite`, fontWeight: 500 }
-              : { fontWeight: 500 }
-            }>
+            <Typography level='body2' sx={{
+              fontSize: { xs: 'xs', sm: 'sm' }, fontWeight: 500,
+              overflowWrap: 'anywhere',
+              ...(messageTyping ? { animation: `${cssRainbowColorKeyframes} 5s linear infinite` } : {}),
+            }}>
               {prettyBaseModel(messageOriginLLM)}
             </Typography>
           </Tooltip>
@@ -308,7 +310,7 @@ export function ChatMessage(props: { message: DMessage, isBottom: boolean, onMes
       {/* Edit / Blocks */}
       {!isEditing ? (
 
-        <Box sx={{ ...cssBlock, flexGrow: 0 }} onDoubleClick={handleMenuEdit}>
+        <Box sx={{ ...cssBlock, flexGrow: 0 }} onDoubleClick={(e) => doubleClickToEdit ? handleMenuEdit(e) : null }>
 
           {fromSystem && wasEdited && (
             <Typography level='body2' color='warning' sx={{ mt: 1, mx: 1.5 }}>modified by user - auto-update disabled</Typography>
@@ -332,7 +334,9 @@ export function ChatMessage(props: { message: DMessage, isBottom: boolean, onMes
             </Tooltip>
           )}
 
-          {isCollapsed && <Button variant='plain' onClick={handleExpand}>... expand ...</Button>}
+          {isCollapsed && (
+            <Button variant='plain' onClick={handleExpand}>... expand ...</Button>
+          )}
 
           {/* import VisibilityIcon from '@mui/icons-material/Visibility'; */}
           {/*<br />*/}
@@ -376,7 +380,7 @@ export function ChatMessage(props: { message: DMessage, isBottom: boolean, onMes
           <MenuItem onClick={handleMenuEdit}>
             <ListItemDecorator><EditIcon /></ListItemDecorator>
             {isEditing ? 'Discard' : 'Edit'}
-            {!isEditing && <span style={{ opacity: 0.5, marginLeft: '8px' }}> (double-click)</span>}
+            {!isEditing && <span style={{ opacity: 0.5, marginLeft: '8px' }}>{doubleClickToEdit ? '(double-click)' : ''}</span>}
           </MenuItem>
           {isImaginable && isImaginableEnabled && (
             <MenuItem onClick={handleMenuImagine} disabled={!isImaginableEnabled || isImagining}>

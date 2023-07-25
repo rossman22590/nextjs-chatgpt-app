@@ -5,12 +5,6 @@ export namespace OpenAI {
 
     export namespace Chat {
 
-      export interface Response {
-        role: 'assistant' | 'system' | 'user';
-        content: string;
-        finish_reason: 'stop' | 'length' | null;
-      }
-
       /**
        * The client will be sent a stream of words. As an extra (an totally optional) 'data channel' we send a
        * string JSON object with the few initial variables. We hope in the future to adopt a better
@@ -20,10 +14,15 @@ export namespace OpenAI {
         model: string;
       }
     }
-
   }
 
-  /// This is the upstream API, for Server (Next.js) -> Upstream Server
+
+  /**
+   * OpenAI API types - https://platform.openai.com/docs/api-reference/
+   *
+   * Notes:
+   *  - [FN0613]: function calling capability - only 2023-06-13 and later Chat models
+   */
   export namespace Wire {
     export namespace ChatCompletion {
 
@@ -37,11 +36,11 @@ export namespace OpenAI {
         max_tokens?: number;
         stream: boolean;
         n: number;
-        // only 2023-06-13 and later Chat models
-        // functions?: RequestFunction[],
-        // function_call?: 'auto' | 'none' | {
-        //   name: string;
-        // },
+        // [FN0613]
+        functions?: RequestFunctionDef[],
+        function_call?: 'auto' | 'none' | {
+          name: string;
+        },
       }
 
       export interface RequestMessage {
@@ -50,7 +49,7 @@ export namespace OpenAI {
         //name?: string; // when role: 'function'
       }
 
-      /*export interface RequestFunction {
+      export interface RequestFunctionDef { // [FN0613]
         name: string;
         description?: string;
         parameters?: {
@@ -64,7 +63,7 @@ export namespace OpenAI {
           }
           required?: string[];
         };
-      }*/
+      }
 
 
       export interface Response {
@@ -74,8 +73,8 @@ export namespace OpenAI {
         model: string; // can differ from the ask, e.g. 'gpt-4-0314'
         choices: {
           index: number;
-          message: ResponseMessage; // | ResponseFunctionCall;
-          finish_reason: 'stop' | 'length' | null; // | 'function_call'
+          message: ResponseMessage | ResponseFunctionCall; // [FN0613]
+          finish_reason: 'stop' | 'length' | null | 'function_call'; // [FN0613]
         }[];
         usage: {
           prompt_tokens: number;
@@ -84,19 +83,19 @@ export namespace OpenAI {
         };
       }
 
-      interface ResponseMessage {
+      export interface ResponseMessage {
         role: 'assistant';
         content: string;
       }
 
-      /*interface ResponseFunctionCall {
+      export interface ResponseFunctionCall { // [FN0613]
         role: 'assistant';
         content: null;
         function_call: { // if content is null and finish_reason is 'function_call'
           name: string;
           arguments: string; // a JSON object, to deserialize
         };
-      }*/
+      }
 
       export interface ResponseStreamingChunk {
         id: string;
@@ -108,6 +107,46 @@ export namespace OpenAI {
           delta: Partial<ResponseMessage>;
           finish_reason: 'stop' | 'length' | null;
         }[];
+        // undocumented, but can be present, e.g. "This model version is deprecated and a newer version \'gpt-4-0613\' is available. Migrate before..."
+        warning?: string;
+        // this could also be an error - first experienced on 2023-06-19 on streaming APIs (undocumented)
+        error?: {
+          message: string;
+          type: 'server_error' | string;
+          param: string | null;
+          code: string | null;
+        };
+      }
+    }
+
+
+    export namespace Moderation {
+      export interface Request {
+        input: string | string[];
+        model?: 'text-moderation-stable' | 'text-moderation-latest';
+      }
+
+      export enum ModerationCategory {
+        // noinspection JSUnusedGlobalSymbols
+        hate = 'hate',
+        'hate/threatening' = 'hate/threatening',
+        'self-harm' = 'self-harm',
+        sexual = 'sexual',
+        'sexual/minors' = 'sexual/minors',
+        violence = 'violence',
+        'violence/graphic' = 'violence/graphic',
+      }
+
+      export interface Response {
+        id: string;
+        model: string;
+        results: [
+          {
+            categories: { [key in ModerationCategory]: boolean };
+            category_scores: { [key in ModerationCategory]: number };
+            flagged: boolean;
+          }
+        ];
       }
     }
 
@@ -117,7 +156,7 @@ export namespace OpenAI {
         id: string;
         object: 'model';
         created: number;
-        owned_by: 'openai' | 'openai-dev' | 'openai-internal' | 'system' | string;
+        owned_by: 'openai' | 'openai-dev' | 'openai-internal' | 'system' | string; // 'user' for Oobabooga models
         permission: any[];
         root: string;
         parent: null;

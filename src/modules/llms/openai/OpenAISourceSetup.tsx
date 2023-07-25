@@ -1,10 +1,9 @@
 import * as React from 'react';
 
-import { Box, Button, FormControl, FormHelperText, FormLabel, Input } from '@mui/joy';
+import { Alert, Box, Button, FormControl, FormHelperText, FormLabel, Input, Switch, Typography } from '@mui/joy';
 import SyncIcon from '@mui/icons-material/Sync';
 
 import { apiQuery } from '~/modules/trpc/trpc.client';
-import { hasServerKeyOpenAI, isValidOpenAIApiKey } from '~/modules/llms/openai/openai.client';
 
 import { Brand } from '~/common/brand';
 import { FormInputKey } from '~/common/components/FormInputKey';
@@ -12,8 +11,8 @@ import { Link } from '~/common/components/Link';
 import { settingsCol1Width, settingsGap } from '~/common/theme';
 
 import { DLLM, DModelSource, DModelSourceId } from '../llm.types';
-import { LLMOptionsOpenAI, normalizeOAISetup, SourceSetupOpenAI } from './openai.vendor';
 import { OpenAI } from './openai.types';
+import { hasServerKeyOpenAI, isValidOpenAIApiKey, LLMOptionsOpenAI, ModelVendorOpenAI } from './openai.vendor';
 import { useModelsStore, useSourceSetup } from '../store-llms';
 
 
@@ -25,8 +24,8 @@ export function OpenAISourceSetup(props: { sourceId: DModelSourceId }) {
   // external state
   const {
     source, sourceLLMs, updateSetup,
-    normSetup: { heliKey, oaiHost, oaiKey, oaiOrg },
-  } = useSourceSetup<SourceSetupOpenAI>(props.sourceId, normalizeOAISetup);
+    normSetup: { heliKey, oaiHost, oaiKey, oaiOrg, moderationCheck },
+  } = useSourceSetup(props.sourceId, ModelVendorOpenAI.normalizeSetup);
 
   const hasModels = !!sourceLLMs.length;
   const needsUserKey = !hasServerKeyOpenAI;
@@ -35,7 +34,10 @@ export function OpenAISourceSetup(props: { sourceId: DModelSourceId }) {
   const shallFetchSucceed = oaiKey ? keyValid : !needsUserKey;
 
   // fetch models
-  const { isFetching, refetch, isError } = apiQuery.openai.listModels.useQuery({ oaiKey, oaiHost, oaiOrg, heliKey }, {
+  const { isFetching, refetch, isError, error } = apiQuery.llmOpenAI.listModels.useQuery({
+    access: { oaiKey, oaiHost, oaiOrg, heliKey, moderationCheck },
+    filterGpt: true,
+  }, {
     enabled: !hasModels && shallFetchSucceed,
     onSuccess: models => {
       const llms = source ? models.map(model => openAIModelToDLLM(model, source)) : [];
@@ -108,6 +110,24 @@ export function OpenAISourceSetup(props: { sourceId: DModelSourceId }) {
       />
     </FormControl>}
 
+    {showAdvanced && <FormControl orientation='horizontal' sx={{ flexWrap: 'wrap', justifyContent: 'space-between' }}>
+      <Box sx={{ minWidth: settingsCol1Width }}>
+        <FormLabel>
+          Moderation
+        </FormLabel>
+        <FormHelperText sx={{ display: 'block' }}>
+          <Link level='body2' href='https://platform.openai.com/docs/guides/moderation/moderation' target='_blank'>Overview</Link>,
+          {' '}<Link level='body2' href='https://openai.com/policies/usage-policies' target='_blank'>policy</Link>
+        </FormHelperText>
+      </Box>
+      <Switch
+        checked={moderationCheck}
+        onChange={event => updateSetup({ moderationCheck: event.target.checked })}
+        endDecorator={moderationCheck ? 'Enabled' : 'Off'}
+        sx={{ flexGrow: 1 }}
+      />
+    </FormControl>}
+
 
     <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between' }}>
 
@@ -126,6 +146,8 @@ export function OpenAISourceSetup(props: { sourceId: DModelSourceId }) {
       </Button>
 
     </Box>
+
+    {isError && <Alert variant='soft' color='warning' sx={{ mt: 1 }}><Typography>Issue: {error?.message || error?.toString() || 'unknown'}</Typography></Alert>}
 
   </Box>;
 }
@@ -166,7 +188,7 @@ const knownBases = [
 ];
 
 
-function openAIModelToDLLM(model: OpenAI.Wire.Models.ModelDescription, source: DModelSource): DLLM & { options: LLMOptionsOpenAI } {
+function openAIModelToDLLM(model: OpenAI.Wire.Models.ModelDescription, source: DModelSource): DLLM<LLMOptionsOpenAI> {
   const base = knownBases.find(base => model.id.startsWith(base.id)) || knownBases[knownBases.length - 1];
   const suffix = model.id.slice(base.id.length).trim();
   const hidden = !!suffix && suffix.startsWith('-03');

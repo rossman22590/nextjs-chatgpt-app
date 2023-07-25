@@ -6,6 +6,7 @@ import { useTheme } from '@mui/joy';
 import type { PublishedSchema } from '~/modules/publish/publish.router';
 import { CmdRunProdia } from '~/modules/prodia/prodia.client';
 import { CmdRunReact } from '~/modules/aifn/react/react';
+import { FlattenerModal } from '~/modules/aifn/flatten/FlattenerModal';
 import { PublishedModal } from '~/modules/publish/PublishedModal';
 import { apiAsync } from '~/modules/trpc/trpc.client';
 import { imaginePromptFromText } from '~/modules/aifn/imagine/imaginePromptFromText';
@@ -15,18 +16,19 @@ import { Brand } from '~/common/brand';
 import { ConfirmationModal } from '~/common/components/ConfirmationModal';
 import { Link } from '~/common/components/Link';
 import { conversationToMarkdown } from '~/common/util/conversationToMarkdown';
-import { createDMessage, DMessage, restoreConversationFromJson, useChatStore } from '~/common/state/store-chats';
-import { extractCommands } from '~/common/util/extractCommands';
+import { createDMessage, DMessage, useChatStore } from '~/common/state/store-chats';
 import { useApplicationBarStore } from '~/common/layouts/appbar/store-applicationbar';
 import { useUIPreferencesStore } from '~/common/state/store-ui';
 
-import { ActionItems } from './components/appbar/ActionItems';
+import { ChatContextItems } from './components/appbar/ChatContextItems';
 import { ChatMessageList } from './components/ChatMessageList';
+import { CmdAddRoleMessage, extractCommands } from './commands';
 import { Composer } from './components/composer/Composer';
 import { ConversationItems } from './components/appbar/ConversationItems';
 import { Dropdowns } from './components/appbar/Dropdowns';
-import { Ephemerals } from './components/ephemerals/Ephemerals';
+import { Ephemerals } from './components/Ephemerals';
 import { ImportedModal, ImportedOutcome } from './components/appbar/ImportedModal';
+import { restoreConversationFromJson } from './exportImport';
 import { runAssistantUpdatingState } from './editors/chat-stream';
 import { runImageGenerationUpdatingState } from './editors/image-generate';
 import { runReActUpdatingState } from './editors/react-tangent';
@@ -34,7 +36,27 @@ import { runReActUpdatingState } from './editors/react-tangent';
 
 const SPECIAL_ID_ALL_CHATS = 'all-chats';
 
-export type SendModeId = 'immediate' | 'react';
+// definition of chat modes
+export type ChatModeId = 'immediate' | 'immediate-follow-up' | 'react' | 'write-user';
+export const ChatModeItems: { [key in ChatModeId]: { label: string; description: string | React.JSX.Element; experimental?: boolean } } = {
+  'immediate': {
+    label: 'Chat',
+    description: 'AI-powered responses',
+  },
+  'immediate-follow-up': {
+    label: 'Chat & Follow-up',
+    description: 'Chat with follow-up questions',
+    experimental: true,
+  },
+  'react': {
+    label: 'Reason+Act',
+    description: 'Answer your questions with ReAct and search',
+  },
+  'write-user': {
+    label: 'Write',
+    description: 'No AI responses',
+  },
+};
 
 
 /// Returns a pretty link to the current page, for promo
@@ -49,12 +71,14 @@ function linkToOrigin() {
 }
 
 
-export function Chat() {
+export function AppChat() {
 
   // state
+  const [chatModeId, setChatModeId] = React.useState<ChatModeId>('immediate');
   const [isMessageSelectionMode, setIsMessageSelectionMode] = React.useState(false);
   const [clearConfirmationId, setClearConfirmationId] = React.useState<string | null>(null);
   const [deleteConfirmationId, setDeleteConfirmationId] = React.useState<string | null>(null);
+  const [flattenConversationId, setFlattenConversationId] = React.useState<string | null>(null);
   const [publishConversationId, setPublishConversationId] = React.useState<string | null>(null);
   const [publishResponse, setPublishResponse] = React.useState<PublishedSchema | null>(null);
   const [conversationImportOutcome, setConversationImportOutcome] = React.useState<ImportedOutcome | null>(null);
@@ -62,12 +86,13 @@ export function Chat() {
 
   // external state
   const theme = useTheme();
-  const { activeConversationId, isConversationEmpty, conversationsCount, importConversation, deleteAllConversations, setMessages, systemPurposeId, setAutoTitle } = useChatStore(state => {
+  const { activeConversationId, isConversationEmpty, conversationsCount, duplicateConversation, importConversation, deleteAllConversations, setMessages, systemPurposeId, setAutoTitle } = useChatStore(state => {
     const conversation = state.conversations.find(conversation => conversation.id === state.activeConversationId);
     return {
       activeConversationId: state.activeConversationId,
       isConversationEmpty: conversation ? !conversation.messages.length : true,
       conversationsCount: state.conversations.length,
+      duplicateConversation: state.duplicateConversation,
       importConversation: state.importConversation,
       deleteAllConversations: state.deleteAllConversations,
       setMessages: state.setMessages,
@@ -77,11 +102,11 @@ export function Chat() {
   }, shallow);
 
 
-  const handleExecuteConversation = async (sendModeId: SendModeId, conversationId: string, history: DMessage[]) => {
+  const handleExecuteConversation = async (chatModeId: ChatModeId, conversationId: string, history: DMessage[]) => {
     const { chatLLMId } = useModelsStore.getState();
     if (!conversationId || !chatLLMId) return;
 
-    // Command - last user message is a cmd
+    // /command: overrides the chat mode
     const lastMessage = history.length > 0 ? history[history.length - 1] : null;
     if (lastMessage?.role === 'user') {
       const pieces = extractCommands(lastMessage.text);
@@ -96,36 +121,48 @@ export function Chat() {
           setMessages(conversationId, history);
           return await runReActUpdatingState(conversationId, prompt, chatLLMId);
         }
-        // if (CmdRunSearch.includes(command))
-        //   return await run...
+        if (CmdAddRoleMessage.includes(command)) {
+          lastMessage.role = command.startsWith('/s') ? 'system' : command.startsWith('/a') ? 'assistant' : 'user';
+          lastMessage.sender = 'Bot';
+          lastMessage.text = prompt;
+          return setMessages(conversationId, history);
+        }
       }
     }
 
     // synchronous long-duration tasks, which update the state as they go
-    if (sendModeId && chatLLMId && systemPurposeId) {
-      switch (sendModeId) {
+    if (chatModeId && chatLLMId && systemPurposeId) {
+      switch (chatModeId) {
         case 'immediate':
-          return await runAssistantUpdatingState(conversationId, history, chatLLMId, systemPurposeId);
+        case 'immediate-follow-up':
+          return await runAssistantUpdatingState(conversationId, history, chatLLMId, systemPurposeId, true, chatModeId === 'immediate-follow-up');
         case 'react':
-          if (lastMessage?.text) {
-            setMessages(conversationId, history);
-            return await runReActUpdatingState(conversationId, lastMessage.text, chatLLMId);
-          }
+          if (!lastMessage?.text)
+            break;
+          setMessages(conversationId, history);
+          return await runReActUpdatingState(conversationId, lastMessage.text, chatLLMId);
+        case 'write-user':
+          setMessages(conversationId, history);
+          return;
       }
     }
 
     // ISSUE: if we're here, it means we couldn't do the job, at least sync the history
+    console.log('handleExecuteConversation: issue running', conversationId, lastMessage);
     setMessages(conversationId, history);
   };
 
   const _findConversation = (conversationId: string) =>
     conversationId ? useChatStore.getState().conversations.find(c => c.id === conversationId) ?? null : null;
 
-  const handleSendUserMessage = async (sendModeId: SendModeId, conversationId: string, userText: string) => {
+  const handleSendUserMessage = async (conversationId: string, userText: string) => {
     const conversation = _findConversation(conversationId);
     if (conversation)
-      return await handleExecuteConversation(sendModeId, conversationId, [...conversation.messages, createDMessage('user', userText)]);
+      return await handleExecuteConversation(chatModeId, conversationId, [...conversation.messages, createDMessage('user', userText)]);
   };
+
+  const handleExecuteChatHistory = async (conversationId: string, history: DMessage[]) =>
+    await handleExecuteConversation(chatModeId, conversationId, history);
 
   const handleImagineFromText = async (conversationId: string, messageText: string) => {
     const conversation = _findConversation(conversationId);
@@ -158,6 +195,8 @@ export function Chat() {
       setDeleteConfirmationId(null);
     }
   };
+
+  const handleFlattenConversation = (conversationId: string) => setFlattenConversationId(conversationId);
 
   const handlePublishConversation = (conversationId: string) => setPublishConversationId(conversationId);
 
@@ -237,18 +276,20 @@ export function Chat() {
   );
 
   const actionItems = React.useMemo(() =>
-      <ActionItems
+      <ChatContextItems
         conversationId={activeConversationId} isConversationEmpty={isConversationEmpty}
         isMessageSelectionMode={isMessageSelectionMode} setIsMessageSelectionMode={setIsMessageSelectionMode}
         onClearConversation={handleClearConversation}
+        onDuplicateConversation={duplicateConversation}
+        onFlattenConversation={handleFlattenConversation}
         onPublishConversation={handlePublishConversation}
       />,
-    [activeConversationId, isConversationEmpty, isMessageSelectionMode],
+    [activeConversationId, duplicateConversation, isConversationEmpty, isMessageSelectionMode],
   );
 
   React.useEffect(() => {
-    useApplicationBarStore.getState().register(dropdowns, conversationsBadge, conversationItems, actionItems);
-    return () => useApplicationBarStore.getState().unregister();
+    useApplicationBarStore.getState().registerClientComponents(dropdowns, conversationsBadge, conversationItems, actionItems);
+    return () => useApplicationBarStore.getState().unregisterClientComponents();
   }, [dropdowns, conversationsBadge, conversationItems, actionItems]);
 
   return <>
@@ -256,7 +297,7 @@ export function Chat() {
     <ChatMessageList
       conversationId={activeConversationId}
       isMessageSelectionMode={isMessageSelectionMode} setIsMessageSelectionMode={setIsMessageSelectionMode}
-      onExecuteConversation={handleExecuteConversation}
+      onExecuteChatHistory={handleExecuteChatHistory}
       onImagineFromText={handleImagineFromText}
       sx={{
         flexGrow: 1,
@@ -276,6 +317,7 @@ export function Chat() {
 
     <Composer
       conversationId={activeConversationId} messageId={null}
+      chatModeId={chatModeId} setChatModeId={setChatModeId}
       isDeveloperMode={systemPurposeId === 'Developer'}
       onSendMessage={handleSendUserMessage}
       sx={{
@@ -308,6 +350,9 @@ export function Chat() {
         ? 'Yes, delete all'
         : 'Delete conversation'}
     />
+
+    {/* Flatten */}
+    {!!flattenConversationId && <FlattenerModal conversationId={flattenConversationId} onClose={() => setFlattenConversationId(null)} />}
 
     {/* Publishing */}
     <ConfirmationModal

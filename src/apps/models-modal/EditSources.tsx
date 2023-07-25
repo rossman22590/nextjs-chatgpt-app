@@ -8,19 +8,24 @@ import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined';
 import ComputerIcon from '@mui/icons-material/Computer';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
+import { DModelSourceId, ModelVendor, ModelVendorId } from '~/modules/llms/llm.types';
+import { createModelSourceForVendor, findAllVendors, findVendorById } from '~/modules/llms/vendor.registry';
+import { hasServerKeyOpenAI } from '~/modules/llms/openai/openai.vendor';
+import { useModelsStore } from '~/modules/llms/store-llms';
+
 import { ConfirmationModal } from '~/common/components/ConfirmationModal';
 import { hideOnDesktop, hideOnMobile } from '~/common/theme';
-
-import { DModelSourceId, ModelVendor, ModelVendorId } from '../llm.types';
-import { createModelSource, findAllVendors, findVendorById } from '../vendor.registry';
-import { hasServerKeyOpenAI } from '../openai/openai.client';
-import { useModelsStore } from '../store-llms';
 
 
 function locationIcon(vendor?: ModelVendor | null) {
   if (vendor && vendor.id === 'openai' && hasServerKeyOpenAI)
     return <CloudDoneOutlinedIcon />;
   return !vendor ? null : vendor.location === 'local' ? <ComputerIcon /> : <CloudOutlinedIcon />;
+}
+
+function vendorIcon(vendor?: ModelVendor | null) {
+  const Icon = !vendor ? null : vendor.Icon;
+  return Icon ? <Icon /> : null;
 }
 
 
@@ -45,7 +50,7 @@ export function EditSources(props: {
   const handleAddSourceFromVendor = React.useCallback((vendorId: ModelVendorId) => {
     closeVendorsMenu();
     const { sources: modelSources } = useModelsStore.getState();
-    const modelSource = createModelSource(vendorId, modelSources);
+    const modelSource = createModelSourceForVendor(vendorId, modelSources);
     if (modelSource) {
       addModelSource(modelSource);
       props.setSelectedSourceId(modelSource.id);
@@ -77,9 +82,9 @@ export function EditSources(props: {
       component: (
         <MenuItem key={vendor.id} disabled={!enabled} onClick={() => handleAddSourceFromVendor(vendor.id)}>
           <ListItemDecorator>
-            {locationIcon(vendor)}
+            {vendorIcon(vendor)}
           </ListItemDecorator>
-          {vendor.name}{sourceCount > 0 && ` (added)`}
+          {vendor.name}{/*{sourceCount > 0 && ` (added)`}*/}
         </MenuItem>
       ),
     };
@@ -110,7 +115,7 @@ export function EditSources(props: {
         variant='outlined'
         value={props.selectedSourceId}
         disabled={noSources}
-        onChange={(event, value) => value && props.setSelectedSourceId(value)}
+        onChange={(_event, value) => value && props.setSelectedSourceId(value)}
         startDecorator={selectedSourceItem?.icon}
         slotProps={{
           root: { sx: { minWidth: 190 } },

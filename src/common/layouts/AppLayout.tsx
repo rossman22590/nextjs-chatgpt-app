@@ -3,9 +3,11 @@ import { shallow } from 'zustand/shallow';
 
 import { Box, Container, useTheme } from '@mui/joy';
 
-import { Configurator } from '~/modules/llms/configurator/Configurator';
-import { SettingsModal } from '../../apps/settings/SettingsModal';
+import { ModelsModal } from '../../apps/models-modal/ModelsModal';
+import { SettingsModal } from '../../apps/settings-modal/SettingsModal';
 
+import { isPwa } from '~/common/util/pwaUtils';
+import { useAppStateStore } from '~/common/state/store-appstate';
 import { useUIPreferencesStore } from '~/common/state/store-ui';
 
 import { ApplicationBar } from './appbar/ApplicationBar';
@@ -13,12 +15,16 @@ import { NoSSR } from '../components/NoSSR';
 
 
 export function AppLayout(props: {
-  noAppBar?: boolean, noSettings?: boolean, noModelsSetup?: boolean,
+  noAppBar?: boolean, suspendAutoModelsSetup?: boolean,
   children: React.ReactNode,
 }) {
   // external state
   const theme = useTheme();
-  const { centerMode } = useUIPreferencesStore(state => ({ centerMode: state.centerMode }), shallow);
+  const { centerMode } = useUIPreferencesStore(state => ({ centerMode: isPwa() ? 'full' : state.centerMode }), shallow);
+
+  // usage counter, for progressive disclosure of features
+  // noinspection JSUnusedLocalSymbols
+  const usageCount = useAppStateStore(state => state.usageCount);
 
   return (
     // Global NoSSR wrapper: the overall Container could have hydration issues when using localStorage and non-default maxWidth
@@ -35,7 +41,10 @@ export function AppLayout(props: {
           },
         }}>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
+        <Box sx={{
+          display: 'flex', flexDirection: 'column',
+          height: '100dvh',
+        }}>
 
           {!props.noAppBar && <ApplicationBar sx={{
             zIndex: 20, // position: 'sticky', top: 0,
@@ -48,9 +57,9 @@ export function AppLayout(props: {
 
       </Container>
 
-      {!props.noSettings && <SettingsModal />}
+      <SettingsModal />
 
-      {!props.noModelsSetup && <Configurator />}
+      <ModelsModal suspendAutoModelsSetup={props.suspendAutoModelsSetup} />
 
     </NoSSR>
   );
