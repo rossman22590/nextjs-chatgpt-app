@@ -1,3 +1,4 @@
+/**
  * Application Identity (Brand)
  *
  * Also note that the 'Brand' is used in the following places:
