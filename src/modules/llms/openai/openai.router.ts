@@ -183,36 +183,44 @@ type FunctionsSchema = z.infer<typeof functionsSchema>;
 
 async function openaiGET<TOut>(access: AccessSchema, apiPath: string /*, signal?: AbortSignal*/): Promise<TOut> {
   const { headers, url } = openAIAccess(access, apiPath);
-  const response = await fetch(url, { headers });
-  return await response.json() as TOut;
+  return await fetchOrTRPCError<undefined, TOut>(url, 'GET', headers, undefined, 'OpenAI');
 }
 
 async function openaiPOST<TBody, TOut>(access: AccessSchema, body: TBody, apiPath: string /*, signal?: AbortSignal*/): Promise<TOut> {
   const { headers, url } = openAIAccess(access, apiPath);
-  return await httpPOSTorTRPCError<TBody, TOut>(url, headers, body, 'OpenAI');
+  return await fetchOrTRPCError<TBody, TOut>(url, 'POST', headers, body, 'OpenAI');
 }
 
 /**
  * Post from TRPC
  */
-export async function httpPOSTorTRPCError<TBody, TOut>(url: string, headers: HeadersInit, body: TBody, moduleName: string): Promise<TOut> {
-  const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+export async function fetchOrTRPCError<TBody, TOut>(url: string, method: 'GET' | 'POST', headers: HeadersInit, body: TBody | undefined, moduleName: string): Promise<TOut> {
+  let response: Response;
+  try {
+    response = await fetch(url, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+  } catch (error: any) {
+    console.error(`[${moduleName} Fetch Error]:`, error);
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `[${moduleName} Issue] ${error?.message || error?.toString() || 'Unknown fetch error'} - ${error?.cause}`,
+    });
+  }
   if (!response.ok) {
     const error: any | null = await response.json().catch(() => null);
-    console.log('httpPOSTorTRPCError', error);
+    // console.log('fetchOrTRPCError', url, error);
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: error
-        ? `[${moduleName} Issue] ${error?.error?.message || error?.error || error?.toString() || 'Unknown POST error'}`
-        : `[Issue] ${response.statusText}`,
+        ? `[${moduleName} Issue] ${error?.error?.message || error?.error || error?.toString() || 'Unknown http error'}`
+        : `[Issue] ${response.statusText} (${response.status})` + (response.status === 403 ? ` - is ${url} accessible by the server?` : ''),
     });
   }
   try {
-    return await response.json();
+    return await response.json() as TOut;
   } catch (error: any) {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: `[${moduleName} Issue] ${error?.message || error?.toString() || 'Unknown POST json error'}`,
+      message: `[${moduleName} Issue] ${error?.message || error?.toString() || 'Unknown json error'}`,
     });
   }
 }
