@@ -124,7 +124,7 @@ export function AppBar(props: { sx?: SxProps }) {
       variant='solid' color='neutral' invertedColors
       sx={{
         p: 1,
-        display: 'flex', flexDirection: 'row', justifyContent: 'space-between',
+        display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         ...(props.sx || {}),
       }}>
 
@@ -153,7 +153,7 @@ export function AppBar(props: { sx?: SxProps }) {
 
     {/* Drawer Menu */}
     {!!drawerItems && <CloseableMenu
-      maxHeightGapPx={56} sx={{ minWidth: 320 }}
+      maxHeightGapPx={56 + 24} sx={{ minWidth: 320 }}
       open={!!drawerAnchor} anchorEl={drawerAnchor} onClose={closeApplicationMenu}
       placement='bottom-start'
     >
@@ -162,13 +162,13 @@ export function AppBar(props: { sx?: SxProps }) {
 
     {/* Menu Menu */}
     <CloseableMenu
-      maxHeightGapPx={56} noBottomPadding noTopPadding sx={{ minWidth: 320 }}
+      maxHeightGapPx={56 + 24} noBottomPadding noTopPadding sx={{ minWidth: 320 }}
       open={!!menuAnchor} anchorEl={menuAnchor} onClose={closeContextMenu}
       placement='bottom-end'
     >
       {commonMenuItems}
       {!!menuItems && <ListDivider sx={{ mt: 0 }} />}
-      {menuItems}
+      {!!menuItems && <Box sx={{ overflowY: 'auto' }}>{menuItems}</Box>}
       {!!menuItems && <ListDivider sx={{ mb: 0 }} />}
       <AppBarSwitcherItem />
       {/*<AppBarSupportItem />*/}
