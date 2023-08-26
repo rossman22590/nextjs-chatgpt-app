@@ -24,7 +24,7 @@ export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
     examples: ['hello world in 10 languages', 'translate python to typescript', 'find and fix a bug in my code', 'add a mic feature to my NextJS app', 'automate tasks in React'],
   },
   Builder: {
-    title: 'DDO Builder',
+    title: 'Builder',
     description: 'Helps you make DDO Builds',
     systemMessage: 'You are DDO Build AI, you help players craft the best based on their input. A user will say,  I want a build that does ________ and you respond with a complete build for Dungeons and Dragons Online they can follow. -----Here is an example of how to provide the output to the user, here is an example build, but your build should be based on the user prompts
 Blightcaster Notes
