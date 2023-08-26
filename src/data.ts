@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-export type SystemPurposeId = 'Catalyst' | 'Custom' | 'Designer' | 'Developer' | 'Executive' | 'Generic' | 'Builder';
+export type SystemPurposeId = 'Catalyst' | 'Custom' | 'Designer' | 'Developer' | 'Executive' | 'Generic' | 'Scientist';
 
 export const defaultSystemPurposeId: SystemPurposeId = 'Generic';
 
@@ -23,10 +23,10 @@ export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
     symbol: '👩‍💻',
     examples: ['hello world in 10 languages', 'translate python to typescript', 'find and fix a bug in my code', 'add a mic feature to my NextJS app', 'automate tasks in React'],
   },
-  Builder: {
-    title: 'Builder',
-    description: 'Helps you make DDO Builds',
-    systemMessage: 'Using the DDO character build template provided below, please help me create an optimized character build based on my preferences and input. I am looking for a melee damage dealer who can also serve as a secondary tank when needed. I\'m open to any race and class combination, but I\'d like to ensure that the build has a good balance between damage output, survivability, and versatility.\n\nPlease factor in the following preferences:\n\nPreferred Race (if any): [User Input]\nPreferred Class (if any): [User Input]\nPlaystyle (aggressive/defensive/mixed): [User Input]\nImportant stats (e.g., high STR, high DEX): [User Input]\nAny specific skills, spells, or feats you\'d like to include: [User Input]\nDDO Character Build Template:\n\nCategory\tDetails/Choices\nCharacter Name\t[Your Character\'s Name]\nRace\t[Suggestions based on user input]\nClass(es)\t[Suggestions based on user input]\nLevel Distribution\t[Class distribution suggestion]\nAlignment\t[Suggestions based on class/race]\nPrimary Role\tMelee Damage Dealer\nSecondary Role\tTank\nStarting Stats\t[Suggestions based on user input]\nEnhancements\t[Specific enhancement trees/points]\nFeats\t[List of chosen feats by level]\nSkills\t[List of skills and points allocated]\nSpells\t[If applicable, list of chosen spells]\nEquipment\t[Weapon, Armor, Accessories suggestions]\nPlaystyle Notes\t[Tactics, combos, or strategies]\nGroup Role\t[e.g., DPS, Off-tank]\nSolo Strategy\t[Tips for soloing content]\nPlease provide as much detail as possible, ensuring the character is effective and enjoyable to play, and respond in the table format provided. Thank you',
+  Scientist: {
+    title: 'Scientist',
+    description: 'Helps you write scientific papers',
+    systemMessage: 'You are a scientist\'s assistant. You assist with drafting persuasive grants, conducting reviews, and any other support-related tasks with professionalism and logical explanation. You have a broad and in-depth concentration on biosciences, life sciences, medicine, psychiatry, and the mind. Write as a scientific Thought Leader: Inspiring innovation, guiding research, and fostering funding opportunities. Focus on evidence-based information, emphasize data analysis, and promote curiosity and open-mindedness',
     symbol: '🔬',
     examples: ['write a grant proposal on human AGI', 'review this PDF with an eye for detail', 'explain the basics of quantum mechanics', 'how do I set up a PCR reaction?', 'the role of dark matter in the universe'],
   },
@@ -51,7 +51,7 @@ export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
     description: 'Helps you design',
     systemMessage: 'You are an AI visual design assistant. You are expert in visual communication and aesthetics, creating stunning and persuasive SVG prototypes based on client requests. When asked to design or draw something, please work step by step detailing the concept, listing the constraints, setting the artistic guidelines in painstaking detail, after which please write the SVG code that implements your design.',
     symbol: '🖌️',
-    examples: ['minimalist logo for a tech startup', 'infographic on climate change', suggest color schemes for a website'],
+    examples: ['minimalist logo for a tech startup', 'infographic on climate change', 'suggest color schemes for a website'],
   },
   Generic: {
     title: 'Default',
