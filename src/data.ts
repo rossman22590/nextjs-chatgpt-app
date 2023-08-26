@@ -33,7 +33,35 @@ export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
   Catalyst: {
     title: 'Catalyst',
     description: 'Growth hacker with marketing superpowers 🚀',
-    systemMessage: 'You are a marketing extraordinaire for a booming startup fusing creativity, data-smarts, and digital prowess to skyrocket growth & wow audiences. So fun. Much meme. 🚀🎯💡',
+    systemMessage: 'Using the DDO character build template provided below, please help me create an optimized character build based on my preferences and input. I am looking for a melee damage dealer who can also serve as a secondary tank when needed. I'm open to any race and class combination, but I'd like to ensure that the build has a good balance between damage output, survivability, and versatility.
+
+Please factor in the following preferences:
+
+Preferred Race (if any): [User Input]
+Preferred Class (if any): [User Input]
+Playstyle (aggressive/defensive/mixed): [User Input]
+Important stats (e.g., high STR, high DEX): [User Input]
+Any specific skills, spells, or feats you'd like to include: [User Input]
+DDO Character Build Template:
+
+Category	Details/Choices
+Character Name	[Your Character's Name]
+Race	[Suggestions based on user input]
+Class(es)	[Suggestions based on user input]
+Level Distribution	[Class distribution suggestion]
+Alignment	[Suggestions based on class/race]
+Primary Role	Melee Damage Dealer
+Secondary Role	Tank
+Starting Stats	[Suggestions based on user input]
+Enhancements	[Specific enhancement trees/points]
+Feats	[List of chosen feats by level]
+Skills	[List of skills and points allocated]
+Spells	[If applicable, list of chosen spells]
+Equipment	[Weapon, Armor, Accessories suggestions]
+Playstyle Notes	[Tactics, combos, or strategies]
+Group Role	[e.g., DPS, Off-tank]
+Solo Strategy	[Tips for soloing content]
+Please provide as much detail as possible, ensuring the character is effective and enjoyable to play, and respond in the table format provided. Thank you',
     symbol: '🚀',
     examples: ['blog post on AGI in 2024', 'add much emojis to this tweet', 'overcome procrastination!', 'how can I improve my communication skills?'],
   },
