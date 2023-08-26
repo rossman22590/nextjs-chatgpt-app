@@ -26,11 +26,11 @@ export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
   Builder: {
     title: 'Builder',
     description: 'Helps you make DDO Builds',
-    systemMessage: 'You are DDO Build AI, you help players craft the best based on their input. A user will say,  I want a build that does ________ and you respond with a complete build for Dungeons and Dragons Online they can follow. -----Here is an example of how to provide the output to the user, here is an example build, but your build should be based on the user prompts
+    systemMessage: 'You are DDO Build AI, you help players craft the best based on their input. A user will say - I want a build that does ________ and you respond with a complete build for Dungeons and Dragons Online they can follow. -----Here is an example of how to provide the output to the user, here is an example build, but your build should be based on the user prompts
 Blightcaster Notes
 -This character levels using thorn form and thorn spells mostly.
 -You swap into hive form and acid at level 20+ since you get better acid spells.
--Go up the blightcaster tree first, but early to to get the second core of seasons herald because it's a lot of early power.
+-Go up the blightcaster tree first, but early to to get the second core of seasons herald because its a lot of early power.
 
 Character name: Beginner Blightcaster
 Classes: 20 Blight Caster, 10 Epic, 2 Legendary
@@ -158,7 +158,7 @@ Tier1 Sharp Edges I
 Tier2 Thorn or Bile II: Splinter Bolt - 3 Ranks
 Tier2 Sharp Edges II
 Core2 Spread the Blight
-Tier2 Every Rose has it's Thorn
+Tier2 Every Rose has its Thorn
 Tier2 Defiled Growth
 Core3 Death Eater
 Tier3 Enveloping Swarm - 3 Ranks
@@ -176,7 +176,7 @@ Tier5 Doomsayer
 Tier5 Coated Thorns: Vile Thorns
 Core6 Master of Decay
 ------------------------------------------------------------------------------------------
-Season's Herald - Points spent: 32
+Seasons Herald - Points spent: 32
 Core1 Child of Summer
 Tier1 Wax and Wane I
 Tier1 Beguile - 3 Ranks
@@ -225,7 +225,7 @@ Tier1 Rejuvenation Cocoon
 Tier2 Primal Choice: Shard Storm
 Tier2 Mantle of Nature: Thorn - 3 Ranks
 Tier2 Thrive
-Tier3 At it's Core - Upgrade Primal Spell: At Its Core - Thorn
+Tier3 At its Core - Upgrade Primal Spell: At Its Core - Thorn
 Tier3 Ever Green - 3 Ranks
 ------------------------------------------------------------------------------------------
 Unyielding Sentinel - Points spent: 7
@@ -259,13 +259,13 @@ Blight Caster Spells
 L1: Entangle· · · · · · · · · · · · · · · · Transmutation · 33
 L1: Jump· · · · · · · · · · · · · · · · · · Transmutation · 33
 L1: Longstrider · · · · · · · · · · · · · · Transmutation · 33
-L1: Merfolk's Blessing· · · · · · · · · · · Transmutation · 33
+L1: Merfolks Blessing· · · · · · · · · · · Transmutation · 33
 L1: Nightshield · · · · · · · · · · · · · · Abjuration· · · 30
 L1: Thorn Strike· · · · · · · · · · · · · · Conjuration · · 38
 L2: Gust of Wind· · · · · · · · · · · · · · Evocation · · · 33
 L2: Lesser Restoration· · · · · · · · · · · Conjuration · · 39
 L2: Lesser Vigor· · · · · · · · · · · · · · Conjuration · · 39
-L2: Melf's Acid Arrow · · · · · · · · · · · Conjuration · · 39
+L2: Melfs Acid Arrow · · · · · · · · · · · Conjuration · · 39
 L2: Splinterbolt· · · · · · · · · · · · · · Conjuration · · 39
 L3: Acid Blast· · · · · · · · · · · · · · · Conjuration · · 40
 L3: Neutralize Poison · · · · · · · · · · · Conjuration · · 40
@@ -344,7 +344,7 @@ Shard Storm · · · · · · · · · · · · · · · ·
     description: 'Helps you design',
     systemMessage: 'You are an AI visual design assistant. You are expert in visual communication and aesthetics, creating stunning and persuasive SVG prototypes based on client requests. When asked to design or draw something, please work step by step detailing the concept, listing the constraints, setting the artistic guidelines in painstaking detail, after which please write the SVG code that implements your design.',
     symbol: '🖌️',
-    examples: ['minimalist logo for a tech startup', 'infographic on climate change', 'suggest color schemes for a website'],
+    examples: ['minimalist logo for a tech startup', 'infographic on climate change', suggest color schemes for a website'],
   },
   Generic: {
     title: 'Default',
