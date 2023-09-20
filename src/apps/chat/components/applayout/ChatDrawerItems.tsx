@@ -1,12 +1,12 @@
 import * as React from 'react';
 import { shallow } from 'zustand/shallow';
 
-import { Box, ListDivider, ListItemDecorator, MenuItem, Tooltip, Typography } from '@mui/joy';
+import { Box, ListDivider, ListItemDecorator, MenuItem, Typography } from '@mui/joy';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 
-import { MAX_CONVERSATIONS, useChatStore } from '~/common/state/store-chats';
+import { useChatStore } from '~/common/state/store-chats';
 import { setLayoutDrawerAnchor } from '~/common/layout/store-applayout';
 import { useUIPreferencesStore } from '~/common/state/store-ui';
 
@@ -42,9 +42,10 @@ export function ChatDrawerItems(props: {
   }), shallow);
 
 
-  const hasChats = conversationIDs.length > 0;
-  const singleChat = conversationIDs.length === 1;
-  const maxReached = conversationIDs.length >= MAX_CONVERSATIONS;
+  const totalConversations = conversationIDs.length;
+  const hasChats = totalConversations > 0;
+  const singleChat = totalConversations === 1;
+  const softMaxReached = totalConversations >= 50;
 
   const closeDrawerMenu = () => setLayoutDrawerAnchor(null);
 
@@ -67,8 +68,6 @@ export function ChatDrawerItems(props: {
     if (!singleChat && conversationId)
       deleteConversation(conversationId);
   }, [deleteConversation, singleChat]);
-
-  const NewPrefix = maxReached && <Tooltip title={`Maximum limit: ${MAX_CONVERSATIONS} chats. Proceeding will remove the oldest chat.`}><Box sx={{ mr: 2 }}>⚠️</Box></Tooltip>;
 
   // grouping
   let sortedIds = conversationIDs;
@@ -98,9 +97,9 @@ export function ChatDrawerItems(props: {
     {/*  </Typography>*/}
     {/*</ListItem>*/}
 
-    <MenuItem disabled={maxReached || (!!topNewConversationId && topNewConversationId === props.conversationId)} onClick={handleNew}>
+    <MenuItem disabled={!!topNewConversationId && topNewConversationId === props.conversationId} onClick={handleNew}>
       <ListItemDecorator><AddIcon /></ListItemDecorator>
-      {NewPrefix}New
+      New
     </MenuItem>
 
     <ListDivider sx={{ mb: 0 }} />
@@ -127,7 +126,7 @@ export function ChatDrawerItems(props: {
           isActive={conversationId === props.conversationId}
           isSingle={singleChat}
           showSymbols={showSymbols}
-          maxChatMessages={experimentalLabs ? maxChatMessages : 0}
+          maxChatMessages={(experimentalLabs || softMaxReached) ? maxChatMessages : 0}
           conversationActivate={handleConversationActivate}
           conversationDelete={handleConversationDelete}
         />)}
@@ -146,7 +145,7 @@ export function ChatDrawerItems(props: {
     <MenuItem disabled={!hasChats} onClick={props.onDeleteAllConversations}>
       <ListItemDecorator><DeleteOutlineIcon /></ListItemDecorator>
       <Typography>
-        Delete all
+        Delete {totalConversations >= 2 ? `all ${totalConversations} chats` : 'chat'}
       </Typography>
     </MenuItem>
 
