@@ -13,7 +13,7 @@ Or fork & run on Vercel
 
 ## Useful 👊
 
-![Ask away, paste a ton, copy the gems](docs/pixels/big-AGI-compo1.png)
+![Ask away, paste a ton, copy the gems](docs/pixels/big-AGI-compo1.png) 
 
 - Engaging AI Personas
 - Clean UX, w/ tokens counters
