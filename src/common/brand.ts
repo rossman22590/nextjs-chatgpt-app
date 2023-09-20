@@ -20,9 +20,9 @@ export const Brand = {
   URIs: {
     Home: 'https://myapps.ai',
     // App: 'https://get.big-agi.com',
-    CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
-    OpenRepo: 'https://myapps.ai',
-    SupportInvite: 'https://myapps.ai',
+    CardImage: 'https://myapps.ai/images/gfx/feature/tutorai_screenshot1.png',
+    OpenRepo: 'https://account.myapps.ai/dashboard',
+    SupportInvite: 'https://account.myapps.ai/dashboard',
     // Twitter: 'https://www.twitter.com/enricoros',
   },
 };
