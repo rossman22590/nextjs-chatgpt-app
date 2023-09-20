@@ -1,7 +1,6 @@
 import * as React from 'react';
 
-export type SystemPurposeId = 'Catalyst' | 'Custom' | 'Designer' | 'Developer' | 'Executive' | 'Generic' | 'Scientist';
-
+export type SystemPurposeId = 'Catalyst' | 'Designer' | 'ContentMode' | 'Custom' | 'Developer' | 'Executive' | 'Generic' | 'EmailAI' | 'TutorAI' | 'AssistantAI' | 'AdviceAI' | 'CareerAI' | 'Scientist' | 'Translator' | 'LegalAI' | 'FinancialAI' | 'HealthAI' | 'TravelAI' | 'CookingAI' | 'FitnessAI' | 'Imagine' | 'Prompter' | 'Professor' | 'ShoppingAI' | 'LessonPlanner' | 'HomeImprovementAI' | 'MusicAI' | 'MovieAI' | 'FashionAI' | 'PetCareAI' | 'GardeningAI' | 'AutomotiveAI' | 'JournalAI' | 'EduPal';
 export const defaultSystemPurposeId: SystemPurposeId = 'Generic';
 
 type SystemPurposeData = {
