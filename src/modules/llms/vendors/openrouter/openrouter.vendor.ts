@@ -6,7 +6,7 @@ import { LLMOptionsOpenAI, ModelVendorOpenAI } from '../openai/openai.vendor';
 import { OpenAILLMOptions } from '../openai/OpenAILLMOptions';
 
 import { OpenRouterSourceSetup } from './OpenRouterSourceSetup';
-
+export const hasServerKeyOR = !!process.env.HAS_SERVER_KEY_OR;
 
 // special symbols
 export const isValidOpenRouterKey = (apiKey?: string) => !!apiKey && apiKey.startsWith('sk-or-') && apiKey.length > 40;
