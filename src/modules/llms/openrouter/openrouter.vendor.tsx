@@ -5,10 +5,16 @@ import { OpenAILLMOptions } from '~/modules/llms/openai/OpenAILLMOptions';
 
 import { OpenRouterIcon } from './OpenRouterIcon';
 import { OpenRouterSourceSetup } from './OpenRouterSourceSetup';
+// special symbols from ENV
+export const hasServerKeyOR = !!process.env.HAS_SERVER_KEY_OR;
 
 // special symbols
 export const isValidOpenRouterKey = (apiKey?: string) => !!apiKey && apiKey.startsWith('sk-or-') && apiKey.length > 40;
 
+
+
+
+// user OpenAI-compatible host and key
 // user OpenAI-compatible host and key
 export interface SourceSetupOpenRouter extends Pick<SourceSetupOpenAI, 'oaiHost' | 'oaiKey'> {
 }
