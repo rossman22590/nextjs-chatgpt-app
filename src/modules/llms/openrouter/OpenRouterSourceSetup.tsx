@@ -15,7 +15,7 @@ import { settingsGap } from '~/common/theme';
 import { DLLM, DModelSource, DModelSourceId } from '../llm.types';
 import { useModelsStore, useSourceSetup } from '../store-llms';
 
-import { isValidOpenRouterKey, ModelVendorOpenRouter } from './openrouter.vendor';
+import { hasServerKeyOR, isValidOpenRouterKey, ModelVendorOpenRouter } from './openrouter.vendor';
 
 
 export function OpenRouterSourceSetup(props: { sourceId: DModelSourceId }) {
@@ -27,7 +27,7 @@ export function OpenRouterSourceSetup(props: { sourceId: DModelSourceId }) {
   } = useSourceSetup(props.sourceId, ModelVendorOpenRouter.normalizeSetup);
 
   const hasModels = !!sourceLLMs.length;
-  const needsUserKey = true; // !hasServerKey...;
+  const needsUserKey = !hasServerKeyOR
   const keyValid = isValidOpenRouterKey(oaiKey);
   const keyError = (/*needsUserKey ||*/ !!oaiKey) && !keyValid;
   const shallFetchSucceed = oaiKey ? keyValid : !needsUserKey;
