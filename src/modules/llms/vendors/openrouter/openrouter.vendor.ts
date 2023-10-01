@@ -1,18 +1,21 @@
-import { ModelVendor } from '../llm.types';
+import { OpenRouterIcon } from '~/common/components/icons/OpenRouterIcon';
 
-import { LLMOptionsOpenAI, ModelVendorOpenAI, SourceSetupOpenAI } from '~/modules/llms/openai/openai.vendor';
-import { OpenAILLMOptions } from '~/modules/llms/openai/OpenAILLMOptions';
+import { IModelVendor } from '../IModelVendor';
 
-import { OpenRouterIcon } from './OpenRouterIcon';
+import { LLMOptionsOpenAI, ModelVendorOpenAI } from '../openai/openai.vendor';
+import { OpenAILLMOptions } from '../openai/OpenAILLMOptions';
+
 import { OpenRouterSourceSetup } from './OpenRouterSourceSetup';
+
 
 // special symbols
 export const isValidOpenRouterKey = (apiKey?: string) => !!apiKey && apiKey.startsWith('sk-or-') && apiKey.length > 40;
 
-// user OpenAI-compatible host and key
-export interface SourceSetupOpenRouter extends Pick<SourceSetupOpenAI, 'oaiHost' | 'oaiKey'> {
+// use OpenAI-compatible host and key
+export interface SourceSetupOpenRouter {
+  oaiKey: string;
+  oaiHost: string;
 }
-
 
 /**
  * NOTE: the support is just started and incomplete - in particular it depends on some code that
@@ -21,11 +24,11 @@ export interface SourceSetupOpenRouter extends Pick<SourceSetupOpenAI, 'oaiHost'
  * Completion:
  *  [x] raise instanceLimit from 0 to 1 to continue development
  *  [x] add support to the OpenAI Router and Streaming function to add the headers required by OpenRouter (done in the access function)
- *  [ ] merge the server-side models remapping from Azure OpenAI - not needed, using client-side remapping for now
+ *  [~] merge the server-side models remapping from Azure OpenAI - not needed, using client-side remapping for now
  *  [x] decide whether to do UI work to improve the appearance - prioritized models
  *  [x] works!
  */
-export const ModelVendorOpenRouter: ModelVendor<SourceSetupOpenRouter, LLMOptionsOpenAI> = {
+export const ModelVendorOpenRouter: IModelVendor<SourceSetupOpenRouter, LLMOptionsOpenAI> = {
   id: 'openrouter',
   name: 'OpenRouter',
   rank: 25,
@@ -38,8 +41,9 @@ export const ModelVendorOpenRouter: ModelVendor<SourceSetupOpenRouter, LLMOption
   LLMOptionsComponent: OpenAILLMOptions,
 
   // functions
-  initalizeSetup: () => ({
+  initializeSetup: () => ({
     oaiHost: 'https://openrouter.ai/api',
+    oaiKey: '',
   }),
   normalizeSetup: (partialSetup?: Partial<SourceSetupOpenRouter>) => ({
     oaiHost: '',
