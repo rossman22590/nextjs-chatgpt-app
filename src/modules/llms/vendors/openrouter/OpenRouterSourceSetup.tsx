@@ -13,7 +13,8 @@ import { settingsGap } from '~/common/theme';
 
 import { DLLM, DModelSource, DModelSourceId, useModelsStore, useSourceSetup } from '../../store-llms';
 
-import { isValidOpenRouterKey, ModelVendorOpenRouter } from './openrouter.vendor';
+import { hasServerKeyOR, isValidOpenRouterKey, ModelVendorOpenRouter } from './openrouter.vendor';
+
 
 
 export function OpenRouterSourceSetup(props: { sourceId: DModelSourceId }) {
