@@ -3,7 +3,8 @@ import * as React from 'react';
 import { Box, Button, Typography } from '@mui/joy';
 import SyncIcon from '@mui/icons-material/Sync';
 
-import { LLMOptionsOpenAI, ModelVendorOpenAI } from '../openai/openai.vendor';
+import { LLMOptionsOpenAI, ModelVendorOpenAI } from '~/modules/llms/openai/openai.vendor';
+import { OpenAI } from '~/modules/llms/openai/openai.types';
 import { apiQuery } from '~/modules/trpc/trpc.client';
 
 import { FormInputKey } from '~/common/components/FormInputKey';
@@ -11,9 +12,10 @@ import { InlineError } from '~/common/components/InlineError';
 import { Link } from '~/common/components/Link';
 import { settingsGap } from '~/common/theme';
 
-import { DLLM, DModelSource, DModelSourceId, useModelsStore, useSourceSetup } from '../../store-llms';
+import { DLLM, DModelSource, DModelSourceId } from '../llm.types';
+import { useModelsStore, useSourceSetup } from '../store-llms';
 
-import { isValidOpenRouterKey, ModelVendorOpenRouter } from './openrouter.vendor';
+import { hasServerKeyOR, isValidOpenRouterKey, ModelVendorOpenRouter } from './openrouter.vendor';
 
 
 export function OpenRouterSourceSetup(props: { sourceId: DModelSourceId }) {
@@ -25,7 +27,7 @@ export function OpenRouterSourceSetup(props: { sourceId: DModelSourceId }) {
   } = useSourceSetup(props.sourceId, ModelVendorOpenRouter.normalizeSetup);
 
   const hasModels = !!sourceLLMs.length;
-  const needsUserKey = true; // !hasServerKey...;
+  const needsUserKey = !hasServerKeyOR
   const keyValid = isValidOpenRouterKey(oaiKey);
   const keyError = (/*needsUserKey ||*/ !!oaiKey) && !keyValid;
   const shallFetchSucceed = oaiKey ? keyValid : !needsUserKey;
@@ -56,7 +58,7 @@ export function OpenRouterSourceSetup(props: { sourceId: DModelSourceId }) {
     {/*</Box>*/}
 
     <FormInputKey
-      id='openrouter-key' label='OpenRouter API Key'
+      label={'OpenRouter API Key'}
       rightLabel={<>{needsUserKey
         ? !oaiKey && <Link level='body-sm' href='https://openrouter.ai/keys' target='_blank'>create key</Link>
         : '✔️ already set in server'
@@ -117,7 +119,7 @@ const orModelMap: { [id: string]: { name: string; contextWindowSize: number; isO
 
 const orModelFamilyOrder = ['openai/', 'anthropic/', 'google/', 'meta-llama/'];
 
-function orFamilySortFn(a: { id: string }, b: { id: string }): number {
+function orFamilySortFn(a: OpenAI.Wire.Models.ModelDescription, b: OpenAI.Wire.Models.ModelDescription): number {
   const aPrefixIndex = orModelFamilyOrder.findIndex(prefix => a.id.startsWith(prefix));
   const bPrefixIndex = orModelFamilyOrder.findIndex(prefix => b.id.startsWith(prefix));
 
@@ -130,7 +132,7 @@ function orFamilySortFn(a: { id: string }, b: { id: string }): number {
 }
 
 
-function openRouterModelToDLLM(model: { id: string, created: number }, source: DModelSource): DLLM<LLMOptionsOpenAI> {
+function openRouterModelToDLLM(model: OpenAI.Wire.Models.ModelDescription, source: DModelSource): DLLM<LLMOptionsOpenAI> {
   // label: use the known name if available, otherwise format the model id
   const orModel = orModelMap[model.id] ?? null;
   const label = orModel?.name || model.id.replace('/', ' · ');
