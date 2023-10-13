@@ -39,8 +39,8 @@ export const theme = extendTheme({
       palette: {
         neutral: {
           plainColor: 'var(--joy-palette-neutral-800)',     // increase contrast a bit - Menu text
-          solidBg: 'var(--joy-palette-neutral-700)',        // AppBar: background (#32383E)
-          solidHoverBg: 'var(--joy-palette-neutral-800)',   // AppBar: buttons background on hover
+          solidBg: '#000',        // AppBar: background (#32383E)
+          solidHoverBg: '#640471',   // AppBar: buttons background on hover
         },
         text: {
           icon: 'var(--joy-palette-neutral-700)',           // <IconButton color='neutral' /> icon color
@@ -61,6 +61,7 @@ export const theme = extendTheme({
       palette: {
         text: {
           // do not increase contrast - text.primary would scream at you
+          
           // secondary: 'var(--joy-palette-neutral-100, #EAEEF6)',
           // tertiary: 'var(--joy-palette-neutral-400, #9FA6AD)',
         },
