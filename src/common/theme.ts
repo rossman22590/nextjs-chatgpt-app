@@ -39,7 +39,7 @@ export const theme = extendTheme({
       palette: {
         neutral: {
           plainColor: 'var(--joy-palette-neutral-800)',     // increase contrast a bit - Menu text
-          solidBg: '#000',        // AppBar: background (#32383E)
+          solidBg: '#0d071b',        // AppBar: background (#32383E)
           solidHoverBg: '#640471',   // AppBar: buttons background on hover
         },
         text: {
