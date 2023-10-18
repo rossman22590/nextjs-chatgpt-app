@@ -1,21 +1,26 @@
 import * as React from 'react';
 
-import { Box, Button, Typography } from '@mui/joy';
+import { Badge, Box, Button, Typography } from '@mui/joy';
+import DoneIcon from '@mui/icons-material/Done';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
-
-import { ExportPublishedModal } from './ExportPublishedModal';
-import { PublishedSchema } from '~/modules/sharing/sharing.router';
-import { apiAsync } from '~/modules/trpc/trpc.client';
+import IosShareIcon from '@mui/icons-material/IosShare';
 
 import { Brand } from '~/common/brand';
 import { ConfirmationModal } from '~/common/components/ConfirmationModal';
 import { Link } from '~/common/components/Link';
-import { conversationToMarkdown } from './trade.markdown';
+import { apiAsyncNode } from '~/common/util/trpc.client';
 import { useChatStore } from '~/common/state/store-chats';
-import { useUIPreferencesStore } from '~/common/state/store-ui';
+import { useUICounter, useUIPreferencesStore } from '~/common/state/store-ui';
 
-import { downloadDAllJson, downloadDConversationJson } from './trade.json';
+import type { PublishedSchema, SharePutSchema } from './server/trade.router';
+import { ExportPublishedModal } from './ExportPublishedModal';
+import { ExportSharedModal } from './ExportSharedModal';
+import { conversationToJsonV1, conversationToMarkdown, downloadAllConversationsJson, downloadConversationJson } from './trade.client';
+
+
+// global flag to enable/disable the sharing mechanics
+const ENABLE_SHARING = process.env.HAS_SERVER_DB_PRISMA;
 
 
 export type ExportConfig = { dir: 'export', conversationId: string | null };
@@ -38,15 +43,53 @@ function findConversation(conversationId: string) {
 
 /**
  * Export Buttons and functionality
- * Supports Share to Paste.gg and Download in own format
+ * Supports Share locally, Pulish to Paste.gg and Download in own format
  */
 export function ExportChats(props: { config: ExportConfig, onClose: () => void }) {
 
   // state
-  const [publishConversationId, setPublishConversationId] = React.useState<string | null>(null);
-  const [publishResponse, setPublishResponse] = React.useState<PublishedSchema | null>(null);
   const [downloadedState, setDownloadedState] = React.useState<'ok' | 'fail' | null>(null);
   const [downloadedAllState, setDownloadedAllState] = React.useState<'ok' | 'fail' | null>(null);
+  const [shareConversationId, setShareConversationId] = React.useState<string | null>(null);
+  const [shareUploading, setShareUploading] = React.useState(false);
+  const [shareResponse, setShareResponse] = React.useState<SharePutSchema | null>(null);
+  const [publishConversationId, setPublishConversationId] = React.useState<string | null>(null);
+  const [publishUploading, setPublishUploading] = React.useState(false);
+  const [publishResponse, setPublishResponse] = React.useState<PublishedSchema | null>(null);
+
+  // external state
+  const { novel: shareWebBadge, touch: shareWebTouch } = useUICounter('share-web');
+
+
+  // share
+
+  const handleShareConversation = () => setShareConversationId(props.config.conversationId);
+
+  const handleConfirmedShare = async () => {
+    if (!shareConversationId) return;
+
+    const conversation = findConversation(shareConversationId);
+    setShareConversationId(null);
+    if (!conversation) return;
+
+    setShareUploading(true);
+    try {
+      const chatV1 = conversationToJsonV1(conversation);
+      const response: SharePutSchema = await apiAsyncNode.trade.sharePut.mutate({
+        ownerId: undefined, // TODO: save owner id and reuse every time
+        dataType: 'CHAT_V1',
+        dataObject: chatV1,
+      });
+      setShareResponse(response);
+      shareWebTouch();
+    } catch (error: any) {
+      setShareResponse({
+        type: 'error',
+        error: error?.message ?? error?.toString() ?? 'unknown error',
+      });
+    }
+    setShareUploading(false);
+  };
 
 
   // publish
@@ -60,9 +103,10 @@ export function ExportChats(props: { config: ExportConfig, onClose: () => void }
     setPublishConversationId(null);
     if (!conversation) return;
 
+    setPublishUploading(true);
     const markdownContent = conversationToMarkdown(conversation, !useUIPreferencesStore.getState().showSystemMessages);
     try {
-      const paste = await apiAsync.sharing.publishTo.mutate({
+      const paste = await apiAsyncNode.trade.publishTo.mutate({
         to: 'paste.gg',
         title: '🤖💬 Chat Conversation',
         fileContent: markdownContent,
@@ -74,6 +118,7 @@ export function ExportChats(props: { config: ExportConfig, onClose: () => void }
       alert(`Failed to publish conversation: ${error?.message ?? error?.toString() ?? 'unknown error'}`);
       setPublishResponse(null);
     }
+    setPublishUploading(false);
   };
 
   const handlePublishResponseClosed = () => {
@@ -81,22 +126,24 @@ export function ExportChats(props: { config: ExportConfig, onClose: () => void }
     props.onClose();
   };
 
+
   // download
 
   const handleDownloadConversation = () => {
     if (!props.config.conversationId) return;
     const conversation = findConversation(props.config.conversationId);
     if (!conversation) return;
-    downloadDConversationJson(conversation)
+    downloadConversationJson(conversation)
       .then(() => setDownloadedState('ok'))
       .catch(() => setDownloadedState('fail'));
   };
 
   const handleDownloadAllConversations = () => {
-    downloadDAllJson()
+    downloadAllConversationsJson()
       .then(() => setDownloadedAllState('ok'))
       .catch(() => setDownloadedAllState('fail'));
   };
+
 
   const hasConversation = !!props.config.conversationId;
 
@@ -107,18 +154,34 @@ export function ExportChats(props: { config: ExportConfig, onClose: () => void }
         Share or download this conversation
       </Typography>
 
-      <Button variant='soft' size='md' disabled={!hasConversation} endDecorator={<ExitToAppIcon />} sx={{ minWidth: 240, justifyContent: 'space-between' }}
+      {ENABLE_SHARING && <Badge color='danger' invisible={!shareWebBadge}>
+        <Button variant='soft' disabled={!hasConversation || shareUploading}
+                loading={shareUploading}
+                color={shareResponse ? 'success' : 'primary'}
+                endDecorator={shareResponse ? <DoneIcon /> : <IosShareIcon />}
+                sx={{ minWidth: 240, justifyContent: 'space-between' }}
+                onClick={handleShareConversation}>
+          Share on {Brand.Title.Base}
+        </Button>
+      </Badge>}
+
+      <Button variant='soft' disabled={!hasConversation || publishUploading}
+              loading={publishUploading}
+              color={publishResponse ? 'success' : 'primary'}
+              endDecorator={<ExitToAppIcon />}
+              sx={{ minWidth: 240, justifyContent: 'space-between' }}
               onClick={handlePublishConversation}>
-        Share to Paste.gg
+        Publish to Paste.gg
       </Button>
 
       {/*<Button variant='soft' size='md' disabled sx={{ minWidth: 240, justifyContent: 'space-between', fontWeight: 400 }}>*/}
-      {/*  Share to ShareGPT*/}
+      {/*  Publish to ShareGPT*/}
       {/*</Button>*/}
 
-      <Button variant='soft' size='md' disabled={!hasConversation} sx={{ minWidth: 240, justifyContent: 'space-between' }}
+      <Button variant='soft' disabled={!hasConversation}
               color={downloadedState === 'ok' ? 'success' : downloadedState === 'fail' ? 'warning' : 'primary'}
-              endDecorator={downloadedState === 'ok' ? '✔' : downloadedState === 'fail' ? '✘' : <FileDownloadIcon />}
+              endDecorator={downloadedState === 'ok' ? <DoneIcon /> : downloadedState === 'fail' ? '✘' : <FileDownloadIcon />}
+              sx={{ minWidth: 240, justifyContent: 'space-between' }}
               onClick={handleDownloadConversation}>
         Download chat
       </Button>
@@ -126,13 +189,32 @@ export function ExportChats(props: { config: ExportConfig, onClose: () => void }
       <Typography level='body-sm' sx={{ mt: 2 }}>
         Store or transfer between devices
       </Typography>
-      <Button variant='soft' size='md' sx={{ minWidth: 240, justifyContent: 'space-between' }}
+      <Button variant='soft' size='md'
               color={downloadedAllState === 'ok' ? 'success' : downloadedAllState === 'fail' ? 'warning' : 'primary'}
-              endDecorator={downloadedAllState === 'ok' ? '✔' : downloadedAllState === 'fail' ? '✘' : <FileDownloadIcon />}
+              endDecorator={downloadedAllState === 'ok' ? <DoneIcon /> : downloadedAllState === 'fail' ? '✘' : <FileDownloadIcon />}
+              sx={{ minWidth: 240, justifyContent: 'space-between' }}
               onClick={handleDownloadAllConversations}>
-        Backup all chats
+        Download all chats
       </Button>
     </Box>
+
+    {/* [share] confirmation */}
+    {ENABLE_SHARING && shareConversationId && (
+      <ConfirmationModal
+        open onClose={() => setShareConversationId(null)} onPositive={handleConfirmedShare}
+        title='Upload Confirmation'
+        confirmationText={<>
+          Everyone with the link will be able to see this chat.
+          It will be automatically deleted after 30 days.
+          For more information, please see the <Link href={Brand.URIs.PrivacyPolicy} target='_blank'>privacy
+          policy</Link> of this server. <br />
+          Are you sure you want to proceed?
+        </>} positiveActionText={'Yes, create shared link'}
+      />
+    )}
+
+    {/* [share] outcome */}
+    {!!shareResponse && <ExportSharedModal open onClose={() => setShareResponse(null)} response={shareResponse} />}
 
     {/* [publish] confirmation */}
     {publishConversationId && <ConfirmationModal

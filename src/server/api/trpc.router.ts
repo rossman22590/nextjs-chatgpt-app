@@ -5,7 +5,7 @@ import { googleSearchRouter } from '~/modules/google/search.router';
 import { llmAnthropicRouter } from '~/modules/llms/transports/server/anthropic.router';
 import { llmOpenAIRouter } from '~/modules/llms/transports/server/openai.router';
 import { prodiaRouter } from '~/modules/prodia/prodia.router';
-import { sharingRouter } from '~/modules/sharing/sharing.router';
+import { tradeRouter } from '../../apps/chat/trade/server/trade.router';
 import { ytPersonaRouter } from '../../apps/personas/ytpersona.router';
 
 /**
@@ -13,15 +13,19 @@ import { ytPersonaRouter } from '../../apps/personas/ytpersona.router';
  *
  * All routers added in /api/routers should be manually added here.
  */
-export const appRouter = createTRPCRouter({
+export const appRouterEdge = createTRPCRouter({
   elevenlabs: elevenlabsRouter,
   googleSearch: googleSearchRouter,
   llmAnthropic: llmAnthropicRouter,
   llmOpenAI: llmOpenAIRouter,
   prodia: prodiaRouter,
-  sharing: sharingRouter,
   ytpersona: ytPersonaRouter,
 });
 
+export const appRouterNode = createTRPCRouter({
+  trade: tradeRouter,
+});
+
 // export type definition of API
-export type AppRouter = typeof appRouter;
+export type AppRouterEdge = typeof appRouterEdge;
+export type AppRouterNode = typeof appRouterNode;

@@ -24,5 +24,6 @@ export const Brand = {
     OpenRepo: 'https://account.myapps.ai/dashboard',
     SupportInvite: 'https://account.myapps.ai/dashboard',
     // Twitter: 'https://www.twitter.com/enricoros',
+    PrivacyPolicy: 'https://big-agi.com/privacy',
   },
 };
