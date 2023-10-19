@@ -1,5 +1,7 @@
 // noinspection JSUnusedGlobalSymbols
 
+/** Keep this file in sync with docs/environment-variables.md */
+
 declare namespace NodeJS {
 
   // available to the server-side
@@ -11,34 +13,33 @@ declare namespace NodeJS {
 
     // LLM: OpenAI
     OPENAI_API_KEY: string;
-    OPENAI_API_ORG_ID: string;
     OPENAI_API_HOST: string;
+    OPENAI_API_ORG_ID: string;
 
     // LLM: Azure OpenAI
     AZURE_OPENAI_API_ENDPOINT: string;
     AZURE_OPENAI_API_KEY: string;
 
     // LLM: Anthropic
-    ANTHROPIC_API_KEY: string;
-    ANTHROPIC_API_HOST: string;
+    ANTHROPIC_API_KEY?: string;
 
     // LLM: OpenRouter
     OPENROUTER_API_KEY: string;
 
-    // Helicone
-    HELICONE_API_KEY: string;
+    // Helicone - works on both OpenAI and Anthropic vendors
+    HELICONE_API_KEY?: string;
 
     // ElevenLabs - speech.ts
     ELEVENLABS_API_KEY: string;
     ELEVENLABS_API_HOST: string;
     ELEVENLABS_VOICE_ID: string;
 
-    // Prodia
-    PRODIA_API_KEY: string;
-
     // Google Custom Search
     GOOGLE_CLOUD_API_KEY: string;
     GOOGLE_CSE_ID: string;
+
+    // Prodia
+    PRODIA_API_KEY: string;
 
   }
 
