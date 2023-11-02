@@ -6,12 +6,12 @@ import { fetchTextOrTRPCError } from '~/server/api/trpc.serverutils';
 
 import { chatGptImportConversation, chatGptSharedChatSchema } from './import.chatgpt';
 import { postToPasteGGOrThrow, publishToInputSchema, publishToOutputSchema } from './publish.pastegg';
-import { shareDeleteOutputSchema, shareDeleteProcedure, shareGetProducedure, sharePutOutputSchema, sharePutProcedure } from './share.server';
+import { storageDeleteOutputSchema, storageGetProcedure, storageMarkAsDeletedProcedure, storagePutOutputSchema, storagePutProcedure } from './storage.server';
 
 
-export type SharePutSchema = z.infer<typeof sharePutOutputSchema>;
+export type StoragePutSchema = z.infer<typeof storagePutOutputSchema>;
 
-export type ShareDeleteSchema = z.infer<typeof shareDeleteOutputSchema>;
+export type StorageDeleteSchema = z.infer<typeof storageDeleteOutputSchema>;
 
 export type PublishedSchema = z.infer<typeof publishToOutputSchema>;
 
@@ -25,8 +25,17 @@ export const tradeRouter = createTRPCRouter({
     .input(z.object({ url: z.string().url().startsWith('https://chat.openai.com/share/') }))
     .output(z.object({ data: chatGptSharedChatSchema, conversationId: z.string() }))
     .query(async ({ input: { url } }) => {
-      const htmlPage = await fetchTextOrTRPCError(url, 'GET', {}, undefined, 'ChatGPT Importer');
+
+      // add headers that make it closest to a browser request
+      const htmlPage = await fetchTextOrTRPCError(url, 'GET', {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+      }, undefined, 'ChatGPT Importer');
+
       const data = await chatGptImportConversation(htmlPage);
+
       return {
         data: data.props.pageProps.serverResponse.data,
         conversationId: data.props.pageProps.sharedConversationId,
@@ -34,19 +43,19 @@ export const tradeRouter = createTRPCRouter({
     }),
 
   /**
-   * Experimental: 'Sharing functionality': server-side storage
+   * Write an object to storage, and return the ID, owner, and deletion key
    */
-  sharePut: sharePutProcedure,
+  storagePut: storagePutProcedure,
 
   /**
-   * This function will read the shared data by ID, but only if not deleted or expired
+   * Read a stored object by ID (optional owner)
    */
-  shareGet: shareGetProducedure,
+  storageGet: storageGetProcedure,
 
   /**
-   * This function will delete the shared data by ID, but only if not deleted or expired
+   * Delete a stored object by ID and deletion key
    */
-  shareDelete: shareDeleteProcedure,
+  storageDelete: storageMarkAsDeletedProcedure,
 
   /**
    * Publish a text file (with title, content, name) to a sharing service

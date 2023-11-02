@@ -13,7 +13,6 @@ export function FormInputKey(props: {
   value: string, onChange: (value: string) => void,
   placeholder?: string, isVisible?: boolean,
   required: boolean, isError?: boolean,
-  noFormControl?: boolean,
   noKey?: boolean,
 }) {
 
@@ -28,29 +27,29 @@ export function FormInputKey(props: {
     </IconButton>
   ), [props.value, props.noKey, isVisible]);
 
-  const Wrapper = props.noFormControl ? React.Fragment : FormControl;
+  return (
+    <FormControl>
 
-  return <Wrapper>
+      {!!props.label && <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        <FormLabel>{props.label}</FormLabel>
+        {!!props.rightLabel && <FormHelperText sx={{ display: 'block' }}>
+          {props.rightLabel}
+        </FormHelperText>}
+      </Box>}
 
-    {!!props.label && <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-      <FormLabel>{props.label}</FormLabel>
-      {!!props.rightLabel && <FormHelperText sx={{ display: 'block' }}>
-        {props.rightLabel}
-      </FormHelperText>}
-    </Box>}
+      <Input
+        id={props.id}
+        variant={props.required ? 'outlined' : 'outlined' /* 'soft */}
+        value={props.value} onChange={handleChange}
+        placeholder={props.required ? props.placeholder ? 'required: ' + props.placeholder : 'required' : props.placeholder || '...'}
+        type={(isVisible || !!props.noKey) ? 'text' : 'password'}
+        error={props.isError}
+        startDecorator={!props.noKey && <KeyIcon />}
+        endDecorator={endDecorator}
+      />
 
-    <Input
-      id={props.id}
-      variant={props.required ? 'outlined' : 'outlined' /* 'soft */}
-      value={props.value} onChange={handleChange}
-      placeholder={props.required ? props.placeholder ? 'required: ' + props.placeholder : 'required' : props.placeholder || '...'}
-      type={(isVisible || !!props.noKey) ? 'text' : 'password'}
-      error={props.isError}
-      startDecorator={!props.noKey && <KeyIcon />}
-      endDecorator={endDecorator}
-    />
+      {props.description && <FormHelperText sx={{ display: 'block' }}>{props.description}</FormHelperText>}
 
-    {props.description && <FormHelperText sx={{ display: 'block' }}>{props.description}</FormHelperText>}
-
-  </Wrapper>;
+    </FormControl>
+  );
 }

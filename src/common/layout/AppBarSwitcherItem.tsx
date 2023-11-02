@@ -87,7 +87,7 @@ export function AppBarSwitcherItem() {
         }}
       >
         <BringTheLove text='Dashboard' icon={<DiscordIcon />} link={Brand.URIs.SupportInvite} />
-        {/* <BringTheLove text='GitHub' icon={<GitHubIcon />} link={Brand.URIs.OpenRepo} /> */}
+{/*         <BringTheLove text='My Account' icon={<GitHubIcon />} link={Brand.URIs.OpenRepo} /> */}
       </ButtonGroup>
 
     </ListItem>

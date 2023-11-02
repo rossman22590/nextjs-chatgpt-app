@@ -1,104 +1,34 @@
 import * as React from 'react';
 import TimeAgo from 'react-timeago';
-import { shallow } from 'zustand/shallow';
-import { useRouter } from 'next/router';
 
-import { Box, Button, Card, List, ListItem, MenuItem, Switch, Tooltip, Typography } from '@mui/joy';
+import { Box, Button, Card, List, ListItem, Tooltip, Typography } from '@mui/joy';
 import TelegramIcon from '@mui/icons-material/Telegram';
 
 import { ChatMessage } from '../chat/components/message/ChatMessage';
-import { conversationTitle } from '../chat/components/applayout/ConversationItem';
 
 import { Brand } from '~/common/brand';
-import { DConversation, useChatStore } from '~/common/state/store-chats';
+import { conversationTitle, DConversation, useChatStore } from '~/common/state/store-chats';
 import { navigateToChat } from '~/common/routes';
-import { useLayoutPluggable } from '~/common/layout/store-applayout';
 import { useUIPreferencesStore } from '~/common/state/store-ui';
 
 
-/*const cssMagicSwapKeyframes = keyframes`
-    0% {
-        opacity: 0;
-        transform-origin: 0 100%;
-        transform: scale(0, 0) translate(-300px, 0px);
-    }
-    100% {
-        opacity: 1;
-        transform-origin: 100% 100%;
-        transform: scale(1, 1) translate(0px, 0px);
-    }`;
-*/
-
-function AppSharedMenuItems() {
-
-  // external state
-  const {
-    renderMarkdown, setRenderMarkdown,
-    zenMode, setZenMode,
-  } = useUIPreferencesStore(state => ({
-    renderMarkdown: state.renderMarkdown, setRenderMarkdown: state.setRenderMarkdown,
-    zenMode: state.zenMode, setZenMode: state.setZenMode,
-  }), shallow);
-
-  const zenOn = zenMode === 'cleaner';
-
-  const handleRenderMarkdownChange = (event: React.ChangeEvent<HTMLInputElement>) => setRenderMarkdown(event.target.checked);
-
-  const handleZenModeChange = (event: React.ChangeEvent<HTMLInputElement>) => setZenMode(event.target.checked ? 'cleaner' : 'clean');
-
-  return <>
-
-    <MenuItem onClick={() => setRenderMarkdown(!renderMarkdown)} sx={{ justifyContent: 'space-between' }}>
-      <Typography>
-        Markdown
-      </Typography>
-      <Switch
-        checked={renderMarkdown} onChange={handleRenderMarkdownChange}
-        endDecorator={renderMarkdown ? 'On' : 'Off'}
-        slotProps={{ endDecorator: { sx: { minWidth: 26 } } }}
-      />
-    </MenuItem>
-
-    <MenuItem onClick={() => setZenMode(zenOn ? 'clean' : 'cleaner')} sx={{ justifyContent: 'space-between' }}>
-      <Typography>
-        Zen
-      </Typography>
-      <Switch
-        checked={zenOn} onChange={handleZenModeChange}
-        endDecorator={zenOn ? 'On' : 'Off'}
-        slotProps={{ endDecorator: { sx: { minWidth: 26 } } }}
-      />
-    </MenuItem>
-
-  </>;
-}
-
-export function ViewSharedConversation(props: { conversation: DConversation, sharedAt: Date, expiresAt: Date | null }) {
+/**
+ * Renders a chat link view with conversation details and messages.
+ */
+export function ViewChatLink(props: { conversation: DConversation, storedAt: Date, expiresAt: Date | null }) {
 
   // state
   const [cloning, setCloning] = React.useState<boolean>(false);
   const listBottomRef = React.useRef<HTMLDivElement>(null);
 
   // external state
-  const { push: routerPush } = useRouter();
   const showSystemMessages = useUIPreferencesStore(state => state.showSystemMessages);
-  const conversationId = props.conversation.id;
-  const existingId = useChatStore(state => state.conversations.some(c => c.id === conversationId));
+  const hasExistingChat = useChatStore(state => state.conversations.some(c => c.id === props.conversation.id));
 
   // derived state
   const messages = props.conversation.messages;
   const filteredMessages = messages.filter(m => m.role !== 'system' || showSystemMessages);
   const hasMessages = filteredMessages.length > 0;
-
-
-  // pluggable UI
-
-  const menuItems = React.useMemo(() =>
-      <AppSharedMenuItems />,
-    [],
-  );
-
-  useLayoutPluggable(null, null, menuItems);
 
 
   // Effect: Turn on Markdown (globally) if there are tables in the chat
@@ -123,10 +53,11 @@ export function ViewSharedConversation(props: { conversation: DConversation, sha
     }, 1000);
   }, [messages]);*/
 
+
   const handleClone = async (canOverwrite: boolean) => {
     setCloning(true);
     useChatStore.getState().importConversation({ ...props.conversation }, !canOverwrite);
-    await navigateToChat(routerPush);
+    await navigateToChat();
     setCloning(false);
   };
 
@@ -152,10 +83,10 @@ export function ViewSharedConversation(props: { conversation: DConversation, sha
         // animation: `${cssMagicSwapKeyframes} 0.4s cubic-bezier(0.22, 1, 0.36, 1)`,
       }}>
         <Typography level='h3' startDecorator={<TelegramIcon sx={{ fontSize: 'xl3', mr: 0.5 }} />}>
-          {conversationTitle(props.conversation)}
+          {conversationTitle(props.conversation, 'Chat')}
         </Typography>
         <Typography level='title-sm'>
-          Uploaded <TimeAgo date={props.sharedAt} />
+          Uploaded <TimeAgo date={props.storedAt} />
           {!!props.expiresAt && <>, expires <TimeAgo date={props.expiresAt} /></>}.
         </Typography>
       </Box>
@@ -220,7 +151,7 @@ export function ViewSharedConversation(props: { conversation: DConversation, sha
           Clone on {Brand.Title.Base}
         </Button>
 
-        {existingId && (
+        {hasExistingChat && (
           <Tooltip title='This conversation is already present, enabling Overwrite'>
             <Button
               variant='soft' color='warning'

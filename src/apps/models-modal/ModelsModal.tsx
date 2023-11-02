@@ -72,7 +72,7 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
 
       {!!llmCount && <Divider />}
 
-      {!!llmCount && <ModelsList filterSourceId={showAllSources ? null : selectedSourceId} />}
+      {/* {!!llmCount && <ModelsList filterSourceId={showAllSources ? null : selectedSourceId} />} */}
 
       <Divider />
 

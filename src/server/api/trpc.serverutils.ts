@@ -1,21 +1,23 @@
 import { TRPCError } from '@trpc/server';
 
+import { SERVER_DEBUG_WIRE, debugGenerateCurlCommand } from '~/server/wire';
+
 
 // JSON fetcher
-export const fetchJsonOrTRPCError: <TOut = unknown, TPostBody = undefined>(
+export const fetchJsonOrTRPCError: <TOut extends object, TPostBody extends object | undefined = undefined /* undefined for GET requests */>(
   url: string,
   method: 'GET' | 'POST',
   headers: HeadersInit,
-  body: TPostBody | undefined,
+  body: TPostBody,
   moduleName: string,
 ) => Promise<TOut> = createFetcherFromTRPC(async (response) => await response.json(), 'json');
 
 // Text fetcher
-export const fetchTextOrTRPCError: <TPostBody = undefined>(
+export const fetchTextOrTRPCError: <TPostBody extends object | undefined>(
   url: string,
   method: 'GET' | 'POST',
   headers: HeadersInit,
-  body: TPostBody | undefined,
+  body: TPostBody,
   moduleName: string,
 ) => Promise<string> = createFetcherFromTRPC(async (response) => await response.text(), 'text');
 
@@ -25,12 +27,14 @@ function createFetcherFromTRPC<TPostBody, TOut>(parser: (response: Response) => 
   return async (url, method, headers, body, moduleName) => {
     let response: Response;
     try {
+      if (SERVER_DEBUG_WIRE)
+        console.log('-> tRPC curl', debugGenerateCurlCommand(method, url, headers, body as any));
       response = await fetch(url, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
     } catch (error: any) {
       console.error(`[${moduleName} Fetch Error]:`, error);
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: `[${moduleName} Issue] ${error?.message || error?.toString() || 'Unknown fetch error'} - ${error?.cause}`,
+        message: `[${moduleName} Issue] (network) ${error?.message || error?.toString() || 'Unknown fetch error'} - ${error?.cause}`,
       });
     }
     if (!response.ok) {

@@ -17,6 +17,9 @@ export const NewsItems: NewsItem[] = [
   /*{
     versionName: 'NEXT',
     items: [
+      { text: <>CloudFlare OpenAI API Gateway</> },
+      { text: <>Helicone Anthropic support</> },
+      { text: <>Highlight differneces (Labs)</> },
       { text: <>(Labs mode) YouTube personas creator</> },
     ],
   },*/
@@ -24,7 +27,7 @@ export const NewsItems: NewsItem[] = [
     versionName: '1.4.0',
     items: [
       { text: <><B>Share and clone</B> conversations, with public links</> },
-      { text: <><B>Azure</B> models full support, incl. gpt-4-32k</> },
+      { text: <><B>Azure</B> models <Link href='https://github.com/enricoros/big-agi/blob/main/docs/config-azure-openai.md' target='_blank'>full support</Link>, incl. gpt-4-32k</> },
       { text: <><B>OpenRouter</B> models full support, incl. gpt-4-32k</> },
       { text: <>Latex Rendering</> },
       { text: <>Augmented Chat modes (Labs)</> },
@@ -47,7 +50,7 @@ export const NewsItems: NewsItem[] = [
       { text: <><B>Flattener</B> - 4-mode conversations summarizer</> },
       { text: <><B>Forking</B> - branch your conversations</> },
       { text: <><B>/s</B> and <B>/a</B> to append a <i>system</i> or <i>assistant</i> message</> },
-      { text: <>Local LLMs with <Link href='https://github.com/enricoros/big-agi/blob/main/docs/local-llm-text-web-ui.md' target='_blank'>Oobabooga server</Link></> },
+      { text: <>Local LLMs with <Link href='https://github.com/enricoros/big-agi/blob/main/docs/config-local-oobabooga.md' target='_blank'>Oobabooga server</Link></> },
       { text: 'NextJS STOP bug.. squashed, with Vercel!' },
     ],
   },

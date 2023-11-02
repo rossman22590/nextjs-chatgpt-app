@@ -15,21 +15,22 @@ import { InlineError } from '~/common/components/InlineError';
 import { Link } from '~/common/components/Link';
 import { apiAsyncNode } from '~/common/util/trpc.client';
 import { copyToClipboard } from '~/common/util/copyToClipboard';
+import { getChatLinkRelativePath } from '~/common/routes';
 import { getOriginUrl } from '~/common/util/urlUtils';
-import { getSharingRelativePath } from '~/common/routes';
 import { webShare, webSharePresent } from '~/common/util/pwaUtils';
 
-import { type ShareDeleteSchema, type SharePutSchema } from './server/trade.router';
+import { removeChatLinkItem } from '../store-sharing';
+import { type StorageDeleteSchema, type StoragePutSchema } from '../server/trade.router';
 
 
-export function ExportSharedModal(props: { onClose: () => void, response: SharePutSchema, open: boolean }) {
+export function ExportedChatLink(props: { onClose: () => void, response: StoragePutSchema, open: boolean }) {
 
   // state
   const [opened, setOpened] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
-  const [shared, setShared] = React.useState(false);
+  const [native, setNative] = React.useState(false);
   const [confirmDeletion, setConfirmDeletion] = React.useState(false);
-  const [deletionResponse, setDeletionResponse] = React.useState<ShareDeleteSchema | null>(null);
+  const [deletionResponse, setDeletionResponse] = React.useState<StorageDeleteSchema | null>(null);
 
   // in case of 'put' error, just display the message
   if (props.response.type === 'error') {
@@ -41,8 +42,8 @@ export function ExportSharedModal(props: { onClose: () => void, response: ShareP
   }
 
   // success
-  const { sharedId, deletionKey, expiresAt } = props.response;
-  const relativeUrl = getSharingRelativePath(sharedId);
+  const { objectId, deletionKey, expiresAt } = props.response;
+  const relativeUrl = getChatLinkRelativePath(objectId);
   const fullUrl = getOriginUrl() + relativeUrl;
 
 
@@ -53,8 +54,8 @@ export function ExportSharedModal(props: { onClose: () => void, response: ShareP
     setCopied(true);
   };
 
-  const onShare = async () => webShare(Brand.Title.Common, 'Check out this chat!', fullUrl,
-    () => setShared(true));
+  const onNative = async () => webShare(Brand.Title.Base, 'Check out this chat!', fullUrl,
+    () => setNative(true));
 
 
   const onDeleteNow = () => setConfirmDeletion(true);
@@ -62,8 +63,10 @@ export function ExportSharedModal(props: { onClose: () => void, response: ShareP
   const onDeleteCancelled = () => setConfirmDeletion(false);
 
   const onConfirmedDeletion = async () => {
-    const result: ShareDeleteSchema = await apiAsyncNode.trade.shareDelete.mutate({ sharedId, deletionKey });
+    const result: StorageDeleteSchema = await apiAsyncNode.trade.storageDelete.mutate({ objectId, deletionKey });
     setDeletionResponse(result);
+    if (result.type === 'success')
+      removeChatLinkItem(objectId);
     setConfirmDeletion(false);
   };
 
@@ -109,8 +112,8 @@ export function ExportSharedModal(props: { onClose: () => void, response: ShareP
           {webSharePresent() &&
             <Tooltip title='Share the link using your device'>
               <Button
-                variant={shared ? 'soft' : 'solid'} onClick={onShare}
-                color={shared ? 'success' : undefined} endDecorator={shared ? <DoneIcon /> : <IosShareIcon />}
+                variant={native ? 'soft' : 'solid'} onClick={onNative}
+                color={native ? 'success' : undefined} endDecorator={native ? <DoneIcon /> : <IosShareIcon />}
                 sx={{ flexGrow: 1 }}
               >
                 Share
