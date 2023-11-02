@@ -51,7 +51,7 @@ export const openAIFunctionsSchema = z.array(z.object({
 
 export const listModelsInputSchema = z.object({
   access: openAIAccessSchema,
-  filterGpt: z.boolean().optional(),
+  onlyChatModels: z.boolean().optional(),
 });
 
 const chatGenerateWithFunctionsInputSchema = z.object({
@@ -92,9 +92,16 @@ export const llmOpenAIRouter = createTRPCRouter({
 
       const wireModels: OpenAI.Wire.Models.Response = await openaiGET<OpenAI.Wire.Models.Response>(input.access, '/v1/models');
 
-      // filter out the non-gpt models, if requested
-      let llms = (wireModels.data || [])
-        .filter(model => !input.filterGpt || model.id.includes('gpt'));
+      let llms = wireModels.data || [];
+
+      // filter out the non-gpt models, if requested (only by OpenAI right now)
+      if (llms.length && input.onlyChatModels) {
+        llms = llms.filter(model => {
+          if (model.id.includes('-instruct'))
+            return false;
+          return model.id.includes('gpt');
+        });
+      }
 
       // remove models with duplicate ids (can happen for local servers)
       const preFilterCount = llms.length;
@@ -222,12 +229,12 @@ type ModelSchema = z.infer<typeof openAIModelSchema>;
 type HistorySchema = z.infer<typeof openAIHistorySchema>;
 type FunctionsSchema = z.infer<typeof openAIFunctionsSchema>;
 
-async function openaiGET<TOut>(access: OpenAIAccessSchema, apiPath: string /*, signal?: AbortSignal*/): Promise<TOut> {
+async function openaiGET<TOut extends object>(access: OpenAIAccessSchema, apiPath: string /*, signal?: AbortSignal*/): Promise<TOut> {
   const { headers, url } = openAIAccess(access, null, apiPath);
   return await fetchJsonOrTRPCError<TOut>(url, 'GET', headers, undefined, 'OpenAI');
 }
 
-async function openaiPOST<TOut, TPostBody>(access: OpenAIAccessSchema, modelRefId: string | null, body: TPostBody, apiPath: string /*, signal?: AbortSignal*/): Promise<TOut> {
+async function openaiPOST<TOut extends object, TPostBody extends object>(access: OpenAIAccessSchema, modelRefId: string | null, body: TPostBody, apiPath: string /*, signal?: AbortSignal*/): Promise<TOut> {
   const { headers, url } = openAIAccess(access, modelRefId, apiPath);
   return await fetchJsonOrTRPCError<TOut, TPostBody>(url, 'POST', headers, body, 'OpenAI');
 }
@@ -235,8 +242,9 @@ async function openaiPOST<TOut, TPostBody>(access: OpenAIAccessSchema, modelRefI
 
 const DEFAULT_OPENAI_HOST = 'api.openai.com';
 const DEFAULT_OPENROUTER_HOST = 'https://openrouter.ai/api';
+const DEFAULT_HELICONE_OPENAI_HOST = 'oai.hconeai.com';
 
-function fixupHost(host: string, apiPath: string): string {
+export function fixupHost(host: string, apiPath: string): string {
   if (!host.startsWith('http'))
     host = `https://${host}`;
   if (host.endsWith('/') && apiPath.startsWith('/'))
@@ -275,12 +283,43 @@ export function openAIAccess(access: OpenAIAccessSchema, modelRefId: string | nu
     case 'openai':
       const oaiKey = access.oaiKey || process.env.OPENAI_API_KEY || '';
       const oaiOrg = access.oaiOrg || process.env.OPENAI_API_ORG_ID || '';
-      const oaiHost = fixupHost(access.oaiHost || process.env.OPENAI_API_HOST || DEFAULT_OPENAI_HOST, apiPath);
+      let oaiHost = fixupHost(access.oaiHost || process.env.OPENAI_API_HOST || DEFAULT_OPENAI_HOST, apiPath);
       // warn if no key - only for default (non-overridden) hosts
       if (!oaiKey && oaiHost.indexOf(DEFAULT_OPENAI_HOST) !== -1)
         throw new Error('Missing OpenAI API Key. Add it on the UI (Models Setup) or server side (your deployment).');
 
-      const heliKey = access.heliKey || process.env.HELICONE_API_KEY || '';
+      // [Helicone]
+      // We don't change the host (as we do on Anthropic's), as we expect the user to have a custom host.
+      let heliKey = access.heliKey || process.env.HELICONE_API_KEY || false;
+      if (heliKey) {
+        if (oaiHost.includes(DEFAULT_OPENAI_HOST)) {
+          oaiHost = `https://${DEFAULT_HELICONE_OPENAI_HOST}`;
+        } else if (!oaiHost.includes(DEFAULT_HELICONE_OPENAI_HOST)) {
+          // throw new Error(`The Helicone OpenAI Key has been provided, but the host is not set to https://${DEFAULT_HELICONE_OPENAI_HOST}. Please fix it in the Models Setup page.`);
+          heliKey = false;
+        }
+      }
+
+      // [Cloudflare OpenAI AI Gateway support]
+      // Adapts the API path when using a 'universal' or 'openai' Cloudflare AI Gateway endpoint in the "API Host" field
+      if (oaiHost.includes('https://gateway.ai.cloudflare.com')) {
+        const parsedUrl = new URL(oaiHost);
+        const pathSegments = parsedUrl.pathname.split('/').filter(segment => segment.length > 0);
+
+        // The expected path should be: /v1/<ACCOUNT_TAG>/<GATEWAY_URL_SLUG>/<PROVIDER_ENDPOINT>
+        if (pathSegments.length < 3 || pathSegments.length > 4 || pathSegments[0] !== 'v1')
+          throw new Error('Cloudflare AI Gateway API Host is not valid. Please check the API Host field in the Models Setup page.');
+
+        const [_v1, accountTag, gatewayName, provider] = pathSegments;
+        if (provider && provider !== 'openai')
+          throw new Error('Cloudflare AI Gateway only supports OpenAI as a provider.');
+
+        if (apiPath.startsWith('/v1'))
+          apiPath = apiPath.replace('/v1', '');
+
+        oaiHost = 'https://gateway.ai.cloudflare.com';
+        apiPath = `/v1/${accountTag}/${gatewayName}/${provider || 'openai'}${apiPath}`;
+      }
 
       return {
         headers: {

@@ -2,67 +2,20 @@ import type { ModelDescriptionSchema } from '../../transports/server/server.comm
 import { LLM_IF_OAI_Chat, LLM_IF_OAI_Complete, LLM_IF_OAI_Fn } from '../../store-llms';
 
 const knownOpenAIChatModels: ({ idPrefix: string } & Omit<ModelDescriptionSchema, 'id'>)[] = [
-  // GPT4-32k's
-  {
-    idPrefix: 'gpt-4-32k-0314',
-    label: 'GPT-4-32k (0314)',
-    description: 'Snapshot of gpt-4-32 from March 14th 2023. Will be deprecated on June 13th 2024 at the earliest.',
-    contextWindow: 32768,
-    interfaces: [LLM_IF_OAI_Chat],
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4-32k-0613',
-    label: 'GPT-4-32k (0613)',
-    description: 'Snapshot of gpt-4-32 from June 13th 2023.',
-    contextWindow: 32768,
-    interfaces: [LLM_IF_OAI_Chat],
-  },
-  {
-    idPrefix: 'gpt-4-32k',
-    label: 'GPT-4-32k',
-    description: 'Largest context window for big problems',
-    contextWindow: 32768,
-    interfaces: [LLM_IF_OAI_Chat],
-  },
-
-  // GPT4's
-  {
-    idPrefix: 'gpt-4-0613',
-    label: 'GPT-4 (0613)',
-    description: 'Snapshot of gpt-4 from June 13th 2023 with function calling data.',
-    contextWindow: 8192,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-  },
-  {
-    idPrefix: 'gpt-4-0314',
-    label: 'GPT-4 (0314)',
-    description: 'Snapshot of gpt-4 from March 14th 2023 with function calling data.',
-    contextWindow: 8192,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4',
-    label: 'GPT-4',
-    description: 'Insightful, big thinker, slower, pricey',
-    contextWindow: 8192,
-    interfaces: [LLM_IF_OAI_Chat],
-    hidden: true,
-  },
+ 
 
 
   // 3.5-Turbo-16k's
   {
     idPrefix: 'gpt-3.5-turbo-16k-0613',
-    label: '3.5-Turbo-16k (0613)',
+    label: 'gpt-4 (0613)',
     description: 'Snapshot of gpt-3.5-turbo-16k from June 13th 2023.',
     contextWindow: 16385,
     interfaces: [LLM_IF_OAI_Chat],
   },
   {
     idPrefix: 'gpt-3.5-turbo-16k',
-    label: '3.5-Turbo-16k',
+    label: 'gpt-3.5-turbo-16k (0613)',
     description: 'Same capabilities as the standard gpt-3.5-turbo model but with 4 times the context.',
     contextWindow: 16385,
     interfaces: [LLM_IF_OAI_Chat],

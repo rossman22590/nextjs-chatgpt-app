@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
 import { createParser as createEventsourceParser, EventSourceParser, ParsedEvent, ReconnectInterval } from 'eventsource-parser';
 
+import { SERVER_DEBUG_WIRE, debugGenerateCurlCommand } from '~/server/wire';
+
 import { AnthropicWire } from './anthropic.wiretypes';
 import { OpenAI } from './openai.wiretypes';
 import { anthropicAccess, anthropicAccessSchema, anthropicChatCompletionPayload } from './anthropic.router';
@@ -99,8 +101,19 @@ function createEventStreamTransformer(vendorTextParser: AIStreamParser): Transfo
 
   return new TransformStream({
     start: async (controller): Promise<void> => {
+
+      // only used for debugging
+      let debugLastMs: number | null = null;
+
       eventSourceParser = createEventsourceParser(
         (event: ParsedEvent | ReconnectInterval) => {
+
+          if (SERVER_DEBUG_WIRE) {
+            const nowMs = Date.now();
+            const elapsedMs = debugLastMs ? nowMs - debugLastMs : 0;
+            debugLastMs = nowMs;
+            console.log(`<- SSE (${elapsedMs} ms):`, event);
+          }
 
           // ignore 'reconnect-interval' and events with no data
           if (event.type !== 'event' || !('data' in event))
@@ -134,10 +147,10 @@ function createEventStreamTransformer(vendorTextParser: AIStreamParser): Transfo
   });
 }
 
-export async function throwResponseNotOk(response: Response) {
+export async function throwIfResponseNotOk(response: Response) {
   if (!response.ok) {
     const errorPayload: object | null = await response.json().catch(() => null);
-    throw new Error(`${response.status} · ${response.statusText}${errorPayload ? ' · ' + JSON.stringify(errorPayload) : ''}`);
+    throw new Error(`${response.statusText} (${response.status})${errorPayload ? ' · ' + JSON.stringify(errorPayload) : ''}`);
   }
 }
 
@@ -161,12 +174,12 @@ export async function openaiStreamingResponse(req: NextRequest): Promise<Respons
   const { access, model, history } = chatStreamInputSchema.parse(await req.json());
 
   // begin event streaming from the OpenAI API
+  let headersUrl: { headers: HeadersInit, url: string } = { headers: {}, url: '' };
   let upstreamResponse: Response;
   let vendorStreamParser: AIStreamParser;
   try {
 
     // prepare the API request data
-    let headersUrl: { headers: HeadersInit, url: string };
     let body: object;
     switch (access.dialect) {
       case 'anthropic':
@@ -184,18 +197,26 @@ export async function openaiStreamingResponse(req: NextRequest): Promise<Respons
         break;
     }
 
+    if (SERVER_DEBUG_WIRE)
+      console.log('-> streaming curl', debugGenerateCurlCommand('POST', headersUrl.url, headersUrl.headers, body));
+
     // POST to our API route
     upstreamResponse = await fetch(headersUrl.url, {
       method: 'POST',
       headers: headersUrl.headers,
       body: JSON.stringify(body),
     });
-    await throwResponseNotOk(upstreamResponse);
+    await throwIfResponseNotOk(upstreamResponse);
 
   } catch (error: any) {
-    const fetchOrVendorError = (error?.message || typeof error === 'string' ? error : JSON.stringify(error)) + (error?.cause ? ' · ' + error.cause : '');
-    console.log(`/api/llms/stream: fetch issue: ${fetchOrVendorError}`);
-    return new NextResponse('[OpenAI Issue] ' + fetchOrVendorError, { status: 500 });
+    const fetchOrVendorError = (error?.message || (typeof error === 'string' ? error : JSON.stringify(error))) + (error?.cause ? ' · ' + error.cause : '');
+    const dialectError = (access.dialect.charAt(0).toUpperCase() + access.dialect.slice(1)) + ' - ' + fetchOrVendorError;
+
+    // server-side admins message
+    console.log(`/api/llms/stream: fetch issue:`, dialectError, headersUrl?.url);
+
+    // client-side users visible message
+    return new NextResponse('[Issue] ' + dialectError + (process.env.NODE_ENV === 'development' ? ` · [URL: ${headersUrl?.url}]` : ''), { status: 500 });
   }
 
   /* The following code is heavily inspired by the Vercel AI SDK, but simplified to our needs and in full control.
