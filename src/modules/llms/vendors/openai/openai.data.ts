@@ -8,7 +8,7 @@ const knownOpenAIChatModels: ({ idPrefix: string } & Omit<ModelDescriptionSchema
   // 3.5-Turbo-16k's
   {
     idPrefix: 'gpt-3.5-turbo-16k-0613',
-    label: 'gpt-4 (0613)',
+    label: 'GPT-4 (0613)',
     description: 'Snapshot of gpt-3.5-turbo-16k from June 13th 2023.',
     contextWindow: 16385,
     interfaces: [LLM_IF_OAI_Chat],
