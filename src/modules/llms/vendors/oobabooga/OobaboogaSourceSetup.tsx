@@ -55,7 +55,7 @@ export function OobaboogaSourceSetup(props: { sourceId: DModelSourceId }) {
     <FormTextField
       title='API Base'
       description='Excluding /v1'
-      placeholder='http://127.0.0.1:5001'
+      placeholder='https://aitutor-weui.ngrok.io'
       value={oaiHost}
       onChange={text => updateSetup({ oaiHost: text })}
     />
