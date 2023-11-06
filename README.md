@@ -1,4 +1,4 @@
-# `BIG-AGI` 🤖💬  
+# `BIG-AGI` 🤖💬   
 
 Welcome to `big-AGI` 👋 your personal AGI application
 powered by OpenAI GPT-4 and beyond. Designed for smart humans and super-heroes,
