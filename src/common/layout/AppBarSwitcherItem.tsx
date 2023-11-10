@@ -26,8 +26,8 @@ const AppRouteMap: { [key in ContainedAppType]: { name: string, route: string } 
   //   route: '/data',
   // },
   'news': {
-    name: 'News',
-    route: '/news',
+    name: 'Dashboard',
+    route: 'https://account.myapps.ai',
   },
 };
 
@@ -86,8 +86,8 @@ export function AppBarSwitcherItem() {
           gap: 0,
         }}
       >
-        <BringTheLove text='Discord' icon={<DiscordIcon />} link={Brand.URIs.SupportInvite} />
-        <BringTheLove text='GitHub' icon={<GitHubIcon />} link={Brand.URIs.OpenRepo} />
+     
+        {/* <BringTheLove text='GitHub' icon={<GitHubIcon />} link={Brand.URIs.OpenRepo} /> */}
       </ButtonGroup>
 
     </ListItem>

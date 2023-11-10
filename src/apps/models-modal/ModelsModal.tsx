@@ -72,9 +72,9 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
 
       {!!activeSource && <VendorSourceSetup source={activeSource} />}
 
-      {!!llmCount && <Divider />}
+      {/* {!!llmCount && <Divider />}
 
-      {!!llmCount && <ModelsList filterSourceId={showAllSources ? null : selectedSourceId} />}
+      {!!llmCount && <ModelsList filterSourceId={showAllSources ? null : selectedSourceId} />} */}
 
       <Divider />
 

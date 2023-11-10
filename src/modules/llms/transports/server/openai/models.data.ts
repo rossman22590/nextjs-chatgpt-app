@@ -56,6 +56,7 @@ const _knownOpenAIChatModels: ManualMappings = [
     description: 'Snapshot of gpt-4 from June 13th 2023 with function calling data.',
     contextWindow: 8192,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+    hidden: true,
   },
   {
     idPrefix: 'gpt-4-0314',
