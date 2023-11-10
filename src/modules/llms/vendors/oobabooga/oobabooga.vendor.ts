@@ -28,7 +28,7 @@ export const ModelVendorOoobabooga: IModelVendor<SourceSetupOobabooga, LLMOption
 
   // functions
   initializeSetup: (): SourceSetupOobabooga => ({
-    oaiHost: 'http://127.0.0.1:5000',
+    oaiHost: 'https://aitutor-weui.ngrok.io',
   }),
   getAccess: (partialSetup): OpenAIAccessSchema => ({
     dialect: 'oobabooga',
