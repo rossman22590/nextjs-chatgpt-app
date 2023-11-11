@@ -119,15 +119,14 @@ const MicContinuationButton = (props: { variant: VariantProp, color: ColorPalett
   </Tooltip>;
 
 const CallButtonMobile = (props: { disabled?: boolean, onClick: () => void, sx?: SxProps }) =>
-  <IconButton variant='soft' color='primary' disabled={!!props.disabled} onClick={props.onClick} sx={props.sx}>
+  <IconButton variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} sx={props.sx}>
     <CallIcon />
   </IconButton>;
 
 const CallButtonDesktop = (props: { disabled?: boolean, onClick: () => void, sx?: SxProps }) =>
-  <Button variant='soft' color='primary' disabled={!!props.disabled} onClick={props.onClick} endDecorator={<CallIcon />} sx={props.sx}>
+  <Button variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} endDecorator={<CallIcon />} sx={props.sx}>
     Call
   </Button>;
-
 
 const DrawOptionsButtonMobile = (props: { onClick: () => void, sx?: SxProps }) =>
   <IconButton variant='soft' color='warning' onClick={props.onClick} sx={props.sx}>
