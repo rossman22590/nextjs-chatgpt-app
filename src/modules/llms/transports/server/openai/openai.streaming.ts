@@ -20,7 +20,7 @@ import { wireOllamaGenerationSchema } from '../ollama/ollama.wiretypes';
  * The peculiarity of our parser is the injection of a JSON structure at the beginning of the stream, to
  * communicate parameters before the text starts flowing to the client.
  */
-type AIStreamParser = (data: string) => { text: string, close: boolean };
+export type AIStreamParser = (data: string) => { text: string, close: boolean };
 
 type EventStreamFormat = 'sse' | 'json-nl';
 
@@ -140,7 +140,14 @@ function createOllamaStreamParser(): AIStreamParser {
 
   return (data: string) => {
 
-    const wireGeneration = JSON.parse(data);
+    let wireGeneration: any;
+    try {
+      wireGeneration = JSON.parse(data);
+    } catch (error: any) {
+      // log the malformed data to the console, and rethrow to transmit as 'error'
+      console.log(`/api/llms/stream: Ollama parsing issue: ${error?.message || error}`, data);
+      throw error;
+    }
     const generation = wireOllamaGenerationSchema.parse(wireGeneration);
     let text = generation.response;
 
@@ -271,7 +278,7 @@ function createJsonNewlineParser(onParse: EventSourceParseCallback): EventSource
     feed: (chunk: string): void => {
       accumulator += chunk;
       if (accumulator.endsWith('\n')) {
-        for (const jsonString of chunk.split('\n').filter(line => !!line)) {
+        for (const jsonString of accumulator.split('\n').filter(line => !!line)) {
           const mimicEvent: ParsedEvent = {
             type: 'event',
             id: undefined,
