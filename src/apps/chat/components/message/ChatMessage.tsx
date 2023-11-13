@@ -193,14 +193,16 @@ function useSanityTextDiffs(text: string, diffText: string | undefined) {
 export function ChatMessage(props: {
   message: DMessage,
   showDate?: boolean, diffText?: string,
+  hideAvatars?: boolean, codeBackground?: string, noMarkdown?: boolean,
   isBottom?: boolean, noBottomBorder?: boolean,
   isImagining?: boolean, isSpeaking?: boolean,
   onMessageDelete?: () => void,
-  onMessageEdit: (text: string) => void,
+  onMessageEdit?: (text: string) => void,
   onMessageRunFrom?: (offset: number) => void,
   onTextDiagram?: (text: string) => Promise<void>
   onTextImagine?: (text: string) => Promise<void>
   onTextSpeak?: (text: string) => Promise<void>
+  sx?: SxProps,
 }) {
 
   // state
@@ -213,8 +215,8 @@ export function ChatMessage(props: {
   // const contentRef = React.useRef<HTMLUListElement>(null);
 
   // external state
-  const { showAvatars, renderMarkdown, doubleClickToEdit } = useUIPreferencesStore(state => ({
-    showAvatars: state.zenMode !== 'cleaner',
+  const { cleanerLooks, renderMarkdown, doubleClickToEdit } = useUIPreferencesStore(state => ({
+    cleanerLooks: state.zenMode === 'cleaner',
     renderMarkdown: state.renderMarkdown,
     doubleClickToEdit: state.doubleClickToEdit,
   }), shallow);
@@ -232,10 +234,13 @@ export function ChatMessage(props: {
     created: messageCreated,
     updated: messageUpdated,
   } = props.message;
+
   const fromAssistant = messageRole === 'assistant';
   const fromSystem = messageRole === 'system';
   const fromUser = messageRole === 'user';
   const wasEdited = !!messageUpdated;
+
+  const showAvatars = props.hideAvatars !== true && !cleanerLooks;
 
   const textSel = selMenuText ? selMenuText : messageText;
   const isSpecialProdia = textSel.startsWith('https://images.prodia.xyz/') || textSel.startsWith('/imagine') || textSel.startsWith('/img');
@@ -246,7 +251,7 @@ export function ChatMessage(props: {
 
   const handleTextEdited = (editedText: string) => {
     setIsEditing(false);
-    if (editedText?.trim() && editedText !== messageText)
+    if (props.onMessageEdit && editedText?.trim() && editedText !== messageText)
       props.onMessageEdit(editedText);
   };
 
@@ -390,7 +395,7 @@ export function ChatMessage(props: {
   };
   const codeSx: SxProps = {
     // backgroundColor: fromAssistant ? 'background.level1' : 'background.level1',
-    backgroundColor: fromAssistant ? 'neutral.plainHoverBg' : 'primary.plainActiveBg',
+    backgroundColor: props.codeBackground ? props.codeBackground : fromAssistant ? 'neutral.plainHoverBg' : 'primary.plainActiveBg',
     boxShadow: 'xs',
     fontFamily: 'code',
     fontSize: '14px',
@@ -424,6 +429,7 @@ export function ChatMessage(props: {
         ...(ENABLE_COPY_MESSAGE_OVERLAY && { position: 'relative' }),
         ...(props.isBottom === true && { mb: 'auto' }),
         '&:hover > button': { opacity: 1 },
+        ...props.sx,
       }}
     >
 
@@ -461,7 +467,7 @@ export function ChatMessage(props: {
       {!isEditing ? (
 
         <Box
-          onDoubleClick={(e) => doubleClickToEdit ? handleOpsEdit(e) : null}
+          onDoubleClick={event => (doubleClickToEdit && props.onMessageEdit) ? handleOpsEdit(event) : null}
           sx={{
             ...blockSx,
             flexGrow: 0,
@@ -487,7 +493,7 @@ export function ChatMessage(props: {
             ) : (
               <Box
                 // ref={contentRef}
-                onContextMenu={ENABLE_SELECTION_RIGHT_CLICK_MENU ? event => handleMouseUp(event.nativeEvent) : undefined}
+                onContextMenu={(ENABLE_SELECTION_RIGHT_CLICK_MENU && !!props.onMessageEdit) ? event => handleMouseUp(event.nativeEvent) : undefined}
               >
                 {parseBlocks(collapsedText, fromSystem, diffs).map((block, index) =>
                   block.type === 'html'
@@ -500,7 +506,7 @@ export function ChatMessage(props: {
                           ? <RenderLatex key={'latex-' + index} latexBlock={block} />
                           : block.type === 'diff'
                             ? <RenderTextDiff key={'latex-' + index} diffBlock={block} />
-                            : (renderMarkdown && !fromSystem)
+                            : (renderMarkdown && props.noMarkdown !== true && !fromSystem)
                               ? <RenderMarkdown key={'text-md-' + index} textBlock={block} />
                               : <RenderText key={'text-' + index} textBlock={block} />,
                 )}
@@ -549,11 +555,13 @@ export function ChatMessage(props: {
           open anchorEl={opsMenuAnchor} onClose={closeOperationsMenu}
         >
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <MenuItem variant='plain' disabled={messageTyping} onClick={handleOpsEdit} sx={{ flex: 1 }}>
-              <ListItemDecorator><EditIcon /></ListItemDecorator>
-              {isEditing ? 'Discard' : 'Edit'}
-              {/*{!isEditing && <span style={{ opacity: 0.5, marginLeft: '8px' }}>{doubleClickToEdit ? '(double-click)' : ''}</span>}*/}
-            </MenuItem>
+            {!!props.onMessageEdit && (
+              <MenuItem variant='plain' disabled={messageTyping} onClick={handleOpsEdit} sx={{ flex: 1 }}>
+                <ListItemDecorator><EditIcon /></ListItemDecorator>
+                {isEditing ? 'Discard' : 'Edit'}
+                {/*{!isEditing && <span style={{ opacity: 0.5, marginLeft: '8px' }}>{doubleClickToEdit ? '(double-click)' : ''}</span>}*/}
+              </MenuItem>
+            )}
             <MenuItem onClick={handleOpsCopy} sx={{ flex: 1 }}>
               <ListItemDecorator><ContentCopyIcon /></ListItemDecorator>
               Copy
@@ -576,7 +584,7 @@ export function ChatMessage(props: {
           )}
           {!!props.onTextDiagram && <MenuItem onClick={handleOpsDiagram} disabled={!couldDiagram || props.isImagining}>
             <ListItemDecorator><AccountTreeIcon color='success' /></ListItemDecorator>
-            Diagram ...
+            Visualize ...
           </MenuItem>}
           {!!props.onTextImagine && <MenuItem onClick={handleOpsImagine} disabled={!couldImagine || props.isImagining}>
             <ListItemDecorator>{props.isImagining ? <CircularProgress size='sm' /> : <FormatPaintIcon color='success' />}</ListItemDecorator>
@@ -608,7 +616,7 @@ export function ChatMessage(props: {
           </MenuItem>
           {!!props.onTextDiagram && <MenuItem onClick={handleOpsDiagram} disabled={!couldDiagram || props.isImagining}>
             <ListItemDecorator><AccountTreeIcon color='success' /></ListItemDecorator>
-            Diagram ...
+            Visualize ...
           </MenuItem>}
           {!!props.onTextImagine && <MenuItem onClick={handleOpsImagine} disabled={!couldImagine || props.isImagining}>
             <ListItemDecorator>{props.isImagining ? <CircularProgress size='sm' /> : <FormatPaintIcon color='success' />}</ListItemDecorator>
