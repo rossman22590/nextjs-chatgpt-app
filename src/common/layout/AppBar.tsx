@@ -22,12 +22,12 @@ import { closeLayoutDrawer, closeLayoutMenu, openLayoutPreferences, setLayoutDra
 function AppBarTitle() {
   return (
     <Link href='/'>
-      <LogoSquircle sx={{
+      {/* <LogoSquircle sx={{
         width: 32,
         height: 32,
         color: 'white',
         // filter: 'invert(1)',
-      }} />
+      }} /> */}
       <Typography sx={{
         ml: { xs: 1, md: 2 },
         color: 'white',
