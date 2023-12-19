@@ -5,8 +5,8 @@ export const env = createEnv({
   server: {
 
     // Backend Postgres, for optional storage via Prisma
-    POSTGRES_PRISMA_URL: z.string().url().optional(),
-    POSTGRES_URL_NON_POOLING: z.string().url().optional(),
+    POSTGRES_PRISMA_URL: z.string().optional(),
+    POSTGRES_URL_NON_POOLING: z.string().optional(),
 
     // LLM: OpenAI
     OPENAI_API_KEY: z.string().optional(),
@@ -61,6 +61,9 @@ export const env = createEnv({
     console.error('❌ Invalid environment variables:', error.issues);
     throw new Error('Invalid environment variable');
   },
+
+  // matches user expectations - see https://github.com/enricoros/big-AGI/issues/279
+  emptyStringAsUndefined: true,
 
   // with Noext.JS >= 13.4.4 we'd only need to destructure client variables
   experimental__runtimeEnv: {},
