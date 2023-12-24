@@ -8,17 +8,17 @@
  */
 export const Brand = {
   Title: {
-    Base: 'big-AGI',
+    Base: 'AI Tutor Plus',
     Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'big-AGI',
   },
   Meta: {
-    Description: 'Launch big-AGI to unlock the full potential of AI, with precise control over your data and models. Voice interface, AI personas, advanced features, and fun UX.',
-    SiteName: 'big-AGI | Precision AI for You',
-    ThemeColor: '#32383E',
-    TwitterSite: '@enricoros',
+    Description: 'AI web interface to help you learn, think, and do. AI personas, superior privacy, advanced features, and fun UX.',
+    SiteName: 'AI Tutor | Unlock AI Tools',
+    ThemeColor: '#6a0083',
+    TwitterSite: '@tsi_org',
   },
   URIs: {
-    Home: 'https://big-agi.com',
+    Home: 'https://myapps.ai',
     // App: 'https://get.big-agi.com',
     CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
     OpenRepo: 'https://github.com/enricoros/big-agi',
