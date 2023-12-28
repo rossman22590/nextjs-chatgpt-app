@@ -38,17 +38,17 @@ export const newsCallout =
         <Grid xs={12} sm={7}>
           <Button
             fullWidth variant='soft' color='primary' endDecorator={<LaunchIcon />}
-            component={Link} href={OpenProject} noLinkStyle target='_blank'
+            component={Link} href='https://docs.myapps.ai/help-center' noLinkStyle target='_blank'
           >
-            Explore
+            Docs
           </Button>
         </Grid>
         <Grid xs={12} sm={5} sx={{ display: 'flex', flexAlign: 'center', justifyContent: 'center' }}>
           <Button
             fullWidth variant='plain' color='primary' endDecorator={<LaunchIcon />}
-            component={Link} href={RIssues + '#'} noLinkStyle target='_blank'
+            component={Link} href='https://calendly.com/techinschools/30min' noLinkStyle target='_blank'
           >
-            Suggest a Feature
+            Get Help
           </Button>
         </Grid>
       </Grid>
@@ -81,7 +81,7 @@ export const NewsItems: NewsItem[] = [
       { text: <>Updated Ollama (v0.1.17) and OpenRouter models</> },
       { text: <>More: fixed ⌘ shortcuts on Mac</> },
       { text: <><Link href='https://big-agi.com'>Website</Link>: official downloads</> },
-      { text: <>Easier Vercel deployment, documented <Link href='#'>network troubleshooting</Link></>, dev: true },
+      { text: <>Easier Vercel deployment, documented <Link href='https://github.com/enricoros/big-AGI/issues/276#issuecomment-1858591483'>network troubleshooting</Link></>, dev: true },
     ],
   },
   {
