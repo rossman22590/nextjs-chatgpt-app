@@ -25,35 +25,35 @@ const RIssues = `${OpenRepo}/issues`;
 
 // callout, for special occasions
 export const newsCallout =
-  <Card>
-    <CardContent sx={{ gap: 2 }}>
-      <Typography level='title-lg'>
-        Open Roadmap
-      </Typography>
-      <Typography level='body-md'>
-        Take a peek at our roadmap to see what&apos;s in the pipeline.
-        Discover upcoming features and let us know what excites you the most!
-      </Typography>
-      <Grid container spacing={1}>
-        <Grid xs={12} sm={7}>
-          <Button
-            fullWidth variant='soft' color='primary' endDecorator={<LaunchIcon />}
-            component={Link} href={OpenProject} noLinkStyle target='_blank'
-          >
-            Explore
-          </Button>
-        </Grid>
-        <Grid xs={12} sm={5} sx={{ display: 'flex', flexAlign: 'center', justifyContent: 'center' }}>
-          <Button
-            fullWidth variant='plain' color='primary' endDecorator={<LaunchIcon />}
-            component={Link} href={RIssues + '/new?template=roadmap-request.md&title=%5BSuggestion%5D'} noLinkStyle target='_blank'
-          >
-            Suggest a Feature
-          </Button>
-        </Grid>
-      </Grid>
-    </CardContent>
-  </Card>;
+<Card>
+<CardContent sx={{ gap: 2 }}>
+  <Typography level='title-lg'>
+    Open Roadmap
+  </Typography>
+  <Typography level='body-md'>
+    Take a peek at our roadmap to see what&apos;s in the pipeline.
+    Discover upcoming features and let us know what excites you the most!
+  </Typography>
+  <Grid container spacing={1}>
+    <Grid xs={12} sm={7}>
+      <Button
+        fullWidth variant='soft' color='primary' endDecorator={<LaunchIcon />}
+        component={Link} href='https://docs.myapps.ai/help-center' noLinkStyle target='_blank'
+      >
+        Docs
+      </Button>
+    </Grid>
+    <Grid xs={12} sm={5} sx={{ display: 'flex', flexAlign: 'center', justifyContent: 'center' }}>
+      <Button
+        fullWidth variant='plain' color='primary' endDecorator={<LaunchIcon />}
+        component={Link} href='https://calendly.com/techinschools/30min' noLinkStyle target='_blank'
+      >
+        Get Help
+      </Button>
+    </Grid>
+  </Grid>
+</CardContent>
+</Card>;
 
 
 // news and feature surfaces
@@ -65,12 +65,12 @@ export const NewsItems: NewsItem[] = [
     versionMoji: '🎨🌌',
     versionDate: new Date('2023-12-28T22:30:00Z'),
     items: [
-      { text: <><B href={RIssues + '/212'}>DALL·E 3</B> support (/draw), with advanced control</>, issue: 212 },
-      { text: <><B href={RIssues + '/304'}>Perfect scrolling</B> UX, on all devices</>, issue: 304 },
-      { text: <>Create personas <B href={RIssues + '/287'}>from text</B></>, issue: 287 },
-      { text: <>Openrouter: auto-detect models, support free-tiers and rates</>, issue: 291 },
+      { text: <><B href={RIssues + '#'}>DALL·E 3</B> support (/draw), with advanced control</>, },
+      { text: <><B href={RIssues + '#'}>Perfect scrolling</B> UX, on all devices</>,  },
+      { text: <>Create personas <B href={RIssues + '#'}>from text</B></>,  },
+      { text: <>Openrouter: auto-detect models, support free-tiers and rates</>,  },
       { text: <>Image drawing: unified UX, including auto-prompting</> },
-      { text: <>Fix layout on Firefox</>, issue: 255 },
+      { text: <>Fix layout on Firefox</>,},
       { text: <>Developers: new Text2Image subsystem, Optima layout subsystem, ScrollToBottom library, using new Panes library, improved Llms subsystem</>, dev: true },
     ],
   },
@@ -80,15 +80,15 @@ export const NewsItems: NewsItem[] = [
     // versionMoji: '🚀🌕🔙❤️',
     versionDate: new Date('2023-12-20T09:30:00Z'),
     items: [
-      { text: <><B href={RIssues + '/275'}>Google Gemini</B> models support</> },
-      { text: <><B href={RIssues + '/273'}>Mistral Platform</B> support</> },
-      { text: <><B href={RIssues + '/270'}>Ollama chats</B> perfection</> },
-      { text: <>Custom <B href={RIssues + '/280'}>diagrams instructions</B> (@joriskalz)</> },
+      { text: <><B href={RIssues + '#'}>Google Gemini</B> models support</> },
+      { text: <><B href={RIssues + '#'}>Mistral Platform</B> support</> },
+      { text: <><B href={RIssues + '#'}>Ollama chats</B> perfection</> },
+      { text: <>Custom <B href={RIssues + '#'}>diagrams instructions</B> (@joriskalz)</> },
       { text: <><B>Single-Tab</B> mode, enhances data integrity and prevents DB corruption</> },
       { text: <>Updated Ollama (v0.1.17) and OpenRouter models</> },
       { text: <>More: fixed ⌘ shortcuts on Mac</> },
-      { text: <><Link href='https://big-agi.com'>Website</Link>: official downloads</> },
-      { text: <>Easier Vercel deployment, documented <Link href='https://github.com/enricoros/big-AGI/issues/276#issuecomment-1858591483'>network troubleshooting</Link></>, dev: true },
+      { text: <><Link href='https://myapps.ai'>Website</Link>: official downloads</> },
+      // { text: <>Easier Vercel deployment, documented <Link href='https://github.com/enricoros/big-AGI/issues/276#issuecomment-1858591483'>network troubleshooting</Link></>, dev: true },
     ],
   },
   {
@@ -97,11 +97,11 @@ export const NewsItems: NewsItem[] = [
     // versionDate: new Date('2023-12-11T06:00:00Z'), // 1.7.3
     versionDate: new Date('2023-12-10T12:00:00Z'), // 1.7.0
     items: [
-      { text: <>Redesigned <B href={RIssues + '/251'}>attachments system</B>: drag, paste, link, snap, images, text, pdfs</> },
-      { text: <>Desktop <B href={RIssues + '/253'}>webcam access</B> for direct image capture (Labs option)</> },
-      { text: <>Independent browsing with <B href={RCode + '/docs/config-browse.md'}>Browserless</B> support</> },
-      { text: <><B href={RIssues + '/256'}>Overheat</B> LLMs with higher temperature limits</> },
-      { text: <>Enhanced security via <B href={RCode + '/docs/deploy-authentication.md'}>password protection</B></> },
+      { text: <>Redesigned <B href={RIssues + '#'}>attachments system</B>: drag, paste, link, snap, images, text, pdfs</> },
+      { text: <>Desktop <B href={RIssues + '/#'}>webcam access</B> for direct image capture (Labs option)</> },
+      { text: <>Independent browsing with <B href={RCode + '#'}>Browserless</B> support</> },
+      { text: <><B href={RIssues + '#'}>Overheat</B> LLMs with higher temperature limits</> },
+      { text: <>Enhanced security via <B href={RCode + '#'}>password protection</B></> },
       { text: <>{platformAwareKeystrokes('Ctrl+Shift+O')}: quick access to model options</> },
       { text: <>Optimized voice input and performance</> },
       { text: <>Latest Ollama and Oobabooga models</> },
@@ -112,10 +112,10 @@ export const NewsItems: NewsItem[] = [
     versionName: 'Surf\'s Up',
     versionDate: new Date('2023-11-28T21:00:00Z'),
     items: [
-      { text: <><B href={RIssues + '/237'}>Web Browsing</B> support, see the <B href={RCode + '/docs/config-browse.md'}>browsing user guide</B></> },
-      { text: <><B href={RIssues + '/235'}>Branching Discussions</B> at any message</> },
-      { text: <><B href={RIssues + '/207'}>Keyboard Navigation</B>: use {platformAwareKeystrokes('Ctrl+Shift+Left/Right')} to navigate chats</> },
-      { text: <><B href={RIssues + '/236'}>UI fixes</B> (thanks to the first sponsor)</> },
+      { text: <><B href={RIssues + '#'}>Web Browsing</B> support, see the <B href={RCode + '/docs/config-browse.md'}>browsing user guide</B></> },
+      { text: <><B href={RIssues + '#'}>Branching Discussions</B> at any message</> },
+      { text: <><B href={RIssues + '#'}>Keyboard Navigation</B>: use {platformAwareKeystrokes('Ctrl+Shift+Left/Right')} to navigate chats</> },
+      { text: <><B href={RIssues + '#'}>UI fixes</B> (thanks to the first sponsor)</> },
       { text: <>Added support for Anthropic Claude 2.1</> },
       { text: <>Large rendering performance optimization</> },
       { text: <>More: <Chip>/help</Chip>, import ChatGPT from source, new Flattener</> },
@@ -127,10 +127,10 @@ export const NewsItems: NewsItem[] = [
     versionName: 'Loaded!',
     versionDate: new Date('2023-11-19T21:00:00Z'),
     items: [
-      { text: <><B href={RIssues + '/190'}>Continued Voice</B> for hands-free interaction</> },
-      { text: <><B href={RIssues + '/192'}>Visualization</B> Tool for data representations</> },
-      { text: <><B href={RCode + '/docs/config-ollama.md'}>Ollama (guide)</B> local models support</> },
-      { text: <><B href={RIssues + '/194'}>Text Tools</B> including highlight differences</> },
+      { text: <><B href={RIssues + '#'}>Continued Voice</B> for hands-free interaction</> },
+      { text: <><B href={RIssues + '#'}>Visualization</B> Tool for data representations</> },
+      { text: <><B href={RCode + '#'}>Ollama (guide)</B> local models support</> },
+      { text: <><B href={RIssues + '#'}>Text Tools</B> including highlight differences</> },
       { text: <><B href='https://mermaid.js.org/'>Mermaid</B> Diagramming Rendering</> },
       { text: <><B>OpenAI 1106</B> Chat Models</> },
       { text: <><B>SDXL</B> support with Prodia</> },
