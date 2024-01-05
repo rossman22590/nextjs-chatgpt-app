@@ -8,23 +8,23 @@
  */
 export const Brand = {
   Title: {
-    Base: 'big-AGI',
-    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'big-AGI',
+    Base: 'Plus',
+    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'Plus',
   },
   Meta: {
-    Description: 'Launch big-AGI to unlock the full potential of AI, with precise control over your data and models. Voice interface, AI personas, advanced features, and fun UX.',
-    SiteName: 'big-AGI | Precision AI for You',
+    Description: 'Launch our app to unlock the full potential of AI, with precise control over your data and models. Voice interface, AI personas, advanced features, and fun UX.',
+    SiteName: 'Ai Tutor Plus | Precision AI for You',
     ThemeColor: '#32383E',
-    TwitterSite: '@enricoros',
+    TwitterSite: '@tsi_org',
   },
   URIs: {
-    Home: 'https://big-agi.com',
+    Home: 'https://myapps.ai',
     // App: 'https://get.big-agi.com',
     CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
-    OpenRepo: 'https://github.com/enricoros/big-agi',
-    OpenProject: 'https://github.com/users/enricoros/projects/4',
-    SupportInvite: 'https://discord.gg/MkH4qj2Jp9',
+    OpenRepo: 'https://myapps.ai',
+    OpenProject: 'https://myapps.ai',
+    SupportInvite: 'https://discord.gg/QH4ZsGEaam',
     // Twitter: 'https://www.twitter.com/enricoros',
-    PrivacyPolicy: 'https://big-agi.com/privacy',
+    PrivacyPolicy: 'https://myapps.ai/privacy',
   },
 };

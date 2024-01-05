@@ -38,20 +38,20 @@ export const appTheme = extendTheme({
     light: {
       palette: {
         neutral: {
-          plainColor: 'var(--joy-palette-neutral-800)',     // [700 -> 800] Dropdown menu: increase text contrast a bit
-          solidBg: 'var(--joy-palette-neutral-700)',        // [500 -> 700] AppBar background & Button[solid]
-          solidHoverBg: 'var(--joy-palette-neutral-800)',   // [600 -> 800] Buttons[solid]:hover
+          plainColor: '#09090D',     // [700 -> 800] Dropdown menu: increase text contrast a bit
+          solidBg: '#09090D',        // [500 -> 700] AppBar background & Button[solid]
+          solidHoverBg: '#09090D',   // [600 -> 800] Buttons[solid]:hover
         },
         // primary [800] > secondary [700 -> 800] > tertiary [600] > icon [500 -> 700]
         text: {
           icon: 'var(--joy-palette-neutral-700)',           // <IconButton color='neutral' /> icon color
           secondary: 'var(--joy-palette-neutral-800)',      // increase contrast a bit
-          // tertiary: 'var(--joy-palette-neutral-700)',       // increase contrast a bit
+          tertiary: 'var(--joy-palette-neutral-700)',       // increase contrast a bit
         },
         // popup [white] > surface [50] > level1 [100] > level2 [200] > level3 [300 -> unused] > body [white -> 300]
         background: {
           // New
-          surface: 'var(--joy-palette-neutral-50, #FBFCFE)',
+          surface: 'var(--joy-palette-neutral-50, #301934)',
           level1: 'var(--joy-palette-neutral-100, #F0F4F8)',
           level2: 'var(--joy-palette-neutral-200, #DDE7EE)',
           body: 'var(--joy-palette-neutral-300, #CDD7E1)',
@@ -69,11 +69,11 @@ export const appTheme = extendTheme({
         },
         background: {
           // New
-          popup: '#24292c', // 3: #32383E, 1: #171A1C, 2: #25282B
-          surface: 'var(--joy-palette-neutral-800, #171A1C)',
-          level1: 'var(--joy-palette-neutral-900, #0B0D0E)',
-          level2: 'var(--joy-palette-neutral-800, #171A1C)',
-          body: '#060807',
+          popup: '#09090D', // 3: #32383E, 1: #171A1C, 2: #25282B
+          surface: 'var(--joy-palette-neutral-800, #09090D)',
+          level1: 'var(--joy-palette-neutral-900, #09090D)',
+          level2: 'var(--joy-palette-neutral-800, #09090D)',
+          body: '#09090D',
           // Former: popup > surface [900] > level 1 [black], level 2 [800] > body [black]
         },
       },
@@ -98,6 +98,7 @@ export const appTheme = extendTheme({
      * */
     JoySelect: {
       styleOverrides: {
+        
         root: {
           boxShadow: 'none',
         },
