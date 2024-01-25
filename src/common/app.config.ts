@@ -13,7 +13,7 @@ export const Brand = {
   },
   Meta: {
     Description: 'Launch our app to unlock the full potential of AI, with precise control over your data and models. Voice interface, AI personas, advanced features, and fun UX.',
-    SiteName: 'Ai Tutor Plus | Precision AI for You',
+    SiteName: 'AI Tutor Plus | Precision AI for You',
     ThemeColor: '#32383E',
     TwitterSite: '@tsi_org',
   },
