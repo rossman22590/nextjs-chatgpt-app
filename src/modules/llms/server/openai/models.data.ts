@@ -10,6 +10,15 @@ import { wireTogetherAIListOutputSchema } from '~/modules/llms/server/openai/tog
 const _knownOpenAIChatModels: ManualMappings = [
   // GPT4 Turbo
   {
+    idPrefix: 'gpt-4-0125-preview',
+    label: '4-Turbo (0125)',
+    description: '128k context, fresher knowledge, cheaper than GPT-4.',
+    contextWindow: 128000,
+    maxCompletionTokens: 4096,
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+    latest: true,
+  },
+  {
     idPrefix: 'gpt-4-1106-preview',
     label: '4-Turbo (1106)',
     description: '128k context, fresher knowledge, cheaper than GPT-4.',
