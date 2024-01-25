@@ -80,21 +80,6 @@ const ContactCardConversationCall = (props: { conversation: DConversation, onCon
 
 function CallContactCard(props: {
   persona: MockPersona,
-  symbol: string; 
-  callGrayUI: boolean,
-  conversations: DConversation[],
-  setCallIntent: (intent: AppCallIntent) => void,
-}) {
-
-  // state
-  const [conversationsExpanded, setConversationsExpanded] = React.useState(false);
-
-  // derived state
-  const { persona, setCallIntent } = props;
-  const conversations = props.conversations.slice(0, conversationsExpanded ? undefined : COLLAPSED_COUNT);
-  const hasConversations = !!conversations.length;
-  cfunction CallContactCard(props: {
-  persona: MockPersona,
   callGrayUI: boolean,
   conversations: DConversation[],
   setCallIntent: (intent: AppCallIntent) => void,
@@ -195,7 +180,6 @@ function CallContactCard(props: {
     </Box>
   );
 }
-
 
 
 function useConversationsByPersona() {
