@@ -23,7 +23,7 @@ export const Brand = {
     CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
     OpenRepo: 'https://myapps.ai',
     OpenProject: 'https://myapps.ai',
-    SupportInvite: 'https://discord.gg/kgp43BEX',
+    SupportInvite: 'https://discord.gg/4ESyw4rpNC',
     // Twitter: 'https://www.twitter.com/enricoros',
     PrivacyPolicy: 'https://myapps.ai',
   },
