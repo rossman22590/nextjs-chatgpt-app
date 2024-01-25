@@ -22,9 +22,9 @@ export const Brand = {
     // App: 'https://get.big-agi.com',
     CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
     OpenRepo: 'https://myapps.ai',
-    OpenProject: 'https://github.com/users/enricoros/projects/4',
+    OpenProject: 'https://myapps.ai',
     SupportInvite: 'https://discord.gg/kgp43BEX',
     // Twitter: 'https://www.twitter.com/enricoros',
-    PrivacyPolicy: 'https://big-agi.com/privacy',
+    PrivacyPolicy: 'https://myapps.ai',
   },
 };
