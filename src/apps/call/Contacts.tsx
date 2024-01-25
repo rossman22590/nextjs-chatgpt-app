@@ -93,8 +93,20 @@ function CallContactCard(props: {
   const { persona, setCallIntent } = props;
   const conversations = props.conversations.slice(0, conversationsExpanded ? undefined : COLLAPSED_COUNT);
   const hasConversations = !!conversations.length;
-  const showExpander = props.conversations.length > COLLAPSED_COUNT && !conversationsExpanded;
+  cfunction CallContactCard(props: {
+  persona: MockPersona,
+  callGrayUI: boolean,
+  conversations: DConversation[],
+  setCallIntent: (intent: AppCallIntent) => void,
+}) {
+  // state
+  const [conversationsExpanded, setConversationsExpanded] = React.useState(false);
 
+  // derived state
+  const { persona, setCallIntent } = props;
+  const conversations = props.conversations.slice(0, conversationsExpanded ? undefined : COLLAPSED_COUNT);
+  const hasConversations = !!conversations.length;
+  const showExpander = props.conversations.length > COLLAPSED_COUNT && !conversationsExpanded;
 
   const handleCallPersona = React.useCallback(() => setCallIntent({
     conversationId: null,
@@ -109,19 +121,12 @@ function CallContactCard(props: {
   }), [persona.personaId, setCallIntent]);
 
   return (
-
     <Box sx={{ mt: 3.5 }}>
-
-      <Card sx={{
-        // boxShadow: 'lg',
-        height: '100%',
-        gap: 0,
-      }}>
-
+      <Card sx={{ height: '100%', gap: 0 }}>
         {/* Persona Symbol - Overlapping */}
         <ContactCardAvatar
           size='6rem'
-          symbol={persona.symbol}
+          symbol={persona.symbol} // Access symbol from persona object
           imageUrl={persona?.imageUri}
           sx={{
             mx: 'auto',
@@ -136,17 +141,13 @@ function CallContactCard(props: {
             {typeof persona.description === 'string' ? persona.description : 'Custom persona'}
           </Typography>
 
-          {/*{hasConversations && <Divider>*/}
-          {/*<Typography level='body-xs'>call about</Typography>*/}
-          {/*</Divider>}*/}
-
-          {/* Persona Recent Converstions */}
+          {/* Persona Recent Conversations */}
           {conversations.map(conversation =>
             <ContactCardConversationCall
               key={conversation.id}
               conversation={conversation}
               onConversationClicked={handleCallPersonaRe}
-            />,
+            />
           )}
 
           {showExpander && <Chip
@@ -168,23 +169,14 @@ function CallContactCard(props: {
 
         </CardContent>
 
-        {/*<Divider />*/}
-
         {/* Bottom Name and "Call" Button */}
         <Sheet
           variant='soft' color='primary'
           invertedColors={props.callGrayUI ? undefined : true}
           sx={{
-            // emulate CardOverflow, because CardOverflow doesn't work well with Sheet/Inverted
-            // (there's also a potential top-level inversion)
-            '--variant-borderWidth': '1px',
-            '--CardOverflow-offset': 'calc(-1 * var(--Card-padding))',
-            '--CardOverflow-radius': 'calc(var(--Card-radius) - var(--variant-borderWidth, 0px))',
             margin: '0 var(--CardOverflow-offset) var(--CardOverflow-offset)',
             borderRadius: '0 0 var(--CardOverflow-radius) var(--CardOverflow-radius)',
             padding: '0.5rem var(--Card-padding)',
-
-            // contents
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             gap: 1,
           }}
@@ -193,22 +185,17 @@ function CallContactCard(props: {
             {persona.title}
           </Typography>
           <MuiLink overlay onClick={handleCallPersona}>
-            <IconButton size='md' variant='soft' sx={{
-              // borderRadius: '50%',
-              ml: 'auto',
-              mr: -1,
-            }}>
+            <IconButton size='md' variant='soft' sx={{ ml: 'auto', mr: -1 }}>
               <CallIcon />
             </IconButton>
           </MuiLink>
         </Sheet>
 
       </Card>
-
     </Box>
-
   );
 }
+
 
 
 function useConversationsByPersona() {
