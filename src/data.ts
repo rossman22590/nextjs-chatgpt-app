@@ -4,7 +4,7 @@ export type SystemPurposeId ='Catalyst' | 'Designer' | 'ContentMode' | 'Custom' 
 
 export const defaultSystemPurposeId: SystemPurposeId = 'Generic';
 
-type SystemPurposeData = {
+export type SystemPurposeData = {
   title: string;
   description: string | React.JSX.Element;
   systemMessage: string;
