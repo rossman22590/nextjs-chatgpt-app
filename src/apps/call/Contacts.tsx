@@ -267,7 +267,7 @@ export function Contacts(props: { setCallIntent: (intent: AppCallIntent) => void
           Explore ideas and ignite creativity
         </Typography>
         <Chip variant='outlined' size='sm' sx={{ px: 1, py: 0.5, mt: 0.25, ml: -1, textWrap: 'wrap' }}>
-          This is in BETA if you have any issue please email rcohen@mytsi.org
+          This feature is in BETA if you would like access please email rcohen@mytsi.org
         </Chip>
       </Box>
     </Box>
