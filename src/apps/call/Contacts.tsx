@@ -80,6 +80,7 @@ const ContactCardConversationCall = (props: { conversation: DConversation, onCon
 
 function CallContactCard(props: {
   persona: MockPersona,
+  symbol: string; 
   callGrayUI: boolean,
   conversations: DConversation[],
   setCallIntent: (intent: AppCallIntent) => void,
