@@ -63,13 +63,13 @@ const _knownOpenAIChatModels: ManualMappings = [
   },
 
   // GPT4's
-  {
-    idPrefix: 'gpt-4-0613',
-    label: 'GPT-4 (0613)',
-    description: 'Snapshot of gpt-4 from June 13th 2023 with function calling data.',
-    contextWindow: 8192,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-  },
+  // {
+  //   idPrefix: 'gpt-4-0613',
+  //   label: 'GPT-4 (0613)',
+  //   description: 'Snapshot of gpt-4 from June 13th 2023 with function calling data.',
+  //   contextWindow: 8192,
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  // },
   {
     idPrefix: 'gpt-4-0314',
     label: 'GPT-4 (0314)',
