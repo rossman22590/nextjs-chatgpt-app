@@ -3,12 +3,11 @@ import { shallow } from 'zustand/shallow';
 
 import { Box, Checkbox, Divider } from '@mui/joy';
 
-import { DModelSource, DModelSourceId, useModelsStore } from '~/modules/llms/store-llms';
-import { createModelSourceForDefaultVendor, findVendorById } from '~/modules/llms/vendors/vendors.registry';
-
 import { GoodModal } from '~/common/components/GoodModal';
-import { closeLayoutModelsSetup, openLayoutModelsSetup, useLayoutModelsSetup } from '~/common/layout/store-applayout';
-import { settingsGap } from '~/common/app.theme';
+import { useOptimaLayout } from '~/common/layout/optima/useOptimaLayout';
+
+import { DModelSource, DModelSourceId, useModelsStore } from '../store-llms';
+import { createModelSourceForDefaultVendor, findVendorById } from '../vendors/vendors.registry';
 
 import { LLMOptionsModal } from './LLMOptionsModal';
 import { ModelsList } from './ModelsList';
@@ -19,7 +18,7 @@ function VendorSourceSetup(props: { source: DModelSource }) {
   const vendor = findVendorById(props.source.vId);
   if (!vendor)
     return 'Configuration issue: Vendor not found for Source ' + props.source.id;
-  return <vendor.SourceSetupComponent sourceId={props.source.id} />;
+  return <vendor.SourceSetupComponent key={props.source.id} sourceId={props.source.id} />;
 }
 
 
@@ -30,7 +29,11 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
   const [showAllSources, setShowAllSources] = React.useState<boolean>(false);
 
   // external state
-  const [modelsSetupOpen, llmOptionsId] = useLayoutModelsSetup();
+  const {
+    closeLlmOptions, closeModelsSetup,
+    openLlmOptions, openModelsSetup,
+    showLlmOptions, showModelsSetup,
+  } = useOptimaLayout();
   const { modelSources, llmCount } = useModelsStore(state => ({
     modelSources: state.sources,
     llmCount: state.llms.length,
@@ -47,8 +50,8 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
   // if no sources at startup, open the modal
   React.useEffect(() => {
     if (!selectedSourceId && !props.suspendAutoModelsSetup)
-      openLayoutModelsSetup();
-  }, [selectedSourceId, props.suspendAutoModelsSetup]);
+      openModelsSetup();
+  }, [selectedSourceId, props.suspendAutoModelsSetup, openModelsSetup]);
 
   // add the default source on cold - will require setup
   React.useEffect(() => {
@@ -61,7 +64,7 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
   return <>
 
     {/* Sources Setup */}
-    {modelsSetupOpen && <GoodModal
+    {showModelsSetup && <GoodModal
       title={<>Configure <b>AI Models</b></>}
       startButton={
         multiSource ? <Checkbox
@@ -69,7 +72,11 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
           checked={showAllSources} onChange={() => setShowAllSources(all => !all)}
         /> : undefined
       }
-      open onClose={closeLayoutModelsSetup}
+      open onClose={closeModelsSetup}
+      sx={{
+        // forces some shrinkage of the contents (ModelsList)
+        overflow: 'auto',
+      }}
     >
 
       <ModelsSourceSelector selectedSourceId={selectedSourceId} setSelectedSourceId={setSelectedSourceId} />
@@ -77,21 +84,31 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
       {!!activeSource && <Divider />}
 
       {!!activeSource && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: settingsGap }}>
+        <Box sx={{ display: 'grid', gap: 'var(--Card-padding)' }}>
           <VendorSourceSetup source={activeSource} />
         </Box>
       )}
 
       {!!llmCount && <Divider />}
-{/* 
-      {!!llmCount && <ModelsList filterSourceId={showAllSources ? null : selectedSourceId} />} */}
+
+      {/* {!!llmCount && (
+        <ModelsList
+          filterSourceId={showAllSources ? null : selectedSourceId}
+          onOpenLLMOptions={openLlmOptions}
+          sx={{
+            // works in tandem with the parent (GoodModal > Dialog) overflow: 'auto'
+            minHeight: '6rem',
+            overflowY: 'auto',
+          }}
+        />
+      )} */}
 
       <Divider />
 
     </GoodModal>}
 
     {/* per-LLM options */}
-    {!!llmOptionsId && <LLMOptionsModal id={llmOptionsId} />}
+    {!!showLlmOptions && <LLMOptionsModal id={showLlmOptions} onClose={closeLlmOptions} />}
 
   </>;
 }
