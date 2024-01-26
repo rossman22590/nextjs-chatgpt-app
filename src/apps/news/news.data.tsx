@@ -28,11 +28,10 @@ export const newsCallout =
   <Card>
     <CardContent sx={{ gap: 2 }}>
       <Typography level='title-lg'>
-        Open Roadmap
+       Support
       </Typography>
       <Typography level='body-md'>
-        Take a peek at our roadmap to see what&apos;s in the pipeline.
-        Discover upcoming features and let us know what excites you the most!
+        **Known issue with copy , please email rcohen@mytsi.org if you want the fix.
       </Typography>
       <Grid container spacing={1}>
         <Grid xs={12} sm={7}>
