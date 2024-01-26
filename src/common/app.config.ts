@@ -20,7 +20,7 @@ export const Brand = {
   URIs: {
     Home: 'https://myapps.ai',
     // App: 'https://get.big-agi.com',
-    CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
+    CardImage: 'https://beta.myapps.ai/wp-content/uploads/2023/12/Untitled-design-1-1.png',
     OpenRepo: 'https://myapps.ai',
     OpenProject: 'https://myapps.ai',
     SupportInvite: 'https://discord.gg/4ESyw4rpNC',
