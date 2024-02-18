@@ -98,6 +98,15 @@ const _knownOpenAIChatModels: ManualMappings = [
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
     latest: true,
   },
+    {
+    idPrefix: 'gpt-3.5-turbo-0125',
+    label: '3.5-Turbo-16k (0125)',
+    description: 'Snapshot of gpt-3.5-turbo-16k from November 6th 2023.',
+    contextWindow: 16385,
+    maxCompletionTokens: 4096,
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+    latest: true,
+  },
   {
     idPrefix: 'gpt-3.5-turbo-16k-0613',
     label: '3.5-Turbo-16k (0613)',
