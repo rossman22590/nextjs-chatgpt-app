@@ -271,7 +271,7 @@ export function findSourceOrThrow<TSourceSetup>(sourceId: DModelSourceId) {
 }
 
 
-const defaultChatSuffixPreference = ['gpt-4-0125-preview', 'gpt-3.5-turbo'];
+const defaultChatSuffixPreference = ['gpt-3.5-turbo', 'gpt-4-0125-preview'];
 const defaultFastSuffixPreference = ['gpt-3.5-turbo-1106', 'gpt-3.5-turbo-16k-0613', 'gpt-3.5-turbo-0613', 'gpt-3.5-turbo-16k', 'gpt-3.5-turbo'];
 const defaultFuncSuffixPreference = ['gpt-4-0125-preview', 'gpt-3.5-turbo-16k-0613', 'gpt-3.5-turbo-0613'];
 
