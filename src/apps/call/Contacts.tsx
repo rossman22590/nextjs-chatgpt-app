@@ -289,13 +289,13 @@ export function Contacts(props: { setCallIntent: (intent: AppCallIntent) => void
 
       <Box>
         <Typography level='title-lg'>
-          Call AGI
+          Call AI Tutor
         </Typography>
         <Typography level='title-sm' sx={{ mt: 1 }}>
           Explore ideas and ignite creativity
         </Typography>
         <Chip variant='outlined' size='sm' sx={{ px: 1, py: 0.5, mt: 0.25, ml: -1, textWrap: 'wrap' }}>
-          Out-of-the-blue, or within a conversation
+          This feature is in BETA if you would like access please email rcohen@mytsi.org
         </Chip>
       </Box>
     </Box>
@@ -331,7 +331,7 @@ export function Contacts(props: { setCallIntent: (intent: AppCallIntent) => void
       issue={354}
       text='Call App: Support thread and compatibility matrix'
       note={<>
-        Voice input uses the HTML Web Speech API, and speech output requires an ElevenLabs API Key.
+        Voice input uses the HTML Web Speech API, we offer phone calls using ElevenLabs.
       </>}
       // note2='Please report any issues you encounter'
       sx={{

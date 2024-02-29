@@ -14,12 +14,12 @@ export const GitHubProjectIssueCard = (props: {
 }) =>
   <Card variant='outlined' color='primary' sx={props.sx}>
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      <GitHubIcon />
+      {/* <GitHubIcon /> */}
       <Typography level='body-sm'>
-        <MuiLink overlay href={`https://github.com/enricoros/big-AGI/issues/${props.issue}`} target='_blank'>
-          big-AGI #{props.issue}
+        <MuiLink overlay href={`https://myapps.ai`} target='_blank'>
+          AI Tutor Plus 
         </MuiLink>
-        {' · '}{props.text}.
+        {/* {' · '}{props.text}. */}
       </Typography>
     </Box>
     {!!props.note && (

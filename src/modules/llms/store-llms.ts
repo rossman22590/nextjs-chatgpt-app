@@ -287,7 +287,7 @@ export function findSourceOrThrow<TSourceSetup>(sourceId: DModelSourceId) {
 const modelsKnowledgeMap: { contains: string[], cutoff: string }[] = [
   { contains: ['4-0125', '4-turbo'], cutoff: '2023-12' },
   { contains: ['4-1106', '4-vision'], cutoff: '2023-04' },
-  { contains: ['4-0613', '4-0314', '4-32k', '3.5-turbo'], cutoff: '2021-09' },
+  { contains: ['3.5-turbo'], cutoff: '2021-09' },
 ] as const;
 
 export function getKnowledgeMapCutoff(llmId?: DLLMId): string | null {
@@ -298,9 +298,9 @@ export function getKnowledgeMapCutoff(llmId?: DLLMId): string | null {
   return null;
 }
 
-const defaultChatSuffixPreference = ['gpt-4-0125-preview', 'gpt-4-1106-preview', 'gpt-4-0613', 'gpt-4', 'gpt-4-32k', 'gpt-3.5-turbo'];
+const defaultChatSuffixPreference = ['gpt-4-0125-preview', 'gpt-4-1106-preview', 'gpt-3.5-turbo'];
 const defaultFastSuffixPreference = ['gpt-3.5-turbo-0125', 'gpt-3.5-turbo-1106', 'gpt-3.5-turbo-16k-0613', 'gpt-3.5-turbo-0613', 'gpt-3.5-turbo-16k', 'gpt-3.5-turbo'];
-const defaultFuncSuffixPreference = ['gpt-4-0125-preview', 'gpt-4-1106-preview', 'gpt-3.5-turbo-16k-0613', 'gpt-3.5-turbo-0613', 'gpt-4-0613'];
+const defaultFuncSuffixPreference = ['gpt-4-0125-preview', 'gpt-4-1106-preview', 'gpt-3.5-turbo-16k-0613', 'gpt-3.5-turbo-0613', ];
 
 function updateSelectedIds(allLlms: DLLM[], chatLlmId: DLLMId | null, fastLlmId: DLLMId | null, funcLlmId: DLLMId | null): Partial<ModelsData> {
   if (chatLlmId && !allLlms.find(llm => llm.id === chatLlmId)) chatLlmId = null;

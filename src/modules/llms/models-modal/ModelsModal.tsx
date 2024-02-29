@@ -93,7 +93,7 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
         </Box>
       )}
 
-      {!!llmCount && <Divider />}
+      {/* {!!llmCount && <Divider />}
 
       {!!llmCount && (
         <ModelsList
@@ -119,7 +119,7 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
         />
       )}
 
-      <Divider />
+      <Divider /> */}
 
     </GoodModal>}
 

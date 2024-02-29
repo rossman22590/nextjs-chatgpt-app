@@ -51,7 +51,7 @@ export const config = {
     // Include root
     '/',
     // Include pages
-    '/(call|index|news|personas|link)(.*)',
+    '/(call|index||personas|link)(.*)',
     // Include API routes
     '/api(.*)',
     // Note: this excludes _next, /images etc..
