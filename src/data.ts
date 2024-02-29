@@ -8,6 +8,7 @@ export type SystemPurposeData = {
   title: string;
   description: string | React.JSX.Element;
   systemMessage: string;
+  systemMessageNotes?: string;
   symbol: string;
   imageUri?: string;
   examples?: string[];
