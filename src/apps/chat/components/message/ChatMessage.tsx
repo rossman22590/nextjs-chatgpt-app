@@ -53,7 +53,7 @@ export function messageBackground(messageRole: DMessage['role'] | string, wasEdi
     case 'assistant':
       return unknownAssistantIssue ? 'danger.softBg' : 'background.surface';
     case 'system':
-      return wasEdited ? 'warning.softHoverBg' : 'background.surface';
+      return wasEdited ? 'warning.softHoverBg' : 'neutral.softBg';
     default:
       return '#ff0000';
   }
@@ -435,7 +435,7 @@ export function ChatMessage(props: {
         >
 
           {isHovering ? (
-            <IconButton variant='soft' color={fromAssistant ? 'neutral' : 'primary'} sx={avatarIconSx}>
+            <IconButton variant='soft' color={(fromAssistant || fromSystem) ? 'neutral' : 'primary'} sx={avatarIconSx}>
               <MoreVertIcon />
             </IconButton>
           ) : (
@@ -509,6 +509,15 @@ export function ChatMessage(props: {
           open anchorEl={opsMenuAnchor} onClose={closeOpsMenu}
           sx={{ minWidth: 280 }}
         >
+
+          {fromSystem && (
+            <ListItem>
+              <Typography level='body-sm'>
+                System message
+              </Typography>
+            </ListItem>
+          )}
+
           {/* Edit / Copy */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {!!props.onMessageEdit && (
