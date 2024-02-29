@@ -113,7 +113,7 @@ export const navItems: {
       route: '/draw',
       // hideOnMobile: true,
       hideDrawer: true,
-      _delete: false,
+      _delete: true,
     },
     {
       name: 'Cortex',
