@@ -75,7 +75,7 @@ export const newsRoadmapCallout =
         <Grid xs={12} sm={5} sx={{ display: 'flex', flexAlign: 'center', justifyContent: 'center' }}>
           <Button
             fullWidth variant='plain' color='primary' endDecorator={<LaunchIcon />}
-            component={Link} href={Brand.URIs.OpenRepo + '/issues/new?template=roadmap-request.md&title=%5BSuggestion%5D'} noLinkStyle target='_blank'
+            component={Link} href={Brand.URIs.OpenRepo } noLinkStyle target='_blank'
           >
             Get Help
           </Button>
