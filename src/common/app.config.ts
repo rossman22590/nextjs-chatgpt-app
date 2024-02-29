@@ -13,7 +13,7 @@ export const Brand = {
   },
   Meta: {
     Description: 'Launch our app to unlock the full potential of AI, with precise control over your data and models. Voice interface, AI personas, advanced features, and fun UX.',
-    SiteName: 'Ai Tutor Plus | Precision AI for You',
+    SiteName: 'AI Tutor Plus | Precision AI for You',
     ThemeColor: '#32383E',
     TwitterSite: '@tsi_org',
   },
@@ -25,6 +25,6 @@ export const Brand = {
     OpenProject: 'https://docs.myapps.ai',
     SupportInvite: 'https://discord.gg/D3r3HrHHeG',
     // Twitter: 'https://www.twitter.com/enricoros',
-    // PrivacyPolicy: 'https://big-agi.com/privacy',
+    PrivacyPolicy: 'https://big-agi.com/privacy',
   },
 };
