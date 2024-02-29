@@ -39,7 +39,7 @@ export const appTheme = extendTheme({
       palette: {
         neutral: {
           plainColor: 'var(--joy-palette-neutral-800)',     // [700 -> 800] Dropdown menu: increase text contrast a bit
-          solidBg: 'var(--joy-palette-neutral-700)',        // [500 -> 700] PageBar background & Button[solid]
+          solidBg: '#030712',        // [500 -> 700] AppBar background & Button[solid]
           solidHoverBg: 'var(--joy-palette-neutral-800)',   // [600 -> 800] Buttons[solid]:hover
         },
         // primary [800] > secondary [700 -> 800] > tertiary [600] > icon [500 -> 700]
@@ -104,15 +104,6 @@ export const appTheme = extendTheme({
       },
     },
 
-    // JoyModal: {
-    //   styleOverrides: {
-    //     backdrop: {
-    //       // backdropFilter: 'blur(2px)',
-    //       backdropFilter: 'none',
-    //     },
-    //   },
-    // },
-
     /**
      * Switch: increase the size of the thumb, to a default iconButton
      * NOTE: do not use anything else than 'md' size
@@ -121,9 +112,9 @@ export const appTheme = extendTheme({
       styleOverrides: {
         root: ({ ownerState }) => ({
           ...(ownerState.size === 'md' && {
-            '--Switch-trackWidth': '36px',
-            '--Switch-trackHeight': '22px',
-            '--Switch-thumbSize': '17px',
+            '--Switch-trackWidth': '40px',
+            '--Switch-trackHeight': '24px',
+            '--Switch-thumbSize': '18px',
           }),
         }),
       },
