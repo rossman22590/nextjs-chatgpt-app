@@ -1,25 +1,37 @@
-import type { DLLMId } from '~/modules/llms/store-llms';
+import type { StoreApi } from 'zustand';
+
+import { DLLMId, useModelsStore } from '~/modules/llms/store-llms';
 import { bareBonesPromptMixer } from '~/modules/persona/pmix/pmix';
 
 import { SystemPurposeId, SystemPurposes } from '../../data';
 
 import { ChatActions, createDMessage, DConversationId, DMessage, useChatStore } from '../state/store-chats';
 
-import { BeamStore } from './BeamStore';
+import { type BeamStore, createBeamStore } from './store-beam';
 import { EphemeralHandler, EphemeralsStore } from './EphemeralsStore';
 
 
+/**
+ * ConversationHandler is a class to overlay state onto a conversation.
+ * It is a singleton per conversationId.
+ *  - View classes will react to this class (or its members) to update the UI.
+ *  - Controller classes will call directly methods in this class.
+ */
 export class ConversationHandler {
   private readonly chatActions: ChatActions;
   private readonly conversationId: DConversationId;
 
-  readonly beamStore: BeamStore = new BeamStore();
+  private readonly beamStore: StoreApi<BeamStore>;
   readonly ephemeralsStore: EphemeralsStore = new EphemeralsStore();
 
 
   constructor(conversationId: DConversationId) {
     this.chatActions = useChatStore.getState();
     this.conversationId = conversationId;
+
+    // init beamstore
+    const inheritGlobalChatLlm = useModelsStore.getState().chatLLMId;
+    this.beamStore = createBeamStore(inheritGlobalChatLlm);
   }
 
 
@@ -62,40 +74,31 @@ export class ConversationHandler {
   }
 
 
+  // Beam
+
+  getBeamStore(): Readonly<StoreApi<BeamStore>> {
+    // used by the use() hook, and shall not be used elsewhere to guarantee state
+    return this.beamStore;
+  }
+
+  beamOpen(history: DMessage[]) {
+    this.beamClose();
+    this.beamStore.getState().open(history);
+  }
+
+  beamClose() {
+    this.beamStore.getState().close();
+  }
+
+  beamSetRayCount(count: number) {
+    this.beamStore.getState().setRayCount(count);
+  }
+
+
   // Ephemerals
 
   createEphemeral(title: string, initialText: string): EphemeralHandler {
     return new EphemeralHandler(title, initialText, this.ephemeralsStore);
   }
 
-}
-
-
-// Singleton to get a global instance relate to a conversationId. Note we don't have reference counting, and mainly because we cannot
-// do comprehensive lifecycle tracking.
-export class ConversationManager {
-  private static _instance: ConversationManager;
-  private readonly handlers: Map<DConversationId, ConversationHandler> = new Map();
-
-  static getHandler(conversationId: DConversationId): ConversationHandler {
-    const instance = ConversationManager._instance || (ConversationManager._instance = new ConversationManager());
-    let handler = instance.handlers.get(conversationId);
-    if (!handler) {
-      handler = new ConversationHandler(conversationId);
-      instance.handlers.set(conversationId, handler);
-    }
-    return handler;
-  }
-
-  // Acquires a ConversationHandler, ensuring automatic release when done, with debug location.
-  // enable in 2025, after support from https://github.com/tc39/proposal-explicit-resource-management
-  /*usingHandler(conversationId: DConversationId, debugLocation: string) {
-    const handler = this.getHandler(conversationId, debugLocation);
-    return {
-      handler,
-      [Symbol.dispose]: () => {
-        this.releaseHandler(handler, debugLocation);
-      },
-    };
-  }*/
 }
