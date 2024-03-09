@@ -42,8 +42,7 @@ export const newsRoadmapCallout =
         Open Roadmap
       </Typography>
       <Typography level='body-sm'>
-        Take a peek at our roadmap to see what&apos;s in the pipeline.
-        Discover upcoming features and let us know what excites you the most!
+      **Known issue with copy, please email rcohen@mytsi.org if you want the fix
       </Typography>
       <Grid container spacing={1}>
         <Grid xs={12} sm={7}>
@@ -51,7 +50,7 @@ export const newsRoadmapCallout =
             fullWidth variant='soft' color='primary' endDecorator={<LaunchIcon />}
             component={Link} href={Brand.URIs.OpenProject} noLinkStyle target='_blank'
           >
-            Explore
+            Docs
           </Button>
         </Grid>
         <Grid xs={12} sm={5} sx={{ display: 'flex', flexAlign: 'center', justifyContent: 'center' }}>
@@ -59,7 +58,7 @@ export const newsRoadmapCallout =
             fullWidth variant='plain' color='primary' endDecorator={<LaunchIcon />}
             component={Link} href={Brand.URIs.OpenRepo + '/issues/new?template=roadmap-request.md&title=%5BSuggestion%5D'} noLinkStyle target='_blank'
           >
-            Suggest a Feature
+            Get Help
           </Button>
         </Grid>
       </Grid>
