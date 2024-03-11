@@ -7,11 +7,10 @@ import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
 
 export function BeamHeader(props: {
   isMobile: boolean,
-  beamCount: number,
-  setBeamCount: (n: number) => void,
-  llmSelectComponent: React.ReactNode,
+  llmComponent: React.ReactNode,
+  rayCount: number,
+  setRayCount: (n: number) => void,
   onStart: () => void,
-  // onClose: () => void,
 }) {
 
   return (
@@ -24,6 +23,7 @@ export function BeamHeader(props: {
         backgroundColor: 'background.surface',
         boxShadow: 'md',
         p: 'var(--Pad)',
+        zIndex: 1, // stay on top of the user message
 
         // layout: max 2 cols (/3 with gap) of min 200px per col
         display: 'grid',
@@ -36,7 +36,7 @@ export function BeamHeader(props: {
     >
 
       {/* Title */}
-      <Box sx={{ display: 'flex', gap: 'var(--Pad_2)' }}>
+      <Box sx={{ display: 'flex', gap: 'var(--Pad_2)', my: 'auto' }}>
         {/*<Typography level='h4'>*/}
         {/*  <ChatBeamIcon sx={{ animation: `${cssRainbowColorKeyframes} 2s linear 2.66` }} />*/}
         {/*</Typography>*/}
@@ -46,7 +46,7 @@ export function BeamHeader(props: {
             Beam
           </Typography>
 
-          <Typography level='body-md'>
+          <Typography level='body-sm'>
             Combine the smarts of models
           </Typography>
         </div>
@@ -54,7 +54,7 @@ export function BeamHeader(props: {
 
       {/* LLM cell */}
       <Box sx={{ display: 'flex', gap: 'calc(var(--Pad) / 2)', alignItems: 'center', justifyContent: props.isMobile ? undefined : 'center' }}>
-        {props.llmSelectComponent}
+        {props.llmComponent}
       </Box>
 
       {/* Count and Start cell */}
@@ -65,13 +65,13 @@ export function BeamHeader(props: {
           {/* xN buttons */}
           <ButtonGroup variant='outlined' sx={{ flex: 1, display: 'flex', '& > *': { flex: 1 } }}>
             {[2, 4, 8].map((n) => {
-              const isActive = n === props.beamCount;
+              const isActive = n === props.rayCount;
               return (
                 <Button
                   key={n}
                   // variant={isActive ? 'solid' : undefined}
                   color='neutral'
-                  onClick={() => props.setBeamCount(n)}
+                  onClick={() => props.setRayCount(n)}
                   sx={{
                     fontWeight: isActive ? 'xl' : 400, /* reset, from 600 */
                     backgroundColor: isActive ? 'background.popup' : undefined,
@@ -91,7 +91,7 @@ export function BeamHeader(props: {
             // endDecorator={<ChatBeamIcon />}
             sx={{ ml: 'auto', minWidth: 80 }}
           >
-            Beam
+            Start
           </Button>
         </Box>
       </FormControl>

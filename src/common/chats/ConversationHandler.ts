@@ -1,5 +1,3 @@
-import type { StoreApi } from 'zustand';
-
 import { DLLMId, useModelsStore } from '~/modules/llms/store-llms';
 import { bareBonesPromptMixer } from '~/modules/persona/pmix/pmix';
 
@@ -7,7 +5,8 @@ import { SystemPurposeId, SystemPurposes } from '../../data';
 
 import { ChatActions, createDMessage, DConversationId, DMessage, useChatStore } from '../state/store-chats';
 
-import { type BeamStore, createBeamStore } from './store-beam';
+import { createBeamStore } from '~/common/beam/store-beam';
+
 import { EphemeralHandler, EphemeralsStore } from './EphemeralsStore';
 
 
@@ -21,17 +20,13 @@ export class ConversationHandler {
   private readonly chatActions: ChatActions;
   private readonly conversationId: DConversationId;
 
-  private readonly beamStore: StoreApi<BeamStore>;
+  private readonly beamStore = createBeamStore();
   readonly ephemeralsStore: EphemeralsStore = new EphemeralsStore();
 
 
   constructor(conversationId: DConversationId) {
     this.chatActions = useChatStore.getState();
     this.conversationId = conversationId;
-
-    // init beamstore
-    const inheritGlobalChatLlm = useModelsStore.getState().chatLLMId;
-    this.beamStore = createBeamStore(inheritGlobalChatLlm);
   }
 
 
@@ -76,22 +71,10 @@ export class ConversationHandler {
 
   // Beam
 
-  getBeamStore(): Readonly<StoreApi<BeamStore>> {
-    // used by the use() hook, and shall not be used elsewhere to guarantee state
-    return this.beamStore;
-  }
+  getBeamStore = () => this.beamStore;
 
   beamOpen(history: DMessage[]) {
-    this.beamClose();
-    this.beamStore.getState().open(history);
-  }
-
-  beamClose() {
-    this.beamStore.getState().close();
-  }
-
-  beamSetRayCount(count: number) {
-    this.beamStore.getState().setRayCount(count);
+    this.beamStore.getState().open(history, useModelsStore.getState().chatLLMId);
   }
 
 
