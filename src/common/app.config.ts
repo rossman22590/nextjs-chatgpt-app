@@ -25,6 +25,6 @@ export const Brand = {
     OpenProject: 'https://docs.myapps.ai',
     SupportInvite: 'https://discord.gg/D3r3HrHHeG',
     // Twitter: 'https://www.twitter.com/enricoros',
-    // PrivacyPolicy: 'https://big-agi.com/privacy',
+    PrivacyPolicy: 'https://big-agi.com/privacy',
   },
 } as const;
