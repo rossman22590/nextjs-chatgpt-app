@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { shallow } from 'zustand/shallow';
 
-import { Box, Dropdown, IconButton, ListDivider, ListItem, ListItemButton, ListItemDecorator, Menu, MenuButton, MenuItem, Tooltip, Typography } from '@mui/joy';
+import { Box, Button, Dropdown, IconButton, ListDivider, ListItem, ListItemButton, ListItemDecorator, Menu, MenuButton, MenuItem, Tooltip, Typography } from '@mui/joy';
 import AddIcon from '@mui/icons-material/Add';
 import CheckIcon from '@mui/icons-material/Check';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -28,7 +28,7 @@ import { ChatDrawerItemMemo, FolderChangeRequest } from './ChatDrawerItem';
 import { ChatFolderList } from './folders/ChatFolderList';
 import { ChatNavGrouping, useChatNavRenderItems } from './useChatNavRenderItems';
 import { ClearFolderText } from './folders/useFolderDropdown';
-import { useChatShowRelativeSize } from '../store-app-chat';
+import { useChatShowPersonaIcons, useChatShowRelativeSize } from '../store-app-chat';
 
 
 // this is here to make shallow comparisons work on the next hook
@@ -79,6 +79,7 @@ function ChatDrawer(props: {
 
   // external state
   const { closeDrawer, closeDrawerOnMobile } = useOptimaDrawers();
+  const { showPersonaIcons, togglePersonaIcons } = useChatShowPersonaIcons();
   const { showRelativeSize, toggleRelativeSize } = useChatShowRelativeSize();
   const { activeFolder, allFolders, enableFolders, toggleEnableFolders } = useFolders(props.activeFolderId);
   const { filteredChatsCount, filteredChatIDs, filteredChatsAreEmpty, filteredChatsBarBasis, filteredChatsIncludeActive, renderNavItems } = useChatNavRenderItems(
@@ -168,6 +169,10 @@ function ChatDrawer(props: {
         <ListItem>
           <Typography level='body-sm'>Show</Typography>
         </ListItem>
+        <MenuItem onClick={togglePersonaIcons}>
+          <ListItemDecorator>{showPersonaIcons && <CheckIcon />}</ListItemDecorator>
+          Persona Icons
+        </MenuItem>
         <MenuItem onClick={toggleRelativeSize}>
           <ListItemDecorator>{showRelativeSize && <CheckIcon />}</ListItemDecorator>
           Relative Size
@@ -214,43 +219,49 @@ function ChatDrawer(props: {
 
       {enableFolders && <ListDivider sx={{ mb: 0 }} />}
 
-      {/* Search Input Field */}
-      <DebounceInputMemo
-        minChars={2}
-        onDebounce={setDebouncedSearchQuery}
-        debounceTimeout={300}
-        placeholder='Search...'
-        aria-label='Search'
-        endDecorator={groupingComponent}
-        sx={{ m: 2 }}
-      />
+      <Box sx={{ display: 'flex', flexDirection: 'column', m: 2, gap: 2 }}>
 
-      {/* New Chat Button */}
-      <ListItem sx={{ mx: '0.25rem', mb: 0.5 }}>
-        <ListItemButton
+        {/* Search Input Field */}
+        <DebounceInputMemo
+          minChars={2}
+          onDebounce={setDebouncedSearchQuery}
+          debounceTimeout={300}
+          placeholder='Search...'
+          aria-label='Search'
+          endDecorator={groupingComponent}
+        />
+
+        {/* New Chat Button */}
+        <Button
           // variant='outlined'
-          variant={disableNewButton ? undefined : 'outlined'}
+          variant={disableNewButton ? undefined : 'soft'}
+          color='primary'
           disabled={disableNewButton}
           onClick={handleButtonNew}
           sx={{
             // ...PageDrawerTallItemSx,
-            px: 'calc(var(--ListItem-paddingX) - 0.25rem)',
+            justifyContent: 'flex-start',
+            padding: '0px 0.75rem',
 
             // text size
             fontSize: 'sm',
             fontWeight: 'lg',
 
             // style
-            borderRadius: 'md',
-            boxShadow: (disableNewButton || props.isMobile) ? 'none' : 'sm',
-            backgroundColor: 'background.popup',
-            transition: 'box-shadow 0.2s',
+            // backgroundColor: 'background.popup',
+            border: '1px solid',
+            borderColor: 'neutral.outlinedBorder',
+            borderRadius: 'sm',
+            '--ListItemDecorator-size': 'calc(2.5rem - 1px)', // compensate for the border
+            // boxShadow: (disableNewButton || props.isMobile) ? 'none' : 'xs',
+            // transition: 'box-shadow 0.2s',
           }}
         >
-          <ListItemDecorator><AddIcon sx={{ '--Icon-fontSize': 'var(--joy-fontSize-xl)', pl: '0.125rem' }} /></ListItemDecorator>
+          <ListItemDecorator><AddIcon sx={{ fontSize: '' }} /></ListItemDecorator>
           New chat
-        </ListItemButton>
-      </ListItem>
+        </Button>
+
+      </Box>
 
       {/*<ListDivider sx={{ mt: 0 }} />*/}
 
@@ -274,7 +285,7 @@ function ChatDrawer(props: {
             <ChatDrawerItemMemo
               key={'nav-chat-' + item.conversationId}
               item={item}
-              showSymbols={showSymbols}
+              showSymbols={showPersonaIcons && showSymbols}
               bottomBarBasis={filteredChatsBarBasis}
               onConversationActivate={handleConversationActivate}
               onConversationBranch={onConversationBranch}

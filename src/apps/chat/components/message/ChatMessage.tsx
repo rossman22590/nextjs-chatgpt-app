@@ -2,7 +2,7 @@ import * as React from 'react';
 import { shallow } from 'zustand/shallow';
 
 import type { SxProps } from '@mui/joy/styles/types';
-import { Avatar, Box, CircularProgress, IconButton, ListDivider, ListItem, ListItemDecorator, MenuItem, Switch, Tooltip, Typography } from '@mui/joy';
+import { Avatar, Badge, Box, CircularProgress, IconButton, ListDivider, ListItem, ListItemDecorator, MenuItem, Switch, Tooltip, Typography } from '@mui/joy';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import ClearIcon from '@mui/icons-material/Clear';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -30,8 +30,9 @@ import { DMessage } from '~/common/state/store-chats';
 import { InlineTextarea } from '~/common/components/InlineTextarea';
 import { KeyStroke } from '~/common/components/KeyStroke';
 import { Link } from '~/common/components/Link';
+import { adjustContentScaling, themeScalingMap } from '~/common/app.theme';
+import { animationColorRainbow } from '~/common/util/animUtils';
 import { copyToClipboard } from '~/common/util/clipboardUtils';
-import { cssRainbowColorKeyframes, themeScalingMap } from '~/common/app.theme';
 import { prettyBaseModel } from '~/common/util/modelUtils';
 import { useUIPreferencesStore } from '~/common/state/store-ui';
 import { useUXLabsStore } from '~/common/state/store-ux-labs';
@@ -75,6 +76,7 @@ export function makeAvatar(messageAvatar: string | null, messageRole: DMessage['
 
     case 'assistant':
       // typing gif (people seem to love this, so keeping it after april fools')
+      const isDownload = messageOriginLLM === 'web';
       const isTextToImage = messageOriginLLM === 'DALL·E' || messageOriginLLM === 'Prodia';
       const isReact = messageOriginLLM?.startsWith('react-');
 
@@ -82,9 +84,10 @@ export function makeAvatar(messageAvatar: string | null, messageRole: DMessage['
       if (messageTyping)
         return <Avatar
           alt={messageSender} variant='plain'
-          src={isTextToImage ? 'https://i.giphy.com/media/5t9ujj9cMisyVjUZ0m/giphy.webp' // brush
-            : isReact ? 'https://i.giphy.com/media/l44QzsOLXxcrigdgI/giphy.webp' // mind
-              : 'https://i.giphy.com/media/jJxaUysjzO9ri/giphy.webp'} // typing
+          src={isDownload ? 'https://i.giphy.com/26u6dIwIphLj8h10A.webp' // hourglass: https://i.giphy.com/TFSxpAIYz5inJGuY8f.webp, small-lq: https://i.giphy.com/131tNuGktpXGhy.webp, floppy: https://i.giphy.com/RxR1KghIie2iI.webp
+            : isTextToImage ? 'https://i.giphy.com/media/5t9ujj9cMisyVjUZ0m/giphy.webp' // brush
+              : isReact ? 'https://i.giphy.com/media/l44QzsOLXxcrigdgI/giphy.webp' // mind
+                : 'https://i.giphy.com/media/jJxaUysjzO9ri/giphy.webp'} // typing
           sx={{ ...mascotSx, borderRadius: 'sm' }}
         />;
 
@@ -92,7 +95,7 @@ export function makeAvatar(messageAvatar: string | null, messageRole: DMessage['
       if (isTextToImage)
         return <FormatPaintIcon sx={{
           ...avatarIconSx,
-          animation: `${cssRainbowColorKeyframes} 1s linear 2.66`,
+          animation: `${animationColorRainbow} 1s linear 2.66`,
         }} />;
 
       // purpose symbol (if present)
@@ -192,12 +195,16 @@ export function ChatMessage(props: {
   isBottom?: boolean,
   isImagining?: boolean,
   isSpeaking?: boolean,
-  blocksShowDate?: boolean,
-  onConversationBranch?: (messageId: string) => void,
-  onConversationRestartFrom?: (messageId: string, offset: number, chatEffectBeam: boolean) => Promise<void>,
-  onConversationTruncate?: (messageId: string) => void,
+  showAvatar?: boolean, // auto if undefined
+  showBlocksDate?: boolean,
+  adjustContentScaling?: number,
+  topDecorator?: React.ReactNode,
+  onMessageAssistantFrom?: (messageId: string, offset: number) => Promise<void>,
+  onMessageBeam?: (messageId: string) => Promise<void>,
+  onMessageBranch?: (messageId: string) => void,
   onMessageDelete?: (messageId: string) => void,
   onMessageEdit?: (messageId: string, text: string) => void,
+  onMessageTruncate?: (messageId: string) => void,
   onTextDiagram?: (messageId: string, text: string) => Promise<void>
   onTextImagine?: (text: string) => Promise<void>
   onTextSpeak?: (text: string) => Promise<void>
@@ -213,9 +220,9 @@ export function ChatMessage(props: {
 
   // external state
   const labsChatBeam = useUXLabsStore(state => state.labsChatBeam);
-  const { cleanerLooks, contentScaling, doubleClickToEdit, renderMarkdown } = useUIPreferencesStore(state => ({
-    cleanerLooks: state.zenMode === 'cleaner',
-    contentScaling: state.contentScaling,
+  const { showAvatar, contentScaling, doubleClickToEdit, renderMarkdown } = useUIPreferencesStore(state => ({
+    showAvatar: props.showAvatar !== undefined ? props.showAvatar : state.zenMode !== 'cleaner',
+    contentScaling: adjustContentScaling(state.contentScaling, props.adjustContentScaling),
     doubleClickToEdit: state.doubleClickToEdit,
     renderMarkdown: state.renderMarkdown,
   }), shallow);
@@ -239,8 +246,6 @@ export function ChatMessage(props: {
   const fromAssistant = messageRole === 'assistant';
   const fromSystem = messageRole === 'system';
   const wasEdited = !!messageUpdated;
-
-  const showAvatars = !cleanerLooks;
 
   const textSel = selMenuText ? selMenuText : messageText;
   const isSpecialT2I = textSel.startsWith('https://images.prodia.xyz/') || textSel.startsWith('/draw ') || textSel.startsWith('/imagine ') || textSel.startsWith('/img ');
@@ -274,23 +279,23 @@ export function ChatMessage(props: {
     closeOpsMenu();
   }, [isEditing, messageTyping]);
 
-  const handleOpsConversationBranch = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation(); // to try to not steal the focus from the banched conversation
-    props.onConversationBranch && props.onConversationBranch(messageId);
-    closeOpsMenu();
-  };
-
-  const handleOpsConversationRestartFrom = async (e: React.MouseEvent) => {
+  const handleOpsAssistantFrom = async (e: React.MouseEvent) => {
     e.preventDefault();
     closeOpsMenu();
-    props.onConversationRestartFrom && await props.onConversationRestartFrom(messageId, fromAssistant ? -1 : 0, false);
+    await props.onMessageAssistantFrom?.(messageId, fromAssistant ? -1 : 0);
   };
 
-  const handleOpsConversationRestartFromBeam = async (e: React.MouseEvent) => {
+  const handleOpsBeamFrom = async (e: React.MouseEvent) => {
     e.stopPropagation();
     closeOpsMenu();
-    props.onConversationRestartFrom && labsChatBeam && await props.onConversationRestartFrom(messageId, fromAssistant ? -1 : 0, true);
+    labsChatBeam && await props.onMessageBeam?.(messageId);
+  };
+
+  const handleOpsBranch = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // to try to not steal the focus from the banched conversation
+    props.onMessageBranch?.(messageId);
+    closeOpsMenu();
   };
 
   const handleOpsToggleShowDiff = () => setShowDiff(!showDiff);
@@ -323,12 +328,12 @@ export function ChatMessage(props: {
   };
 
   const handleOpsTruncate = (_e: React.MouseEvent) => {
-    props.onConversationTruncate && props.onConversationTruncate(messageId);
+    props.onMessageTruncate?.(messageId);
     closeOpsMenu();
   };
 
   const handleOpsDelete = (_e: React.MouseEvent) => {
-    props.onMessageDelete && props.onMessageDelete(messageId);
+    props.onMessageDelete?.(messageId);
   };
 
 
@@ -402,29 +407,44 @@ export function ChatMessage(props: {
 
   // avatar
   const avatarEl: React.JSX.Element | null = React.useMemo(
-    () => showAvatars ? makeAvatar(messageAvatar, messageRole, messageOriginLLM, messagePurposeId, messageSender, messageTyping) : null,
-    [messageAvatar, messageOriginLLM, messagePurposeId, messageRole, messageSender, messageTyping, showAvatars],
+    () => showAvatar ? makeAvatar(messageAvatar, messageRole, messageOriginLLM, messagePurposeId, messageSender, messageTyping) : null,
+    [messageAvatar, messageOriginLLM, messagePurposeId, messageRole, messageSender, messageTyping, showAvatar],
   );
 
 
   return (
     <ListItem
       sx={{
-        display: 'flex', flexDirection: !fromAssistant ? 'row-reverse' : 'row', alignItems: 'flex-start',
-        gap: { xs: 0, md: 1 },
+        // style
+        backgroundColor: backgroundColor,
         px: { xs: 1, md: themeScalingMap[contentScaling]?.chatMessagePadding ?? 2 },
         py: themeScalingMap[contentScaling]?.chatMessagePadding ?? 2,
-        backgroundColor,
-        borderBottom: '1px solid',
-        borderBottomColor: 'divider',
-        ...(ENABLE_COPY_MESSAGE_OVERLAY && { position: 'relative' }),
+        ...(!('borderBottom' in (props.sx || {})) && {
+          borderBottom: '1px solid',
+          borderBottomColor: 'divider',
+        }),
+        ...(!!props.topDecorator && { pt: '2.5rem' }),
         '&:hover > button': { opacity: 1 },
+
+        // layout
+        display: 'flex',
+        flexDirection: !fromAssistant ? 'row-reverse' : 'row',
+        alignItems: 'flex-start',
+        gap: { xs: 0, md: 1 },
+
         ...props.sx,
       }}
     >
 
+      {/* (Optional) underlayed top decorator */}
+      {props.topDecorator && (
+        <Box sx={{ position: 'absolute', left: 0, right: 0, top: 0, textAlign: 'center' }}>
+          {props.topDecorator}
+        </Box>
+      )}
+
       {/* Avatar */}
-      {showAvatars && (
+      {showAvatar && (
         <Box
           onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}
           onClick={event => setOpsMenuAnchor(event.currentTarget)}
@@ -450,7 +470,7 @@ export function ChatMessage(props: {
             <Tooltip title={messageTyping ? null : (messageOriginLLM || 'unk-model')} variant='solid'>
               <Typography level='body-xs' sx={{
                 overflowWrap: 'anywhere',
-                ...(messageTyping ? { animation: `${cssRainbowColorKeyframes} 5s linear infinite` } : {}),
+                ...(messageTyping ? { animation: `${animationColorRainbow} 5s linear infinite` } : {}),
               }}>
                 {prettyBaseModel(messageOriginLLM)}
               </Typography>
@@ -480,7 +500,7 @@ export function ChatMessage(props: {
           isBottom={props.isBottom}
           renderTextAsMarkdown={renderMarkdown}
           renderTextDiff={textDiffs || undefined}
-          showDate={props.blocksShowDate === true ? messageUpdated || messageCreated || undefined : undefined}
+          showDate={props.showBlocksDate === true ? messageUpdated || messageCreated || undefined : undefined}
           wasUserEdited={wasEdited}
           onContextMenu={(props.onMessageEdit && ENABLE_SELECTION_RIGHT_CLICK_MENU) ? handleBlocksContextMenu : undefined}
           onDoubleClick={(props.onMessageEdit && doubleClickToEdit) ? handleBlocksDoubleClick : undefined}
@@ -544,8 +564,8 @@ export function ChatMessage(props: {
               <span style={{ opacity: 0.5 }}>message</span>
             </MenuItem>
           )}
-          {!!props.onConversationBranch && (
-            <MenuItem onClick={handleOpsConversationBranch} disabled={fromSystem}>
+          {!!props.onMessageBranch && (
+            <MenuItem onClick={handleOpsBranch} disabled={fromSystem}>
               <ListItemDecorator>
                 <ForkRightIcon />
               </ListItemDecorator>
@@ -553,7 +573,7 @@ export function ChatMessage(props: {
               {!props.isBottom && <span style={{ opacity: 0.5 }}>from here</span>}
             </MenuItem>
           )}
-          {!!props.onConversationTruncate && (
+          {!!props.onMessageTruncate && (
             <MenuItem onClick={handleOpsTruncate} disabled={props.isBottom}>
               <ListItemDecorator><VerticalAlignBottomIcon /></ListItemDecorator>
               Truncate
@@ -589,31 +609,30 @@ export function ChatMessage(props: {
               Speak
             </MenuItem>
           )}
-          {/* Restart/try */}
-          {!!props.onConversationRestartFrom && <ListDivider />}
-          {!!props.onConversationRestartFrom && (
-            <MenuItem onClick={handleOpsConversationRestartFrom}>
+          {/* Beam/Restart */}
+          {(!!props.onMessageAssistantFrom || !!props.onMessageBeam) && <ListDivider />}
+          {!!props.onMessageAssistantFrom && (
+            <MenuItem disabled={fromSystem} onClick={handleOpsAssistantFrom}>
               <ListItemDecorator>{fromAssistant ? <ReplayIcon color='primary' /> : <TelegramIcon color='primary' />}</ListItemDecorator>
               {!fromAssistant
                 ? <>Restart <span style={{ opacity: 0.5 }}>from here</span></>
                 : !props.isBottom
                   ? <>Retry <span style={{ opacity: 0.5 }}>from here</span></>
-                  : <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                    Retry
-                    <KeyStroke combo='Ctrl + Shift + R' />
-                  </Box>}
-              {labsChatBeam && (
-                <Tooltip title={messageTyping ? null : 'Best-Of'}>
-                  <IconButton
-                    size='sm'
-                    variant='outlined' color='primary'
-                    onClick={handleOpsConversationRestartFromBeam}
-                    sx={{ ml: 'auto', my: '-0.25rem' /* absorb the menuItem padding */ }}
-                  >
-                    <ChatBeamIcon /> {/*<GavelIcon />*/}
-                  </IconButton>
-                </Tooltip>
-              )}
+                  : <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'space-between', gap: 1 }}>Retry<KeyStroke combo='Ctrl + Shift + R' /></Box>}
+            </MenuItem>
+          )}
+          {!!props.onMessageBeam && labsChatBeam && (
+            <MenuItem disabled={fromSystem} onClick={handleOpsBeamFrom}>
+              <ListItemDecorator>
+                <Badge invisible={fromSystem} color='success' size='sm'>
+                  <ChatBeamIcon color={fromSystem ? undefined : 'primary'} />
+                </Badge>
+              </ListItemDecorator>
+              {!fromAssistant
+                ? <>Beam <span style={{ opacity: 0.5 }}>from here</span></>
+                : !props.isBottom
+                  ? <>Beam <span style={{ opacity: 0.5 }}>this message</span></>
+                  : <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'space-between', gap: 1 }}>Beam<KeyStroke combo='Ctrl + Shift + B' /></Box>}
             </MenuItem>
           )}
         </CloseableMenu>
