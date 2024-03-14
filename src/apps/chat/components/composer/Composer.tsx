@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { shallow } from 'zustand/shallow';
 import { fileOpen, FileWithHandle } from 'browser-fs-access';
-import { keyframes } from '@emotion/react';
 
 import { Box, Button, ButtonGroup, Card, Dropdown, Grid, IconButton, Menu, MenuButton, MenuItem, Textarea, Tooltip, Typography } from '@mui/joy';
 import { ColorPaletteProp, SxProps, VariantProp } from '@mui/joy/styles/types';
@@ -27,6 +26,7 @@ import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
 import { DConversationId, useChatStore } from '~/common/state/store-chats';
 import { PreferencesTab, useOptimaLayout } from '~/common/layout/optima/useOptimaLayout';
 import { SpeechResult, useSpeechRecognition } from '~/common/components/useSpeechRecognition';
+import { animationEnterBelow } from '~/common/util/animUtils';
 import { countModelTokens } from '~/common/util/token-counter';
 import { launchAppCall } from '~/common/app.routes';
 import { lineHeightTextareaMd } from '~/common/app.theme';
@@ -63,16 +63,8 @@ import { TokenProgressbarMemo } from './TokenProgressbar';
 import { useComposerStartupText } from './store-composer';
 
 
-export const animationStopEnter = keyframes`
-    from {
-        opacity: 0;
-        transform: translateY(8px)
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0)
-    }
-`;
+const zIndexComposerOverlayDrop = 10;
+const zIndexComposerOverlayMic = 20;
 
 const dropperCardSx: SxProps = {
   display: 'none',
@@ -81,7 +73,7 @@ const dropperCardSx: SxProps = {
   border: '2px dashed',
   borderRadius: 'xs',
   boxShadow: 'none',
-  zIndex: 10,
+  zIndex: zIndexComposerOverlayDrop,
 } as const;
 
 const dropppedCardDraggingSx: SxProps = {
@@ -108,6 +100,7 @@ export function Composer(props: {
 }) {
 
   // state
+  const [chatModeId, setChatModeId] = React.useState<ChatModeId>('generate-text');
   const [composeText, debouncedText, setComposeText] = useDebouncer('', 300, 1200, true);
   const [micContinuation, setMicContinuation] = React.useState(false);
   const [speechInterimResult, setSpeechInterimResult] = React.useState<SpeechResult | null>(null);
@@ -121,7 +114,6 @@ export function Composer(props: {
     labsCameraDesktop: state.labsCameraDesktop,
   }), shallow);
   const { novel: explainShiftEnter, touch: touchShiftEnter } = useUICounter('composer-shift-enter');
-  const [chatModeId, setChatModeId] = React.useState<ChatModeId>('generate-text');
   const [startupText, setStartupText] = useComposerStartupText();
   const enterIsNewline = useUIPreferencesStore(state => state.enterIsNewline);
   const chatMicTimeoutMs = useChatMicTimeoutMsValue();
@@ -496,9 +488,9 @@ export function Composer(props: {
   let textPlaceholder: string =
     isDraw ? 'Describe an idea or a drawing...'
       : isReAct ? 'Multi-step reasoning question...'
-        : isTextBeam ? 'Multi-chat with this persona...'
+        : isTextBeam ? 'Beam: combine the smarts of models...'
           : props.isDeveloperMode ? 'Chat with me' + (isDesktop ? ' · drop source' : '') + ' · attach code...'
-            : props.capabilityHasT2I ? 'Chat · /react · /draw · drop files...'
+            : props.capabilityHasT2I ? 'Chat · /beam · /draw · drop files...'
               : 'Chat · /react · drop files...';
   if (isDesktop && explainShiftEnter)
     textPlaceholder += !enterIsNewline ? '\nShift+Enter to add a new line' : '\nShift+Enter to send';
@@ -625,7 +617,7 @@ export function Composer(props: {
               {isSpeechEnabled && (
                 <Box sx={{
                   position: 'absolute', top: 0, right: 0,
-                  zIndex: 21,
+                  zIndex: zIndexComposerOverlayMic + 1,
                   mt: isDesktop ? 1 : 0.25,
                   mr: isDesktop ? 1 : 0.25,
                   display: 'flex', flexDirection: 'column', gap: isDesktop ? 1 : 0.25,
@@ -652,7 +644,7 @@ export function Composer(props: {
                     border: '1px solid',
                     borderColor: 'primary.solidBg',
                     borderRadius: 'sm',
-                    zIndex: 20,
+                    zIndex: zIndexComposerOverlayMic,
                     px: 1.5, py: 1,
                   }}>
                   <Typography>
@@ -732,7 +724,7 @@ export function Composer(props: {
                     fullWidth variant='soft' disabled={!props.conversationId}
                     onClick={handleStopClicked}
                     endDecorator={<StopOutlinedIcon sx={{ fontSize: 18 }} />}
-                    sx={{ animation: `${animationStopEnter} 0.1s ease-out` }}
+                    sx={{ animation: `${animationEnterBelow} 0.1s ease-out` }}
                   >
                     Stop
                   </Button>
