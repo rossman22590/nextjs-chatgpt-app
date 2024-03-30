@@ -169,9 +169,9 @@ export const geminiGeneratedContentResponseSchema = z.object({
   // no candidates are returned only if there was something wrong with the prompt (see promptFeedback)
   candidates: z.array(z.object({
     index: z.number(),
-    content: geminiContentSchema.optional(), // this can be missing if the finishReason is not 'MAX_TOKENS'
+    content: geminiContentSchema.optional(),
     finishReason: geminiFinishReasonSchema.optional(),
-    safetyRatings: z.array(geminiSafetyRatingSchema),
+    safetyRatings: z.array(geminiSafetyRatingSchema).default([]), // Use default to ensure it's always an array
     citationMetadata: z.object({
       startIndex: z.number().optional(),
       endIndex: z.number().optional(),
@@ -179,9 +179,7 @@ export const geminiGeneratedContentResponseSchema = z.object({
       license: z.string().optional(),
     }).optional(),
     tokenCount: z.number().optional(),
-    // groundingAttributions: z.array(GroundingAttribution).optional(), // This field is populated for GenerateAnswer calls.
   })).optional(),
-  // NOTE: promptFeedback is only send in the first chunk in a streaming response
   promptFeedback: z.object({
     blockReason: z.enum(['BLOCK_REASON_UNSPECIFIED', 'SAFETY', 'OTHER']).optional(),
     safetyRatings: z.array(geminiSafetyRatingSchema).optional(),
