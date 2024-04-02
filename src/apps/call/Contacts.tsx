@@ -267,13 +267,13 @@ export function Contacts(props: { setCallIntent: (intent: AppCallIntent) => void
 
       <Box>
         <Typography level='title-lg'>
-          Call AGI
+          Call AI Tutor
         </Typography>
         <Typography level='title-sm' sx={{ mt: 1 }}>
           Explore ideas and ignite creativity
         </Typography>
         <Chip variant='outlined' size='sm' sx={{ px: 1, py: 0.5, mt: 0.25, ml: -1, textWrap: 'wrap' }}>
-          Out-of-the-blue, or within a conversation
+          This is in BETA to access this please email rcohen@mytsi.org
         </Chip>
       </Box>
     </Box>
@@ -303,7 +303,7 @@ export function Contacts(props: { setCallIntent: (intent: AppCallIntent) => void
       )}
     </Box>
 
-    {showSupport && <ListDivider sx={{ my: 1 }} />}
+    {/* {showSupport && <ListDivider sx={{ my: 1 }} />}
 
     {showSupport && <GitHubProjectIssueCard
       issue={354}
@@ -317,7 +317,7 @@ export function Contacts(props: { setCallIntent: (intent: AppCallIntent) => void
         mb: 2,
         mt: 5,
       }}
-    />}
+    />} */}
 
   </>;
 }
