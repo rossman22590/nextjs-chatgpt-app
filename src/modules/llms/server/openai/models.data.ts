@@ -51,60 +51,60 @@ const _knownOpenAIChatModels: ManualMappings = [
   },
 
   // GPT4-32k's
-  {
-    idPrefix: 'gpt-4-32k-0613',
-    label: 'GPT-4 32k (0613)',
-    description: 'Snapshot of gpt-4-32 from June 13th 2023.',
-    contextWindow: 32768,
-    interfaces: [LLM_IF_OAI_Chat],
-    isLatest: true,
-  },
-  {
-    idPrefix: 'gpt-4-32k-0314',
-    label: 'GPT-4 32k (0314)',
-    description: 'Snapshot of gpt-4-32 from March 14th 2023. Will be deprecated on June 13th 2024 at the earliest.',
-    contextWindow: 32768,
-    interfaces: [LLM_IF_OAI_Chat],
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4-32k',
-    label: 'GPT-4 32k',
-    description: 'Currently points to gpt-4-32k-0613.',
-    symLink: 'gpt-4-32k-0613',
-    // copied
-    contextWindow: 32768,
-    interfaces: [LLM_IF_OAI_Chat],
-    hidden: true,
-  },
+  // {
+  //   idPrefix: 'gpt-4-32k-0613',
+  //   label: 'GPT-4 32k (0613)',
+  //   description: 'Snapshot of gpt-4-32 from June 13th 2023.',
+  //   contextWindow: 32768,
+  //   interfaces: [LLM_IF_OAI_Chat],
+  //   isLatest: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4-32k-0314',
+  //   label: 'GPT-4 32k (0314)',
+  //   description: 'Snapshot of gpt-4-32 from March 14th 2023. Will be deprecated on June 13th 2024 at the earliest.',
+  //   contextWindow: 32768,
+  //   interfaces: [LLM_IF_OAI_Chat],
+  //   hidden: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4-32k',
+  //   label: 'GPT-4 32k',
+  //   description: 'Currently points to gpt-4-32k-0613.',
+  //   symLink: 'gpt-4-32k-0613',
+  //   // copied
+  //   contextWindow: 32768,
+  //   interfaces: [LLM_IF_OAI_Chat],
+  //   hidden: true,
+  // },
 
   // GPT4's
-  {
-    idPrefix: 'gpt-4-0613',
-    label: 'GPT-4 (0613)',
-    description: 'Snapshot of gpt-4 from June 13th 2023 with function calling data. Data up to Sep 2021.',
-    contextWindow: 8192,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    isLatest: true,
-  },
-  {
-    idPrefix: 'gpt-4-0314',
-    label: 'GPT-4 (0314)',
-    description: 'Snapshot of gpt-4 from March 14th 2023 with function calling data. Data up to Sep 2021.',
-    contextWindow: 8192,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4',
-    label: 'GPT-4',
-    description: 'Currently points to gpt-4-0613.',
-    symLink: 'gpt-4-0613',
-    // copied
-    contextWindow: 8192,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    hidden: true,
-  },
+  // {
+  //   idPrefix: 'gpt-4-0613',
+  //   label: 'GPT-4 (0613)',
+  //   description: 'Snapshot of gpt-4 from June 13th 2023 with function calling data. Data up to Sep 2021.',
+  //   contextWindow: 8192,
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  //   isLatest: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4-0314',
+  //   label: 'GPT-4 (0314)',
+  //   description: 'Snapshot of gpt-4 from March 14th 2023 with function calling data. Data up to Sep 2021.',
+  //   contextWindow: 8192,
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  //   hidden: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4',
+  //   label: 'GPT-4',
+  //   description: 'Currently points to gpt-4-0613.',
+  //   symLink: 'gpt-4-0613',
+  //   // copied
+  //   contextWindow: 8192,
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  //   hidden: true,
+  // },
 
 
   // 3.5-Turbo-Instruct (Not for Chat)
