@@ -95,7 +95,7 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
 
       {!!llmCount && <Divider />}
 
-      {!!llmCount && (
+      {/* {!!llmCount && (
         <ModelsList
           filterSourceId={showAllSources ? null : selectedSourceId}
           onOpenLLMOptions={openLlmOptions}
@@ -117,14 +117,14 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
             },
           }}
         />
-      )}
+      )} */}
 
       <Divider />
 
     </GoodModal>}
 
     {/* per-LLM options */}
-    {!!showLlmOptions && <LLMOptionsModal id={showLlmOptions} onClose={closeLlmOptions} />}
+    {/* {!!showLlmOptions && <LLMOptionsModal id={showLlmOptions} onClose={closeLlmOptions} />} */}
 
   </>;
 }
