@@ -19,7 +19,7 @@ const beamSteps: ExplainerPage[] = [
     mdContent: `
 **Hello, we just launched Beam for you.**
 
-Beam is a new Big-AGI chat modality that allows you to engage multiple AI models in parallel. 
+Beam is a new AI Tutor chat modality that allows you to engage multiple AI models in parallel. 
  
 It's like having a brainstorm session with several smart people,
 only they are AI models. And as with people,
