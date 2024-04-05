@@ -26,7 +26,7 @@ only they are AI models. And as with people,
 each AI model has its own unique perspective.
 And Beam lets you make the best of them.
 
-![big-AGI BEAM Rays](https://github.com/rossman22590/nextjs-chatgpt-app/blob/4-1-24/public/images/explainers/explainer-beam-scatter-1200px-alpha.png)
+![big-AGI BEAM Rays](https://img.mytsi.org/i/piV9538.png)
 
 Let&apos;s get you to **better chat answers, faster**.
 `,
@@ -60,7 +60,7 @@ Use a mix of different AI models to get a diverse set of ideas and perspectives.
     mdContent: `
 **Merging is the consolidation phase**, where AI combines the best parts of the responses into a great, coherent answer.
 
-![big-AGI BEAM Rays](https://github.com/rossman22590/nextjs-chatgpt-app/blob/4-1-24/public/images/explainers/explainer-beam-gather-1600px-alpha.png)
+![big-AGI BEAM Rays](https://img.mytsi.org/i/pl6j537.png)
 
 You can choose from various merge options, including Fusion, Checklist, Compare, and Custom.
 Feel free to experiment with different options to find the one that works best for you.
