@@ -81,6 +81,7 @@ interface RenderCodeBaseProps {
   fitScreen?: boolean,
   noCopyButton?: boolean,
   optimizeLightweight?: boolean,
+  initialShowHTML?: boolean,
   sx?: SxProps,
 }
 
@@ -93,7 +94,7 @@ function RenderCodeImpl(props: RenderCodeImplProps) {
 
   // state
   const [fitScreen, setFitScreen] = React.useState(!!props.fitScreen);
-  const [showHTML, setShowHTML] = React.useState(false);
+  const [showHTML, setShowHTML] = React.useState(props.initialShowHTML === true);
   const [showMermaid, setShowMermaid] = React.useState(true);
   const [showPlantUML, setShowPlantUML] = React.useState(true);
   const [showSVG, setShowSVG] = React.useState(true);

@@ -103,6 +103,14 @@ export const appTheme = extendTheme({
       },
     },
 
+    // JoyMenuItem: {
+    //   styleOverrides: {
+    //     root: {
+    //       '--Icon-fontSize': '1rem', // smaller menu(s) icon - default is 1.25rem ('xl', 20px)
+    //     },
+    //   },
+    // },
+
     // JoyModal: {
     //   styleOverrides: {
     //     backdrop: {

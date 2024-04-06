@@ -2,6 +2,7 @@ import * as React from 'react';
 
 import { Button, Card, CardContent, Grid, Typography } from '@mui/joy';
 import LaunchIcon from '@mui/icons-material/Launch';
+import ThumbUpRoundedIcon from '@mui/icons-material/ThumbUpRounded';
 
 import { Link } from '~/common/components/Link';
 
@@ -30,10 +31,11 @@ export const beamNewsCallout =
         </Grid>
         <Grid xs={12} sm={5} sx={{ display: 'flex', flexAlign: 'center', justifyContent: 'center' }}>
           {/*<Button*/}
-          {/*  fullWidth variant='plain' color='primary' endDecorator={<LaunchIcon />}*/}
-          {/*  component={Link} href={Brand.URIs.OpenRepo + '/issues/new?template=roadmap-request.md&title=%5BSuggestion%5D'} noLinkStyle target='_blank'*/}
+          {/*  fullWidth variant='outlined' color='primary' startDecorator={<ThumbUpRoundedIcon />}*/}
+          {/*  // endDecorator={<LaunchIcon />}*/}
+          {/*  component={Link} href={beamHNUrl} noLinkStyle target='_blank'*/}
           {/*>*/}
-          {/*  Suggest a Feature*/}
+          {/*  on Hackernews 🙏*/}
           {/*</Button>*/}
         </Grid>
       </Grid>

@@ -22,7 +22,7 @@ big-AGI is an open book; see the **[ready-to-ship and future ideas](https://gith
 ### What's New in 1.15.0 · April 1, 2024 · Beam
 
 - ⚠️ [**Beam**: the multi-model AI chat](https://big-agi.com/blog/beam-multi-model-ai-reasoning). find better answers, faster - a game-changer for brainstorming, decision-making, and creativity. [#443](https://github.com/enricoros/big-AGI/issues/443)
-- Managed Deployments **Auto-Configuration**: simplify the UI mdoels setup with backend-set models. [#436](https://github.com/enricoros/big-AGI/issues/436)
+- Managed Deployments **Auto-Configuration**: simplify the UI models setup with backend-set models. [#436](https://github.com/enricoros/big-AGI/issues/436)
 - Message **Starring ⭐**: star important messages within chats, to attach them later. [#476](https://github.com/enricoros/big-AGI/issues/476)
 - Enhanced the default Persona
 - Fixes to Gemini models and SVGs, improvements to UI and icons
@@ -218,6 +218,13 @@ Or run the official container:
 
 - manually: `docker run -d -p 3000:3000 ghcr.io/enricoros/big-agi`
 - or, with docker-compose: `docker-compose up` or see [the documentation](docs/deploy-docker.md) for a composer file with integrated browsing
+
+## ⚙️ Deploy with Midori AI Subsystem for Docker
+
+Follow the setup found on [Midori AI Subsystem Site](https://io.midori-ai.xyz/subsystem/manager/) for your host OS
+After setting that up install the Big-AGI docker backend to the Midori AI Subsystem.
+
+Once that is done, you are all set!
 
 ## ☁️ Deploy on Cloudflare Pages
 
