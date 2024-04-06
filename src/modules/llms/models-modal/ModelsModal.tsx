@@ -124,7 +124,7 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
     </GoodModal>}
 
     {/* per-LLM options */}
-    {/* {!!showLlmOptions && <LLMOptionsModal id={showLlmOptions} onClose={closeLlmOptions} />} */}
+    {!!showLlmOptions && <LLMOptionsModal id={showLlmOptions} onClose={closeLlmOptions} />}
 
   </>;
 }
