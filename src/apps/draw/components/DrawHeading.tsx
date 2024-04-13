@@ -38,7 +38,7 @@ export function DrawHeading(props: {
       {/* Messaging */}
       <Box>
         <Typography level='title-lg'>
-          Draw with AI
+          Draw with Pixio
         </Typography>
         <Typography level='title-sm' sx={{ mt: 1 }}>
           Turn your ideas into images
@@ -71,13 +71,13 @@ export function DrawHeading(props: {
             >
               Generate
             </Button>
-            <Button
+            {/* <Button
               disabled
               variant={props.section === 1 ? 'solid' : 'plain'}
               onClick={() => props.setSection(1)}
             >
               Refine
-            </Button>
+            </Button> */}
             {/*<Button*/}
             {/*  disabled*/}
             {/*  variant={props.section === 2 ? 'solid' : 'plain'}*/}

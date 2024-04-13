@@ -113,10 +113,11 @@ export const navItems: {
       iconActive: FormatPaintTwoToneIcon,
       type: 'app',
       route: '/draw',
-      // hideOnMobile: true,
+      fullWidth: true,
+      hideOnMobile: true,
       hideDrawer: true,
-      isDev: true,
-      _delete: true,
+      // isDev: true,
+      // _delete: true,
     },
     {
       name: 'Cortex',
@@ -170,6 +171,7 @@ export const navItems: {
       hideDrawer: true,
       hideIcon: true,
       isDev: true,
+      _delete: true,
     },
     {
       name: 'Media Library',
@@ -232,12 +234,12 @@ export const navItems: {
       icon: DiscordIcon,
       href: Brand.URIs.SupportInvite,
     },
-    {
-      type: 'extLink',
-      name: 'GitHub',
-      icon: GitHubIcon,
-      href: Brand.URIs.OpenRepo,
-    },
+    // {
+    //   type: 'extLink',
+    //   name: 'GitHub',
+    //   icon: GitHubIcon,
+    //   href: Brand.URIs.OpenRepo,
+    // },
   ],
 
 };

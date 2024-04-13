@@ -37,12 +37,12 @@ export const ButtonBeamMemo = React.memo(ButtonBeam);
 
 function ButtonBeam(props: { isMobile?: boolean, disabled?: boolean, hasContent?: boolean, onClick: () => void }) {
   return props.isMobile ? (
-    <IconButton variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} sx={mobileSx}>
+    <IconButton variant='soft' color='primary' disabled={true} onClick={props.onClick} sx={mobileSx}>
       <ChatBeamIcon />
     </IconButton>
   ) : (
     <Tooltip disableInteractive variant='solid' arrow placement='right' title={props.hasContent ? desktopLegend : desktopLegendNoContent}>
-      <Button variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
+      <Button variant='soft' color='primary' disabled={true} onClick={props.onClick} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
         Beam
       </Button>
     </Tooltip>

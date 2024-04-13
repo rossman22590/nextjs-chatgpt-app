@@ -148,7 +148,7 @@ export function PromptDesigner(props: {
         {/*)}*/}
 
         {/* PromptFx */}
-        <Button
+        {/* <Button
           variant='soft' color='success'
           disabled={!userHasText}
           className={promptButtonClass}
@@ -157,7 +157,7 @@ export function PromptDesigner(props: {
           sx={{ borderRadius: 'sm' }}
         >
           Enhance
-        </Button>
+        </Button> */}
 
         {/*<Button*/}
         {/*  variant='soft' color='success'*/}

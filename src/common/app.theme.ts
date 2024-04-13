@@ -14,7 +14,7 @@ export const formLabelStartWidth = 140;
 
 // Theme & Fonts
 
-const font = Inter({
+const inter = Inter({
   weight: [ /* '300', sm */ '400' /* (undefined, default) */, '500' /* md */, '600' /* lg */, '700' /* xl */],
   subsets: ['latin'],
   display: 'swap',
@@ -30,8 +30,7 @@ const jetBrainsMono = JetBrains_Mono({
 
 export const appTheme = extendTheme({
   fontFamily: {
-    body: font.style.fontFamily,
-    display: font.style.fontFamily,
+    body: inter.style.fontFamily,
     code: jetBrainsMono.style.fontFamily,
   },
   colorSchemes: {
@@ -39,7 +38,7 @@ export const appTheme = extendTheme({
       palette: {
         neutral: {
           plainColor: 'var(--joy-palette-neutral-800)',     // [700 -> 800] Dropdown menu: increase text contrast a bit
-          solidBg: 'var(--joy-palette-neutral-700)',        // [500 -> 700] PageBar background & Button[solid]
+          solidBg: '#030712',        // [500 -> 700] AppBar background & Button[solid]
           solidHoverBg: 'var(--joy-palette-neutral-800)',   // [600 -> 800] Buttons[solid]:hover
         },
         // primary [800] > secondary [700 -> 800] > tertiary [600] > icon [500 -> 700]
@@ -103,14 +102,6 @@ export const appTheme = extendTheme({
         },
       },
     },
-
-    // JoyMenuItem: {
-    //   styleOverrides: {
-    //     root: {
-    //       '--Icon-fontSize': '1rem', // smaller menu(s) icon - default is 1.25rem ('xl', 20px)
-    //     },
-    //   },
-    // },
 
     // JoyModal: {
     //   styleOverrides: {

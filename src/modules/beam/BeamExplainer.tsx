@@ -17,16 +17,17 @@ const beamSteps: ExplainerPage[] = [
     // titleSpark: 'B E A M',
     // titleSuffix: ' azing',
     mdContent: `
+
 **Hello, we just launched Beam for you.**
 
-Beam is a new Big-AGI chat modality that allows you to engage multiple AI models in parallel. 
+Beam is a new AI Tutor chat modality that allows you to engage multiple AI models in parallel. 
  
 It's like having a brainstorm session with several smart people,
 only they are AI models. And as with people,
 each AI model has its own unique perspective.
 And Beam lets you make the best of them.
 
-![big-AGI BEAM Rays](https://raw.githubusercontent.com/enricoros/big-AGI/main/public/images/explainers/explainer-beam-scatter-1200px-alpha.png)
+![big-AGI BEAM Rays](https://img.mytsi.org/i/piV9538.png)
 
 Let&apos;s get you to **better chat answers, faster**.
 `,
@@ -60,7 +61,7 @@ Use a mix of different AI models to get a diverse set of ideas and perspectives.
     mdContent: `
 **Merging is the consolidation phase**, where AI combines the best parts of the responses into a great, coherent answer.
 
-![big-AGI BEAM Rays](https://raw.githubusercontent.com/enricoros/big-AGI/main/public/images/explainers/explainer-beam-gather-1600px-alpha.png)
+![big-AGI BEAM Rays](https://img.mytsi.org/i/pl6j537.png)
 
 You can choose from various merge options, including Fusion, Checklist, Compare, and Custom.
 Feel free to experiment with different options to find the one that works best for you.
