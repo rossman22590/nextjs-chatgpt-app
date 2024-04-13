@@ -1,7 +1,7 @@
 import { ChatCommand, ICommandsProvider } from './ICommandsProvider';
 
 import { CommandsAlter } from './CommandsAlter';
-import { CommandsBeam } from './CommandsBeam';
+// import { CommandsBeam } from './CommandsBeam';
 import { CommandsBrowse } from './CommandsBrowse';
 import { CommandsDraw } from './CommandsDraw';
 import { CommandsHelp } from './CommandsHelp';
