@@ -255,13 +255,13 @@ export function AppChat() {
             cHandler.messageAppendAssistant('Available Chat Commands:\n' + chatCommandsText, undefined, 'help', false);
             return;
 
-          case 'mode-beam':
-            if (chatCommand.isError)
-              return cHandler.messagesReplace(history);
-            // remove '/beam ', as we want to be a user chat message
-            Object.assign(lastMessage, { text: chatCommand.params || '' });
-            cHandler.messagesReplace(history);
-            return ConversationsManager.getHandler(conversationId).beamInvoke(history, [], null);
+          // case 'mode-beam':
+          //   if (chatCommand.isError)
+          //     return cHandler.messagesReplace(history);
+          //   // remove '/beam ', as we want to be a user chat message
+          //   Object.assign(lastMessage, { text: chatCommand.params || '' });
+          //   cHandler.messagesReplace(history);
+          //   return ConversationsManager.getHandler(conversationId).beamInvoke(history, [], null);
 
           default:
             return cHandler.messagesReplace([...history, createDMessage('assistant', 'This command is not supported.')]);
