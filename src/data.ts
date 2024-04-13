@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-export type SystemPurposeId ='Catalyst' | 'Developer' |'Designer' | 'ContentMode' | 'Custom' | 'DeveloperPreview' | 'Executive' | 'Generic' | 'EmailAI' | 'TutorAI' | 'AssistantAI' | 'AdviceAI' | 'CareerAI' | 'Scientist' | 'Translator' | 'LegalAI' | 'FinancialAI' | 'HealthAI' | 'TravelAI' | 'CookingAI' | 'FitnessAI' | 'Imagine' | 'Prompter' | 'Professor' | 'ShoppingAI' | 'LessonPlanner' | 'HomeImprovementAI' | 'MusicAI' | 'MovieAI' | 'FashionAI' | 'PetCareAI' | 'GardeningAI' | 'AutomotiveAI' | 'JournalAI' | 'EduPal';
+export type SystemPurposeId ='YouTubeTranscriber' |'Catalyst' | 'Developer' |'Designer' | 'ContentMode' | 'Custom' | 'DeveloperPreview' | 'Executive' | 'Generic' | 'EmailAI' | 'TutorAI' | 'AssistantAI' | 'AdviceAI' | 'CareerAI' | 'Scientist' | 'Translator' | 'LegalAI' | 'FinancialAI' | 'HealthAI' | 'TravelAI' | 'CookingAI' | 'FitnessAI' | 'Imagine' | 'Prompter' | 'Professor' | 'ShoppingAI' | 'LessonPlanner' | 'HomeImprovementAI' | 'MusicAI' | 'MovieAI' | 'FashionAI' | 'PetCareAI' | 'GardeningAI' | 'AutomotiveAI' | 'JournalAI' | 'EduPal';
 
 export const defaultSystemPurposeId: SystemPurposeId = 'Generic';
 
@@ -319,6 +319,15 @@ Current date: {{LocaleNow}}
     examples: ['What are some healthy diet tips?', 'How can I improve my sleep?', 'What are the symptoms of this condition?', 'What are some good exercises for beginners?'],
     call: { starters: ['What\'s the matter?', 'Health advisor on call. What\'s the issue?', 'Ready to feel better?', 'Hello.'] },
     voices: { elevenLabs: { voiceId: 'yoZ06aMxZJJ28mfd3POQ' } },
+  },
+  YouTubeTranscriber: {
+    title: 'YouTube Transcriber',
+    description: 'Enter a YouTube URL to get the transcript and chat about the content.',
+    systemMessage: 'You are an expert in understanding video transcripts and answering questions about video content.',
+    symbol: '📺',
+    examples: ['Analyze the sentiment of this video', 'Summarize the key points of the lecture'],
+    call: { starters: ['Enter a YouTube URL to begin.', 'Ready to transcribe YouTube content.', 'Paste the YouTube link here.'] },
+    voices: { elevenLabs: { voiceId: 'z9fAnlkpzviPz146aGWa' } },
   },
   TravelAI: {
   title: 'Travel AI',
