@@ -116,8 +116,8 @@ export const navItems: {
       fullWidth: true,
       hideOnMobile: true,
       hideDrawer: true,
-      // isDev: true,
-      // _delete: true,
+      isDev: true,
+      _delete: true,
     },
     {
       name: 'Cortex',
