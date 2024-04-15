@@ -171,7 +171,6 @@ export const navItems: {
       hideDrawer: true,
       hideIcon: true,
       isDev: true,
-      _delete: true,
     },
     {
       name: 'Media Library',
