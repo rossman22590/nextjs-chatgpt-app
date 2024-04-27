@@ -267,13 +267,13 @@ export function Contacts(props: { setCallIntent: (intent: AppCallIntent) => void
 
       <Box>
         <Typography level='title-lg'>
-          Call AGI
+          Call AI Tutor
         </Typography>
         <Typography level='title-sm' sx={{ mt: 1 }}>
           Explore ideas and ignite creativity
         </Typography>
         <Chip variant='outlined' size='sm' sx={{ px: 1, py: 0.5, mt: 0.25, ml: -1, textWrap: 'wrap' }}>
-          Out-of-the-blue, or within a conversation
+        Email rcohen@mytsi.org to access this beta! 
         </Chip>
       </Box>
     </Box>

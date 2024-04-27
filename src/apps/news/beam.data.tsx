@@ -8,7 +8,7 @@ import { Link } from '~/common/components/Link';
 
 
 export const beamReleaseDate = '2024-04-01T22:00:00Z';
-export const beamBlogUrl = 'https://big-agi.com/blog/beam-multi-model-ai-reasoning/';
+export const beamBlogUrl = 'https://myapps.ai';
 
 export const beamNewsCallout =
   <Card variant='solid' invertedColors>
@@ -26,7 +26,7 @@ export const beamNewsCallout =
             fullWidth variant='soft' color='primary' endDecorator={<LaunchIcon />}
             component={Link} href={beamBlogUrl} noLinkStyle target='_blank'
           >
-            Blog
+           Get BEAM in AI Tutor
           </Button>
         </Grid>
         <Grid xs={12} sm={5} sx={{ display: 'flex', flexAlign: 'center', justifyContent: 'center' }}>
