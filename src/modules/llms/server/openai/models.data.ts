@@ -29,7 +29,7 @@ const _knownOpenAIChatModels: ManualMappings = [
   {
     isLatest: true,
     idPrefix: 'gpt-4-turbo-2024-04-09',
-    label: 'GPT-4 Turbo (2024-04-09)',
+    label: 'GPT-4 Turbo (Latest 04-12-24',
     description: 'GPT-4 Turbo with Vision model. Vision requests can now use JSON mode and function calling. gpt-4-turbo currently points to this version.',
     contextWindow: 128000,
     maxCompletionTokens: 4096,
