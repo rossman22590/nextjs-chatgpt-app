@@ -29,7 +29,7 @@ const _knownOpenAIChatModels: ManualMappings = [
   {
     isLatest: true,
     idPrefix: 'gpt-4-turbo-2024-04-09',
-    label: 'GPT-4 Turbo (0412 Latest Stuff)',
+    label: 'GPT-4 Turbo (0412)',
     description: 'GPT-4 Turbo with Vision model. Vision requests can now use JSON mode and function calling. gpt-4-turbo currently points to this version.',
     contextWindow: 128000,
     maxCompletionTokens: 4096,
@@ -571,12 +571,12 @@ export function oobaboogaModelToModelDescription(modelId: string, created: numbe
 const orOldModelIDs = [
  
   'anthropic/claude-2.1', 'anthropic/claude-2.0', 'anthropic/claude-v1', 'anthropic/claude-1.2',
-  'anthropic/claude-instant-v1-100k', 'sophosympatheia/midnight-rose-70b','perplexity/sonar-medium-online','anthropic/claude-v1-100k', 'anthropic/claude-instant-1.0',
+  'anthropic/claude-instant-v1-100k','perplexity/sonar-medium-online','anthropic/claude-v1-100k', 'anthropic/claude-instant-1.0',
 ];
 
 const orModelFamilyOrder = [
   // great models (pickes by hand, they're free)
-  'mistralai/mistral-7b-instruct', 'nousresearch/nous-capybara-7b',
+  'mistralai/mistral-7b-instruct','sophosympatheia/midnight-rose-70b', 'nousresearch/nous-capybara-7b',
   // great orgs
   'huggingfaceh4/','cognitivecomputations/', 'perplexity/','openchat/', 'anthropic/', 'google/', 'mistralai/', 'meta-llama/', 'phind/',
 ];
