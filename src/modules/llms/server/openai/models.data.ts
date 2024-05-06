@@ -29,7 +29,7 @@ const _knownOpenAIChatModels: ManualMappings = [
   {
     isLatest: true,
     idPrefix: 'gpt-4-turbo-2024-04-09',
-    label: 'GPT-4 Turbo (Latest 0412)',
+    label: 'GPT-4 Turbo (0412)',
     description: 'GPT-4 Turbo with Vision model. Vision requests can now use JSON mode and function calling. gpt-4-turbo currently points to this version.',
     contextWindow: 128000,
     maxCompletionTokens: 4096,
@@ -110,7 +110,7 @@ const _knownOpenAIChatModels: ManualMappings = [
   },
 
 
-  // GPT4-32k's
+  // // GPT4-32k's
   // {
   //   idPrefix: 'gpt-4-32k',
   //   label: 'GPT-4 32k',
@@ -145,9 +145,8 @@ const _knownOpenAIChatModels: ManualMappings = [
   // },
 
 
-  // GPT4's
+  // // GPT4's
   // {
-  //   isLatest: true,
   //   idPrefix: 'gpt-4-0613',
   //   label: 'GPT-4 (0613)',
   //   description: 'Snapshot of gpt-4 from June 13th 2023 with improved function calling support. Data up to Sep 2021.',
@@ -198,7 +197,6 @@ const _knownOpenAIChatModels: ManualMappings = [
 
   // 3.5-Turbo-16k's
   {
-    isLatest: true,
     idPrefix: 'gpt-3.5-turbo-0125',
     label: '3.5-Turbo (0125)',
     description: 'The latest GPT-3.5 Turbo model with higher accuracy at responding in requested formats and a fix for a bug which caused a text encoding issue for non-English language function calls. Returns a maximum of 4,096 output tokens.',
@@ -361,7 +359,6 @@ const _knownMistralChatModels: ManualMappings = [
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
     pricing: { chatIn: 8, chatOut: 24 },
     benchmark: { cbaElo: 1159 },
-    isLatest: true,
   },
   {
     idPrefix: 'mistral-large-latest',
@@ -425,7 +422,6 @@ const _knownMistralChatModels: ManualMappings = [
     contextWindow: 32768,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
     pricing: { chatIn: 2, chatOut: 6 },
-    isLatest: true,
   },
   {
     idPrefix: 'mistral-small-2312',
@@ -573,16 +569,16 @@ export function oobaboogaModelToModelDescription(modelId: string, created: numbe
 // [OpenRouter]
 
 const orOldModelIDs = [
-  'openai/gpt-3.5-turbo-0301', 'openai/gpt-4-0314', 'openai/gpt-4-32k-0314', 'openai/text-davinci-002',
+ 
   'anthropic/claude-2.1', 'anthropic/claude-2.0', 'anthropic/claude-v1', 'anthropic/claude-1.2',
-  'anthropic/claude-instant-v1-100k', 'anthropic/claude-v1-100k', 'anthropic/claude-instant-1.0',
+  'anthropic/claude-instant-v1-100k','perplexity/sonar-medium-online','anthropic/claude-v1-100k', 'anthropic/claude-instant-1.0',
 ];
 
 const orModelFamilyOrder = [
   // great models (pickes by hand, they're free)
-  'mistralai/mistral-7b-instruct', 'nousresearch/nous-capybara-7b',
+  'mistralai/mistral-7b-instruct','sophosympatheia/midnight-rose-70b', 'nousresearch/nous-capybara-7b',
   // great orgs
-  'huggingfaceh4/', 'openchat/', 'anthropic/', 'google/', 'mistralai/', 'openai/', 'meta-llama/', 'phind/',
+  'huggingfaceh4/','cognitivecomputations/', 'perplexity/','openchat/', 'anthropic/', 'google/', 'mistralai/', 'meta-llama/', 'phind/',
 ];
 
 export function openRouterModelFamilySortFn(a: { id: string }, b: { id: string }): number {
@@ -842,21 +838,46 @@ export function perplexityAIModelSort(a: ModelDescriptionSchema, b: ModelDescrip
   return b.label.localeCompare(a.label);
 }
 
-// Groq
+
+// Groq - https://console.groq.com/docs/models
 
 const _knownGroqModels: ManualMappings = [
-  // {
-  //   id: 'lama2-70b-4096',
-  //   label: 'Llama 2 70B Chat',
-  //   description: 'Llama 2 is a collection of pretrained and fine-tuned generative text models.',
-  //   contextWindow: 4096,
-  //   interfaces: [LLM_IF_OAI_Chat],
-  // },
+  {
+    isLatest: true,
+    idPrefix: 'llama3-70b-8192',
+    label: 'Llama 3 · 70B',
+    description: 'LLaMA3 70b developed by Meta with a context window of 8,192 tokens.',
+    contextWindow: 8192,
+    interfaces: [LLM_IF_OAI_Chat],
+  },
+  {
+    // isLatest: true,
+    idPrefix: 'llama3-8b-8192',
+    label: 'Llama 3 · 8B',
+    description: 'LLaMA3 8b developed by Meta with a context window of 8,192 tokens.',
+    contextWindow: 8192,
+    interfaces: [LLM_IF_OAI_Chat],
+  },
+  {
+    idPrefix: 'llama2-70b-4096',
+    label: 'Llama 2 · 70B',
+    description: 'LLaMA2 70b developed by Meta with a context window of 4,096 tokens.',
+    contextWindow: 4096,
+    interfaces: [LLM_IF_OAI_Chat],
+    hidden: true,
+  },
   {
     idPrefix: 'mixtral-8x7b-32768',
-    label: 'Mixtral 8x7B Instruct v0.1',
-    description: 'The Mixtral-8x7B Large Language Model (LLM) is a pretrained generative Sparse Mixture of Experts.',
+    label: 'Mixtral 8x7B',
+    description: 'Mixtral 8x7b developed by Mistral with a context window of 32,768 tokens.',
     contextWindow: 32768,
+    interfaces: [LLM_IF_OAI_Chat],
+  },
+  {
+    idPrefix: 'gemma-7b-it',
+    label: 'Gemma 1.1 · 7B Instruct',
+    description: 'Gemma 7b developed by Google with a context window of 8,192 tokens.',
+    contextWindow: 8192,
     interfaces: [LLM_IF_OAI_Chat],
   },
 ];
@@ -871,6 +892,15 @@ export function groqModelToModelDescription(_model: unknown): ModelDescriptionSc
     interfaces: [LLM_IF_OAI_Chat],
     hidden: true,
   });
+}
+
+export function groqModelSortFn(a: ModelDescriptionSchema, b: ModelDescriptionSchema): number {
+  // sort as per their order in the known models
+  const aIndex = _knownGroqModels.findIndex(base => a.id.startsWith(base.idPrefix));
+  const bIndex = _knownGroqModels.findIndex(base => b.id.startsWith(base.idPrefix));
+  if (aIndex !== -1 && bIndex !== -1)
+    return aIndex - bIndex;
+  return a.id.localeCompare(b.id);
 }
 
 
