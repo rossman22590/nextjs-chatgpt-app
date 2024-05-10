@@ -1,4 +1,5 @@
 import * as React from 'react';
+import Link from 'next/link';
 
 import type { SxProps } from '@mui/joy/styles/types';
 import { Box, Button, IconButton, Tooltip } from '@mui/joy';
@@ -41,10 +42,12 @@ function ButtonBeam(props: { isMobile?: boolean, disabled?: boolean, hasContent?
       <ChatBeamIcon />
     </IconButton>
   ) : (
-    <Tooltip disableInteractive variant='solid' arrow placement='right' title={props.hasContent ? desktopLegend : desktopLegendNoContent}>
-      <Button variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
-        Beam
-      </Button>
-    </Tooltip>
+<Link href="https://account.myapps.ai/ultra">
+  <Tooltip disableInteractive variant='solid' arrow placement='right' title={props.hasContent ? desktopLegend : desktopLegendNoContent}>
+    <Button variant='soft' color='primary' disabled={props.disabled} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
+      Get Beam Now 💫
+    </Button>
+  </Tooltip>
+</Link>
   );
 }
