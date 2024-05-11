@@ -569,16 +569,17 @@ export function oobaboogaModelToModelDescription(modelId: string, created: numbe
 // [OpenRouter]
 
 const orOldModelIDs = [
-  'openai/gpt-3.5-turbo-0301', 'openai/gpt-4-0314', 'openai/gpt-4-32k-0314', 'openai/text-davinci-002',
+  
   'anthropic/claude-2.1', 'anthropic/claude-2.0', 'anthropic/claude-v1', 'anthropic/claude-1.2',
-  'anthropic/claude-instant-v1-100k', 'anthropic/claude-v1-100k', 'anthropic/claude-instant-1.0',
+  'anthropic/claude-instant-v1-100k','perplexity/sonar-medium-online','anthropic/claude-v1-100k', 'anthropic/claude-instant-1.0',
+   'anthropic/claude-v1-100k',
 ];
 
 const orModelFamilyOrder = [
   // great models (pickes by hand, they're free)
-  'mistralai/mistral-7b-instruct', 'nousresearch/nous-capybara-7b',
+  'mistralai/mistral-7b-instruct','sophosympatheia/midnight-rose-70b', 'nousresearch/nous-capybara-7b',
   // great orgs
-  'huggingfaceh4/', 'openchat/', 'anthropic/', 'google/', 'mistralai/', 'openai/', 'meta-llama/', 'phind/',
+  'huggingfaceh4/', 'openchat/', 'anthropic/',   'meta-llama/', 'phind/',
 ];
 
 export function openRouterModelFamilySortFn(a: { id: string }, b: { id: string }): number {

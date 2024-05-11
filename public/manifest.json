@@ -1,18 +1,11 @@
 {
-  "name": "big-AGI",
-  "short_name": "big-AGI",
+  "name": "Plus",
+  "short_name": "Plus",
   "theme_color": "#32383E",
   "background_color": "#9FA6AD",
-  "description": "Your Generative AI Suite",
-  "categories": [
-    "productivity",
-    "AI",
-    "tool",
-    "utilities"
-  ],
+  "description": "Personal AGI App",
   "display": "standalone",
-  "start_url": "/?source=pwa",
-  "scope": "/",
+  "start_url": "/",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -31,17 +24,6 @@
       "type": "image/png"
     }
   ],
-  "file_handlers": [
-    {
-      "action": "/link/share_target",
-      "accept": {
-        "application/big-agi": [
-          ".agi",
-          ".agi.json"
-        ]
-      }
-    }
-  ],
   "share_target": {
     "action": "/link/share_target",
     "method": "GET",
@@ -51,12 +33,5 @@
       "text": "text",
       "url": "url"
     }
-  },
-  "shortcuts": [
-    {
-      "name": "Call",
-      "url": "/call",
-      "description": "Call a Persona"
-    }
-  ]
+  }
 }
