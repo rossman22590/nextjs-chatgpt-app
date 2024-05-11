@@ -42,7 +42,7 @@ function ButtonBeam(props: { isMobile?: boolean, disabled?: boolean, hasContent?
       <ChatBeamIcon />
     </IconButton>
   ) : (
-<Link href="https://account.myapps.ai/ultra">
+<Link href="https://account.myapps.ai/#pricing">
   <Tooltip disableInteractive variant='solid' arrow placement='right' title={props.hasContent ? desktopLegend : desktopLegendNoContent}>
     <Button variant='soft' color='primary' disabled={props.disabled} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
       Get Beam Now 💫
