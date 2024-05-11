@@ -110,76 +110,76 @@ const _knownOpenAIChatModels: ManualMappings = [
   },
 
 
-  // GPT4-32k's
-  {
-    idPrefix: 'gpt-4-32k',
-    label: 'GPT-4 32k',
-    description: 'Currently points to gpt-4-32k-0613. This model was never rolled out widely in favor of GPT-4 Turbo.',
-    symLink: 'gpt-4-32k-0613',
-    // copied from symlinked
-    contextWindow: 32768,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat],
-    pricing: { chatIn: 60, chatOut: 120 },
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4-32k-0613',
-    label: 'GPT-4 32k (0613)',
-    description: 'Snapshot of gpt-4-32k from June 13th 2023 with improved function calling support. This model was never rolled out widely in favor of GPT-4 Turbo.',
-    contextWindow: 32768,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat],
-    pricing: { chatIn: 60, chatOut: 120 },
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4-32k-0314',
-    label: 'GPT-4 32k (0314)',
-    description: 'Snapshot of gpt-4-32 from March 14th 2023. Will be deprecated on June 13th 2024 at the earliest.',
-    contextWindow: 32768,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat],
-    pricing: { chatIn: 60, chatOut: 120 },
-    hidden: true,
-  },
+  // // GPT4-32k's
+  // {
+  //   idPrefix: 'gpt-4-32k',
+  //   label: 'GPT-4 32k',
+  //   description: 'Currently points to gpt-4-32k-0613. This model was never rolled out widely in favor of GPT-4 Turbo.',
+  //   symLink: 'gpt-4-32k-0613',
+  //   // copied from symlinked
+  //   contextWindow: 32768,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat],
+  //   pricing: { chatIn: 60, chatOut: 120 },
+  //   hidden: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4-32k-0613',
+  //   label: 'GPT-4 32k (0613)',
+  //   description: 'Snapshot of gpt-4-32k from June 13th 2023 with improved function calling support. This model was never rolled out widely in favor of GPT-4 Turbo.',
+  //   contextWindow: 32768,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat],
+  //   pricing: { chatIn: 60, chatOut: 120 },
+  //   hidden: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4-32k-0314',
+  //   label: 'GPT-4 32k (0314)',
+  //   description: 'Snapshot of gpt-4-32 from March 14th 2023. Will be deprecated on June 13th 2024 at the earliest.',
+  //   contextWindow: 32768,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat],
+  //   pricing: { chatIn: 60, chatOut: 120 },
+  //   hidden: true,
+  // },
 
 
-  // GPT4's
-  {
-    idPrefix: 'gpt-4-0613',
-    label: 'GPT-4 (0613)',
-    description: 'Snapshot of gpt-4 from June 13th 2023 with improved function calling support. Data up to Sep 2021.',
-    contextWindow: 8192,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    pricing: { chatIn: 30, chatOut: 60 },
-    benchmark: { cbaElo: 1164 },
-  },
-  {
-    idPrefix: 'gpt-4-0314',
-    label: 'GPT-4 (0314)',
-    description: 'Snapshot of gpt-4 from March 14th 2023 with function calling data. Data up to Sep 2021.',
-    contextWindow: 8192,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    pricing: { chatIn: 30, chatOut: 60 },
-    benchmark: { cbaElo: 1189 },
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4',
-    label: 'GPT-4',
-    description: 'Currently points to gpt-4-0613.',
-    symLink: 'gpt-4-0613',
-    hidden: true,
-    // copied from symlinked
-    contextWindow: 8192,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    pricing: { chatIn: 30, chatOut: 60 },
-    benchmark: { cbaElo: 1164 },
-  },
+  // // GPT4's
+  // {
+  //   idPrefix: 'gpt-4-0613',
+  //   label: 'GPT-4 (0613)',
+  //   description: 'Snapshot of gpt-4 from June 13th 2023 with improved function calling support. Data up to Sep 2021.',
+  //   contextWindow: 8192,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  //   pricing: { chatIn: 30, chatOut: 60 },
+  //   benchmark: { cbaElo: 1164 },
+  // },
+  // {
+  //   idPrefix: 'gpt-4-0314',
+  //   label: 'GPT-4 (0314)',
+  //   description: 'Snapshot of gpt-4 from March 14th 2023 with function calling data. Data up to Sep 2021.',
+  //   contextWindow: 8192,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  //   pricing: { chatIn: 30, chatOut: 60 },
+  //   benchmark: { cbaElo: 1189 },
+  //   hidden: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4',
+  //   label: 'GPT-4',
+  //   description: 'Currently points to gpt-4-0613.',
+  //   symLink: 'gpt-4-0613',
+  //   hidden: true,
+  //   // copied from symlinked
+  //   contextWindow: 8192,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  //   pricing: { chatIn: 30, chatOut: 60 },
+  //   benchmark: { cbaElo: 1164 },
+  // },
 
 
   // 3.5-Turbo-Instruct (Not for Chat)
@@ -572,14 +572,14 @@ const orOldModelIDs = [
   
   'anthropic/claude-2.1', 'anthropic/claude-2.0', 'anthropic/claude-v1', 'anthropic/claude-1.2',
   'anthropic/claude-instant-v1-100k','perplexity/sonar-medium-online','anthropic/claude-v1-100k', 'anthropic/claude-instant-1.0',
-   'anthropic/claude-v1-100k',
+
 ];
 
 const orModelFamilyOrder = [
   // great models (pickes by hand, they're free)
   'mistralai/mistral-7b-instruct','sophosympatheia/midnight-rose-70b', 'nousresearch/nous-capybara-7b',
   // great orgs
-  'huggingfaceh4/', 'openchat/', 'anthropic/',   'meta-llama/', 'phind/',
+  'huggingfaceh4/', 'openchat/', 'anthropic/',  'perplexity/', 'meta-llama/', 'phind/',
 ];
 
 export function openRouterModelFamilySortFn(a: { id: string }, b: { id: string }): number {
