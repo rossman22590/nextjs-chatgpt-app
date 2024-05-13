@@ -12,6 +12,18 @@ import { wireTogetherAIListOutputSchema } from './togetherai.wiretypes';
 const _knownOpenAIChatModels: ManualMappings = [
 
   // GPT4 Turbo with Vision -> 2024-04-09
+    {
+    isLatest: true,
+    idPrefix: 'gpt-4o-2024-05-13',
+    label: 'GPT-4o (2024-04-09)',
+    description: 'GPT-4 Turbo with o model. Vision requests can now use JSON mode and function calling. gpt-4-turbo currently points to this version.',
+    contextWindow: 128000,
+    maxCompletionTokens: 4096,
+    trainingDataCutoff: 'Dec 2023',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json],
+    pricing: { chatIn: 10, chatOut: 30 },
+    benchmark: { cbaElo: 1261 },
+  },
   {
     idPrefix: 'gpt-4-turbo',
     label: 'GPT-4 Turbo',
