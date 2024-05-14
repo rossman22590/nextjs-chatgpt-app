@@ -604,9 +604,9 @@ const orOldModelIDs = [
 
 const orModelFamilyOrder = [
   // great models (pickes by hand, they're free)
-  'mistralai/mistral-7b-instruct', 'nousresearch/nous-capybara-7b',
+  'mistralai/mistral-7b-instruct','sophosympatheia/midnight-rose-70b',  'nousresearch/nous-capybara-7b',
   // great orgs
-  'huggingfaceh4/', 'openchat/', 'anthropic/', 'google/', 'mistralai/',  'meta-llama/', 'phind/',
+  'huggingfaceh4/', 'openchat/', 'perplexity/', 'anthropic/', 'google/', 'mistralai/',  'meta-llama/', 'phind/',
 ];
 
 export function openRouterModelFamilySortFn(a: { id: string }, b: { id: string }): number {
