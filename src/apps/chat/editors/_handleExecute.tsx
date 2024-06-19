@@ -88,16 +88,16 @@ export async function _handleExecute(chatModeId: ChatModeId, conversationId: DCo
           cHandler.messageAppendAssistant('Available Chat Commands:\n' + chatCommandsText, undefined, 'help', false);
           return true;
 
-        case 'mode-beam':
-          if (chatCommand.isError) {
-            cHandler.messagesReplace(history);
-            return false;
-          }
-          // remove '/beam ', as we want to be a user chat message
-          Object.assign(lastMessage, { text: chatCommand.params || '' });
-          cHandler.messagesReplace(history);
-          ConversationsManager.getHandler(conversationId).beamInvoke(history, [], null);
-          return true;
+        // case 'mode-beam':
+        //   if (chatCommand.isError) {
+        //     cHandler.messagesReplace(history);
+        //     return false;
+        //   }
+        //   // remove '/beam ', as we want to be a user chat message
+        //   Object.assign(lastMessage, { text: chatCommand.params || '' });
+        //   cHandler.messagesReplace(history);
+        //   ConversationsManager.getHandler(conversationId).beamInvoke(history, [], null);
+        //   return true;
 
         default:
           cHandler.messagesReplace([...history, createDMessage('assistant', 'This command is not supported.')]);
