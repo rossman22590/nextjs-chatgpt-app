@@ -768,7 +768,7 @@ export function ChatMessage(props: {
                   : <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'space-between', gap: 1 }}>Retry<KeyStroke combo='Ctrl + Shift + R' /></Box>}
             </MenuItem>
           )}
-          {!!props.onMessageBeam && (
+          {/* {!!props.onMessageBeam && (
             <MenuItem disabled={fromSystem} onClick={handleOpsBeamFrom}>
               <ListItemDecorator>
                 <ChatBeamIcon color={fromSystem ? undefined : 'primary'} />
@@ -779,7 +779,7 @@ export function ChatMessage(props: {
                   ? <>Beam <span style={{ opacity: 0.5 }}>this message</span></>
                   : <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'space-between', gap: 1 }}>Beam<KeyStroke combo='Ctrl + Shift + B' /></Box>}
             </MenuItem>
-          )}
+          )} */}
         </CloseableMenu>
       )}
 
