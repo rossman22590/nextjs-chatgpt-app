@@ -69,7 +69,7 @@ function TableRenderer({ children, node, ...props }: TableRendererProps) {
 
       {/* Download CSV link */}
       {tableData?.length >= 1 && (
-        <CSVLink filename='big-agi-export' data={tableData}>
+        <CSVLink filename='aitutor-export' data={tableData}>
           <Button variant='outlined' color='neutral' size='md' endDecorator={<DownloadIcon />} sx={{
             mb: '1rem',
             backgroundColor: 'background.popup', // make this button 'pop' a bit from the page
