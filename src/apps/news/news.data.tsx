@@ -60,7 +60,7 @@ export const NewsItems: NewsItem[] = [
     ]
   }*/  {
     versionCode: '1.19',
-    versionName: 'BEAM v2',
+    versionName: 'BEAM v2.1',
     versionDate: new Date('2024-05-09T00:00:00Z'),
     versionCoverImage: coverV116,
     items: [
