@@ -173,12 +173,12 @@ export function AppNews() {
 
               </Card>
 
-              {/* Inject the roadmap item here*/}
-              {idx === 3 && (
+             
+              {/* {idx === 3 && (
                 <Box sx={{ mb: 3 }}>
                   {newsRoadmapCallout}
                 </Box>
-              )}
+              )} */}
 
             </React.Fragment>;
           })}
