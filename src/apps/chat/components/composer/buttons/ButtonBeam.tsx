@@ -1,5 +1,5 @@
 import * as React from 'react';
-
+import Link from 'next/link';
 import type { SxProps } from '@mui/joy/styles/types';
 import { Box, Button, IconButton, Tooltip } from '@mui/joy';
 
@@ -16,7 +16,7 @@ const desktopLegend =
 
 const desktopLegendNoContent =
   <Box sx={{ px: 1, py: 0.75, lineHeight: '1.5rem' }}>
-    Enter the text to Beam, then press this
+    Upgrade to Ultra to access this feature
   </Box>;
 
 const mobileSx: SxProps = {
@@ -41,10 +41,12 @@ function ButtonBeam(props: { isMobile?: boolean, disabled?: boolean, hasContent?
       <ChatBeamIcon />
     </IconButton>
   ) : (
+    <Link href="https://account.myapps.ai/#pricing">
     <Tooltip disableInteractive variant='solid' arrow placement='right' title={props.hasContent ? desktopLegend : desktopLegendNoContent}>
-      <Button variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
-        Beam
+      <Button variant='soft' color='primary' disabled={props.disabled} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
+        Get Beam Now 💫
       </Button>
     </Tooltip>
+  </Link>
   );
 }
