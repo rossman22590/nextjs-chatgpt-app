@@ -14,7 +14,6 @@ const shortcutsMd = platformAwareKeystrokes(`
 | **Edit**            |                                                 | 
 | Shift + Enter       | Newline                                         |
 | Alt + Enter         | Append (no response)                            |
-| Ctrl + Shift + B    | **Beam** last message                           |
 | Ctrl + Shift + R    | **Regenerate** last message                     |
 | Ctrl + Shift + V    | Attach clipboard (better than Ctrl + V)         |
 | Ctrl + M            | Microphone (voice typing)                       |

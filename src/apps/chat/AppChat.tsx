@@ -259,17 +259,17 @@ export function AppChat() {
     }
   }, [focusedPaneConversationId, handleExecuteAndOutcome]);
 
-  const handleMessageBeamLastInFocusedPane = React.useCallback(async () => {
-    // Ctrl + Shift + B
-    const focusedConversation = getConversation(focusedPaneConversationId);
-    if (focusedConversation?.messages?.length) {
-      const lastMessage = focusedConversation.messages[focusedConversation.messages.length - 1];
-      if (lastMessage.role === 'assistant')
-        ConversationsManager.getHandler(focusedConversation.id).beamInvoke(focusedConversation.messages.slice(0, -1), [lastMessage], lastMessage.id);
-      else if (lastMessage.role === 'user')
-        ConversationsManager.getHandler(focusedConversation.id).beamInvoke(focusedConversation.messages, [], null);
-    }
-  }, [focusedPaneConversationId]);
+  // const handleMessageBeamLastInFocusedPane = React.useCallback(async () => {
+  //   // Ctrl + Shift + B
+  //   const focusedConversation = getConversation(focusedPaneConversationId);
+  //   if (focusedConversation?.messages?.length) {
+  //     const lastMessage = focusedConversation.messages[focusedConversation.messages.length - 1];
+  //     if (lastMessage.role === 'assistant')
+  //       ConversationsManager.getHandler(focusedConversation.id).beamInvoke(focusedConversation.messages.slice(0, -1), [lastMessage], lastMessage.id);
+  //     else if (lastMessage.role === 'user')
+  //       ConversationsManager.getHandler(focusedConversation.id).beamInvoke(focusedConversation.messages, [], null);
+  //   }
+  // }, [focusedPaneConversationId]);
 
   const handleTextDiagram = React.useCallback((diagramConfig: DiagramConfig | null) => setDiagramConfig(diagramConfig), []);
 
@@ -399,7 +399,7 @@ export function AppChat() {
 
   const shortcuts = React.useMemo((): GlobalShortcutItem[] => [
     // focused conversation
-    ['b', true, true, false, handleMessageBeamLastInFocusedPane],
+    // ['b', true, true, false, handleMessageBeamLastInFocusedPane],
     ['r', true, true, false, handleMessageRegenerateLastInFocusedPane],
     ['n', true, false, true, handleConversationNewInFocusedPane],
     ['o', true, false, false, handleFileOpenConversation],
@@ -413,7 +413,7 @@ export function AppChat() {
     ['o', true, true, false, handleOpenChatLlmOptions],
     ['+', true, true, false, useUIPreferencesStore.getState().increaseContentScaling],
     ['-', true, true, false, useUIPreferencesStore.getState().decreaseContentScaling],
-  ], [focusedPaneConversationId, handleConversationBranch, handleConversationClear, handleConversationNewInFocusedPane, handleFileOpenConversation, handleFileSaveConversation, handleDeleteConversations, handleMessageBeamLastInFocusedPane, handleMessageRegenerateLastInFocusedPane, handleNavigateHistoryInFocusedPane, handleOpenChatLlmOptions, isFocusedChatEmpty]);
+  ], [focusedPaneConversationId, handleConversationBranch, handleConversationClear, handleConversationNewInFocusedPane, handleFileOpenConversation, handleFileSaveConversation, handleDeleteConversations, handleMessageRegenerateLastInFocusedPane, handleNavigateHistoryInFocusedPane, handleOpenChatLlmOptions, isFocusedChatEmpty]);
   useGlobalShortcuts(shortcuts);
 
 
