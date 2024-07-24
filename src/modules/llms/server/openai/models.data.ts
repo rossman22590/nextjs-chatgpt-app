@@ -802,6 +802,19 @@ const _knownGroqModels: ManualMappings = [
     description: 'LLaMA3 8b developed by Meta with a context window of 8,192 tokens.',
     contextWindow: 8192,
     interfaces: [LLM_IF_OAI_Chat],
+  },  {
+    idPrefix: 'llama-3.1-8b-instant',
+    label: 'llama-3.1-8b-instant',
+    description: 'Mixdtral 8x7b developed by Mistral with a context window of 32,768 tokens.',
+    contextWindow: 32768,
+    interfaces: [LLM_IF_OAI_Chat],
+  },
+  {
+    idPrefix: 'llama-3.1-70b-versatile',
+    label: 'llama-3.1-70b-versatile',
+    description: 'Mixdtral 8x7b developed by Mistral with a context window of 32,768 tokens.',
+    contextWindow: 32768,
+    interfaces: [LLM_IF_OAI_Chat],
   },
   {
     idPrefix: 'llama2-70b-4096',
