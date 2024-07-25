@@ -9,6 +9,7 @@ import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { useModelsStore } from '~/modules/llms/store-llms';
 
 import { AgiSquircleIcon } from '~/common/components/icons/AgiSquircleIcon';
+import { authUserButton } from '~/common/providers/ProviderAuth';
 import { checkDivider, checkVisibileIcon, NavItemApp, navItems } from '~/common/app.nav';
 import { themeZIndexDesktopNav } from '~/common/app.theme';
 
@@ -96,15 +97,10 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
               <MoreHorizIcon />
             </MenuButton>
           </Tooltip>
-          <Menu
-            variant='outlined'
-            placement='right-start'
-            popperOptions={{ modifiers: [{ name: 'offset', options: { offset: [0, -2] } }] }}
-            sx={{ minWidth: 220 }}
-          >
+          <Menu variant='solid' invertedColors placement='right-start'>
             {overflowApps.map((app, appIdx) =>
-              <MenuItem key={'nav-app-extra-' + appIdx} onClick={() => Router.push(app.landingRoute || app.route)}>
-                <ListItemDecorator>
+              <MenuItem key={'nav-app-extra-' + appIdx} onClick={() => Router.push(app.landingRoute || app.route)} sx={{ minHeight: '2.5rem' }}>
+                <ListItemDecorator sx={{ ml: 1 }}>
                   <app.icon />
                 </ListItemDecorator>
                 {app.name + (app.isDev ? ' [DEV]' : '')}
@@ -189,6 +185,7 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
       <DesktopNavGroupBox sx={{ mb: 'calc(2 * var(--GroupMarginY))' }}>
         {navExtLinkItems}
         {navModalItems}
+        {authUserButton}
       </DesktopNavGroupBox>
 
     </InvertedBar>

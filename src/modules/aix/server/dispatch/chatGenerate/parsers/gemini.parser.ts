@@ -1,5 +1,6 @@
 import type { ChatGenerateParseFunction } from '../chatGenerate.dispatch';
-import { ChatGenerateTransmitter, IssueSymbols } from '../ChatGenerateTransmitter';
+import type { IParticleTransmitter } from '../IParticleTransmitter';
+import { IssueSymbols } from '../ChatGenerateTransmitter';
 
 import { GeminiWire_API_Generate_Content, GeminiWire_Safety } from '../../wiretypes/gemini.wiretypes';
 
@@ -25,7 +26,7 @@ export function createGeminiGenerateContentResponseParser(modelId: string): Chat
   let hasBegun = false;
 
   // this can throw, it's caught by the caller
-  return function(pt: ChatGenerateTransmitter, eventData: string): void {
+  return function(pt: IParticleTransmitter, eventData: string): void {
 
     // -> Model
     if (!hasBegun) {
@@ -39,7 +40,7 @@ export function createGeminiGenerateContentResponseParser(modelId: string): Chat
     // -> Prompt Safety Blocking
     if (generationChunk.promptFeedback?.blockReason) {
       const { blockReason, safetyRatings } = generationChunk.promptFeedback;
-      return pt.endingDialectIssue(`Input not allowed: ${blockReason}: ${_explainGeminiSafetyIssues(safetyRatings)}`, IssueSymbols.PromptBlocked);
+      return pt.setDialectTerminatingIssue(`Input not allowed: ${blockReason}: ${_explainGeminiSafetyIssues(safetyRatings)}`, IssueSymbols.PromptBlocked);
     }
 
     // expect: single completion
@@ -61,10 +62,10 @@ export function createGeminiGenerateContentResponseParser(modelId: string): Chat
           return pt.setEnded('issue-dialect');
 
         case 'RECITATION':
-          return pt.endingDialectIssue(`Generation stopped due to RECITATION`, IssueSymbols.Recitation);
+          return pt.setDialectTerminatingIssue(`Generation stopped due to RECITATION`, IssueSymbols.Recitation);
 
         case 'SAFETY':
-          return pt.endingDialectIssue(`Generation stopped due to SAFETY: ${_explainGeminiSafetyIssues(candidate0.safetyRatings)}`);
+          return pt.setDialectTerminatingIssue(`Generation stopped due to SAFETY: ${_explainGeminiSafetyIssues(candidate0.safetyRatings)}`, null);
 
         default:
           throw new Error(`server response missing content (finishReason: ${candidate0?.finishReason})`);
@@ -83,27 +84,27 @@ export function createGeminiGenerateContentResponseParser(modelId: string): Chat
 
         // <- FunctionCallPart
         case 'functionCall' in mPart:
-          pt.startFunctionToolCall(null, mPart.functionCall.name, 'json_object', mPart.functionCall.args);
-          pt.endPart();
+          pt.startFunctionCallInvocation(null, mPart.functionCall.name, 'json_object', mPart.functionCall.args ?? null);
+          pt.endMessagePart();
           break;
 
         // <- ExecutableCodePart
         case 'executableCode' in mPart:
-          pt.addCodeExecutionToolCall(null, mPart.executableCode.language, mPart.executableCode.code);
+          pt.addCodeExecutionInvocation(null, mPart.executableCode.language || '', mPart.executableCode.code || '', 'gemini_auto_inline');
           break;
 
         // <- CodeExecutionResultPart
         case 'codeExecutionResult' in mPart:
           switch (mPart.codeExecutionResult.outcome) {
             case 'OUTCOME_OK':
-              pt.addCodeExecutionResponse(null, mPart.codeExecutionResult.output || '', undefined);
+              pt.addCodeExecutionResponse(null, false, mPart.codeExecutionResult.output || '', 'gemini_auto_inline', 'upstream');
               break;
             case 'OUTCOME_FAILED':
-              pt.addCodeExecutionResponse(null, '', mPart.codeExecutionResult.output || '');
+              pt.addCodeExecutionResponse(null, true, mPart.codeExecutionResult.output || '', 'gemini_auto_inline', 'upstream');
               break;
             case 'OUTCOME_DEADLINE_EXCEEDED':
               const deadlineError = 'Code execution deadline exceeded' + (mPart.codeExecutionResult.output ? `: ${mPart.codeExecutionResult.output}` : '');
-              pt.addCodeExecutionResponse(null, '', deadlineError);
+              pt.addCodeExecutionResponse(null, deadlineError, '', 'gemini_auto_inline', 'upstream');
               break;
             default:
               throw new Error(`unexpected code execution outcome: ${mPart.codeExecutionResult.outcome}`);
@@ -117,7 +118,10 @@ export function createGeminiGenerateContentResponseParser(modelId: string): Chat
 
     // -> Stats
     if (generationChunk.usageMetadata)
-      pt.setCounters({ chatIn: generationChunk.usageMetadata.promptTokenCount, chatOut: generationChunk.usageMetadata.candidatesTokenCount });
+      pt.setCounters({
+        chatIn: generationChunk.usageMetadata.promptTokenCount,
+        chatOut: generationChunk.usageMetadata.candidatesTokenCount,
+      });
 
   };
 }

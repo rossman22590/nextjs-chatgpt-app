@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+// Used to align Partlces to the Typescript definitions from the frontend-side, on 'chat.fragments.ts'
+import { DMessageToolResponsePart } from '~/common/stores/chat/chat.fragments';
+
 import { anthropicAccessSchema } from '~/modules/llms/server/anthropic/anthropic.router';
 import { geminiAccessSchema } from '~/modules/llms/server/gemini/gemini.router';
 import { ollamaAccessSchema } from '~/modules/llms/server/ollama/ollama.router';
@@ -159,9 +162,9 @@ export namespace AixWire_Parts {
   });
 
   export const ToolInvocationPart_schema = z.object({
-    pt: z.literal('tool_call'),
+    pt: z.literal('tool_invocation'),
     id: z.string(),
-    call: z.discriminatedUnion('type', [
+    invocation: z.discriminatedUnion('type', [
       _FunctionCallInvocation_schema,
       _CodeExecutionInvocation_schema,
     ]),
@@ -412,52 +415,61 @@ export namespace AixWire_API_ChatGenerate {
 /**
  * This is the protocol for both the control objects sent by the tRPC streaming procedures,
  * and the thePartTransmitter/PartReassembler.
+ *
+ * VITAL: when transmitting anything that's "undefined", leave it out of the
+ * object rather than setting it as 'undefined' as 'superjson' will mess it up
+ * and tRPC decoding will be broken (very important!)
  */
-export namespace AixWire_API_Particles {
+export namespace AixWire_Particles {
 
-  /** Unified representation for outputs of chatGenerate */
+  /** Unified particle representation for outputs of chatGenerate */
   export type ChatGenerateOp =
-    | ControlOp
-    | PartOp
-    | { cg: 'issue', issueId: CGIssueId, issueText: string }
-    | { cg: 'end', reason: CGEndReason }
-    | { cg: 'set-model', name: string }
-    | { cg: 'update-counts', counts: Partial<ChatGenerateCounts> };
+    | ChatControlOp
+    | TextParticleOp
+    | PartParticleOp;
 
-  /** Control operations for API call streaming */
-  type ControlOp =
-    | { o: '_debugRequestBody', body: string };
+
+  // ChatControl
+
+  type ChatControlOp =
+    | { cg: 'end', reason: CGEndReason }
+    | { cg: 'issue', issueId: CGIssueId, issueText: string }
+    | { cg: 'set-model', name: string }
+    | { cg: 'update-counts', counts: Partial<ChatGenerateCounts> }
+    | { _debug: 'request', security: 'dev-env', request: { url: string, headers: string, body: string } }; // may generalize this in the future
+
+  export type CGEndReason =
+    | 'done-dialect'            // OpenAI signals the '[DONE]' event, or Anthropic sensds the 'message_stop' event
+    | 'done-dispatch-aborted'   // this shall never see the light of day, as it was a reaction to the intake being aborted first
+    | 'done-dispatch-closed'    // dispatch connection closed
+    | 'issue-dialect'           // ended because a dispatch encountered an issue, such as out-of-tokens, recitation, etc.
+    | 'issue-rpc';              // ended because of an issue
 
   export type CGIssueId =
     | 'dispatch-prepare' | 'dispatch-fetch' | 'dispatch-read' | 'dispatch-parse' // 4 phases of dispatch
     | 'dialect-issue';
 
-  export type CGEndReason =
-    | 'issue-rpc'               // ended because of an issue
-    | 'issue-dialect'           // ended because a dispatch encountered an issue, such as out-of-tokens, recitation, etc.
-    | 'done-dialect'            // OpenAI signals the '[DONE]' event, or Anthropic sensds the 'message_stop' event
-    | 'done-dispatch-closed'    // dispatch connection closed
-    | 'done-dispatch-aborted'   // this shalle never see the light of day, as it was a reaction to the intake being aborted first
-    ;
-  // | 'message-stop' | 'dialect-issue' | 'dispatch-close';
-
-  type PartOp =
-    | { p: 't_', t: string /* incremental text, despite not having the 'i_' prefix for brevity */ }
-    | { p: 'inline-image', mimeType: string, i_b64?: string }
-    | { p: 'ii_', i_b64: string }
-    | { p: 'inline-doc', type: string, ref: string, l1Title: string, i_text?: string }
-    | { p: 'id_', i_text: string }
-    | { p: 'function-call', id: string, name: string, i_args?: string }
-    | { p: 'fc_', i_args: string }
-    | { p: 'code-call', id: string, language: string, code: string }
-    | { p: 'code-response', id: string, output: string, error?: string }
-
   export type ChatGenerateCounts = {
     chatIn?: number,
     chatOut?: number,
-    chatTotal?: number,
     chatOutRate?: number,
     chatTimeInner?: number,
   };
+
+
+  // TextParticle / PartParticle - keep in line with the DMessage*Part counterparts
+
+  export type TextParticleOp =
+    | { t: string }; // special: incremental text, but with a more optimized/succinct representation compared to { p: 't_', i_t: string }
+
+  export type PartParticleOp =
+  // | { p: 'ii', mimeType: string, i_b64?: string /* never undefined */ }
+  // | { p: '_ii', i_b64: string }
+  // | { p: 'di', type: string, ref: string, l1Title: string, i_text?: string /* never undefined */ }
+  // | { p: '_di', i_text: string }
+    | { p: 'fci', id: string, name: string, i_args?: string /* never undefined */ }
+    | { p: '_fci', _args: string }
+    | { p: 'cei', id: string, language: string, code: string, author: 'gemini_auto_inline' }
+    | { p: 'cer', id: string, error: DMessageToolResponsePart['error'], result: string, executor: 'gemini_auto_inline', environment: DMessageToolResponsePart['environment'] };
 
 }

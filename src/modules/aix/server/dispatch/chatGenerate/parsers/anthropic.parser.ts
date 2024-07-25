@@ -1,7 +1,8 @@
 import { safeErrorString } from '~/server/wire';
 
 import type { ChatGenerateParseFunction } from '../chatGenerate.dispatch';
-import { ChatGenerateTransmitter, IssueSymbols } from '../ChatGenerateTransmitter';
+import type { IParticleTransmitter } from '../IParticleTransmitter';
+import { IssueSymbols } from '../ChatGenerateTransmitter';
 
 import { AnthropicWire_API_Message_Create } from '../../wiretypes/anthropic.wiretypes';
 
@@ -37,7 +38,7 @@ export function createAnthropicMessageParser(): ChatGenerateParseFunction {
   let messageStartTime: number | undefined = undefined;
   let chatInTokens: number | undefined = undefined;
 
-  return function(pt: ChatGenerateTransmitter, eventData: string, eventName?: string): void {
+  return function(pt: IParticleTransmitter, eventData: string, eventName?: string): void {
 
     // if we've errored, we should not be receiving more data
     if (hasErrored)
@@ -88,7 +89,10 @@ export function createAnthropicMessageParser(): ChatGenerateParseFunction {
               pt.appendText(content_block.text);
               break;
             case 'tool_use':
-              pt.startFunctionToolCall(content_block.id, content_block.name, 'incr_str', (content_block.input as string) || '');
+              // [Anthropic] Note: .input={} and is parsed as an object - if that's the case, we zap it to ''
+              if (content_block && typeof content_block.input === 'object' && Object.keys(content_block.input).length === 0)
+                content_block.input = null;
+              pt.startFunctionCallInvocation(content_block.id, content_block.name, 'incr_str', content_block.input! ?? null);
               break;
             default:
               throw new Error(`Unexpected content block type: ${(content_block as any).type}`);
@@ -116,7 +120,7 @@ export function createAnthropicMessageParser(): ChatGenerateParseFunction {
             case 'input_json_delta':
               if (responseMessage.content[index].type === 'tool_use') {
                 responseMessage.content[index].input += delta.partial_json;
-                pt.appendFunctionToolCallArgsIStr(responseMessage.content[index].id, delta.partial_json);
+                pt.appendFunctionCallInvocationArgs(responseMessage.content[index].id, delta.partial_json);
               } else
                 throw new Error('Unexpected input_json_delta');
               break;
@@ -136,7 +140,7 @@ export function createAnthropicMessageParser(): ChatGenerateParseFunction {
             throw new Error(`Unexpected content block stop location (${index})`);
 
           // Signal that the tool is ready? (if it is...)
-          pt.endPart();
+          pt.endMessagePart();
         } else
           throw new Error('Unexpected content_block_stop');
         break;
@@ -186,7 +190,7 @@ export function createAnthropicMessageParser(): ChatGenerateParseFunction {
         hasErrored = true;
         const { error } = JSON.parse(eventData);
         const errorText = (error.type && error.message) ? `${error.type}: ${error.message}` : safeErrorString(error);
-        return pt.endingDialectIssue(errorText || 'unknown server issue.', IssueSymbols.Generic);
+        return pt.setDialectTerminatingIssue(errorText || 'unknown server issue.', IssueSymbols.Generic);
 
       default:
         throw new Error(`Unexpected event name: ${eventName}`);
@@ -198,7 +202,7 @@ export function createAnthropicMessageParser(): ChatGenerateParseFunction {
 export function createAnthropicMessageParserNS(): ChatGenerateParseFunction {
   let messageStartTime: number = Date.now();
 
-  return function(pt: ChatGenerateTransmitter, fullData: string): void {
+  return function(pt: IParticleTransmitter, fullData: string): void {
 
     // parse with validation (e.g. type: 'message' && role: 'assistant')
     const {
@@ -223,8 +227,8 @@ export function createAnthropicMessageParserNS(): ChatGenerateParseFunction {
           break;
         case 'tool_use':
           // NOTE: this gets parsed as an object, not string deltas of a json!
-          pt.startFunctionToolCall(contentBlock.id, contentBlock.name, 'json_object', (contentBlock.input as object) || '');
-          pt.endPart();
+          pt.startFunctionCallInvocation(contentBlock.id, contentBlock.name, 'json_object', (contentBlock.input as object) || null);
+          pt.endMessagePart();
           break;
         default:
           throw new Error(`Unexpected content block type: ${(contentBlock as any).type}`);

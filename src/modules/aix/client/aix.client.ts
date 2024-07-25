@@ -2,17 +2,18 @@ import type { ChatStreamingInputSchema } from '~/modules/llms/server/llm.server.
 import type { DLLMId } from '~/modules/llms/store-llms';
 import { findVendorForLlmOrThrow } from '~/modules/llms/vendors/vendors.registry';
 
+import type { DMessageFragment } from '~/common/stores/chat/chat.fragments';
 import { apiStream } from '~/common/util/trpc.client';
-import { getLabsDevMode } from '~/common/state/store-ux-labs';
-
-import type { DMessageDocPart, DMessageErrorPart, DMessageTextPart, DMessageToolInvocationPart, DMessageToolResponsePart } from '~/common/stores/chat/chat.fragments';
+import { getLabsDevMode, getLabsDevNoStreaming } from '~/common/state/store-ux-labs';
 
 // NOTE: pay particular attention to the "import type", as this is importing from the server-side Zod definitions
 import type { AixAPI_Access, AixAPI_ContextChatStream, AixAPI_Model, AixAPIChatGenerate_Request } from '../server/api/aix.wiretypes';
 
+import { PartReassembler } from './PartReassembler';
+
 
 export type StreamingClientUpdate = Partial<{
-  textSoFar: string;
+  fragments: DMessageFragment[];
   typing: boolean;
   originLLM: string;
 }>;
@@ -71,15 +72,12 @@ function _aixModelFromLLMOptions(llmOptions: Record<string, any>, debugLlmId: st
 }
 
 
-export let devMode_AixLastDispatchRequestBody: string | null = null;
-
-
-export type DMessageAixIntakeRecombinedPart =
-  | DMessageTextPart
-  | DMessageDocPart
-  | DMessageToolInvocationPart
-  | DMessageToolResponsePart // [Gemini] code execution is a code response, which may come down the pipe
-  | DMessageErrorPart;
+// export type DMessageAixIntakeRecombinedPart =
+//   | DMessageTextPart
+//   | DMessageDocPart
+//   | DMessageToolInvocationPart
+//   | DMessageToolResponsePart // [Gemini] code execution is a code response, which may come down the pipe
+//   | DMessageErrorPart;
 
 
 /**
@@ -102,72 +100,74 @@ async function _aixChatGenerateContent(
   onUpdate: (update: StreamingClientUpdate, done: boolean) => void,
 ): Promise<void> {
 
+  const sampleFC: boolean = aixModel.id.indexOf('models/gemini') === -1;
+  const sampleCE: boolean = aixModel.id.indexOf('models/gemini') !== -1;
 
-  aixChatGenerate.tools = [
-    {
-      type: 'function_call',
-      function_call: {
-        name: 'get_capybara_info_given_name_and_color_very_long',
-        description: 'Get the info about capybaras. Call one each per name.',
-        input_schema: {
-          properties: {
-            'name': {
-              type: 'string',
-              description: 'The name of the capybara',
-              enum: ['enrico', 'coolio'],
+  if (sampleFC) {
+    aixChatGenerate.tools = [
+      {
+        type: 'function_call',
+        function_call: {
+          name: 'AI-Tutor-Agentic-Call',
+          description: 'Get the info about capybaras. Call one each per name.',
+          input_schema: {
+            properties: {
+              'name': {
+                type: 'string',
+                description: 'The name of the capybara',
+                enum: ['ross', 'aitutor'],
+              },
+              'color': {
+                type: 'string',
+                description: 'The color of the capybara. Mandatory!!',
+              },
+              // 'story': {
+              //   type: 'string',
+              //   description: 'A fantastic story about the capybara. Please 10 characters maximum.',
+              // },
             },
-            'color': {
-              type: 'string',
-              description: 'The color of the capybara. Mandatory!!',
-            },
-            // 'story': {
-            //   type: 'string',
-            //   description: 'A fantastic story about the capybara. Please 10 characters maximum.',
-            // },
+            required: ['name'],
           },
-          required: ['name'],
         },
       },
-    },
-    // {
-    //   type: 'code_execution',
-    //   variant: 'gemini_auto_inline',
-    // },
-  ];
+    ];
+  }
+  if (sampleCE) {
+    aixChatGenerate.tools = [
+      {
+        type: 'code_execution',
+        variant: 'gemini_auto_inline',
+      },
+    ];
+  }
 
 
+  const streaming = !getLabsDevNoStreaming();
   const operation = await apiStream.aix.chatGenerateContent.mutate(
-    { access: aixAccess, model: aixModel, chatGenerate: aixChatGenerate, context: aixContext, streaming: false, connectionOptions: getLabsDevMode() ? { debugDispatchRequestbody: true } : undefined },
+    { access: aixAccess, model: aixModel, chatGenerate: aixChatGenerate, context: aixContext, streaming, connectionOptions: getLabsDevMode() ? { debugDispatchRequestbody: true } : undefined },
     { signal: abortSignal },
   );
 
-  let incrementalText = '';
+  const partReassembler = new PartReassembler();
 
   try {
     for await (const update of operation) {
-      // TODO: improve this recombination protocol...
-      // if ('t' in update) {
-      //   incrementalText += update.t;
-      //   onUpdate({ textSoFar: incrementalText, typing: true }, false);
-      // } else if ('set' in update) {
-      //   // if (update.set.model)
-      //   //   onUpdate({ originLLM: update.set.model }, false);
-      //   // else
-      //   console.log('set:', update.set);
-      // } else if ('issueId' in update) {
-      //   incrementalText += update.issueText;
-      //   onUpdate({ textSoFar: incrementalText, typing: true }, false);
-      // } else if ('_debugClientPrint' in update) {
-      //   console.log('_debugClientPrint:', update._debugClientPrint);
-      //   devMode_AixLastDispatchRequestBody = update._debugClientPrint;
-      // } else
-      console.log('update:', update);
+      console.log('update', update);
+      partReassembler.reassembleParticle(update);
+
+      const fragments = partReassembler.reassembedFragments;
+      console.log('fragments', fragments);
+      onUpdate({ fragments: [...fragments], typing: true }, false);
+
+      if ('cg' in update && update.cg === 'set-model') {
+        onUpdate({ originLLM: update.name }, false);
+      }
     }
   } catch (error) {
     if (error instanceof Error && (error.name === 'AbortError' || (error.cause instanceof DOMException && error.cause.name === 'AbortError'))) {
-      console.log('client-side aborted 111111111111111111111111111222222');
+      console.log('Client-side aborted');
     } else {
-      console.error('aix stream gen Client catch:', (error as any).name, { error });
+      console.error('AIX stream generation Client catch:', (error as any).name, { error });
     }
   }
 

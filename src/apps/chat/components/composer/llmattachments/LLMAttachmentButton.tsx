@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { Box, Button, CircularProgress, ColorPaletteProp, Sheet, Tooltip, Typography } from '@mui/joy';
+import { Box, Button, CircularProgress, ColorPaletteProp, Sheet, Typography } from '@mui/joy';
 import AbcIcon from '@mui/icons-material/Abc';
 import CodeIcon from '@mui/icons-material/Code';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
@@ -19,10 +19,9 @@ import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import { RenderImageURL } from '~/modules/blocks/image/RenderImageURL';
 
 import { GoodTooltip } from '~/common/components/GoodTooltip';
-import { LiveFileIcon } from '~/common/livefile/LiveFileIcons';
+import { LiveFileIcon } from '~/common/livefile/liveFile.icons';
 import { TooltipOutlined } from '~/common/components/TooltipOutlined';
 import { ellipsizeFront, ellipsizeMiddle } from '~/common/util/textUtils';
-import { liveFileInAttachmentFragment } from '~/common/livefile/liveFile';
 
 import type { AttachmentDraft, AttachmentDraftConverterType, AttachmentDraftId } from '~/common/attachment-drafts/attachment.types';
 import type { LLMAttachmentDraft } from './useLLMAttachmentDrafts';
@@ -115,17 +114,17 @@ function attachmentIcons(attachmentDraft: AttachmentDraft): React.ReactNode {
   // }).filter(Boolean);
 
   // 1+ icons
-  return <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+  return <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
 
     {/* If we have a Web preview, show it first */}
     {!!attachmentDraft.input?.urlImage?.webpDataUrl && /*!imageDataRefs.length &&*/ (
-      <Tooltip title={<>This was the page.<br />You can also Add the Screenshot as attachment</>}>
-        <RenderImageURL
-          imageURL={attachmentDraft.input.urlImage.webpDataUrl}
-          variant='attachment-button'
-          scaledImageSx={{ width: 28, height: 28 }}
-        />
-      </Tooltip>
+      // <Tooltip title={<>This was the page.<br />You can also Add the Screenshot as attachment</>}>
+      <RenderImageURL
+        imageURL={attachmentDraft.input.urlImage.webpDataUrl}
+        variant='attachment-button'
+        scaledImageSx={{ width: 28, height: 28 }}
+      />
+      // </Tooltip>
     )}
 
     {/* If an output fragment contains a base64 image, show that as an icon too */}
@@ -148,7 +147,7 @@ function attachmentIcons(attachmentDraft: AttachmentDraft): React.ReactNode {
         </TooltipOutlined>
       );
     })}
-  </Typography>;
+  </Box>;
 }
 
 function attachmentLabelText(attachmentDraft: AttachmentDraft): string {
@@ -165,7 +164,9 @@ function attachmentLabelText(attachmentDraft: AttachmentDraft): string {
 }
 
 
-export function LLMAttachmentButton(props: {
+export const LLMAttachmentButtonMemo = React.memo(LLMAttachmentButton);
+
+function LLMAttachmentButton(props: {
   llmAttachment: LLMAttachmentDraft,
   menuShown: boolean,
   onToggleMenu: (attachmentDraftId: AttachmentDraftId, anchor: HTMLAnchorElement) => void,
@@ -179,7 +180,7 @@ export function LLMAttachmentButton(props: {
   const isUnconvertible = !draft.converters.length;
   const isOutputLoading = draft.outputsConverting;
   const isOutputMissing = !draft.outputFragments.length;
-  const hasLiveFile = draft.outputFragments.some(liveFileInAttachmentFragment);
+  const hasLiveFiles = draft.outputFragments.some(_f => _f.liveFileId);
 
   const showWarning = isUnconvertible || (isOutputMissing || !llmSupportsAllFragments);
 
@@ -268,8 +269,8 @@ export function LLMAttachmentButton(props: {
                 {/* Loading icon */}
                 {isOutputLoading && <CircularProgress color='success' size='sm' />}
 
-                {/* Live file icon */}
-                {hasLiveFile && (
+                {/* LiveFile icon */}
+                {hasLiveFiles && (
                   <TooltipOutlined title='LiveFile is supported' placement='top-end'>
                     <LiveFileIcon />
                   </TooltipOutlined>

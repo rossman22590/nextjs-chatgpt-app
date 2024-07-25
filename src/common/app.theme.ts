@@ -39,7 +39,7 @@ export const appTheme = extendTheme({
       palette: {
         neutral: {
           plainColor: 'var(--joy-palette-neutral-800)',     // [700 -> 800] Dropdown menu: increase text contrast a bit
-          solidBg: 'var(--joy-palette-neutral-700)',        // [500 -> 700] PageBar background & Button[solid]
+          solidBg: '#030712',        // [500 -> 700] PageBar background & Button[solid]
           solidHoverBg: 'var(--joy-palette-neutral-800)',   // [600 -> 800] Buttons[solid]:hover
         },
         // primary [800] > secondary [700 -> 800] > tertiary [600] > icon [500 -> 700]
@@ -175,7 +175,6 @@ interface ContentScalingOptions {
   blockLineHeight: string | number;
   // ChatMessage
   chatMessagePadding: number;
-  fragmentButtonFontSize: string;
   // ChatDrawer
   chatDrawerItemSx: { '--ListItem-minHeight': string, fontSize: string };
   chatDrawerItemFolderSx: { '--ListItem-minHeight': string, fontSize: string };
@@ -188,8 +187,7 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
     blockFontSize: 'xs',
     blockImageGap: 1,
     blockLineHeight: 1.666667,
-    chatMessagePadding: 1,
-    fragmentButtonFontSize: 'xs',
+    chatMessagePadding: 1.25,
     chatDrawerItemSx: { '--ListItem-minHeight': '2.25rem', fontSize: 'sm' },          // 36px
     chatDrawerItemFolderSx: { '--ListItem-minHeight': '2.5rem', fontSize: 'sm' },     // 40px
   },
@@ -200,7 +198,6 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
     blockImageGap: 1.5,
     blockLineHeight: 1.714286,
     chatMessagePadding: 1.5,
-    fragmentButtonFontSize: 'sm',
     chatDrawerItemSx: { '--ListItem-minHeight': '2.25rem', fontSize: 'sm' },
     chatDrawerItemFolderSx: { '--ListItem-minHeight': '2.5rem', fontSize: 'sm' },
   },
@@ -211,7 +208,6 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
     blockImageGap: 2,
     blockLineHeight: 1.75,
     chatMessagePadding: 2,
-    fragmentButtonFontSize: 'sm',
     chatDrawerItemSx: { '--ListItem-minHeight': '2.5rem', fontSize: 'md' },           // 40px
     chatDrawerItemFolderSx: { '--ListItem-minHeight': '2.75rem', fontSize: 'md' },    // 44px
   },

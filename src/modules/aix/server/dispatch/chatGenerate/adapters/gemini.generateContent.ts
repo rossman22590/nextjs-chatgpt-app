@@ -4,6 +4,7 @@ import { GeminiWire_API_Generate_Content, GeminiWire_ContentParts, GeminiWire_Me
 
 // configuration
 const hotFixImagePartsFirst = true;
+const hotFixReplaceEmptyMessagesWithEmptyTextPart = true;
 
 
 export function aixToGeminiGenerateContent(model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request, geminiSafetyThreshold: GeminiWire_Safety.HarmBlockThreshold, jsonOutput: boolean, _streaming: boolean): TRequest {
@@ -49,6 +50,12 @@ type TRequest = GeminiWire_API_Generate_Content.Request;
 
 
 function _toGeminiContents(chatSequence: AixMessages_ChatMessage[]): GeminiWire_Messages.Content[] {
+
+  // Remove messages that are made of empty parts
+  // if (hotFixRemoveEmptyMessages)
+  //   chatSequence = chatSequence.filter(message => message.parts.length > 0);
+
+
   return chatSequence.map(message => {
     const parts: GeminiWire_ContentParts.ContentPart[] = [];
 
@@ -58,6 +65,14 @@ function _toGeminiContents(chatSequence: AixMessages_ChatMessage[]): GeminiWire_
         if (a.pt !== 'inline_image' && b.pt === 'inline_image') return 1;
         return 0;
       });
+    }
+
+    /* Semantically we want to preserve an empty assistant response, but Gemini requires
+     * at least one part for a `Content` object, so the empty message becomes a "" instead.
+     * E.g. { role: 'rolename', parts: [{text: ''}] }
+     */
+    if (hotFixReplaceEmptyMessagesWithEmptyTextPart && message.parts.length === 0) {
+      parts.push(GeminiWire_ContentParts.TextPart(''));
     }
 
     for (const part of message.parts) {
@@ -79,30 +94,31 @@ function _toGeminiContents(chatSequence: AixMessages_ChatMessage[]): GeminiWire_
           parts.push(_toApproximateGeminiReplyTo(part.replyTo));
           break;
 
-        case 'tool_call':
-          switch (part.call.type) {
+        case 'tool_invocation':
+          const invocation = part.invocation;
+          switch (invocation.type) {
             case 'function_call':
               let functionCallArgs: Record<string, any> | undefined;
-              if (part.call.args) {
+              if (invocation.args) {
                 // TODO: migrate to JSON | objects across all providers
                 // noinspection SuspiciousTypeOfGuard - reason: above
-                if (typeof part.call.args === 'string') {
+                if (typeof invocation.args === 'string') {
                   try {
-                    functionCallArgs = JSON.parse(part.call.args);
+                    functionCallArgs = JSON.parse(invocation.args);
                   } catch (e) {
                     console.warn('Gemini: failed to parse (string -> JSON) function call arguments', e);
-                    functionCallArgs = { output: part.call.args };
+                    functionCallArgs = { output: invocation.args };
                   }
                 } else {
-                  functionCallArgs = part.call.args;
+                  functionCallArgs = invocation.args;
                 }
               }
-              parts.push(GeminiWire_ContentParts.FunctionCallPart(part.call.name, functionCallArgs));
+              parts.push(GeminiWire_ContentParts.FunctionCallPart(invocation.name, functionCallArgs));
               break;
             case 'code_execution':
-              if (part.call.language?.toLowerCase() !== 'python')
-                console.warn('Gemini only supports Python code execution, but got:', part.call.language);
-              parts.push(GeminiWire_ContentParts.ExecutableCodePart('PYTHON', part.call.code));
+              if (invocation.language?.toLowerCase() !== 'python')
+                console.warn('Gemini only supports Python code execution, but got:', invocation.language);
+              parts.push(GeminiWire_ContentParts.ExecutableCodePart('PYTHON', invocation.code));
               break;
             default:
               throw new Error(`Unsupported tool call type in message: ${(part as any).call.type}`);

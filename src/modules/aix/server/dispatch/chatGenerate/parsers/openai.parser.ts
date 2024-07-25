@@ -2,7 +2,8 @@ import { safeErrorString } from '~/server/wire';
 import { serverSideId } from '~/server/api/trpc.nanoid';
 
 import type { ChatGenerateParseFunction } from '../chatGenerate.dispatch';
-import { ChatGenerateTransmitter, IssueSymbols } from '../ChatGenerateTransmitter';
+import type { IParticleTransmitter } from '../IParticleTransmitter';
+import { IssueSymbols } from '../ChatGenerateTransmitter';
 
 import { OpenAIWire_API_Chat_Completions } from '../../wiretypes/openai.wiretypes';
 
@@ -49,10 +50,12 @@ export function createOpenAIChatCompletionsChunkParser(): ChatGenerateParseFunct
     tool_calls: [],
   };
 
-  return function(pt: ChatGenerateTransmitter, eventData: string) {
+  return function(pt: IParticleTransmitter, eventData: string) {
 
     // Throws on malformed event data
-    const json = OpenAIWire_API_Chat_Completions.ChunkResponse_schema.parse(JSON.parse(eventData));
+    // ```Can you extend the Zod chunk response object parsing (all optional) to include the missing data? The following is an exampel of the object I received:```
+    const parsedData = JSON.parse(eventData); // this is here just for ease of breakpoint, otherwise it could be inlined
+    const json = OpenAIWire_API_Chat_Completions.ChunkResponse_schema.parse(parsedData);
 
     // -> Model
     if (!hasBegun && json.model) {
@@ -62,7 +65,7 @@ export function createOpenAIChatCompletionsChunkParser(): ChatGenerateParseFunct
 
     // [OpenAI] an upstream error will be handled gracefully and transmitted as text (throw to transmit as 'error')
     if (json.error) {
-      return pt.endingDialectIssue(safeErrorString(json.error) || 'unknown.', IssueSymbols.Generic);
+      return pt.setDialectTerminatingIssue(safeErrorString(json.error) || 'unknown.', IssueSymbols.Generic);
     }
 
     // [OpenAI] if there's a warning, log it once
@@ -79,11 +82,24 @@ export function createOpenAIChatCompletionsChunkParser(): ChatGenerateParseFunct
     // -> Stats
     if (json.usage) {
       if (json.usage.completion_tokens !== undefined)
-        pt.setCounters({ chatIn: json.usage.prompt_tokens || -1, chatOut: json.usage.completion_tokens });
+        pt.setCounters({
+          chatIn: json.usage.prompt_tokens || -1,
+          chatOut: json.usage.completion_tokens,
+        });
 
       // [OpenAI] Expected correct case: the last object has usage, but an empty choices array
       if (!json.choices.length)
         return;
+    }
+    // [Groq] -> Stats
+    if (json.x_groq?.usage) {
+      const { prompt_tokens, completion_tokens, completion_time } = json.x_groq.usage;
+      pt.setCounters({
+        chatIn: prompt_tokens,
+        chatOut: completion_tokens,
+        chatOutRate: (completion_tokens && completion_time) ? Math.round((completion_tokens / completion_time) * 100) / 100 : undefined,
+        chatTimeInner: completion_time,
+      });
     }
 
     // expect: 1 completion, or stop
@@ -127,7 +143,7 @@ export function createOpenAIChatCompletionsChunkParser(): ChatGenerateParseFunct
               arguments: deltaToolCall.function.arguments || '',
             },
           };
-          pt.startFunctionToolCall(created.id, created.function.name, 'incr_str', created.function.arguments);
+          pt.startFunctionCallInvocation(created.id, created.function.name, 'incr_str', created.function.arguments);
           break;
         }
 
@@ -143,7 +159,7 @@ export function createOpenAIChatCompletionsChunkParser(): ChatGenerateParseFunct
         // It's an arguments update - send it
         if (deltaToolCall.function?.arguments) {
           accumulatedToolCall.function.arguments += deltaToolCall.function.arguments;
-          pt.appendFunctionToolCallArgsIStr(accumulatedToolCall.id, deltaToolCall.function.arguments);
+          pt.appendFunctionCallInvocationArgs(accumulatedToolCall.id, deltaToolCall.function.arguments);
         }
 
       } // .choices.tool_calls[]
@@ -166,7 +182,7 @@ export function createOpenAIChatCompletionsChunkParser(): ChatGenerateParseFunct
 
 export function createOpenAIChatCompletionsParserNS(): ChatGenerateParseFunction {
 
-  return function(pt: ChatGenerateTransmitter, eventData: string) {
+  return function(pt: IParticleTransmitter, eventData: string) {
 
     // Throws on malformed event data
     const json = OpenAIWire_API_Chat_Completions.Response_schema.parse(JSON.parse(eventData));
@@ -183,7 +199,10 @@ export function createOpenAIChatCompletionsParserNS(): ChatGenerateParseFunction
 
     // -> Stats
     if (json.usage)
-      pt.setCounters({ chatIn: json.usage.prompt_tokens, chatOut: json.usage.completion_tokens, chatTotal: json.usage.total_tokens });
+      pt.setCounters({
+        chatIn: json.usage.prompt_tokens,
+        chatOut: json.usage.completion_tokens,
+      });
 
     // Assumption/validate: expect 1 completion, or stop
     if (json.choices.length !== 1)
@@ -215,8 +234,8 @@ export function createOpenAIChatCompletionsParserNS(): ChatGenerateParseFunction
 
         if (toolCall.type !== 'function' && !mayBeMistral)
           throw new Error(`unexpected tool_call type: ${toolCall.type}`);
-        pt.startFunctionToolCall(toolCall.id, toolCall.function.name, 'incr_str', toolCall.function.arguments);
-        pt.endPart();
+        pt.startFunctionCallInvocation(toolCall.id, toolCall.function.name, 'incr_str', toolCall.function.arguments);
+        pt.endMessagePart();
       } // .choices.tool_calls[]
 
       // Finish reason: we don't really need it
