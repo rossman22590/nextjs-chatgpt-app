@@ -15,7 +15,6 @@ export function liveFileInSource(source: AttachmentDraftSource): boolean {
 
 export function liveFileCreate(fileWithHandle: FileWithHandle): DMessageAttachmentFragment['_liveFile'] {
   return {
-    lft: 'fs',
     _fsFileHandle: fileWithHandle.handle,
   };
 }

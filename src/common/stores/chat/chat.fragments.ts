@@ -47,7 +47,12 @@ export type DMessageAttachmentFragment = _DMessageFragmentWrapper<'attachment',
   caption: string;                // additional information, such as provenance, content preview, etc.
   created: number;
   liveFileId?: LiveFileId;        // [LiveFile] Optional. Relate to a LiveFile; if present, it may still be invalid, hence we cleanup on load
+  _liveFile?: {                   // Add the _liveFile property
+    _fsFileHandle?: FileSystemFileHandle;
+  };
 };
+
+
 
 // Future Examples: up to 1 per message, containing the Rays and Merges that would be used to restore the Beam state - could be volatile (omitted at save)
 // could not be the data store itself, but only used for save/reload
