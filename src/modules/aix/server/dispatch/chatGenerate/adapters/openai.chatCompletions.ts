@@ -59,7 +59,7 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     model: model.id,
     messages: chatMessages,
     tools: chatGenerate.tools && _toOpenAITools(chatGenerate.tools),
-    tool_choice: chatGenerate.toolsPolicy && _toOpenAIToolChoice(chatGenerate.toolsPolicy),
+    tool_choice: chatGenerate.toolsPolicy && _toOpenAIToolChoice(openAIDialect, chatGenerate.toolsPolicy),
     parallel_tool_calls: undefined,
     max_tokens: model.maxTokens !== undefined ? model.maxTokens : undefined,
     temperature: model.temperature !== undefined ? model.temperature : undefined,
@@ -182,11 +182,10 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | undefined,
               // - doc is rendered as a simple text part, but enclosed in a markdow block
               // - TODO: consider better representation - we use the 'legacy' markdown encoding here,
               //    but we may as well support different ones (e.g. XML) in the future
-              const textContentString = part.pt === 'text'
-                ? part.text
-                : /* doc */ part.data.text.startsWith('```')
-                  ? `\`\`\`${part.ref || ''}\n${part.data.text}\n\`\`\`\n`
-                  : part.data.text;
+              const textContentString =
+                part.pt === 'text' ? part.text
+                  : /* doc */ part.data.text.startsWith('```') ? part.data.text
+                    : `\`\`\`${part.ref || ''}\n${part.data.text}\n\`\`\`\n`;
 
               const textContentPart = OpenAIWire_ContentParts.TextContentPart(textContentString);
 
@@ -335,7 +334,14 @@ function _toOpenAITools(itds: AixTools_ToolDefinition[]): NonNullable<TRequest['
   });
 }
 
-function _toOpenAIToolChoice(itp: AixTools_ToolsPolicy): NonNullable<TRequest['tool_choice']> {
+function _toOpenAIToolChoice(openAIDialect: OpenAIDialects, itp: AixTools_ToolsPolicy): NonNullable<TRequest['tool_choice']> {
+  // [Mistral] - supports 'auto', 'none', 'any'
+  if (openAIDialect === 'mistral' && itp.type !== 'auto') {
+    // Note: we tried adding the 'any' model, but don't feel comfortable with altering our good parsers
+    // to allow for Mistral's deviation from the de-facto norm set by the OpenAI protocol.
+    throw new Error('We only support automatic tool selection for Mistral models');
+  }
+
   // NOTE: OpenAI has an additional policy 'none', which we don't have as it behaves like passing no tools at all.
   //       Passing no tools is mandated instead of 'none'.
   switch (itp.type) {
