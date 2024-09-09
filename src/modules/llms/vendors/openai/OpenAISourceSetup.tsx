@@ -91,7 +91,7 @@ export function OpenAISourceSetup(props: { sourceId: DModelSourceId }) {
       : 'OpenAI traffic will now be routed through Helicone.'}
     </Alert>}
 
-    {advanced.on && <FormSwitchControl
+    {/* {advanced.on && <FormSwitchControl
       title='Moderation' on='Enabled' fullWidth
       description={<>
         <Link level='body-sm' href='https://platform.openai.com/docs/guides/moderation/moderation' target='_blank'>Overview</Link>,
@@ -103,7 +103,7 @@ export function OpenAISourceSetup(props: { sourceId: DModelSourceId }) {
 
     <SetupFormRefetchButton refetch={refetch} disabled={isFetching} error={isError} loading={isFetching} advanced={advanced} />
 
-    {isError && <InlineError error={error} />}
+    {isError && <InlineError error={error} />} */}
 
   </>;
 }
