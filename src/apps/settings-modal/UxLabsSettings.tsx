@@ -2,8 +2,10 @@ import * as React from 'react';
 
 import { FormControl, Typography } from '@mui/joy';
 import AddAPhotoIcon from '@mui/icons-material/AddAPhoto';
+import CodeIcon from '@mui/icons-material/Code';
 import LocalAtmOutlinedIcon from '@mui/icons-material/LocalAtmOutlined';
 import ScreenshotMonitorIcon from '@mui/icons-material/ScreenshotMonitor';
+import ShortcutIcon from '@mui/icons-material/Shortcut';
 import SpeedIcon from '@mui/icons-material/Speed';
 import TitleIcon from '@mui/icons-material/Title';
 
@@ -12,6 +14,8 @@ import { FormSwitchControl } from '~/common/components/forms/FormSwitchControl';
 import { Link } from '~/common/components/Link';
 import { useIsMobile } from '~/common/components/useMatchMedia';
 import { useUXLabsStore } from '~/common/state/store-ux-labs';
+import { isDevModeLocalhost } from '~/common/util/pwaUtils';
+import EngineeringIcon from '@mui/icons-material/Engineering';
 
 
 // uncomment for more settings
@@ -26,13 +30,38 @@ export function UxLabsSettings() {
     labsAttachScreenCapture, setLabsAttachScreenCapture,
     labsCameraDesktop, setLabsCameraDesktop,
     labsChatBarAlt, setLabsChatBarAlt,
+    labsEnhanceCodeBlocks, setLabsEnhanceCodeBlocks,
     labsHighPerformance, setLabsHighPerformance,
     labsShowCost, setLabsShowCost,
+    labsShowShortcutBar, setLabsShowShortcutBar,
+    labsDevMode, setLabsDevMode,
+    labsDevNoStreaming, setLabsDevNoStreaming,
   } = useUXLabsStore();
 
   return <>
 
-    {/* 'v1.15 · ' + .. */}
+    {/* [DEV MODE] Settings */}
+
+    {(isDevModeLocalhost || labsDevMode) && (
+      <FormSwitchControl
+        title={<><EngineeringIcon color='warning' sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Developer Mode</>} description={labsDevMode ? 'Enabled' : 'Disabled'}
+        checked={labsDevMode} onChange={setLabsDevMode}
+      />
+    )}
+
+    {labsDevMode && (
+      <FormSwitchControl
+        title={<><EngineeringIcon color='warning' sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Disable Streaming</>} description={labsDevNoStreaming ? 'Enabled' : 'Disabled'}
+        checked={labsDevNoStreaming} onChange={setLabsDevNoStreaming}
+      />
+    )}
+
+    {/* Non-Graduated Settings */}
+
+    <FormSwitchControl
+      title={<><CodeIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Enhance Legacy Code</>} description={labsEnhanceCodeBlocks ? 'Auto-Enhance' : 'Disabled'}
+      checked={labsEnhanceCodeBlocks} onChange={setLabsEnhanceCodeBlocks}
+    />
 
     <FormSwitchControl
       title={<><SpeedIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Performance</>} description={labsHighPerformance ? 'Unlocked' : 'Default'}
@@ -59,6 +88,11 @@ export function UxLabsSettings() {
       checked={labsShowCost} onChange={setLabsShowCost}
     />
 
+    {!isMobile && <FormSwitchControl
+      title={<><ShortcutIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Pro Shortcuts</>} description={labsShowShortcutBar ? 'Status Bar' : 'Disabled'}
+      checked={labsShowShortcutBar} onChange={setLabsShowShortcutBar}
+    />}
+
     {/*
       Other Graduated (removed or backlog):
         - <Link href='https://github.com/enricoros/big-AGI/issues/359' target='_blank'>Draw App</Link>
@@ -69,11 +103,11 @@ export function UxLabsSettings() {
     <FormControl orientation='horizontal' sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
       <FormLabelStart title='Graduated' description='Ex-labs' />
       <Typography level='body-xs'>
-        <Link href='https://big-agi.com/blog/beam-multi-model-ai-reasoning' target='_blank'>Beam</Link>
-        {' · '}<Link href='https://github.com/enricoros/big-AGI/issues/208' target='_blank'>Split Chats</Link>
-        {' · '}<Link href='https://github.com/enricoros/big-AGI/issues/354' target='_blank'>Call AGI</Link>
-        {' · '}<Link href='https://github.com/enricoros/big-AGI/issues/282' target='_blank'>Persona Creator</Link>
-        {' · '}<Link href='https://github.com/enricoros/big-agi/issues/192' target='_blank'>Auto Diagrams</Link>
+        <Link href='https://myapps.ai' target='_blank'>Beam</Link>
+        {' · '}<Link href='https://myapps.ai' target='_blank'>Split Chats</Link>
+        {' · '}<Link href='https://myapps.ai' target='_blank'>Call AGI</Link>
+        {' · '}<Link href='https://myapps.ai' target='_blank'>Persona Creator</Link>
+        {' · '}<Link href='https://myapps.ai' target='_blank'>Auto Diagrams</Link>
         {' · '}Imagine · Chat Search · Text Tools · LLM Overheat
       </Typography>
     </FormControl>

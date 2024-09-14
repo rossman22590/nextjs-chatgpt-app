@@ -4,12 +4,13 @@ import { Inter, JetBrains_Mono } from 'next/font/google';
 import { extendTheme } from '@mui/joy';
 
 
+// Definitions
+export type UIComplexityMode = 'minimal' | 'pro' | 'extra';
+export type ContentScaling = 'xs' | 'sm' | 'md';
+
+
 // CSS utils
 export const hideOnMobile = { display: { xs: 'none', md: 'flex' } };
-// export const hideOnDesktop = { display: { xs: 'flex', md: 'none' } };
-
-// Dimensions
-export const formLabelStartWidth = 140;
 
 
 // Theme & Fonts
@@ -20,6 +21,7 @@ const font = Inter({
   display: 'swap',
   fallback: ['Helvetica', 'Arial', 'sans-serif'],
 });
+export const themeFontFamilyCss = font.style.fontFamily;
 
 const jetBrainsMono = JetBrains_Mono({
   weight: ['400', '500', '600', '700'],
@@ -27,34 +29,36 @@ const jetBrainsMono = JetBrains_Mono({
   display: 'swap',
   fallback: ['monospace'],
 });
+export const themeCodeFontFamilyCss = jetBrainsMono.style.fontFamily;
 
-export const appTheme = extendTheme({
+
+export const createAppTheme = (uiComplexityMinimal: boolean) => extendTheme({
   fontFamily: {
-    body: font.style.fontFamily,
-    display: font.style.fontFamily,
-    code: jetBrainsMono.style.fontFamily,
+    body: themeFontFamilyCss,
+    display: themeFontFamilyCss,
+    code: themeCodeFontFamilyCss,
   },
   colorSchemes: {
     light: {
       palette: {
         neutral: {
-          plainColor: 'var(--joy-palette-neutral-800)',     // [700 -> 800] Dropdown menu: increase text contrast a bit
-          solidBg: 'var(--joy-palette-neutral-700)',        // [500 -> 700] PageBar background & Button[solid]
+          plainColor: '#030712' ,   // [700 -> 800] Dropdown menu: increase text contrast a bit
+          solidBg: ' #030712' ,    // [500 -> 700] PageBar background & Button[solid]
           solidHoverBg: 'var(--joy-palette-neutral-800)',   // [600 -> 800] Buttons[solid]:hover
         },
         // primary [800] > secondary [700 -> 800] > tertiary [600] > icon [500 -> 700]
         text: {
           icon: 'var(--joy-palette-neutral-700)',           // <IconButton color='neutral' /> icon color
           secondary: 'var(--joy-palette-neutral-800)',      // increase contrast a bit
-          // tertiary: 'var(--joy-palette-neutral-700)',       // increase contrast a bit
+        //   tertiary: 'var(--joy-palette-neutral-700)',       // increase contrast a bit
         },
         // popup [white] > surface [50] > level1 [100] > level2 [200] > level3 [300 -> unused] > body [white -> 300]
         background: {
           // New
-          surface: 'var(--joy-palette-neutral-50, #FBFCFE)',
-          level1: 'var(--joy-palette-neutral-100, #F0F4F8)',
-          level2: 'var(--joy-palette-neutral-200, #DDE7EE)',
-          body: 'var(--joy-palette-neutral-300, #CDD7E1)',
+          surface: 'var(--joy-palette-neutral-50, #030712)',
+          level1: 'var(--joy-palette-neutral-100, #030712)',
+          level2: 'var(--joy-palette-neutral-200, #030712)',
+          body: 'var(--joy-palette-neutral-300, #030712)',
           // Former
           // body: 'var(--joy-palette-neutral-400, #9FA6AD)',
         },
@@ -69,7 +73,7 @@ export const appTheme = extendTheme({
         },
         background: {
           // New
-          popup: '#24292c', // 3: #32383E, 1: #171A1C, 2: #25282B
+          popup: '#030712', // 3: #32383E, 1: #171A1C, 2: #25282B
           surface: 'var(--joy-palette-neutral-800, #171A1C)',
           level1: 'var(--joy-palette-neutral-900, #0B0D0E)',
           level2: 'var(--joy-palette-neutral-800, #171A1C)',
@@ -88,10 +92,14 @@ export const appTheme = extendTheme({
       styleOverrides: {
         root: {
           boxShadow: 'none',
+          
+    
         },
       },
     },
+    
 
+    
     /**
      * Select
      * - remove the box-shadow: https://github.com/mui/material-ui/commit/8d4728df8a66d710660af96ac7ff3f86d2d26382
@@ -100,6 +108,7 @@ export const appTheme = extendTheme({
       styleOverrides: {
         root: {
           boxShadow: 'none',
+          
         },
       },
     },
@@ -112,14 +121,14 @@ export const appTheme = extendTheme({
     //   },
     // },
 
-    // JoyModal: {
-    //   styleOverrides: {
-    //     backdrop: {
-    //       // backdropFilter: 'blur(2px)',
-    //       backdropFilter: 'none',
-    //     },
-    //   },
-    // },
+    JoyModal: !uiComplexityMinimal ? undefined : {
+      styleOverrides: {
+        backdrop: {
+          backdropFilter: 'none',
+          // backdropFilter: 'blur(2px)',
+        },
+      },
+    },
 
     /**
      * Switch: increase the size of the thumb, to a default iconButton
@@ -149,14 +158,12 @@ export const lineHeightTextareaMd = 1.75;
 export const themeZIndexBeamView = 10;
 export const themeZIndexPageBar = 25;
 export const themeZIndexDesktopDrawer = 26;
-export const themeZIndexDesktopNav = 27;
+export const themeZIndexDesktopPanel = 27;
+export const themeZIndexDesktopNav = 30;
 export const themeZIndexOverMobileDrawer = 1301;
 
-export const themeBreakpoints = appTheme.breakpoints.values;
 
-
-// Dyanmic UI Sizing
-export type ContentScaling = 'xs' | 'sm' | 'md';
+// Dynamic UI Sizing
 
 export function adjustContentScaling(scaling: ContentScaling, offset?: number) {
   if (!offset) return scaling;
@@ -175,6 +182,7 @@ interface ContentScalingOptions {
   blockLineHeight: string | number;
   // ChatMessage
   chatMessagePadding: number;
+  fragmentButtonFontSize: string;
   // ChatDrawer
   chatDrawerItemSx: { '--ListItem-minHeight': string, fontSize: string };
   chatDrawerItemFolderSx: { '--ListItem-minHeight': string, fontSize: string };
@@ -187,7 +195,8 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
     blockFontSize: 'xs',
     blockImageGap: 1,
     blockLineHeight: 1.666667,
-    chatMessagePadding: 1.25,
+    chatMessagePadding: 1,
+    fragmentButtonFontSize: 'xs',
     chatDrawerItemSx: { '--ListItem-minHeight': '2.25rem', fontSize: 'sm' },          // 36px
     chatDrawerItemFolderSx: { '--ListItem-minHeight': '2.5rem', fontSize: 'sm' },     // 40px
   },
@@ -198,6 +207,7 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
     blockImageGap: 1.5,
     blockLineHeight: 1.714286,
     chatMessagePadding: 1.5,
+    fragmentButtonFontSize: 'sm',
     chatDrawerItemSx: { '--ListItem-minHeight': '2.25rem', fontSize: 'sm' },
     chatDrawerItemFolderSx: { '--ListItem-minHeight': '2.5rem', fontSize: 'sm' },
   },
@@ -208,6 +218,7 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
     blockImageGap: 2,
     blockLineHeight: 1.75,
     chatMessagePadding: 2,
+    fragmentButtonFontSize: 'sm',
     chatDrawerItemSx: { '--ListItem-minHeight': '2.5rem', fontSize: 'md' },           // 40px
     chatDrawerItemFolderSx: { '--ListItem-minHeight': '2.75rem', fontSize: 'md' },    // 44px
   },
@@ -222,7 +233,7 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
 const isBrowser = typeof document !== 'undefined';
 
 export function createEmotionCache() {
-  let insertionPoint;
+  let insertionPoint: HTMLElement | undefined;
 
   if (isBrowser) {
     // On the client side, _document.tsx has a meta tag with the name "emotion-insertion-point" at the top of the <head>.
@@ -233,7 +244,7 @@ export function createEmotionCache() {
     insertionPoint = emotionInsertionPoint ?? undefined;
   }
 
-  return createCache({ key: 'mui-style', insertionPoint });
+  return createCache({ key: 'mui-style', insertionPoint: insertionPoint });
 }
 
 // MISC

@@ -7,16 +7,16 @@ import LaunchIcon from '@mui/icons-material/Launch';
 import { Link } from '~/common/components/Link';
 
 
-const bigAgi2SurveyUrl = 'https://y2rjg0zillz.typeform.com/to/FDggwwZv?utm_source=github&utm_medium=callout&utm_campaign=ba20';
+const bigAgi2SurveyUrl = 'https://forms.gle/BdkjWRsjrdhoXZaJ8';
 
 export const bigAgi2NewsCallout =
   <Card variant='solid' invertedColors>
     <CardContent sx={{ gap: 2 }}>
       <Typography level='title-lg'>
-        Big-AGI 2.0 - In Development
+        AI Tutor Beam 2
       </Typography>
       <Typography level='body-sm'>
-        We&apos;re building the next version of Big-AGI with your needs in mind. New features, better performance, enhanced AI interactions. Help us shape it.
+        We&apos;re building the next version of BEAM with your needs in mind. New features, better performance, enhanced AI interactions. Help us shape it.
       </Typography>
       <Grid container spacing={1}>
         <Grid xs={12} sm={7}>
