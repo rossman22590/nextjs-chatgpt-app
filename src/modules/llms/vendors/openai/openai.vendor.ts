@@ -50,7 +50,7 @@ export const ModelVendorOpenAI: IModelVendor<DOpenAIServiceSettings, OpenAIAcces
     oaiOrg: '',
     oaiHost: '',
     heliKey: '',
-    moderationCheck: false,
+    moderationCheck: true,
     ...partialSetup,
   }),
 
