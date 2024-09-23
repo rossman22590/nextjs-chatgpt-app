@@ -64,55 +64,55 @@ const _knownGeminiModels: ({
     trainingDataCutoff: 'May 2024',
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json /*, Code Execution */], // input: audio, images and text
   },
-  {
-    id: 'models/gemini-1.5-flash',
-    // copied from above
-    chatPrice: gemini15FlashPricing,
-    trainingDataCutoff: 'Apr 2024',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json], // input: audio, images and text
-    hidden: true,
-  },
-  {
-    id: 'models/gemini-1.5-flash-001',
-    // copied from above
-    chatPrice: gemini15FlashPricing,
-    trainingDataCutoff: 'Apr 2024',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json], // input: audio, images and text
-    hidden: true,
-  },
+  // {
+  //   id: 'models/gemini-1.5-flash',
+  //   // copied from above
+  //   chatPrice: gemini15FlashPricing,
+  //   trainingDataCutoff: 'Apr 2024',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json], // input: audio, images and text
+  //   hidden: true,
+  // },
+  // {
+  //   id: 'models/gemini-1.5-flash-001',
+  //   // copied from above
+  //   chatPrice: gemini15FlashPricing,
+  //   trainingDataCutoff: 'Apr 2024',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json], // input: audio, images and text
+  //   hidden: true,
+  // },
 
-  {
-    id: 'models/gemini-1.5-pro-exp-0801',
-    isNewest: true,
-    isPreview: true,
-    chatPrice: gemini15ProPricing,
-    trainingDataCutoff: 'May 2024',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json /*, Code Execution */], // input: audio, images and text
-  },
-  {
-    id: 'models/gemini-1.5-pro-latest', // updated regularly and might be a preview version
-    isNewest: true,
-    isPreview: true,
-    chatPrice: gemini15ProPricing,
-    trainingDataCutoff: 'May 2024',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json /*, Code Execution */], // input: audio, images and text
-  },
-  {
-    id: 'models/gemini-1.5-pro', // latest stable -> 001
-    // copied from above
-    chatPrice: gemini15ProPricing,
-    trainingDataCutoff: 'Apr 2024',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json],
-    hidden: true,
-  },
-  {
-    id: 'models/gemini-1.5-pro-001', // stable snapshot
-    // copied from above
-    chatPrice: gemini15ProPricing,
-    trainingDataCutoff: 'Apr 2024',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json],
-    hidden: true,
-  },
+  // {
+  //   id: 'models/gemini-1.5-pro-exp-0801',
+  //   isNewest: true,
+  //   isPreview: true,
+  //   chatPrice: gemini15ProPricing,
+  //   trainingDataCutoff: 'May 2024',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json /*, Code Execution */], // input: audio, images and text
+  // },
+  // {
+  //   id: 'models/gemini-1.5-pro-latest', // updated regularly and might be a preview version
+  //   isNewest: true,
+  //   isPreview: true,
+  //   chatPrice: gemini15ProPricing,
+  //   trainingDataCutoff: 'May 2024',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json /*, Code Execution */], // input: audio, images and text
+  // },
+  // {
+  //   id: 'models/gemini-1.5-pro', // latest stable -> 001
+  //   // copied from above
+  //   chatPrice: gemini15ProPricing,
+  //   trainingDataCutoff: 'Apr 2024',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json],
+  //   hidden: true,
+  // },
+  // {
+  //   id: 'models/gemini-1.5-pro-001', // stable snapshot
+  //   // copied from above
+  //   chatPrice: gemini15ProPricing,
+  //   trainingDataCutoff: 'Apr 2024',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json],
+  //   hidden: true,
+  // },
 
 
   // Generation 1.0

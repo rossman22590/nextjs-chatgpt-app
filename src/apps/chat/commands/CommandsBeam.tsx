@@ -1,16 +1,16 @@
-import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
+// import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
 
 import type { ICommandsProvider } from './ICommandsProvider';
 
 export const CommandsBeam: ICommandsProvider = {
-  id: 'cmd-mode-beam',
+  id: 'cmd-mode-react',
   rank: 9,
 
   getCommands: () => [{
     primary: '/beam',
     arguments: ['prompt'],
     description: 'Combine the smarts of models',
-    Icon: ChatBeamIcon,
+    // Icon: ChatBeamIcon,
   }],
 
 };

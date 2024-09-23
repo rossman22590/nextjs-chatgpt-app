@@ -63,7 +63,7 @@ import { chatExecuteModeCanAttach, useChatExecuteMode } from '../../execute-mode
 import { ButtonAttachCameraMemo, useCameraCaptureModal } from './buttons/ButtonAttachCamera';
 import { ButtonAttachClipboardMemo } from './buttons/ButtonAttachClipboard';
 import { ButtonAttachScreenCaptureMemo } from './buttons/ButtonAttachScreenCapture';
-import { ButtonBeamMemo } from './buttons/ButtonBeam';
+// import { ButtonBeamMemo } from './buttons/ButtonBeam';
 import { ButtonCallMemo } from './buttons/ButtonCall';
 import { ButtonMicContinuationMemo } from './buttons/ButtonMicContinuation';
 import { ButtonMicMemo } from './buttons/ButtonMic';
@@ -858,13 +858,13 @@ export function Composer(props: {
                 </ButtonGroup>
 
                 {/* [desktop] secondary-top buttons */}
-                {isDesktop && showChatExtras && !assistantAbortible && (
+                {/* {isDesktop && showChatExtras && !assistantAbortible && (
                   <ButtonBeamMemo
                     disabled={noConversation || noLLM || !llmAttachmentDraftsCollection.canAttachAllFragments}
                     hasContent={!!composeText}
                     onClick={handleSendTextBeamClicked}
                   />
-                )}
+                )} */}
 
               </Box>
 

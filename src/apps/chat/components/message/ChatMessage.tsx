@@ -884,18 +884,7 @@ export function ChatMessage(props: {
                   ? <>Retry <span style={{ opacity: 0.5 }}>from here</span></>
                   : <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'space-between', gap: 1 }}>Retry<KeyStroke combo='Ctrl + Shift + Z' /></Box>}
             </MenuItem>
-          )}
-          {!!props.onMessageBeam && (
-            <MenuItem disabled={fromSystem} onClick={handleOpsBeamFrom}>
-              <ListItemDecorator>
-                <ChatBeamIcon color={fromSystem ? undefined : 'primary'} />
-              </ListItemDecorator>
-              {!fromAssistant
-                ? <>Beam <span style={{ opacity: 0.5 }}>from here</span></>
-                : !props.isBottom
-                  ? <>Beam <span style={{ opacity: 0.5 }}>this message</span></>
-                  : <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'space-between', gap: 1 }}>Beam<KeyStroke combo='Ctrl + Shift + B' /></Box>}
-            </MenuItem>
+          
           )}
         </CloseableMenu>
       )}

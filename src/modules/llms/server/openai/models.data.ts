@@ -93,31 +93,31 @@ const _knownOpenAIChatModels: ManualMappings = [
   },
 
   // o1-preview
-  {
-    idPrefix: 'o1-preview',
-    label: 'o1 Preview',
-    description: 'Points to the most recent snapshot of the o1 model: o1-preview-2024-09-12',
-    symLink: 'o1-preview-2024-09-12',
-    hidden: true,
-    // copied from symlinked
-    contextWindow: 128000,
-    maxCompletionTokens: 32768,
-    trainingDataCutoff: 'Oct 2023',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_SPECIAL_OAI_O1Preview],
-    chatPrice: { input: 15, output: 60 },
-    isPreview: true,
-  },
-  {
-    idPrefix: 'o1-preview-2024-09-12',
-    label: 'o1 Preview (2024-09-12) ⏱️',
-    description: 'This model takes longer to run and does not support streaming.\n\nNew reasoning model for complex tasks that require broad general knowledge.',
-    contextWindow: 128000,
-    maxCompletionTokens: 32768,
-    trainingDataCutoff: 'Oct 2023',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_SPECIAL_OAI_O1Preview],
-    chatPrice: { input: 15, output: 60 },
-    isPreview: true,
-  },
+  // {
+  //   idPrefix: 'o1-preview',
+  //   label: 'o1 Preview',
+  //   description: 'Points to the most recent snapshot of the o1 model: o1-preview-2024-09-12',
+  //   symLink: 'o1-preview-2024-09-12',
+  //   hidden: true,
+  //   // copied from symlinked
+  //   contextWindow: 128000,
+  //   maxCompletionTokens: 32768,
+  //   trainingDataCutoff: 'Oct 2023',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_SPECIAL_OAI_O1Preview],
+  //   chatPrice: { input: 15, output: 60 },
+  //   isPreview: true,
+  // },
+  // {
+  //   idPrefix: 'o1-preview-2024-09-12',
+  //   label: 'o1 Preview (2024-09-12) ⏱️',
+  //   description: 'This model takes longer to run and does not support streaming.\n\nNew reasoning model for complex tasks that require broad general knowledge.',
+  //   contextWindow: 128000,
+  //   maxCompletionTokens: 32768,
+  //   trainingDataCutoff: 'Oct 2023',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_SPECIAL_OAI_O1Preview],
+  //   chatPrice: { input: 15, output: 60 },
+  //   isPreview: true,
+  // },
 
   // o1-mini
   {
@@ -215,77 +215,77 @@ const _knownOpenAIChatModels: ManualMappings = [
   },
 
 
-  // GPT4-32k's
-  {
-    idPrefix: 'gpt-4-32k',
-    label: 'GPT-4 32k',
-    description: 'Currently points to gpt-4-32k-0613. This model was never rolled out widely in favor of GPT-4 Turbo.',
-    symLink: 'gpt-4-32k-0613',
-    // copied from symlinked
-    contextWindow: 32768,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat],
-    chatPrice: { input: 60, output: 120 },
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4-32k-0613',
-    label: 'GPT-4 32k (0613)',
-    description: 'Snapshot of gpt-4-32k from June 13th 2023 with improved function calling support. This model was never rolled out widely in favor of GPT-4 Turbo.',
-    contextWindow: 32768,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat],
-    chatPrice: { input: 60, output: 120 },
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4-32k-0314',
-    label: 'GPT-4 32k (0314)',
-    description: 'Snapshot of gpt-4-32 from March 14th 2023. Will be deprecated on June 13th 2024 at the earliest.',
-    contextWindow: 32768,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat],
-    chatPrice: { input: 60, output: 120 },
-    hidden: true,
-  },
+  // // GPT4-32k's
+  // {
+  //   idPrefix: 'gpt-4-32k',
+  //   label: 'GPT-4 32k',
+  //   description: 'Currently points to gpt-4-32k-0613. This model was never rolled out widely in favor of GPT-4 Turbo.',
+  //   symLink: 'gpt-4-32k-0613',
+  //   // copied from symlinked
+  //   contextWindow: 32768,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat],
+  //   chatPrice: { input: 60, output: 120 },
+  //   hidden: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4-32k-0613',
+  //   label: 'GPT-4 32k (0613)',
+  //   description: 'Snapshot of gpt-4-32k from June 13th 2023 with improved function calling support. This model was never rolled out widely in favor of GPT-4 Turbo.',
+  //   contextWindow: 32768,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat],
+  //   chatPrice: { input: 60, output: 120 },
+  //   hidden: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4-32k-0314',
+  //   label: 'GPT-4 32k (0314)',
+  //   description: 'Snapshot of gpt-4-32 from March 14th 2023. Will be deprecated on June 13th 2024 at the earliest.',
+  //   contextWindow: 32768,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat],
+  //   chatPrice: { input: 60, output: 120 },
+  //   hidden: true,
+  // },
 
 
-  // GPT4's
-  {
-    idPrefix: 'gpt-4-0613',
-    label: 'GPT-4 (0613)',
-    description: 'Snapshot of gpt-4 from June 13th 2023 with improved function calling support. Data up to Sep 2021.',
-    contextWindow: 8192,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    chatPrice: { input: 30, output: 60 },
-    benchmark: { cbaElo: 1161 },
-  },
-  {
-    idPrefix: 'gpt-4-0314',
-    label: 'GPT-4 (0314)',
-    description: 'Snapshot of gpt-4 from March 14th 2023 with function calling data. Data up to Sep 2021.',
-    contextWindow: 8192,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    chatPrice: { input: 30, output: 60 },
-    benchmark: { cbaElo: 1186 },
-    hidden: true,
-  },
-  {
-    idPrefix: 'gpt-4',
-    label: 'GPT-4',
-    description: 'Currently points to gpt-4-0613.',
-    symLink: 'gpt-4-0613',
-    hidden: true,
-    // copied from symlinked
-    contextWindow: 8192,
-    trainingDataCutoff: 'Sep 2021',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    chatPrice: { input: 30, output: 60 },
-    benchmark: { cbaElo: 1161 },
-    isLegacy: true,
-  },
+  // // GPT4's
+  // {
+  //   idPrefix: 'gpt-4-0613',
+  //   label: 'GPT-4 (0613)',
+  //   description: 'Snapshot of gpt-4 from June 13th 2023 with improved function calling support. Data up to Sep 2021.',
+  //   contextWindow: 8192,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  //   chatPrice: { input: 30, output: 60 },
+  //   benchmark: { cbaElo: 1161 },
+  // },
+  // {
+  //   idPrefix: 'gpt-4-0314',
+  //   label: 'GPT-4 (0314)',
+  //   description: 'Snapshot of gpt-4 from March 14th 2023 with function calling data. Data up to Sep 2021.',
+  //   contextWindow: 8192,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  //   chatPrice: { input: 30, output: 60 },
+  //   benchmark: { cbaElo: 1186 },
+  //   hidden: true,
+  // },
+  // {
+  //   idPrefix: 'gpt-4',
+  //   label: 'GPT-4',
+  //   description: 'Currently points to gpt-4-0613.',
+  //   symLink: 'gpt-4-0613',
+  //   hidden: true,
+  //   // copied from symlinked
+  //   contextWindow: 8192,
+  //   trainingDataCutoff: 'Sep 2021',
+  //   interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+  //   chatPrice: { input: 30, output: 60 },
+  //   benchmark: { cbaElo: 1161 },
+  //   isLegacy: true,
+  // },
 
   // 3.5-Turbo
   // As of July 2024, gpt-4o-mini should be used in place of gpt-3.5-turbo, as it is cheaper, more capable, multimodal, and just as fast.
@@ -932,7 +932,7 @@ export function openPipeModelToModelDescriptions(wireModel: object): ModelDescri
 // [OpenRouter]
 
 const orOldModelIDs = [
-  'openai/gpt-3.5-turbo-0301', 'openai/gpt-4-0314', 'openai/gpt-4-32k-0314', 'openai/text-davinci-002',
+,
   'anthropic/claude-2.1', 'anthropic/claude-2.0', 'anthropic/claude-v1', 'anthropic/claude-1.2',
   'anthropic/claude-instant-v1-100k', 'anthropic/claude-v1-100k', 'anthropic/claude-instant-1.0',
 ];
@@ -941,7 +941,7 @@ const orModelFamilyOrder = [
   // great models (pickes by hand, they're free)
   'mistralai/mistral-7b-instruct', 'nousresearch/nous-capybara-7b',
   // great orgs
-  'huggingfaceh4/', 'openchat/', 'anthropic/', 'google/', 'mistralai/', 'openai/', 'meta-llama/', 'phind/',
+  'huggingfaceh4/', 'openchat/', 'anthropic/', 'google/', 'mistralai/',  'meta-llama/', 'phind/',
 ];
 
 export function openRouterModelFamilySortFn(a: { id: string }, b: { id: string }): number {

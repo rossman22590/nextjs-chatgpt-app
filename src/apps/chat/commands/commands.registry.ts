@@ -1,14 +1,14 @@
 import { ChatCommand, ICommandsProvider } from './ICommandsProvider';
 
 import { CommandsAlter } from './CommandsAlter';
-import { CommandsBeam } from './CommandsBeam';
+// import { CommandsBeam } from './CommandsBeam';
 import { CommandsBrowse } from './CommandsBrowse';
 import { CommandsDraw } from './CommandsDraw';
 import { CommandsHelp } from './CommandsHelp';
 import { CommandsReact } from './CommandsReact';
 
 
-export type CommandsProviderId = 'cmd-ass-browse' | 'cmd-ass-t2i' | 'cmd-chat-alter' | 'cmd-help' | 'cmd-mode-beam' | 'cmd-mode-react';
+export type CommandsProviderId = 'cmd-ass-browse' | 'cmd-ass-t2i' | 'cmd-chat-alter' | 'cmd-help' | 'cmd-mode-react';
 
 type TextCommandPiece =
   | { type: 'nocmd'; value: string; }
@@ -20,7 +20,7 @@ const ChatCommandsProviders: Record<CommandsProviderId, ICommandsProvider> = {
   'cmd-ass-t2i': CommandsDraw,
   'cmd-chat-alter': CommandsAlter,
   'cmd-help': CommandsHelp,
-  'cmd-mode-beam': CommandsBeam,
+  // 'cmd-mode-beam': CommandsBeam,
   'cmd-mode-react': CommandsReact,
 };
 
