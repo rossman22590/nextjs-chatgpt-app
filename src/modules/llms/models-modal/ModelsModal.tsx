@@ -90,7 +90,7 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
 
       {!!llmCount && <Divider />}
 
-      {!!llmCount && (
+      {/* {!!llmCount && (
         <ModelsList
           filterServiceId={showAllServices ? null : selectedServiceId}
           onOpenLLMOptions={optimaActions().openModelOptions}
@@ -112,7 +112,7 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
             },
           }}
         />
-      )}
+      )} */}
 
       <Divider />
 
