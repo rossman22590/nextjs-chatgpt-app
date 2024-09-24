@@ -27,7 +27,7 @@ Or fork & run on Vercel
 - Proper support for Gemini models
 - Added the latest Mistral model
 - Tokenizer support for gpt-4o
-- Updates to Beam
+- Updates to Beam 
 
 ### What's New in 1.16.1 · May 13, 2024 (minor release)
 
