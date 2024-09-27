@@ -17,7 +17,7 @@ import { useCapabilityTextToImage } from '~/modules/t2i/t2i.client';
 
 import { ConfirmationModal } from '~/common/components/ConfirmationModal';
 import { ConversationsManager } from '~/common/chats/ConversationsManager';
-import { GlobalShortcutItem, ShortcutKeyName, useGlobalShortcuts } from '~/common/components/useGlobalShortcut';
+import { GlobalShortcutDefinition, useGlobalShortcuts } from '~/common/components/useGlobalShortcuts';
 import { PanelResizeInset } from '~/common/components/panes/GoodPanelResizeHandler';
 import { PreferencesTab, useOptimaLayout, usePluggableOptimaLayout } from '~/common/layout/optima/useOptimaLayout';
 import { ScrollToBottom } from '~/common/scroll-to-bottom/ScrollToBottom';
@@ -259,17 +259,17 @@ export function AppChat() {
     }
   }, [focusedPaneConversationId, handleExecuteAndOutcome]);
 
-  // const handleMessageBeamLastInFocusedPane = React.useCallback(async () => {
-  //   // Ctrl + Shift + B
-  //   const focusedConversation = getConversation(focusedPaneConversationId);
-  //   if (focusedConversation?.messages?.length) {
-  //     const lastMessage = focusedConversation.messages[focusedConversation.messages.length - 1];
-  //     if (lastMessage.role === 'assistant')
-  //       ConversationsManager.getHandler(focusedConversation.id).beamInvoke(focusedConversation.messages.slice(0, -1), [lastMessage], lastMessage.id);
-  //     else if (lastMessage.role === 'user')
-  //       ConversationsManager.getHandler(focusedConversation.id).beamInvoke(focusedConversation.messages, [], null);
-  //   }
-  // }, [focusedPaneConversationId]);
+  const handleMessageBeamLastInFocusedPane = React.useCallback(async () => {
+    // Ctrl + Shift + B
+    const focusedConversation = getConversation(focusedPaneConversationId);
+    if (focusedConversation?.messages?.length) {
+      const lastMessage = focusedConversation.messages[focusedConversation.messages.length - 1];
+      if (lastMessage.role === 'assistant')
+        ConversationsManager.getHandler(focusedConversation.id).beamInvoke(focusedConversation.messages.slice(0, -1), [lastMessage], lastMessage.id);
+      else if (lastMessage.role === 'user')
+        ConversationsManager.getHandler(focusedConversation.id).beamInvoke(focusedConversation.messages, [], null);
+    }
+  }, [focusedPaneConversationId]);
 
   const handleTextDiagram = React.useCallback((diagramConfig: DiagramConfig | null) => setDiagramConfig(diagramConfig), []);
 
@@ -397,23 +397,22 @@ export function AppChat() {
     openLlmOptions(chatLLMId);
   }, [openLlmOptions]);
 
-  const shortcuts = React.useMemo((): GlobalShortcutItem[] => [
+  const shortcuts = React.useMemo((): GlobalShortcutDefinition[] => [
     // focused conversation
-    // ['b', true, true, false, handleMessageBeamLastInFocusedPane],
-    ['r', true, true, false, handleMessageRegenerateLastInFocusedPane],
-    ['n', true, false, true, handleConversationNewInFocusedPane],
+    ['b', true, true, false, handleMessageBeamLastInFocusedPane],
+    ['g', true, true, false, handleMessageRegenerateLastInFocusedPane],
     ['o', true, false, false, handleFileOpenConversation],
     ['s', true, false, false, () => handleFileSaveConversation(focusedPaneConversationId)],
-    ['b', true, false, true, () => isFocusedChatEmpty || (focusedPaneConversationId && handleConversationBranch(focusedPaneConversationId, null))],
-    ['x', true, false, true, () => isFocusedChatEmpty || (focusedPaneConversationId && handleConversationClear(focusedPaneConversationId))],
-    ['d', true, false, true, () => focusedPaneConversationId && handleDeleteConversations([focusedPaneConversationId], false)],
-    [ShortcutKeyName.Left, true, false, true, () => handleNavigateHistoryInFocusedPane('back')],
-    [ShortcutKeyName.Right, true, false, true, () => handleNavigateHistoryInFocusedPane('forward')],
+    ['n', true, true, false, handleConversationNewInFocusedPane],
+    ['x', true, true, false, () => isFocusedChatEmpty || (focusedPaneConversationId && handleConversationClear(focusedPaneConversationId))],
+    ['d', true, true, false, () => focusedPaneConversationId && handleDeleteConversations([focusedPaneConversationId], false)],
+    ['[', true, false, false, () => handleNavigateHistoryInFocusedPane('back')],
+    [']', true, false, false, () => handleNavigateHistoryInFocusedPane('forward')],
     // global
     ['o', true, true, false, handleOpenChatLlmOptions],
     ['+', true, true, false, useUIPreferencesStore.getState().increaseContentScaling],
     ['-', true, true, false, useUIPreferencesStore.getState().decreaseContentScaling],
-  ], [focusedPaneConversationId, handleConversationBranch, handleConversationClear, handleConversationNewInFocusedPane, handleFileOpenConversation, handleFileSaveConversation, handleDeleteConversations, handleMessageRegenerateLastInFocusedPane, handleNavigateHistoryInFocusedPane, handleOpenChatLlmOptions, isFocusedChatEmpty]);
+  ], [focusedPaneConversationId, handleConversationClear, handleConversationNewInFocusedPane, handleFileOpenConversation, handleFileSaveConversation, handleDeleteConversations, handleMessageBeamLastInFocusedPane, handleMessageRegenerateLastInFocusedPane, handleNavigateHistoryInFocusedPane, handleOpenChatLlmOptions, isFocusedChatEmpty]);
   useGlobalShortcuts(shortcuts);
 
 

@@ -11,27 +11,30 @@ Stay ahead of the curve with big-AGI. 🚀 Pros & Devs love big-AGI. 🤖
 
 [![Official Website](https://img.shields.io/badge/BIG--AGI.com-%23096bde?style=for-the-badge&logo=vercel&label=launch)](https://big-agi.com)
 
+> 🚀 Big-AGI 2 is launching Q4 2024. Be the first to experience it before the public release.
+>
+> 👉 [Apply for Early Access](https://y2rjg0zillz.typeform.com/to/FDggwwZv?utm_source=github&utm_medium=readme&utm_campaign=ba20)
+
 Or fork & run on Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fenricoros%2Fbig-AGI&env=OPENAI_API_KEY&envDescription=Backend%20API%20keys%2C%20optional%20and%20may%20be%20overridden%20by%20the%20UI.&envLink=https%3A%2F%2Fgithub.com%2Fenricoros%2Fbig-AGI%2Fblob%2Fmain%2Fdocs%2Fenvironment-variables.md&project-name=big-AGI)
 
-## 👉 [roadmap](https://github.com/users/enricoros/projects/4/views/2) 👉 [installation](docs/installation.md) 👉 [documentation](docs/README.md)
+### Quick links: 👉 [roadmap](https://github.com/users/enricoros/projects/4/views/2) 👉 [installation](docs/installation.md) 👉 [documentation](docs/README.md)
 
-> Note: bigger better features (incl. Beam-2) are being cooked outside of `main`.
+### What's New in 1.16.1...1.16.8 · Sep 13, 2024 (patch releases)
 
-[//]: # (big-AGI is an open book; see the **[ready-to-ship and future ideas]&#40;https://github.com/users/enricoros/projects/4/views/2&#41;** in our open roadmap)
-
-### What's New in 1.16.2 · Jun 7, 2024 (minor release)
-
-- Improve web downloads, as text, markdwon, or HTML
-- Proper support for Gemini models
-- Added the latest Mistral model
-- Tokenizer support for gpt-4o
-- Updates to Beam
-
-### What's New in 1.16.1 · May 13, 2024 (minor release)
-
-- Support for the new OpenAI GPT-4o 2024-05-13 model
+- 1.16.8: OpenAI ChatGPT-4o Latest (o1-preview and o1-mini are supported in Big-AGI 2)
+- 1.16.7: OpenAI support for GPT-4o 2024-08-06
+- 1.16.6: Groq support for Llama 3.1 models
+- 1.16.5: GPT-4o Mini support
+- 1.16.4: 8192 tokens support for Claude 3.5 Sonnet
+- 1.16.3: Anthropic Claude 3.5 Sonnet model support
+- 1.16.2: Improve web downloads, as text, markdwon, or HTML
+- 1.16.2: Proper support for Gemini models
+- 1.16.2: Added the latest Mistral model
+- 1.16.2: Tokenizer support for gpt-4o
+- 1.16.2: Updates to Beam
+- 1.16.1: Support for the new OpenAI GPT-4o 2024-05-13 model
 
 ### What's New in 1.16.0 · May 9, 2024 · Crystal Clear
 
@@ -145,7 +148,7 @@ You can easily configure 100s of AI models in big-AGI:
 
 | **AI models**       | _supported vendors_                                                                                                                                                                                                             |
 |:--------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Opensource Servers  | [LocalAI](https://localai.com) (multimodal) · [Ollama](https://ollama.com/) · [Oobabooga](https://github.com/oobabooga/text-generation-webui)                                                                                   |
+| Opensource Servers  | [LocalAI](https://localai.io/) (multimodal) · [Ollama](https://ollama.com/) · [Oobabooga](https://github.com/oobabooga/text-generation-webui)                                                                                   |
 | Local Servers       | [LM Studio](https://lmstudio.ai/)                                                                                                                                                                                               |
 | Multimodal services | [Azure](https://azure.microsoft.com/en-us/products/ai-services/openai-service) · [Google Gemini](https://ai.google.dev/) · [OpenAI](https://platform.openai.com/docs/overview)                                                  |
 | Language services   | [Anthropic](https://anthropic.com) · [Groq](https://wow.groq.com/) · [Mistral](https://mistral.ai/) · [OpenRouter](https://openrouter.ai/) · [Perplexity](https://www.perplexity.ai/) · [Together AI](https://www.together.ai/) | 
