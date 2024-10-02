@@ -1,4 +1,4 @@
-# Environment Variables
+# Environment Variables 
 
 This document provides an explanation of the environment variables used in the big-AGI application.
 
