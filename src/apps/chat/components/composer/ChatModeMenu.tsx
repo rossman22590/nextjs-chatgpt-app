@@ -7,7 +7,7 @@ import { KeyStroke, platformAwareKeystrokes } from '~/common/components/KeyStrok
 import { useUIPreferencesStore } from '~/common/state/store-ui';
 
 import { ChatModeId } from '../../AppChat';
-
+const isBeamEnabled = false; // Set this to true if you want to enable Beam mode
 
 interface ChatModeDescription {
   label: string;
@@ -17,18 +17,27 @@ interface ChatModeDescription {
   hideOnDesktop?: boolean;
   requiresTTI?: boolean;
 }
+type ChatModeItemsType = {
+  'generate-text': ChatModeDescription;
+  'generate-text-beam'?: ChatModeDescription; // Make it optional
+  'append-user': ChatModeDescription;
+  'generate-image': ChatModeDescription;
+  'generate-react': ChatModeDescription;
+};
 
-const ChatModeItems: { [key in ChatModeId]: ChatModeDescription } = {
+const ChatModeItems: ChatModeItemsType = {
   'generate-text': {
     label: 'Chat',
     description: 'Persona replies',
   },
-  // 'generate-text-beam': {
-  //   label: 'Beam', // Best of, Auto-Prime, Top Pick, Select Best
-  //   description: 'Combine multiple models', // Smarter: combine...
-  //   shortcut: 'Ctrl + Enter',
-  //   hideOnDesktop: true,
-  // },
+  ...(isBeamEnabled ? {
+    'generate-text-beam': {
+      label: 'Beam',
+      description: 'Combine multiple models',
+      shortcut: 'Ctrl + Enter',
+      hideOnDesktop: true,
+    },
+  } : {}),
   'append-user': {
     label: 'Write',
     description: 'Append a message',
@@ -40,11 +49,10 @@ const ChatModeItems: { [key in ChatModeId]: ChatModeDescription } = {
     requiresTTI: true,
   },
   'generate-react': {
-    label: 'Reason + Act', //  · α
+    label: 'Reason + Act',
     description: 'Answer questions in multiple steps',
   },
 };
-
 
 function fixNewLineShortcut(shortcut: string, enterIsNewLine: boolean) {
   if (shortcut === 'ENTER')
