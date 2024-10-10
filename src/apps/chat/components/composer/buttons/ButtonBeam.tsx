@@ -11,7 +11,7 @@ import { animationEnterBelow } from '~/common/util/animUtils';
 const desktopLegend =
   <Box sx={{ px: 1, py: 0.75, lineHeight: '1.5rem' }}>
     Combine the answers from multiple models<br />
-    <KeyStroke combo='Ctrl + Enter' sx={{ mt: 0.5, mb: 0.25 }} />
+    {/* <KeyStroke combo='Ctrl + Enter' sx={{ mt: 0.5, mb: 0.25 }} /> */}
   </Box>;
 
 const desktopLegendNoContent =

@@ -125,7 +125,7 @@ export function Composer(props: {
   const timeToShowTips = useAppStateStore(state => state.usageCount > 2);
   const { novel: explainShiftEnter, touch: touchShiftEnter } = useUICounter('composer-shift-enter');
   const { novel: explainAltEnter, touch: touchAltEnter } = useUICounter('composer-alt-enter');
-  const { novel: explainCtrlEnter, touch: touchCtrlEnter } = useUICounter('composer-ctrl-enter');
+  // const { novel: explainCtrlEnter, touch: touchCtrlEnter } = useUICounter('composer-ctrl-enter');
   const [startupText, setStartupText] = useComposerStartupText();
   const enterIsNewline = useUIPreferencesStore(state => state.enterIsNewline);
   const chatMicTimeoutMs = useChatMicTimeoutMsValue();
@@ -337,12 +337,12 @@ export function Composer(props: {
         return e.preventDefault();
       }
 
-      // Ctrl (Windows) or Command (Mac) + Enter: send for beaming
-      if ((isMacUser && e.metaKey && !e.ctrlKey) || (!isMacUser && e.ctrlKey && !e.metaKey)) {
-        if (handleSendAction('generate-text-beam', composeText))
-          touchCtrlEnter();
-        return e.preventDefault();
-      }
+      // // Ctrl (Windows) or Command (Mac) + Enter: send for beaming
+      // if ((isMacUser && e.metaKey && !e.ctrlKey) || (!isMacUser && e.ctrlKey && !e.metaKey)) {
+      //   if (handleSendAction('generate-text-beam', composeText))
+      //     touchCtrlEnter();
+      //   return e.preventDefault();
+      // }
 
       // Shift: toggles the 'enter is newline'
       if (e.shiftKey)
@@ -354,7 +354,7 @@ export function Composer(props: {
       }
     }
 
-  }, [actileInterceptKeydown, assistantAbortible, chatModeId, composeText, enterIsNewline, handleSendAction, touchAltEnter, touchCtrlEnter, touchShiftEnter]);
+  }, [actileInterceptKeydown, assistantAbortible, chatModeId, composeText, enterIsNewline, handleSendAction, touchAltEnter, touchShiftEnter]);
 
 
   // Focus mode
