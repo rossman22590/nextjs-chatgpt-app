@@ -23,12 +23,12 @@ const ChatModeItems: { [key in ChatModeId]: ChatModeDescription } = {
     label: 'Chat',
     description: 'Persona replies',
   },
-  'generate-text-beam': {
-    label: 'Beam', // Best of, Auto-Prime, Top Pick, Select Best
-    description: 'Combine multiple models', // Smarter: combine...
-    shortcut: 'Ctrl + Enter',
-    hideOnDesktop: true,
-  },
+  // 'generate-text-beam': {
+  //   label: 'Beam', // Best of, Auto-Prime, Top Pick, Select Best
+  //   description: 'Combine multiple models', // Smarter: combine...
+  //   shortcut: 'Ctrl + Enter',
+  //   hideOnDesktop: true,
+  // },
   'append-user': {
     label: 'Write',
     description: 'Append a message',
