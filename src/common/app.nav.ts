@@ -119,7 +119,7 @@ export const navItems: {
       hideDrawer: true,
       // hideOnMobile: true,
       // isDev: true,
-      // _delete: true,
+      _delete: true,
     },
     {
       name: 'Cortex',
@@ -189,6 +189,7 @@ export const navItems: {
       hideDrawer: true,
       hideIcon: true,
       isDev: true,
+      _delete: true,
     },
     {
       name: 'Media Library',
@@ -251,12 +252,12 @@ export const navItems: {
       icon: DiscordIcon,
       href: Brand.URIs.SupportInvite,
     },
-    {
-      type: 'extLink',
-      name: 'GitHub',
-      icon: GitHubIcon,
-      href: Brand.URIs.OpenRepo,
-    },
+    // {
+    //   type: 'extLink',
+    //   name: 'GitHub',
+    //   icon: GitHubIcon,
+    //   href: Brand.URIs.OpenRepo,
+    // },
   ],
 
 };
