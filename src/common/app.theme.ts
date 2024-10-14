@@ -3,6 +3,8 @@ import createCache from '@emotion/cache';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { extendTheme } from '@mui/joy';
 
+import { animationEnterModal } from '~/common/util/animUtils';
+
 
 // Definitions
 export type UIComplexityMode = 'minimal' | 'pro' | 'extra';
@@ -92,14 +94,10 @@ export const createAppTheme = (uiComplexityMinimal: boolean) => extendTheme({
       styleOverrides: {
         root: {
           boxShadow: 'none',
-          
-    
         },
       },
     },
-    
 
-    
     /**
      * Select
      * - remove the box-shadow: https://github.com/mui/material-ui/commit/8d4728df8a66d710660af96ac7ff3f86d2d26382
@@ -108,7 +106,6 @@ export const createAppTheme = (uiComplexityMinimal: boolean) => extendTheme({
       styleOverrides: {
         root: {
           boxShadow: 'none',
-          
         },
       },
     },
@@ -121,11 +118,16 @@ export const createAppTheme = (uiComplexityMinimal: boolean) => extendTheme({
     //   },
     // },
 
-    JoyModal: !uiComplexityMinimal ? undefined : {
+    JoyModal: {
       styleOverrides: {
-        backdrop: {
+        backdrop: !uiComplexityMinimal ? undefined : {
           backdropFilter: 'none',
           // backdropFilter: 'blur(2px)',
+        },
+        root: uiComplexityMinimal ? undefined : {
+          '& .agi-animate-enter': {
+            animation: `${animationEnterModal} 0.2s`,
+          },
         },
       },
     },
@@ -160,6 +162,7 @@ export const themeZIndexPageBar = 25;
 export const themeZIndexDesktopDrawer = 26;
 export const themeZIndexDesktopPanel = 27;
 export const themeZIndexDesktopNav = 30;
+export const themeZIndexChatBubble = 50;
 export const themeZIndexOverMobileDrawer = 1301;
 
 

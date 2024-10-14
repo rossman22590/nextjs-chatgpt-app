@@ -27,4 +27,7 @@ export const Brand = {
     // Twitter: 'https://www.twitter.com/enricoros',
     PrivacyPolicy: 'https://myapps.ai',
   },
+  Docs: {
+    Public: (docPage: string) => `https://docs.myapps.ai`,
+  }
 } as const;

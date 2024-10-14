@@ -111,17 +111,6 @@ export const navItems: {
       fullWidth: true,
     },
     {
-      name: 'Draw',
-      icon: FormatPaintOutlinedIcon,
-      iconActive: FormatPaintTwoToneIcon,
-      type: 'app',
-      route: '/draw',
-      hideDrawer: true,
-      // hideOnMobile: true,
-      // isDev: true,
-      _delete: true,
-    },
-    {
       name: 'Cortex',
       icon: AutoAwesomeOutlinedIcon,
       iconActive: AutoAwesomeIcon,
