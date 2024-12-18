@@ -26,5 +26,9 @@ export const Brand = {
     SupportInvite: 'https://discord.gg/D3r3HrHHeG',
     // Twitter: 'https://www.twitter.com/enricoros',
     PrivacyPolicy: 'https://myapps.ai',
+    TermsOfService: 'https://myapps.ai',
   },
+  Docs: {
+    Public: (docPage: string) => `https://support.myapps.ai`,
+  }
 } as const;
