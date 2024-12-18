@@ -43,7 +43,7 @@ export function aixCreateModelFromLLMOptions(
   if (llmOptionsOverride?.llmTemperature !== undefined) llmTemperature = llmOptionsOverride.llmTemperature;
   if (llmOptionsOverride?.llmResponseTokens !== undefined) llmResponseTokens = llmOptionsOverride.llmResponseTokens;
 
-  const isO1Model = llmRef.startsWith('o1-');
+  const isO1Model = llmRef.startsWith('o1-') || llmRef === 'o1';
 
   return {
     id: llmRef,
@@ -253,6 +253,14 @@ function _llToText(src: AixChatGenerateContent_LL, dest: AixChatGenerateText_Sim
 function prepareO1ModelInput(aixChatGenerate: AixAPIChatGenerate_Request): AixAPIChatGenerate_Request {
   return {
     ...aixChatGenerate,
+    systemMessage: aixChatGenerate.systemMessage
+      ? {
+          ...aixChatGenerate.systemMessage,
+          parts: aixChatGenerate.systemMessage.parts.map(part => 
+            part.pt === 'text' ? { ...part, role: 'developer' } : part
+          ),
+        }
+      : null,
     chatSequence: aixChatGenerate.chatSequence.map(message => {
       if (message.role === 'tool') {
         return {
@@ -286,7 +294,7 @@ export async function aixChatGenerateContent_DMessage<TServiceSettings extends o
 
   const aixModel = aixCreateModelFromLLMOptions(llm.options, clientOptions?.llmOptionsOverride, llmId);
 
-  const isO1Preview = llm.interfaces.includes(LLM_IF_SPECIAL_OAI_O1Preview);
+  const isO1Preview = llm.interfaces.includes(LLM_IF_SPECIAL_OAI_O1Preview) || aixModel.id === 'o1' || aixModel.id.startsWith('o1-');
   let effectiveAixChatGenerate = isO1Preview ? prepareO1ModelInput(aixChatGenerate) : aixChatGenerate;
 
   if (isO1Preview) {
