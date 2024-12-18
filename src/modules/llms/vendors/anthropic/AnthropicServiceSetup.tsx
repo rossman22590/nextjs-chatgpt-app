@@ -48,7 +48,7 @@ export function AnthropicServiceSetup(props: { serviceId: DModelsServiceId }) {
 
   return <>
 
-    <ApproximateCosts serviceId={service?.id} whoSaved='Big-AGI saved you'>
+    <ApproximateCosts serviceId={service?.id} whoSaved='SI Tutor saved you'>
       <Alert variant='soft' color='success'>
         <div>
           Enjoy <b>Sonnet 3.5</b>, <b>Opus</b> and <b>Haiku 3</b>. Anthropic <ExternalLink level='body-sm' href='https://status.anthropic.com/'>server status</ExternalLink>.
