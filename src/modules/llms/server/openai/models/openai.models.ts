@@ -154,7 +154,37 @@ export const _knownOpenAIChatModels: ManualMappings = [
     hidden: true,
   },
 
-  // o1-preview
+  // o1-full
+  {
+    idPrefix: 'o1',
+    label: 'o1 Full⏱️',
+    description: 'Points to the most recent snapshot of the o1 model: o1-preview-2024-09-12',
+    // symLink: 'o1-2024-12-17',
+    hidden: false,
+    // copied from symlinked
+    contextWindow: 200000,
+    maxCompletionTokens: 32768,
+    trainingDataCutoff: 'Oct 2023',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_SPECIAL_OAI_O1Preview,LLM_IF_OAI_Vision, LLM_IF_OAI_PromptCaching,LLM_IF_OAI_Fn, LLM_IF_OAI_Json],
+    chatPrice: { input: 15, cache: { cType: 'oai-ac', read: 7.5 }, output: 60 },
+    benchmark: { cbaElo: 1339 },
+    isPreview: false,
+  },
+    {
+    idPrefix: 'o1',
+    label: 'o1 2024-12-17',
+    description: 'Points to the most recent snapshot of the o1 model: o1-preview-2024-09-12',
+    // symLink: 'o1-2024-12-17',
+    hidden: false,
+    // copied from symlinked
+    contextWindow: 200000,
+    maxCompletionTokens: 32768,
+    trainingDataCutoff: 'Oct 2023',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_SPECIAL_OAI_O1Preview,LLM_IF_OAI_Vision, LLM_IF_OAI_PromptCaching,LLM_IF_OAI_Fn, LLM_IF_OAI_Json],
+    chatPrice: { input: 15, cache: { cType: 'oai-ac', read: 7.5 }, output: 60 },
+    benchmark: { cbaElo: 1339 },
+    isPreview: false,
+  },
   {
     idPrefix: 'o1-preview',
     label: 'o1 Preview',

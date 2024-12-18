@@ -318,6 +318,8 @@ export function prettyShortChatModelName(model: string | undefined): string {
 
   // [OpenAI]
   if (model.includes('o1-')) {
+    if (model.includes('o1-2024-12-17')) return 'o1-2024-12-17';
+    if (model.includes('o1')) return 'o1';
     if (model.includes('o1-mini')) return 'o1 Mini';
     if (model.includes('o1-preview')) return 'o1 Preview';
     return 'o1';
