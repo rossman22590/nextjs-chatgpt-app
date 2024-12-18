@@ -44,23 +44,23 @@ export const createAppTheme = (uiComplexityMinimal: boolean) => extendTheme({
     light: {
       palette: {
         neutral: {
-          plainColor: 'var(--joy-palette-neutral-800)',     // [700 -> 800] Dropdown menu: increase text contrast a bit
-          solidBg: 'var(--joy-palette-neutral-700)',        // [500 -> 700] PageBar background & Button[solid]
+          plainColor: '#030712' ,   // [700 -> 800] Dropdown menu: increase text contrast a bit
+          solidBg: ' #030712' ,    // [500 -> 700] PageBar background & Button[solid]
           solidHoverBg: 'var(--joy-palette-neutral-800)',   // [600 -> 800] Buttons[solid]:hover
         },
         // primary [800] > secondary [700 -> 800] > tertiary [600] > icon [500 -> 700]
         text: {
           icon: 'var(--joy-palette-neutral-700)',           // <IconButton color='neutral' /> icon color
           secondary: 'var(--joy-palette-neutral-800)',      // increase contrast a bit
-          // tertiary: 'var(--joy-palette-neutral-700)',       // increase contrast a bit
+        //   tertiary: 'var(--joy-palette-neutral-700)',       // increase contrast a bit
         },
         // popup [white] > surface [50] > level1 [100] > level2 [200] > level3 [300 -> unused] > body [white -> 300]
         background: {
           // New
-          surface: 'var(--joy-palette-neutral-50, #FBFCFE)',
-          level1: 'var(--joy-palette-neutral-100, #F0F4F8)',
-          level2: 'var(--joy-palette-neutral-200, #DDE7EE)',
-          body: 'var(--joy-palette-neutral-300, #CDD7E1)',
+          surface: 'var(--joy-palette-neutral-50, #030712)',
+          level1: 'var(--joy-palette-neutral-100, #030712)',
+          level2: 'var(--joy-palette-neutral-200, #030712)',
+          body: 'var(--joy-palette-neutral-300, #030712)',
           // Former
           // body: 'var(--joy-palette-neutral-400, #9FA6AD)',
         },
@@ -75,7 +75,7 @@ export const createAppTheme = (uiComplexityMinimal: boolean) => extendTheme({
         },
         background: {
           // New
-          popup: '#24292c', // 3: #32383E, 1: #171A1C, 2: #25282B
+          popup: '#030712', // 3: #32383E, 1: #171A1C, 2: #25282B
           surface: 'var(--joy-palette-neutral-800, #171A1C)',
           level1: 'var(--joy-palette-neutral-900, #0B0D0E)',
           level2: 'var(--joy-palette-neutral-800, #171A1C)',
