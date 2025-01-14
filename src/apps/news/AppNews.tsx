@@ -204,7 +204,7 @@ export function AppNews() {
               onClick={() => setLastNewsIdx(index => index + NEWS_LOAD_STEP)}
               endDecorator={<ExpandMoreIcon />}
             >
-              Previous News
+              Previous 
             </Button>
           )}
         </Container>
