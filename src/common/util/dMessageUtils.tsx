@@ -203,7 +203,7 @@ export function useMessageAvatarLabel(
     }
     if (!generator) {
       return {
-        label: 'unk-model',
+        label: 'BEAM',
         tooltip: null,
       };
     }

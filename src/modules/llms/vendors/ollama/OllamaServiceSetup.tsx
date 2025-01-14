@@ -43,7 +43,7 @@ export function OllamaServiceSetup(props: { serviceId: DModelsServiceId }) {
     <FormTextField
       autoCompleteId='ollama-host'
       title='Ollama Host'
-      description={<Link level='body-sm' href='https://github.com/enricoros/big-agi/blob/main/docs/config-local-ollama.md' target='_blank'>Information</Link>}
+      description={<Link level='body-sm' href='https://support.myapps.ai' target='_blank'>Information</Link>}
       placeholder='http://127.0.0.1:11434'
       isError={hostError}
       value={ollamaHost || ''}
@@ -52,7 +52,7 @@ export function OllamaServiceSetup(props: { serviceId: DModelsServiceId }) {
 
     <FormSwitchControl
       title='JSON Output' on='Enabled' fullWidth
-      description={<Link level='body-sm' href='https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion' target='_blank'>Information</Link>}
+      description={<Link level='body-sm' href='https://support.myapps.ai' target='_blank'>Information</Link>}
       checked={ollamaJson}
       onChange={on => {
         updateSettings({ ollamaJson: on });

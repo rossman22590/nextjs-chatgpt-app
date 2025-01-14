@@ -40,7 +40,7 @@ export function AzureServiceSetup(props: { serviceId: DModelsServiceId }) {
     <FormTextField
       autoCompleteId='azure-endpoint'
       title='Azure Endpoint'
-      description={<Link level='body-sm' href='https://github.com/enricoros/big-agi/blob/main/docs/config-azure-openai.md' target='_blank'>configuration</Link>}
+      description={<Link level='body-sm' href='https://support.myapps.ai' target='_blank'>configuration</Link>}
       placeholder='https://your-resource-name.openai.azure.com/'
       isError={hostError}
       value={azureEndpoint}
@@ -50,7 +50,7 @@ export function AzureServiceSetup(props: { serviceId: DModelsServiceId }) {
     <FormInputKey
       autoCompleteId='azure-key' label='Azure Key'
       rightLabel={<>{needsUserKey
-        ? !azureKey && <Link level='body-sm' href='https://azure.microsoft.com/en-us/products/ai-services/openai-service' target='_blank'>request Key</Link>
+        ? !azureKey && <Link level='body-sm' href='https://support.myapps.ai' target='_blank'>request Key</Link>
         : <AlreadySet />}
       </>}
       value={azureKey} onChange={value => updateSettings({ azureKey: value })}

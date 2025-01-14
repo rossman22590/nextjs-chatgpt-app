@@ -72,7 +72,7 @@ export function OpenRouterServiceSetup(props: { serviceId: DModelsServiceId }) {
       <Link href='https://openrouter.ai/keys' target='_blank'>OpenRouter</Link> is an independent service
       granting access to <Link href='https://openrouter.ai/docs#models' target='_blank'>exclusive models</Link> such
       as GPT-4 32k, Claude, and more. <Link
-      href='https://github.com/enricoros/big-agi/blob/main/docs/config-openrouter.md' target='_blank'>
+      href='https://support.myapps.ai' target='_blank'>
       Configuration &amp; documentation</Link>.
     </Typography>
 

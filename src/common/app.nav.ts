@@ -117,9 +117,9 @@ export const navItems: {
       type: 'app',
       route: '/draw',
       hideDrawer: true,
-      // hideOnMobile: true,
+      hideOnMobile: true,
       // isDev: true,
-      // _delete: true,
+      _delete: true,
     },
     {
       name: 'Cortex',
@@ -253,12 +253,12 @@ export const navItems: {
       icon: DiscordIcon,
       href: Brand.URIs.SupportInvite,
     },
-    {
-      type: 'extLink',
-      name: 'GitHub',
-      icon: GitHubIcon,
-      href: Brand.URIs.OpenRepo,
-    },
+    // {
+    //   type: 'extLink',
+    //   name: 'GitHub',
+    //   icon: GitHubIcon,
+    //   href: Brand.URIs.OpenRepo,
+    // },
   ],
 
 };
