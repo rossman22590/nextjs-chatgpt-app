@@ -16,7 +16,7 @@ export const beamNewsCallout =
         Beam - launched in 1.15
       </Typography>
       <Typography level='body-sm'>
-        Beam is a world-first, multi-model AI chat modality that accelerates the discovery of superior solutions by leveraging the collective strengths of diverse LLMs.
+        Beam is a world-first, multi-model AI chat modality that accelerates the discovery of superior solutions by leveraging the collective strengths of many  LLMs.
         {/*Beam is a world-first, multi-model AI chat modality. By combining the strenghts of diverse LLMs, Beam allows you to find better answers, faster.*/}
       </Typography>
       <Grid container spacing={1}>
