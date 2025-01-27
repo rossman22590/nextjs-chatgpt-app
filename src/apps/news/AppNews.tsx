@@ -50,7 +50,7 @@ export const newsRoadmapCallout =
             fullWidth variant='plain' color='primary' endDecorator={<LaunchIcon />}
             component={Link} href={Brand.URIs.OpenRepo + '/issues/new?template=roadmap-request.md&title=%5BSuggestion%5D'} noLinkStyle target='_blank'
           >
-            Suggest a Feature
+            Suggest a new Feature
           </Button>
         </Grid>
       </Grid>
