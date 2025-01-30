@@ -32,11 +32,12 @@ type TRequestMessages = TRequest['messages'];
 export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request, jsonOutput: boolean, streaming: boolean): TRequest {
 
   // Dialect incompatibilities -> Hotfixes
-  const hotFixAlternateUserAssistantRoles = openAIDialect === 'perplexity';
+  const hotFixAlternateUserAssistantRoles = openAIDialect === 'deepseek' || openAIDialect === 'perplexity';
   const hotFixRemoveEmptyMessages = openAIDialect === 'perplexity';
   const hotFixRemoveStreamOptions = openAIDialect === 'azure' || openAIDialect === 'mistral';
   const hotFixSquashMultiPartText = openAIDialect === 'deepseek';
   const hotFixThrowCannotFC = openAIDialect === 'openrouter' /* OpenRouter FC support is not good (as of 2024-07-15) */ || openAIDialect === 'perplexity';
+  const hotFixVndORIncludeReasoning = openAIDialect === 'openrouter'; // [OpenRouter, 2025-01-24] has a special `include_reasoning` field to show the chain of thought
 
   // Model incompatibilities -> Hotfixes
 
@@ -82,6 +83,10 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     user: undefined,
   };
 
+  // [OpenRouter, 2025-01-24]
+  if (hotFixVndORIncludeReasoning)
+    payload.include_reasoning = true;
+
   // Top-P instead of temperature
   if (model.topP !== undefined) {
     delete payload.temperature;
@@ -122,8 +127,8 @@ function _fixAlternateUserAssistantRoles(chatMessages: TRequestMessages): TReque
     // treat intermediate system messages as user messages
     if (acc.length > 0 && historyItem.role === 'system') {
       historyItem = {
+        ...historyItem,
         role: 'user',
-        content: historyItem.content,
       };
     }
 
