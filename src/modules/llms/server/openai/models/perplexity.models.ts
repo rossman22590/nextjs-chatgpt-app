@@ -1,9 +1,23 @@
 import type { ModelDescriptionSchema } from '../../llm.server.types';
 
 import { LLM_IF_OAI_Chat } from '~/common/stores/llms/llms.types';
+import { LLM_IF_OAI_Reasoning} from '~/common/stores/llms/llms.types';
 
 const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
   // Current Perplexity Models
+  {
+    id: 'sonar-reasoning',
+    label: 'Sonar Reasoning 🌐',
+    description: 'Advanced model with enhanced search capabilities and 200k context window',
+    contextWindow: 127000,
+    maxCompletionTokens: 8000,
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning], // ✅ Correct syntax
+    chatPrice: {
+      input: 3,    // $3 per 1M tokens
+      output: 15,  // $15 per 1M tokens
+      // Note: also has $5 per 1000 searches cost, but our pricing model doesn't support this yet
+    },
+  },
   {
     id: 'sonar-pro',
     label: 'Sonar Pro 🌐',
