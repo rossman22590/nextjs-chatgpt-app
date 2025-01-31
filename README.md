@@ -105,7 +105,7 @@ https://github.com/enricoros/big-AGI/assets/32999/01732528-730e-41dc-adc7-511385
 </details>
 
 <details>
-<summary>What's New in 1.12.0 · Jan 26, 2024 · AGI Hotline</summary>
+<summary> What's New in 1.12.0 · Jan 26, 2024 · AGI Hotline</summary>
 
 https://github.com/enricoros/big-AGI/assets/32999/95ceb03c-945d-4fdd-9a9f-3317beb54f3f
 
