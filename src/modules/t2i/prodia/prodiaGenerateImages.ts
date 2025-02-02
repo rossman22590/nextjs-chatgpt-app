@@ -1,12 +1,9 @@
 import { apiAsync } from '~/common/util/trpc.client';
-
 import { useProdiaStore } from './store-module-prodia';
-
 import type { T2iCreateImageOutput } from '../t2i.server';
 
-
 export async function prodiaGenerateImages(imageText: string, count: number): Promise<T2iCreateImageOutput[]> {
-  // Use the most current model and settings
+  // Use the most current model and settings from state
   const {
     prodiaApiKey: prodiaKey, prodiaModelId, prodiaModelGen,
     prodiaNegativePrompt: negativePrompt, prodiaSteps: steps, prodiaCfgScale: cfgScale,
@@ -19,8 +16,8 @@ export async function prodiaGenerateImages(imageText: string, count: number): Pr
   const generateImage = async (): Promise<T2iCreateImageOutput[]> => {
     const generatedImages = await apiAsync.prodia.createImage.query({
       ...(!!prodiaKey && { prodiaKey }),
-      prodiaModel: prodiaModelId || 'sd_xl_base_1.0.safetensors [be9edd61]', // was: Realistic_Vision_V5.0.safetensors [614d1063]
-      prodiaGen: prodiaModelGen || 'sd', // data versioning fix
+      prodiaModel: prodiaModelId || 'sd_xl_base_1.0.safetensors [be9edd61]', // default model fallback
+      prodiaGen: prodiaModelGen || 'sd', // version fix
       prompt: imageText,
       ...(!!negativePrompt && { negativePrompt }),
       ...(!!steps && { steps }),
@@ -37,11 +34,11 @@ export async function prodiaGenerateImages(imageText: string, count: number): Pr
     return generatedImages;
   };
 
-  // Run the image generation 'count' times in parallel and handle all results
+  // Run multiple image generations in parallel
   const imagePromises = Array.from({ length: count }, generateImage);
   const results = await Promise.allSettled(imagePromises);
 
-  // Filter and return only the successful results
+  // Return only the successful results
   return results
     .filter(result => result.status === 'fulfilled')
     .map(result => (result as PromiseFulfilledResult<T2iCreateImageOutput[]>).value)

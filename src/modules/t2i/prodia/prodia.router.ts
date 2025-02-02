@@ -2,12 +2,9 @@ import { z } from 'zod';
 
 import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
 import { env } from '~/server/env.mjs';
-import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
-
 import { getPngDimensionsFromBytes, t2iCreateImagesOutputSchema } from '../t2i.server';
 
 import { HARDCODED_MODELS } from './prodia.models';
-
 
 const createImageInputSchema = z.object({
   prodiaKey: z.string().optional(),
@@ -27,76 +24,61 @@ const modelsInputSchema = z.object({
   prodiaKey: z.string().optional(),
 });
 
-
 export const prodiaRouter = createTRPCRouter({
-
-  /** [Prodia] Generate an image, returning the cloud URL */
+  /** [Prodia] Generate an image using the new inference API */
   createImage: publicProcedure
     .input(createImageInputSchema)
     .output(t2iCreateImagesOutputSchema)
     .query(async ({ input }) => {
-
-      // timeout, in seconds
-      const timeout = 25;
-      const tStart = Date.now();
-
-      // crate the job, getting back a job ID
-      let jobRequest: JobRequestSD | JobRequestSDXL;
-      const jobRequestCommon = {
+      // Build common job parameters
+      let jobParams: any = {
         model: input.prodiaModel,
         prompt: input.prompt,
-        ...(!!input.negativePrompt && { negative_prompt: input.negativePrompt }),
-        ...(!!input.steps && { steps: input.steps }),
-        ...(!!input.cfgScale && { cfg_scale: input.cfgScale }),
-        ...(!!input.seed && { seed: input.seed }),
+        ...(input.negativePrompt && { negative_prompt: input.negativePrompt }),
+        ...(input.steps && { steps: input.steps }),
+        ...(input.cfgScale && { cfg_scale: input.cfgScale }),
+        ...(input.seed && { seed: input.seed }),
       };
-      // SDXL takes the resolution
+
       if (input.prodiaGen === 'sdxl') {
-        const resTokens = input.resolution?.split('x');
-        const width = resTokens?.length === 2 ? parseInt(resTokens[0], 10) : undefined;
-        const height = resTokens?.length === 2 ? parseInt(resTokens[1], 10) : undefined;
-        jobRequest = {
-          ...jobRequestCommon,
-          ...(!!width && { width }),
-          ...(!!height && { height }),
-        };
-      }
-      // SD takes the aspect ratio and upscale
-      else {
-        jobRequest = {
-          ...jobRequestCommon,
-          ...(!!input.aspectRatio && input.aspectRatio !== 'square' && { aspect_ratio: input.aspectRatio }),
-          ...(!!input.upscale && { upscale: input.upscale }),
-        };
-      }
-      let j: JobResponse = await createGenerationJob(input.prodiaKey, input.prodiaGen === 'sdxl', jobRequest);
-
-      // poll the job status until it's done
-      let sleepDelay = 3000;
-      while (j.status !== 'succeeded' && j.status !== 'failed' && (Date.now() - tStart) < (timeout * 1000)) {
-        await new Promise(resolve => setTimeout(resolve, sleepDelay));
-        j = await getJobStatus(input.prodiaKey, j.job);
-        if (sleepDelay >= 300)
-          sleepDelay /= 2;
+        // For SDXL, parse resolution (expected format: "widthxheight")
+        if (input.resolution) {
+          const resTokens = input.resolution.split('x');
+          const width = resTokens.length === 2 ? parseInt(resTokens[0], 10) : undefined;
+          const height = resTokens.length === 2 ? parseInt(resTokens[1], 10) : undefined;
+          if (width && height) {
+            jobParams.width = width;
+            jobParams.height = height;
+          }
+        }
+      } else {
+        // For SD, add optional aspect ratio and upscale
+        if (input.aspectRatio && input.aspectRatio !== 'square') {
+          jobParams.aspect_ratio = input.aspectRatio;
+        }
+        if (input.upscale) {
+          jobParams.upscale = input.upscale;
+        }
       }
 
-      // check for success
-      const elapsed = Math.round((Date.now() - tStart) / 100) / 10;
-      if (j.status !== 'succeeded' || !j.imageUrl) {
-        console.error('Prodia image generation failed:', j);
-        throw new Error(`Prodia image generation failed within ${elapsed}s`);
+      // Resolve the API key from input or environment
+      const prodiaKey = input.prodiaKey || env.PRODIA_API_KEY;
+      if (!prodiaKey || !prodiaKey.trim()) {
+        throw new Error('Missing Prodia API Key. Add it on the UI (Setup) or server side (your deployment).');
       }
 
-      // download the image and convert to base64
-      const imageResponse = await fetch(j.imageUrl);
-      const imageBuffer = await imageResponse.arrayBuffer();
+      // Call the new inference API (synchronously) to get the image buffer
+      const imageBuffer = await createGenerationJob(
+        prodiaKey.trim(),
+        input.prodiaGen === 'sdxl',
+        jobParams
+      );
+
+      // Convert the image to base64, determine dimensions, and return the result
       const base64Image = Buffer.from(imageBuffer).toString('base64');
-
-      // width and height by looking at the PNG (imageBuffer)
       const { width, height } = getPngDimensionsFromBytes(imageBuffer);
+      const altText = input.prompt;
 
-      // respond with 1 result
-      const { prompt: altText, ...otherParameters } = jobRequest;
       return [{
         mimeType: 'image/png',
         base64Data: base64Image,
@@ -104,120 +86,48 @@ export const prodiaRouter = createTRPCRouter({
         width,
         height,
         generatorName: 'prodia-' + input.prodiaModel,
-        parameters: otherParameters,
+        parameters: jobParams,
         generatedAt: new Date().toISOString(),
       }];
     }),
 
-  /** List models - for now just hardcode the list, as there's no endpoint */
+  /** List models – since the new inference API doesn’t support model listing, return the hardcoded list */
   listModels: publicProcedure
     .input(modelsInputSchema)
-    .query(async ({ input }) => {
-
-      // fetch in parallel both the SD and SDXL models
-      const { headers, url } = prodiaAccess(input.prodiaKey, `/v1/sd/models`);
-      const [sdModelIds, sdXlModelIds] = await Promise.all([
-        fetchJsonOrTRPCThrow<string[]>({ url, headers, name: 'Prodia SD' }),
-        fetchJsonOrTRPCThrow<string[]>({ url: url.replace('/sd/', '/sdxl/'), headers, name: 'Prodia SDXL' }),
-      ]);
-      const apiModelIDs = [...sdModelIds, ...sdXlModelIds];
-
-      // filter and print the hardcoded models that are not in the API list
-      const hardcodedRemoved = HARDCODED_MODELS.models.filter(m => !apiModelIDs.includes(m.id));
-      if (hardcodedRemoved.length)
-        console.warn(`Prodia models now removed from the API: ${hardcodedRemoved.map(m => m.id).join(', ')}`);
-
-      // add and print the models that are not in the hardcoded list
-      const hardcodedExisting = HARDCODED_MODELS.models.filter(m => apiModelIDs.includes(m.id));
-      const missingHardcodedIDs = apiModelIDs.filter(id => !hardcodedExisting.find(m => m.id === id));
-      if (missingHardcodedIDs.length) {
-        console.log(`Prodia API models that are new to the hardcoded list: ${missingHardcodedIDs.join(', ')}`);
-        hardcodedExisting.push(...missingHardcodedIDs.map(id => {
-          const missingLabel = '[New] ' + id.split('[')[0].replaceAll('_', ' ').replaceAll('.safetensors', '').trim();
-          return { id, label: missingLabel, gen: (sdXlModelIds.includes(id) ? 'sdxl' : 'sd') as 'sd' | 'sdxl' };
-        }));
-      }
-
-      // sort the models by priority, then isSDXL, then label
-      hardcodedExisting.sort((a, b) => {
-        const pa = a.priority || 0;
-        const pb = b.priority || 0;
-        if (pa !== pb) return pb - pa;
-        if (a.gen !== b.gen) return a.gen === 'sdxl' ? -1 : 1;
-        return a.label.localeCompare(b.label);
-      });
-
-      // return the hardcoded models
-      return { models: hardcodedExisting };
+    .query(async () => {
+      return { models: HARDCODED_MODELS.models };
     }),
-
 });
 
+// Updated createGenerationJob using the new inference API (synchronous)
+async function createGenerationJob<TJobRequest>(
+  apiKey: string,
+  isGenSDXL: boolean,
+  jobParams: TJobRequest
+): Promise<ArrayBuffer> {
+  const jobType = isGenSDXL
+    ? "inference.flux.schnell.txt2img.sdxl.v1"
+    : "inference.flux.schnell.txt2img.v1";
 
-interface JobRequestBase {
-  model: string,
-  prompt: string,
-  negative_prompt?: string;
-  steps?: number;
-  cfg_scale?: number;
-  seed?: number;
-  // sampler..
-}
-
-export interface JobRequestSD extends JobRequestBase {
-  upscale?: boolean;
-  aspect_ratio?: 'square' | 'portrait' | 'landscape';
-}
-
-export interface JobRequestSDXL extends JobRequestBase {
-  width?: number;
-  height?: number;
-}
-
-export interface JobResponse {
-  job: string;
-  // params: {
-  //   prompt: string;
-  //   cfg_scale: number;
-  //   steps: number;
-  //   negative_prompt: string;
-  //   seed: number;
-  //   upscale: boolean;
-  //   sampler_name: 'Euler' | string;
-  //   width: 512 | number;
-  //   height: 512 | number;
-  //   options: { sd_model_checkpoint: 'sdv1_4.ckpt [7460a6fa]' | string; };
-  // };
-  status: 'queued' | 'generating' | 'succeeded' | 'failed';
-  imageUrl?: string;
-}
-
-
-async function createGenerationJob<TJobRequest extends JobRequestBase>(apiKey: string | undefined, isGenSDXL: boolean, jobRequest: TJobRequest): Promise<JobResponse> {
-  const { headers, url } = prodiaAccess(apiKey, isGenSDXL ? '/v1/sdxl/generate' : '/v1/sd/generate');
-  return await fetchJsonOrTRPCThrow<JobResponse, TJobRequest>({ url, method: 'POST', headers, body: jobRequest, name: 'Prodia Job Create' });
-}
-
-async function getJobStatus(apiKey: string | undefined, jobId: string): Promise<JobResponse> {
-  const { headers, url } = prodiaAccess(apiKey, `/v1/job/${jobId}`);
-  return await fetchJsonOrTRPCThrow<JobResponse>({ url, headers, name: 'Prodia Job Status' });
-}
-
-
-function prodiaAccess(_prodiaKey: string | undefined, apiPath: string): { headers: HeadersInit, url: string } {
-  // API key
-  const prodiaKey = (_prodiaKey || env.PRODIA_API_KEY || '').trim();
-  if (!prodiaKey)
-    throw new Error('Missing Prodia API Key. Add it on the UI (Setup) or server side (your deployment).');
-
-  // API host
-  const prodiaHost = 'https://api.prodia.com';
-
-  return {
-    headers: {
-      'X-Prodia-Key': prodiaKey,
-      'Content-Type': 'application/json',
-    },
-    url: prodiaHost + apiPath,
+  const jobConfig = {
+    type: jobType,
+    config: jobParams,
   };
+
+  const response = await fetch("https://inference.prodia.com/v2/job", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "Accept": "image/png",
+    },
+    body: JSON.stringify(jobConfig),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Prodia image generation failed: ${response.status} ${errorText}`);
+  }
+
+  return await response.arrayBuffer();
 }
