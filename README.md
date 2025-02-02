@@ -87,7 +87,7 @@ Note: After the V2 Q1 2025 release, `v2-dev` will become the default branch and 
 - Enhanced UX with auto-sizing charts, refined search and folder functionalities, perfected scaling
 - And with more UI improvements, documentation, bug fixes (20 tickets), and developer enhancements
 
-</details>
+</details> 
 
 <details>
 <summary>What's New in 1.13.0 · Feb 8, 2024 · Multi + Mind</summary>
