@@ -17,6 +17,18 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
     },
   },
   {
+    id: 'sonar-reasoning-pro',
+    label: 'Sonar Reasoning Pro 🌐',
+    description: 'Advanced reasoning model with 127k context window. Based on DeepSeek R1.',
+    contextWindow: 127000,
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning],
+    chatPrice: {
+      input: 1,
+      output: 5,
+      // Note: also has $5 per 1000 searches cost, but our pricing model doesn't support this yet
+    },
+  },
+  {
     id: 'sonar-pro',
     label: 'Sonar Pro 🌐',
     description: 'Advanced model with enhanced search capabilities and 200k context window',
