@@ -7,16 +7,16 @@ import LaunchIcon from '@mui/icons-material/Launch';
 import { Link } from '~/common/components/Link';
 
 
-const bigAgi2SurveyUrl = 'https://y2rjg0zillz.typeform.com/to/ZSADpr5u?utm_source=gh-2&utm_medium=news&utm_campaign=ea2';
+const bigAgi2SurveyUrl = 'https://support.myapps.ai';
 
 export const bigAgi2NewsCallout =
   <Card variant='solid' invertedColors>
     <CardContent sx={{ gap: 2 }}>
       <Typography level='title-lg'>
-        Big-AGI 2.0 - In Development
+        AI Tutor Beam 3.0 - In Development
       </Typography>
       <Typography level='body-sm'>
-        We&apos;re building the next version of Big-AGI with your needs in mind. New features, better performance, enhanced AI interactions. Help us shape it.
+        We&apos;re building the next version of AI Tutor with your needs in mind. New features, better performance, enhanced AI interactions. Help us shape it.
       </Typography>
       <Grid container spacing={1}>
         <Grid xs={12} sm={7}>
@@ -24,7 +24,7 @@ export const bigAgi2NewsCallout =
             fullWidth variant='soft' color='primary' endDecorator={<LaunchIcon />}
             component={Link} href={bigAgi2SurveyUrl} noLinkStyle target='_blank'
           >
-            Apply for Early Access
+            Learn More
           </Button>
         </Grid>
         <Grid xs={12} sm={5} sx={{ display: 'flex', flexAlign: 'center', justifyContent: 'center' }}>
@@ -32,7 +32,7 @@ export const bigAgi2NewsCallout =
             fullWidth variant='outlined' color='primary' startDecorator={<AccessTimeIcon />}
             disabled
           >
-            Coming Fall 2024
+            Coming Fall 2025
           </Button>
         </Grid>
       </Grid>

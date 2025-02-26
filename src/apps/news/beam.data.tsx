@@ -7,7 +7,7 @@ import { Link } from '~/common/components/Link';
 
 
 // export const beamReleaseDate = '2024-04-01T22:00:00Z';
-export const beamBlogUrl = 'https://big-agi.com/blog/beam-multi-model-ai-reasoning/';
+export const beamBlogUrl = 'https://support.myapps.ai';
 
 export const beamNewsCallout =
   <Card variant='solid' invertedColors>
@@ -16,7 +16,7 @@ export const beamNewsCallout =
         Beam - launched in 1.15
       </Typography>
       <Typography level='body-sm'>
-        Beam is a world-first, multi-model AI chat modality that accelerates the discovery of superior solutions by leveraging the collective strengths of diverse LLMs.
+        Beam is a world-first, multi-model AI chat modality that accelerates the discovery of superior solutions by leveraging the collective strengths of many  LLMs.
         {/*Beam is a world-first, multi-model AI chat modality. By combining the strenghts of diverse LLMs, Beam allows you to find better answers, faster.*/}
       </Typography>
       <Grid container spacing={1}>
