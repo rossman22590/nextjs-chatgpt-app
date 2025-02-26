@@ -571,20 +571,20 @@ export function oobaboogaModelToModelDescription(modelId: string, created: numbe
 
 // [OpenRouter]
 
+// [OpenRouter]
 
 const orOldModelIDs = [
-  
   'anthropic/claude-2.1', 'anthropic/claude-2.0', 'anthropic/claude-v1', 'anthropic/claude-1.2',
   'anthropic/claude-instant-v1-100k','perplexity/sonar-medium-online','anthropic/claude-v1-100k', 'anthropic/claude-instant-1.0'
-
 ];
 
 const orModelFamilyOrder = [
-  // great models (pickes by hand, they're free)
+  // great models (picked by hand, they're free)
   'mistralai/mistral-7b-instruct','microsoft/phi-3-medium-4k-instruct','google/gemini-flash-1.5','sophosympatheia/midnight-rose-70b', 'nousresearch/nous-capybara-7b',
   // great orgs
-  'huggingfaceh4/', 'openchat/', 'anthropic/',  'perplexity/', 'meta-llama/', 'phind/',
+  'Qwen','NVIDIA','huggingfaceh4/', 'openchat/', 'anthropic/',  'perplexity/', 'meta-llama/', 'phind/',
 ];
+
 export function openRouterModelFamilySortFn(a: { id: string }, b: { id: string }): number {
   const aPrefixIndex = orModelFamilyOrder.findIndex(prefix => a.id.startsWith(prefix));
   const bPrefixIndex = orModelFamilyOrder.findIndex(prefix => b.id.startsWith(prefix));
@@ -598,7 +598,6 @@ export function openRouterModelFamilySortFn(a: { id: string }, b: { id: string }
 }
 
 export function openRouterModelToModelDescription(wireModel: object): ModelDescriptionSchema {
-
   // parse the model
   const model = wireOpenrouterModelsListOutputSchema.parse(wireModel);
 
@@ -617,7 +616,10 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
     label += ' · 🎁'; // Free? Discounted?
 
   // hidden: hide by default older models or models not in known families
-  const hidden = orOldModelIDs.includes(model.id) || !orModelFamilyOrder.some(prefix => model.id.startsWith(prefix));
+  // Only show free models from OpenRouter
+  const hidden = orOldModelIDs.includes(model.id) || 
+                !orModelFamilyOrder.some(prefix => model.id.startsWith(prefix)) || 
+                !seemsFree; // Hide models that aren't free
 
   return fromManualMapping([], model.id, undefined, undefined, {
     idPrefix: model.id,
@@ -635,6 +637,7 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
     hidden,
   });
 }
+
 
 
 // [Together AI]
