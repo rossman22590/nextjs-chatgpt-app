@@ -14,8 +14,8 @@ export const Release = {
   TenantSlug: 'open',
 
   App: {
-    versionCode: '2.0.0-rc1',       // 1.92.0 sequentially...
-    versionName: 'Big-AGI V2 RC1',
+    versionCode: '3.0.0-rc1',       // 1.92.0 sequentially...
+    versionName: 'AI Tutor V2 RC1',
   },
 
   // Future compatibility
