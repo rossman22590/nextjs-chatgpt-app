@@ -8,27 +8,27 @@
  */
 export const Brand = {
   Title: {
-    Base: 'big-AGI',
-    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'big-AGI',
+    Base: 'AI Tutor',
+    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'AI Tutor Plus',
   },
   Meta: {
-    Description: 'Launch big-AGI to unlock the full potential of AI, with precise control over your data and models. Voice interface, AI personas, advanced features, and fun UX.',
-    SiteName: 'big-AGI | Precision AI for You',
-    ThemeColor: '#32383E',
-    TwitterSite: '@enricoros',
+    Description: 'Launch our app to unlock the full potential of AI, with precise control over your data and models. Voice interface, AI personas, advanced features, and fun UX.',
+    SiteName: 'AI Tutor  | Mulit LLM AI for You',
+    ThemeColor: '#030712',
+    TwitterSite: '@tsi_org',
   },
   URIs: {
-    Home: 'https://big-agi.com',
+    Home: 'https://myapps.ai',
     // App: 'https://get.big-agi.com',
-    CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
-    OpenRepo: 'https://github.com/enricoros/big-agi',
-    OpenProject: 'https://github.com/users/enricoros/projects/4',
-    SupportInvite: 'https://discord.gg/MkH4qj2Jp9',
+    CardImage: 'https://img.mytsi.org/i/2wWp518.png',
+    OpenRepo: 'https://myapps.ai',
+    OpenProject: 'https://docs.myapps.ai',
+    SupportInvite: 'https://discord.gg/DH7UPaCB',
     // Twitter: 'https://www.twitter.com/enricoros',
-    PrivacyPolicy: 'https://big-agi.com/privacy',
-    TermsOfService: 'https://big-agi.com/terms',
+    PrivacyPolicy: 'https://myapps.ai',
+    TermsOfService: 'https://myapps.ai',
   },
   Docs: {
-    Public: (docPage: string) => `https://big-agi.com/docs/${docPage}`,
+    Public: (docPage: string) => `https://support.myapps.ai`,
   }
 } as const;
