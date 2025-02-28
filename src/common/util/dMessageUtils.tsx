@@ -231,7 +231,7 @@ export function useMessageAvatarLabel(
     const modelId = generator.aix?.mId ?? null;
     const vendorId = generator.aix?.vId ?? null;
     const VendorIcon = (vendorId && complexity !== 'minimal') ? findModelVendor(vendorId)?.Icon : null;
-    const metrics = generator.metrics ? _prettyMetrics(generator.metrics) : null;
+    const metrics = generator.metrics ? _prettyMetrics(generator.metrics, complexity) : null;
     const stopReason = generator.tokenStopReason ? _prettyTokenStopReason(generator.tokenStopReason, complexity) : null;
 
     // aix tooltip: more details
@@ -250,10 +250,17 @@ export function useMessageAvatarLabel(
   }, [complexity, created, generator, pendingIncomplete, updated]);
 }
 
-function _prettyMetrics(metrics: DMessageGenerator['metrics']): React.ReactNode {
+function _prettyMetrics(metrics: DMessageGenerator['metrics'], uiComplexityMode: UIComplexityMode): React.ReactNode {
   if (!metrics) return null;
+
+  const showWaitingTime = metrics?.dtStart !== undefined && (uiComplexityMode === 'extra' || metrics.dtStart >= 10000);
+  const showSpeedSection = uiComplexityMode !== 'minimal' && (showWaitingTime || metrics?.vTOutInner !== undefined);
+
   const costCode = metrics.$code ? _prettyCostCode(metrics.$code) : null;
+
   return <Box sx={tooltipMetricsGridSx}>
+
+    {/* Tokens */}
     {metrics?.TIn !== undefined && <div>Tokens:</div>}
     {metrics?.TIn !== undefined && <div>
       {' '}<b>{metrics.TIn?.toLocaleString() || ''}</b> in
@@ -263,6 +270,18 @@ function _prettyMetrics(metrics: DMessageGenerator['metrics']): React.ReactNode 
       {metrics.TOutR !== undefined && <> (<b>{metrics.TOutR?.toLocaleString() || ''}</b> for reasoning)</>}
       {/*{metrics.TOutA !== undefined && <> (<b>{metrics.TOutA?.toLocaleString() || ''}</b> for audio)</>}*/}
     </div>}
+
+    {/* Timings */}
+    {showSpeedSection && <div>Speed:</div>}
+    {showSpeedSection && <div>
+      {!!metrics.vTOutInner && <>~<b>{(Math.round(metrics.vTOutInner * 10) / 10).toLocaleString() || ''}</b> tok/s</>}
+      {showWaitingTime && (<span style={{ opacity: 0.5 }}>
+        {metrics.vTOutInner !== undefined && ' · '}
+        <span>{(Math.round(metrics.dtStart! / 100) / 10).toLocaleString() || ''}</span>s wait
+      </span>)}
+    </div>}
+
+    {/* Costs */}
     {metrics?.$c !== undefined && <div>Costs:</div>}
     {metrics?.$c !== undefined && <div>
       <b>{formatModelsCost(metrics.$c / 100)}</b>
@@ -274,7 +293,7 @@ function _prettyMetrics(metrics: DMessageGenerator['metrics']): React.ReactNode 
         })</small>
       </>}
     </div>}
-    {costCode && <div />}
+    {costCode && metrics?.$c !== undefined ? <div>Costs:</div> : <div />}
     {costCode && <div><em>{costCode}</em></div>}
   </Box>;
 }
@@ -331,6 +350,7 @@ export function prettyShortChatModelName(model: string | undefined): string {
   if (model.includes('gpt-4')) {
     if (model.includes('gpt-4o-mini')) return 'GPT-4o mini';
     if (model.includes('gpt-4o')) return 'GPT-4o';
+    if (model.includes('gpt-4.5')) return 'GPT-4.5';
     if (model.includes('gpt-4-0125-preview')
       || model.includes('gpt-4-1106-preview')
       || model.includes('gpt-4-turbo')
