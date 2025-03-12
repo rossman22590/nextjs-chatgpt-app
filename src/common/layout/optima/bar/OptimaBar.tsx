@@ -195,7 +195,7 @@ export function OptimaBar(props: { component: React.ElementType, currentApp?: Na
             <MenuItem onClick={handleShowTechnologies}>
               {/*<ListItemDecorator><EventNoteOutlinedIcon /></ListItemDecorator>*/}
               <ListItemDecorator><EngineeringIcon /></ListItemDecorator>
-              Build Info
+             v4 Beta Build Info
             </MenuItem>
 
 

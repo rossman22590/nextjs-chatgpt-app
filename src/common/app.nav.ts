@@ -212,6 +212,8 @@ export const navItems: {
       route: '/news',
       hideBar: true,
       hideDrawer: true,
+      isDev: true,
+      _delete: true,
     },
   ],
 

@@ -275,9 +275,9 @@ export function SettingsModal(props: {
             <Topic icon='🖍️️' title='OpenAI DALL·E'>
               <DallESettings />
             </Topic>
-            <Topic icon='🖍️️' title='Prodia API' startCollapsed>
+            {/* <Topic icon='🖍️️' title='Prodia API' startCollapsed>
               <ProdiaSettings noSkipKey />
-            </Topic>
+            </Topic> */}
           </Topics>
         </TabPanel>
 
