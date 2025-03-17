@@ -6,7 +6,7 @@ import type { ModelDescriptionSchema } from '../../llm.server.types';
 import { fromManualMapping, ManualMappings } from './models.data';
 
 
-// [Azure] / [OpenAI]
+// [OpenAI] Known Chat Models
 // https://platform.openai.com/docs/models
 export const _knownOpenAIChatModels: ManualMappings = [
 
@@ -145,7 +145,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     contextWindow: 128000,
     maxCompletionTokens: 16384,
     trainingDataCutoff: 'Sep 30, 2023',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json, LLM_IF_HOTFIX_NoTemperature],
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Json, LLM_IF_HOTFIX_NoTemperature], // NOTE: 2025-03-15: confirmed on 'playground' that this model does not support images
     parameterSpecs: [{ paramId: 'llmVndOaiWebSearchContext' }, { paramId: 'llmVndOaiWebSearchGeolocation' }],
     chatPrice: { input: 2.5, output: 10 },
     isPreview: true,
@@ -158,7 +158,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     contextWindow: 128000,
     maxCompletionTokens: 16384,
     trainingDataCutoff: 'Sep 30, 2023',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json, LLM_IF_HOTFIX_NoTemperature],
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Json, LLM_IF_HOTFIX_NoTemperature], // NOTE: 2025-03-15: confirmed on 'playground' that this model does not support images
     parameterSpecs: [{ paramId: 'llmVndOaiWebSearchContext' }, { paramId: 'llmVndOaiWebSearchGeolocation' }],
     chatPrice: { input: 2.5, output: 10 },
     isPreview: true,
@@ -335,7 +335,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     contextWindow: 128000,
     maxCompletionTokens: 16384,
     trainingDataCutoff: 'Sep 30, 2023',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json, LLM_IF_HOTFIX_NoTemperature], // NOTE: this support function calling, but only its own, not a Custom Function
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Json, LLM_IF_HOTFIX_NoTemperature], // NOTE: this support function calling, but only its own, not a Custom Function
     parameterSpecs: [{ paramId: 'llmVndOaiWebSearchContext' }, { paramId: 'llmVndOaiWebSearchGeolocation' }],
     chatPrice: { input: 0.15, output: 0.6 },
     isPreview: true,
@@ -348,7 +348,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     contextWindow: 128000,
     maxCompletionTokens: 16384,
     trainingDataCutoff: 'Sep 30, 2023',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json, LLM_IF_HOTFIX_NoTemperature], // NOTE: this support function calling, but only its own, not a Custom Function
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Json, LLM_IF_HOTFIX_NoTemperature], // NOTE: this support function calling, but only its own, not a Custom Function
     parameterSpecs: [{ paramId: 'llmVndOaiWebSearchContext' }, { paramId: 'llmVndOaiWebSearchGeolocation' }],
     chatPrice: { input: 0.15, output: 0.6 },
     isPreview: true,
@@ -669,7 +669,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
   },
 
 
-  // Azure variants - because someone forgot the dot
+  // [Azure] variants: Azure names these differently compared to OpenAI (no dots) - also: obsolete
   {
     idPrefix: 'gpt-35-turbo-16k',
     label: '3.5-Turbo 16k',
@@ -828,13 +828,4 @@ export function openAISortModels(a: ModelDescriptionSchema, b: ModelDescriptionS
   //   return aCount - bCount;
   // }
   // return bId.localeCompare(aId);
-}
-
-
-// [Azure]
-
-export function azureModelToModelDescription(azureDeploymentRef: string, openAIModelIdBase: string, modelCreated: number, modelUpdated?: number): ModelDescriptionSchema {
-  // if the deployment name mataches an OpenAI model prefix, use that
-  const known = _knownOpenAIChatModels.find(base => azureDeploymentRef == base.idPrefix);
-  return fromManualMapping(_knownOpenAIChatModels, known ? azureDeploymentRef : openAIModelIdBase, modelCreated, modelUpdated, undefined, true);
 }

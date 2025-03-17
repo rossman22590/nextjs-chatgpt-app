@@ -2,7 +2,7 @@ import type { GeminiWire_API_Models_List } from '~/modules/aix/server/dispatch/w
 
 import type { ModelDescriptionSchema } from '../llm.server.types';
 
-import { LLM_IF_GEM_CodeExecution, LLM_IF_HOTFIX_Sys0ToUsr0, LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
+import { LLM_IF_GEM_CodeExecution, LLM_IF_HOTFIX_StripImages, LLM_IF_HOTFIX_StripSys0, LLM_IF_HOTFIX_Sys0ToUsr0, LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
 
 
 // dev options
@@ -147,6 +147,19 @@ const _knownGeminiModels: ({
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Reasoning, LLM_IF_GEM_CodeExecution],
     parameterSpecs: [{ paramId: 'llmVndGeminiShowThoughts' }],
     benchmark: { cbaElo: 1363 },
+    isPreview: true,
+  },
+
+  // 2.0 Experimental - Flash Image Generation
+  {
+    id: 'models/gemini-2.0-flash-exp-image-generation',
+    // labelOverride: 'Gemini 2.0 Flash Native Image Generation',
+    chatPrice: geminiExpPricingFree,
+    interfaces: [
+      LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_GEM_CodeExecution,
+      LLM_IF_HOTFIX_StripSys0, // This first Gemini Image Generation model does not support the developer instruction
+    ],
+    parameterSpecs: [],
     isPreview: true,
   },
 
@@ -322,7 +335,11 @@ const _knownGeminiModels: ({
   {
     id: 'models/gemma-3-27b-it',
     isPreview: true,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_HOTFIX_Sys0ToUsr0 /* Developer instruction is not enabled for models/gemma-3-27b-it */ ],
+    interfaces: [
+      LLM_IF_OAI_Chat,
+      LLM_IF_HOTFIX_StripImages, /* "Image input modality is not enabled for models/gemma-3-27b-it" */
+      LLM_IF_HOTFIX_Sys0ToUsr0, /* "Developer instruction is not enabled for models/gemma-3-27b-it" */
+    ],
     // chatPrice: geminiExpPricingFree,
     // hidden: true,
     // _delete: true,

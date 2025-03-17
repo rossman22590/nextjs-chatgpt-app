@@ -449,6 +449,7 @@ export namespace AixWire_API {
 
   export const ConnectionOptions_schema = z.object({
     debugDispatchRequest: z.boolean().optional(),
+    debugProfilePerformance: z.boolean().optional(),
     throttlePartTransmitter: z.number().optional(), // in ms
     // retry: z.number().optional(),
     // retryDelay: z.number().optional(),
@@ -513,7 +514,8 @@ export namespace AixWire_Particles {
     | { cg: 'issue', issueId: CGIssueId, issueText: string }
     | { cg: 'set-metrics', metrics: CGSelectMetrics }
     | { cg: 'set-model', name: string }
-    | { cg: '_debugDispatchRequest', security: 'dev-env', dispatchRequest: { url: string, headers: string, body: string } }; // may generalize this in the future
+    | { cg: '_debugDispatchRequest', security: 'dev-env', dispatchRequest: { url: string, headers: string, body: string } } // may generalize this in the future
+    | { cg: '_debugProfiler', measurements: Record<string, number | string>[] };
 
   export type CGEndReason =     // the reason for the end of the chat generation
     | 'abort-client'            // user aborted before the end of stream
@@ -572,6 +574,7 @@ export namespace AixWire_Particles {
     | { t: string }; // special: incremental text, but with a more optimized/succinct representation compared to { p: 't_', i_t: string }
 
   export type PartParticleOp =
+    | { p: '❤' } // heart beat
     | { p: 'tr_', _t: string, weak?: 'tag' } // reasoning text, incremental; could be a 'weak' detection, e.g. heuristic from '<think>' rather than API-provided
     | { p: 'trs', signature: string } // reasoning signature
     | { p: 'trr_', _data: string } // reasoning raw (or redacted) data
@@ -583,6 +586,7 @@ export namespace AixWire_Particles {
     | { p: '_fci', _args: string }
     | { p: 'cei', id: string, language: string, code: string, author: 'gemini_auto_inline' }
     | { p: 'cer', id: string, error: DMessageToolResponsePart['error'], result: string, executor: 'gemini_auto_inline', environment: DMessageToolResponsePart['environment'] }
+    | { p: 'ii', mimeType: string, i_b64: string, label?: string, generator?: string, prompt?: string } // inline image, complete
     | { p: 'urlc', title: string, url: string, num?: number, from?: number, to?: number, text?: string }; // url citation
 
 }
