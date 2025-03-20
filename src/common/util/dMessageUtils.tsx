@@ -293,6 +293,7 @@ function _prettyMetrics(metrics: DMessageGenerator['metrics'], uiComplexityMode:
     </div>}
 
     {/* Costs */}
+    {/* {metrics?.$c !== undefined && <div>You Saved::</div>} */}
     {metrics?.$c !== undefined && <div>Costs:</div>}
     {metrics?.$c !== undefined && <div>
       <b>{formatModelsCost(metrics.$c / 100)}</b>

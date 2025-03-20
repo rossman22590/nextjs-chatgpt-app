@@ -10,12 +10,15 @@ import { GeminiWire_API_Generate_Content } from '../wiretypes/gemini.wiretypes';
 
 import { aixToAnthropicMessageCreate } from './adapters/anthropic.messageCreate';
 import { aixToGeminiGenerateContent } from './adapters/gemini.generateContent';
-import { aixToOpenAIChatCompletions } from './adapters/openai.chatCompletions';
+// import { aixToOpenAIChatCompletions } from './adapters/openai.chatCompletions';
+import { aixToOpenAIChatCompletions } from '~/modules/aix/server/dispatch/chatGenerate/adapters/openai.responsesAPI.override';
+
 
 import type { IParticleTransmitter } from './IParticleTransmitter';
 import { createAnthropicMessageParser, createAnthropicMessageParserNS } from './parsers/anthropic.parser';
 import { createGeminiGenerateContentResponseParser } from './parsers/gemini.parser';
 import { createOpenAIChatCompletionsChunkParser, createOpenAIChatCompletionsParserNS } from './parsers/openai.parser';
+
 
 
 /**

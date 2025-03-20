@@ -8,7 +8,7 @@ import { AixDemuxers } from '../dispatch/stream.demuxers';
 import { AixWire_API, AixWire_API_ChatContentGenerate, AixWire_Particles } from './aix.wiretypes';
 import { ChatGenerateTransmitter } from '../dispatch/chatGenerate/ChatGenerateTransmitter';
 import { PerformanceProfiler } from '../dispatch/PerformanceProfiler';
-import { createChatGenerateDispatch } from '../dispatch/chatGenerate/chatGenerate.dispatch';
+import { createChatGenerateDispatch } from '../dispatch/chatGenerate/chatGenerate.dispatch.override';
 import { heartbeatsWhileAwaiting } from '../dispatch/heartbeatsWhileAwaiting';
 
 
