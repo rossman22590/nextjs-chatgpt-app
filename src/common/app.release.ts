@@ -15,7 +15,7 @@ export const Release = {
 
   App: {
     versionCode: '2.0.0-open-rc2',       // 1.92.0 sequentially...
-    versionName: 'Big-AGI 2',
+    versionName: 'Beam v4',
     releaseNotes: '',
   },
 
