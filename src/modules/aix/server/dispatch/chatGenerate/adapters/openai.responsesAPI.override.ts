@@ -174,7 +174,7 @@ export function aixToOpenAIChatCompletions(
         }
       },
       reasoning: {
-        effort: model.vndOaiReasoningEffort || "medium"
+        effort: model.vndOaiReasoningEffort || "high"
       },
       store: true,
       stream: streaming
