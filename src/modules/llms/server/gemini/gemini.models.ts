@@ -105,15 +105,7 @@ const _knownGeminiModels: ({
   /// Generation 2.5
 
   // 2.5 Pro Preview (Paid Tier)
-  {
-    id: 'models/gemini-2.5-pro-preview-03-25',
-    isPreview: true,
-    chatPrice: gemini25ProPreviewPricing,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning, LLM_IF_GEM_CodeExecution],
-    // parameterSpecs: [{ paramId: 'llmVndGeminiShowThoughts' }], // Gemini doesn't show thoughts anymore
-    benchmark: { cbaElo: 1440 },
-    _delete:true
-  },
+
   // 2.5 Pro Experimental (Free Tier)
   {
     id: 'models/gemini-2.5-pro-exp-03-25',
