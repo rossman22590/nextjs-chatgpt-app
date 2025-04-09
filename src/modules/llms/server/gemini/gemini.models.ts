@@ -112,6 +112,7 @@ const _knownGeminiModels: ({
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Json, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning, LLM_IF_GEM_CodeExecution],
     // parameterSpecs: [{ paramId: 'llmVndGeminiShowThoughts' }], // Gemini doesn't show thoughts anymore
     benchmark: { cbaElo: 1440 },
+    _delete: true
   },
   // 2.5 Pro Experimental (Free Tier)
   {
