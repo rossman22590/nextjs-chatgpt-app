@@ -784,7 +784,7 @@ export function FlashBackup(props: {
   const { onStartedBackup } = props;
   const isProcessing = backupState === 'processing';
 
-  // handlers
+  // handlersFlash File Details:
 
   const handleFullBackup = React.useCallback(async (event: React.MouseEvent) => {
     setBackupState('processing');
@@ -796,7 +796,7 @@ export function FlashBackup(props: {
         'full',
         event.ctrlKey, // control forces a traditional browser download - default: fileSave
         includeImages,
-        `Big-AGI-flash${includeImages ? '+images' : ''}${event.ctrlKey ? '-download' : ''}-${dateStr}.json`,
+        `AI Tutor-flash${includeImages ? '+images' : ''}${event.ctrlKey ? '-download' : ''}-${dateStr}.json`,
       );
       setBackupState(success ? 'success' : 'idle');
     } catch (error: any) {

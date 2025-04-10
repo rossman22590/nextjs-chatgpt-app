@@ -66,7 +66,6 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
   if (hotFixAlternateUserAssistantRoles)
     chatMessages = _fixAlternateUserAssistantRoles(chatMessages);
 
-
   // Construct the request payload
   let payload: TRequest = {
     model: model.id,
@@ -85,6 +84,20 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     stop: undefined,
     user: undefined,
   };
+
+  // XAI Grok compatibility fix - check if this is a Grok model (both 2 and 3)
+  if (openAIDialect === 'xai' && model.id && (
+      model.id.toLowerCase().includes('grok-3') || 
+      model.id.toLowerCase().includes('grok-2')
+    )) {
+    // For Grok models, just remove stream_options which causes the error
+    if (payload.stream_options) {
+      delete payload.stream_options;
+      console.log('[Grok Fix] Removed stream_options for XAI model:', model.id);
+    }
+    
+    // Do NOT force stream to false - respect the original streaming setting
+  }
 
   // [OpenRouter, 2025-01-24]
   if (hotFixVndORIncludeReasoning)
