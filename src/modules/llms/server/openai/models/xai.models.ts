@@ -13,6 +13,41 @@ import { openAIAccess, OpenAIAccessSchema } from '../openai.router';
 // List on: https://console.x.ai/team/_TEAM_ID_/models
 const _knownXAIChatModels: ManualMappings = [
 
+  // Grok 3
+  {
+    idPrefix: 'grok-3-fast-beta',
+    label: `Grok 3 Fast (Beta)`,
+    description: 'xAI model grok-3-fast-beta with text input capabilities. Supports text generation with a 131,072 token context window.',
+    contextWindow: 131072,
+    maxCompletionTokens: undefined,
+    trainingDataCutoff: 'Jul 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+    chatPrice: { input: 5.00, output: 25.00 },
+    benchmark: { cbaElo: 1350 }, // Estimated benchmark
+  },
+  {
+    idPrefix: 'grok-3-mini-fast-beta',
+    label: `Grok 3 Mini Fast (Beta)`,
+    description: 'xAI model grok-3-mini-fast-beta with text input capabilities. Supports text generation with a 131,072 token context window.',
+    contextWindow: 131072,
+    maxCompletionTokens: undefined,
+    trainingDataCutoff: 'Jul 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+    chatPrice: { input: 0.60, output: 4.00 },
+    benchmark: { cbaElo: 1320 }, // Estimated benchmark
+  },
+  {
+    idPrefix: 'grok-3-mini-beta',
+    label: `Grok 3 Mini (Beta)`,
+    description: 'xAI model grok-3-mini-beta with text input capabilities. Supports text generation with a 131,072 token context window.',
+    contextWindow: 131072,
+    maxCompletionTokens: undefined,
+    trainingDataCutoff: 'Jul 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
+    chatPrice: { input: 0.30, output: 0.50 },
+    benchmark: { cbaElo: 1300 }, // Estimated benchmark
+  },
+
   // Grok 2
   {
     idPrefix: 'grok-2-vision-1212',
@@ -81,7 +116,7 @@ export async function xaiModelDescriptions(access: OpenAIAccessSchema): Promise<
       idPrefix: xm.id,
       label: `${xm.id}${xm.version ? ' ' + xm.version : ''}`,
       description: `xAI model ${xm.id}`,
-      contextWindow: 16384,
+      contextWindow: 131384,
       interfaces: [
         LLM_IF_OAI_Chat,
         LLM_IF_OAI_Fn,
