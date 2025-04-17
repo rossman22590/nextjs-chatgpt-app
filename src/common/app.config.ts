@@ -9,7 +9,7 @@
 export const Brand = {
   Title: {
     Base: 'AI Tutor',
-    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'AI Tutor Plus',
+    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'AI Tutor BEAM',
   },
   Meta: {
     Description: 'Launch our app to unlock the full potential of AI, with precise control over your data and models. Voice interface, AI personas, advanced features, and fun UX.',
