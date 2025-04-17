@@ -113,7 +113,7 @@ export function UxLabsSettings() {
         - Chat Mode: follow-ups; moved to Chat Advanced UI
     */}
 
-    <FormControl orientation='horizontal' sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+    {/* <FormControl orientation='horizontal' sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
       <FormLabelStart title='Graduated' description='Ex-labs' />
       <Typography level='body-xs'>
         <Link href='https://big-agi.com/blog/beam-multi-model-ai-reasoning' target='_blank'>Beam</Link>
@@ -123,7 +123,7 @@ export function UxLabsSettings() {
         {' · '}<Link href='https://github.com/enricoros/big-agi/issues/192' target='_blank'>Auto Diagrams</Link>
         {' · '}Imagine · Chat Search · Text Tools · LLM Overheat
       </Typography>
-    </FormControl>
+    </FormControl> */}
 
   </>;
 }

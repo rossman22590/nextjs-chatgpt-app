@@ -1,47 +1,27 @@
 {
-  "name": "big-AGI",
-  "short_name": "big-AGI",
+  "name": "Plus",
+  "short_name": "Plus",
   "theme_color": "#32383E",
   "background_color": "#9FA6AD",
-  "description": "Your Generative AI Suite",
-  "categories": [
-    "productivity",
-    "AI",
-    "tool",
-    "utilities"
-  ],
+  "description": "Personal AGI App",
   "display": "standalone",
-  "start_url": "/?source=pwa",
-  "scope": "/",
+  "start_url": "/",
   "icons": [
-    {
-      "src": "/icons/icon-1024x1024.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
     {
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
-    }
-  ],
-  "file_handlers": [
+      "purpose": "maskable"
+    },
     {
-      "action": "/link/share_target",
-      "accept": {
-        "application/big-agi": [
-          ".agi",
-          ".agi.json"
-        ]
-      }
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-1024x1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
     }
   ],
   "share_target": {
@@ -53,31 +33,5 @@
       "text": "text",
       "url": "url"
     }
-  },
-  "shortcuts": [
-    {
-      "name": "Call",
-      "url": "/call",
-      "description": "Call a Persona",
-      "icons": [
-        {
-          "src": "/icons/icon-call-96x96.png",
-          "sizes": "96x96",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "New Voice Chat",
-      "url": "/?newChat=voiceInput",
-      "description": "Start a new chat with voice input",
-      "icons": [
-        {
-          "src": "/icons/icon-voicechat-96x96.png",
-          "sizes": "96x96",
-          "type": "image/png"
-        }
-      ]
-    }
-  ]
+  }
 }
