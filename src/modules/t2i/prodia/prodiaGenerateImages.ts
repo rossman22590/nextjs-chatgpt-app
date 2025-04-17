@@ -19,8 +19,8 @@ export async function prodiaGenerateImages(imageText: string, count: number): Pr
   const generateImage = async (): Promise<T2iCreateImageOutput[]> => {
     const generatedImages = await apiAsync.prodia.createImage.query({
       ...(!!prodiaKey && { prodiaKey }),
-      prodiaModel: prodiaModelId || 'sd_xl_base_1.0.safetensors [be9edd61]', // was: Realistic_Vision_V5.0.safetensors [614d1063]
-      prodiaGen: prodiaModelGen || 'sd', // data versioning fix
+      prodiaModel: 'inference.flux.pro.txt2img.v1', // Always use Flux Pro model
+      prodiaGen: 'sd', // data versioning fix
       prompt: imageText,
       ...(!!negativePrompt && { negativePrompt }),
       ...(!!steps && { steps }),
