@@ -33,7 +33,12 @@ const hCodeIncipitMap: { starts: string[], language: string }[] = [
   { starts: ['@startuml', '@startmindmap', '@startsalt', '@startwbs', '@startgantt'], language: 'plant-uml' },
 ];
 
-
+/**
+ * Infer the programming language from the block title or the code itself.
+ * @param blockTitle the title of the code block
+ * @param code the code itself
+ * @returns the inferred language, or null if it cannot be inferred
+ */
 export function inferCodeLanguage(blockTitle: string, code: string): string | null {
 
   // if we have a block title, use it to infer the language
@@ -83,18 +88,22 @@ export function inferCodeLanguage(blockTitle: string, code: string): string | nu
 export function highlightCode(inferredCodeLanguage: string | null, blockCode: string, addLineNumbers: boolean): string {
   // NOTE: to save power, we could skip highlighting until the block is complete (future feature)
   const safeHighlightLanguage = inferredCodeLanguage || 'typescript';
+  
+  // Get the highlighted code
   const code = Prism.highlight(
     blockCode,
     Prism.languages[safeHighlightLanguage] || Prism.languages.typescript,
     safeHighlightLanguage,
   );
+  
   // add line numbers to the code block
   if (addLineNumbers) {
     // https://stackoverflow.com/questions/59508413/static-html-generation-with-prismjs-how-to-enable-line-numbers
-    const linesMatcher = code.match(/\n(?!$)/g);
+    const linesMatcher = blockCode.match(/\n(?!$)/g);
     const linesCount = linesMatcher ? linesMatcher.length + 1 : 1;
     const linesSpans = new Array(linesCount + 1).join('<span></span>');
     return code + `<span aria-hidden='true' class='line-numbers-rows'>${linesSpans}</span>`;
   }
+  
   return code;
 }

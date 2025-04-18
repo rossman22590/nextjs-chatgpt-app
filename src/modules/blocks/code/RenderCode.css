@@ -2,44 +2,38 @@
 /* adapted from: prismjs/plugins/line-numbers/prism-line-numbers.css */
 
 code.line-numbers {
-    --ln-padding: 4.5em;
-    padding-left: var(--ln-padding);
+  position: relative;
+  padding-left: 3.8em;
+  counter-reset: linenumber;
+}
 
-    > .code-container {
-        position: relative;
-        counter-reset: linenumber;
-        /*white-space: inherit;*/
-    }
+code.line-numbers > .code-container {
+  position: relative;
+}
 
-    .line-numbers-rows {
-        position: absolute;
-        top: 0;
-        left: calc(-1 * var(--ln-padding));
-        width: calc(var(--ln-padding) - 0.8em);
-        font-size: 100%;
-        letter-spacing: -1px;
-        /*noinspection CssUnresolvedCustomProperty*/
-        border-right: 1px solid var(--joy-palette-primary-solidDisabledColor);
+code.line-numbers .line-numbers-rows {
+  position: absolute;
+  pointer-events: none;
+  top: 0;
+  font-size: 100%;
+  left: -3.8em;
+  width: 3em;
+  /* works for line-numbers below 1000 lines */
+  letter-spacing: -1px;
+  border-right: 1px solid rgba(0, 0, 0, 0.2);
+  user-select: none;
+  background-color: transparent; /* Remove blue background */
+}
 
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-        pointer-events: none;
+.line-numbers-rows > span {
+  display: block;
+  counter-increment: linenumber;
+}
 
-        > span {
-            display: block;
-            counter-increment: linenumber;
-        }
-
-        > span:before {
-            content: counter(linenumber);
-            /*noinspection CssUnresolvedCustomProperty*/
-            color: var(--joy-palette-primary-solidDisabledColor);
-            display: block;
-            padding-right: 0.8em;
-            font-weight: 400;
-            text-align: right;
-        }
-    }
+.line-numbers-rows > span:before {
+  content: counter(linenumber);
+  color: rgba(0, 0, 0, 0.5);
+  display: block;
+  padding-right: 0.8em;
+  text-align: right;
 }

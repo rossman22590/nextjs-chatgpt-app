@@ -87,13 +87,25 @@ const renderCodecontainerSx: SxProps = {
   [`&:hover > .${overlayButtonsClassName}`]: overlayButtonsActiveSx,
 };
 
+// Override the blue background for code blocks
+const codeSx: SxProps = {
+  backgroundColor: 'transparent', // Remove the default blue background
+  border: 'none',
+  boxShadow: 'none',
+  whiteSpace: 'pre',
+  width: '100%',
+  height: '100%',
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+};
+
 const overlayGridSx: SxProps = {
   ...overlayButtonsTopRightSx,
   display: 'grid',
   gap: 0.5,
   justifyItems: 'end',
 };
-
 
 const overlayFirstRowSx: SxProps = {
   display: 'flex',
@@ -222,7 +234,6 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
 
   }), [isBorderless, isRenderingDiagram, props.sx, showSoftWrap]);
 
-
   return (
     <Box
       // onMouseEnter={handleMouseOverEnter}
@@ -258,7 +269,26 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
             : renderMermaid ? <RenderCodeMermaid mermaidCode={code} fitScreen={fitScreen} />
               : renderSVG ? <RenderCodeSVG svgCode={code} fitScreen={fitScreen} />
                 : (renderPlantUML && (plantUmlSvgData || plantUmlError)) ? <RenderCodePlantUML svgCode={plantUmlSvgData ?? null} error={plantUmlError} fitScreen={fitScreen} />
-                  : <RenderCodeSyntax highlightedSyntaxAsHtml={highlightedCode} presenterMode={isFullscreen} />}
+                  : <Box
+                    component='code'
+                    sx={{
+                      ...codeSx,
+                      backgroundColor: 'transparent', /* Remove blue background */
+                      maxWidth: '100%',
+                      width: '100%',
+                      minHeight: '100%',
+                      flex: 1,
+                      display: 'flex',
+                      overflowX: 'auto',
+                      whiteSpace: showSoftWrap ? 'pre-wrap' : 'pre',
+                    }}
+                    className={renderLineNumbers ? 'line-numbers' : undefined}
+                  >
+                    <RenderCodeSyntax
+                      highlightedSyntaxAsHtml={highlightedCode}
+                      presenterMode={isFullscreen && !showSoftWrap}
+                    />
+                  </Box>}
         </Box>
 
       </Box>
