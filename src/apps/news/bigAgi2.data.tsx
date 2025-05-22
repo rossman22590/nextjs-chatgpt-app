@@ -13,10 +13,10 @@ export const bigAgi2NewsCallout =
   <Card variant='solid' invertedColors>
     <CardContent sx={{ gap: 2 }}>
       <Typography level='title-lg'>
-        Big-AGI 2.0 - In Development
+        AI Tutor Chat 3.0 - In Development
       </Typography>
       <Typography level='body-sm'>
-        We&apos;re building the next version of Big-AGI with your needs in mind. New features, better performance, enhanced AI interactions. Help us shape it.
+        We&apos;re building the next version of AI Tutor with your needs in mind. New features, better performance, enhanced AI interactions. Help us shape it.
       </Typography>
       <Grid container spacing={1}>
         <Grid xs={12} sm={7}>
