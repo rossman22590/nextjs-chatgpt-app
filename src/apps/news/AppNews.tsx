@@ -9,6 +9,7 @@ export function AppNews() {
   );
 }
 
-export function BuildInfoCard() {
+export function BuildInfoCard(props: { noMargin?: boolean }) {
+  // Return null to render nothing
   return null;
 }
