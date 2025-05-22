@@ -10,7 +10,7 @@ export const NewsItems = [
         text: (
           <>
             For latest news visit our support site: {' '}
-            <ExternalLink href='https://your-support-site.com'>
+            <ExternalLink href='https://support.myapps.ai'>
               Support & News
             </ExternalLink>
           </>
