@@ -113,7 +113,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
               {outer ? (
                 <button className='button' onClick={() => window.location.reload()}>
-                  Reload Big-AGI
+                  Reload AI Tutor
                 </button>
               ) : (
                 <button className='button' onClick={() => this.resetErrorBoundary()}>

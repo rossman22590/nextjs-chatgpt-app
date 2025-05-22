@@ -18,7 +18,7 @@ class BigAgiDB extends Dexie {
   largeAssets!: Dexie.Table<DBlobDBAsset, string>;
 
   constructor() {
-    super('Big-AGI');
+    super('AI Tutor');
     this.version(1).stores({
       // Index common properties (and compound indexes)
       largeAssets: 'id, [contextId+scopeId], assetType, [assetType+contextId+scopeId], data.mimeType, origin.ot, origin.source, createdAt, updatedAt',

@@ -9,11 +9,11 @@
 export const Brand = {
   Title: {
     Base: 'AI Tutor',
-    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'AI Tutor BEAM',
+    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'AI Tutor Ultra',
   },
   Meta: {
     Description: 'Launch our app to unlock the full potential of AI, with precise control over your data and models. Voice interface, AI personas, advanced features, and fun UX.',
-    SiteName: 'AI Tutor  | Mulit LLM AI for You',
+    SiteName: 'AI Tutor  | Muliti LLM AI for You',
     ThemeColor: '#030712',
     TwitterSite: '@tsi_org',
   },

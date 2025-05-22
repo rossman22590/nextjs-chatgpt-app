@@ -18,7 +18,7 @@ import { downloadBlob } from '~/common/util/downloadUtils';
 
 
 // configuration
-const BACKUP_FILE_FORMAT = 'Big-AGI Flash File';
+const BACKUP_FILE_FORMAT = 'AI Tutor Flash File';
 const BACKUP_FORMAT_VERSION = '1.2';
 const BACKUP_FORMAT_VERSION_NUMBER = 102000;
 const WINDOW_RELOAD_DELAY = 200;
@@ -26,7 +26,7 @@ const EXCLUDED_LOCAL_STORAGE_KEYS = [
   'agi-logger-log', // the log cannot be restored as it's in-mem and being persisted while this is running
 ];
 const EXCLUDED_IDB_DATABASES = [
-  'Big-AGI', // exclude DBlobs IDB
+  'AI Tutor', // exclude DBlobs IDB
 ];
 const INCLUDED_IDB_KEYS: { [dbName: string]: { [storeName: string]: string[]; }; } = {
   'keyval-store': { 'keyval': ['app-chats'] }, // include ONLY the chats IDB
@@ -265,7 +265,7 @@ async function restoreIndexedDB(allDbData: Record<string, any>): Promise<void> {
   // expected local DBs to restore over, from the latest `v2-dev` (2025-05-14)
   const dbTargetVersions: { [dbName: string]: number } = {
     'keyval-store': 1,
-    'Big-AGI': 10, // Dexie multiplied the version (1) by 10 (https://github.com/dexie/Dexie.js/issues/59)
+    'AI Tutor': 10, // Dexie multiplied the version (1) by 10 (https://github.com/dexie/Dexie.js/issues/59)
   };
 
   // process each database in sequence
@@ -293,7 +293,7 @@ async function restoreIndexedDB(allDbData: Record<string, any>): Promise<void> {
                   // v2-dev-style key-value store for the chats cell
                   db.createObjectStore(storeName);
                   logger.info(`Created keyval object store in keyval-store database`);
-                } else if (dbName === 'Big-AGI' && storeName === 'largeAssets') {
+                } else if (dbName === 'AI Tutor' && storeName === 'largeAssets') {
                   // v2-dev-style Blobs store
                   const largeAssetsStore = db.createObjectStore(storeName, { keyPath: 'id' });
                   largeAssetsStore.createIndex('contextId+scopeId', ['contextId', 'scopeId']);
@@ -304,7 +304,7 @@ async function restoreIndexedDB(allDbData: Record<string, any>): Promise<void> {
                   largeAssetsStore.createIndex('origin.source', 'origin.source');
                   largeAssetsStore.createIndex('createdAt', 'createdAt');
                   largeAssetsStore.createIndex('updatedAt', 'updatedAt');
-                  logger.info(`Created largeAssets object store with all needed indexes in Big-AGI database`);
+                  logger.info(`Created largeAssets object store with all needed indexes in AI TutorI database`);
                 } else {
                   logger.warn(`Cannot automatically create object store "${storeName}" in DB "${dbName}" as its schema is unknown.`);
                 }
@@ -605,7 +605,7 @@ async function createFlashObject(backupType: 'full' | 'auto-before-restore', ign
     metadata: {
       version: BACKUP_FORMAT_VERSION,
       timestamp: new Date().toISOString(),
-      application: 'Big-AGI',
+      application: 'AI Tutor',
       backupType,
     },
     storage: {
@@ -669,8 +669,8 @@ export function FlashRestore(props: { unlockRestore?: boolean }) {
       // validations
       if (!isValidBackup(data))
         throw new Error(`Invalid Flash file format. This does not appear to be a valid ${BACKUP_FILE_FORMAT}.`);
-      if (data.metadata.application !== 'Big-AGI' || !data.storage.indexedDB || !data.storage.localStorage)
-        throw new Error(`Incompatible Flash file. Found application "${data.metadata.application}" but expected "Big-AGI".`);
+      if (data.metadata.application !== 'AI Tutor' || !data.storage.indexedDB || !data.storage.localStorage)
+        throw new Error(`Incompatible Flash file. Found application "${data.metadata.application}" but expected "AI Tutor".`);
 
       // load data purely into state, and ready for confirmation
       setBackupDataForRestore(data);
@@ -837,7 +837,7 @@ export function FlashBackup(props: {
         'full',
         event.ctrlKey, // control forces a traditional browser download - default: fileSave
         includeImages,
-        `Big-AGI-flash${includeImages ? '+images' : ''}${event.ctrlKey ? '-download' : ''}-${dateStr}.json`,
+        `AI Tutor-flash${includeImages ? '+images' : ''}${event.ctrlKey ? '-download' : ''}-${dateStr}.json`,
       );
       setBackupState(success ? 'success' : 'idle');
     } catch (error: any) {

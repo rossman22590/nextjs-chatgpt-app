@@ -46,7 +46,7 @@ export const googleSearchRouter = createTRPCRouter({
         headers: {
           'Accept': 'application/json',
           'Accept-Encoding': 'gzip',
-          'User-Agent': 'Big-AGI (gzip)',
+          'User-Agent': 'AI Tutor (gzip)',
         },
       });
 
