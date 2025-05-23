@@ -204,10 +204,10 @@ export function OptimaBar(props: { component: React.ElementType, currentApp?: Na
             </MenuItem>
 
 
-            {scratchClipSupported() && <MenuItem onClick={toggleScratchClipVisibility}>
+            {/* {scratchClipSupported() && <MenuItem onClick={toggleScratchClipVisibility}>
               <ListItemDecorator><HistoryIcon /></ListItemDecorator>
               {isScratchClipVisible ? 'Hide ' : ''}Clipboard History
-            </MenuItem>}
+            </MenuItem>} */}
 
             {/*<ListDivider />*/}
 
