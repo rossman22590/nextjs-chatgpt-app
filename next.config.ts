@@ -7,7 +7,7 @@ let buildHash = process.env.NEXT_PUBLIC_BUILD_HASH || process.env.GITHUB_SHA || 
 try {
   // fallback to local git commit hash
   if (!buildHash)
-    buildHash = execSync('git rev-parse --short HEAD').toString().trim();
+    buildHash = execSync('git rev-parse --short HEAD 2>/dev/null').toString().trim();
 } catch {
   // final fallback
   buildHash = '2-dev';
