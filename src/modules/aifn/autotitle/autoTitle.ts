@@ -55,6 +55,7 @@ Only respond with the lowercase short title and nothing else.
 ${historyLines.join('\n')}
 \`\`\``,
       'chat-ai-title', conversationId,
+      { abortSignal: 'NON_ABORTABLE', llmOptionsOverride: { llmForceNoStream: true } },
     );
 
     // parse title
