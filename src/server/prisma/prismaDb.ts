@@ -3,16 +3,43 @@ import { PrismaClient } from '@prisma/client';
 // Check if database is enabled via environment variable
 const isDatabaseEnabled = process.env.ENABLE_DATABASE !== 'false';
 
-// Create a mock PrismaClient that will be used when database is disabled
+// Create a more complete mock PrismaClient that handles nested models
 class MockPrismaClient {
+  [key: string]: any;
+  
   constructor() {
-    return new Proxy({}, {
+    return new Proxy(this, {
       get: (target, prop) => {
-        // Return a function that returns a Promise resolving to an empty array or object
+        // Special case for then/catch/finally to make it non-thenable
         if (prop === 'then' || prop === 'catch' || prop === 'finally') {
           return undefined;
         }
-        return () => Promise.resolve([]);
+        
+        // Handle model access (e.g., prisma.linkStorage)
+        // Return a nested proxy that handles all model operations
+        return new Proxy({}, {
+          get: (_, modelMethod) => {
+            // Create a function that returns a Promise for any model method
+            // like findUnique, findMany, create, etc.
+            return (..._args: any[]) => {
+              if (modelMethod === 'count') {
+                return Promise.resolve(0);
+              }
+              if (modelMethod === 'findMany') {
+                return Promise.resolve([]);
+              }
+              if (modelMethod === 'findUnique' || modelMethod === 'findFirst') {
+                return Promise.resolve(null);
+              }
+              if (modelMethod === 'create' || modelMethod === 'update' || modelMethod === 'upsert') {
+                // For create operations, return a mock object with an ID
+                return Promise.resolve({ id: 'mock-id' });
+              }
+              // Default response for any other method
+              return Promise.resolve(null);
+            };
+          }
+        });
       }
     });
   }
