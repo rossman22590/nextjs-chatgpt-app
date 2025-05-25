@@ -251,9 +251,22 @@ export const aixRouter = createTRPCRouter({
        * - we haven't isolated the cause, but seems that awaiting for the next event loop cycle suppresses
        *   the issue.
        *
+       * Update 2025-05-24: Enhanced workaround to be more reliable by using a try-catch and ensuring
+       * the delay happens regardless of execution path.
+       *
        * Ext refs: posted to the tRCP Discord on the streaming channel if anyone else saw this issue.
        */
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      try {
+        // Ensure we have a delay before exiting the function
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      } catch (e) {
+        // If somehow the timeout itself fails, still wait synchronously
+        // This is a belt-and-suspenders approach to ensure the workaround is applied
+        const startTime = Date.now();
+        while (Date.now() - startTime < 10) {
+          // Intentional busy wait as a last resort
+        }
+      }
 
     }),
 
