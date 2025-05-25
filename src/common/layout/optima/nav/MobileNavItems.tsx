@@ -96,13 +96,15 @@ export function MobileNavItems(props: { currentApp?: NavItemApp }) {
           Models
         </Button>
 
-        {/* HARDCODED: Discord */}
-        <BringTheLove
-          text={navItems.links[0].name}
-          icon={navItems.links[0].icon}
-          link={navItems.links[0].href}
-          sx={{ color: 'text.primary', px: 0, minWidth: 80 }}
-        />
+        {/* HARDCODED: Discord - with null check to prevent errors */}
+        {navItems.links && navItems.links.length > 0 && (
+          <BringTheLove
+            text={navItems.links[0]?.name || 'Community'}
+            icon={navItems.links[0]?.icon}
+            link={navItems.links[0]?.href || '#'}
+            sx={{ color: 'text.primary', px: 0, minWidth: 80 }}
+          />
+        )}
       </Box>
 
     </Sheet>
