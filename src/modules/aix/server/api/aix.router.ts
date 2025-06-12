@@ -8,8 +8,9 @@ import { AixDemuxers } from '../dispatch/stream.demuxers';
 import { AixWire_API, AixWire_API_ChatContentGenerate, AixWire_Particles } from './aix.wiretypes';
 import { ChatGenerateTransmitter } from '../dispatch/chatGenerate/ChatGenerateTransmitter';
 import { PerformanceProfiler } from '../dispatch/PerformanceProfiler';
-import { createChatGenerateDispatch } from '../dispatch/chatGenerate/chatGenerate.dispatch';
+import { createChatGenerateDispatch } from '../dispatch/chatGenerate/chatGenerate.dispatch.override';
 import { heartbeatsWhileAwaiting } from '../dispatch/heartbeatsWhileAwaiting';
+import { usesResponsesAPI } from '../dispatch/chatGenerate/adapters/openai.responsesAPI.override';
 
 
 /**
@@ -47,7 +48,12 @@ export const aixRouter = createTRPCRouter({
       const prettyDialect = serverCapitalizeFirstLetter(accessDialect);
 
       // Applies per-model streaming suppression; added for o3 without verification
-      const streaming = model.forceNoStream ? false : aixStreaming;
+      const isResponsesAPIModel = access.dialect === 'openai' && usesResponsesAPI(model);
+      const streaming = (model.forceNoStream || isResponsesAPIModel) ? false : aixStreaming;
+      
+      if (isResponsesAPIModel) {
+        console.log(`Router: Model ${model.id} uses Responses API, forcing streaming=false (was: ${aixStreaming})`);
+      }
 
 
       // Intake Transmitters
@@ -152,7 +158,7 @@ export const aixRouter = createTRPCRouter({
 
       // STREAM the response to the client
       const dispatchReader = (dispatchResponse.body || createEmptyReadableStream()).getReader();
-      const dispatchDecoder = new TextDecoder('utf-8', { fatal: false /* malformed data -> “ ” (U+FFFD) */ });
+      const dispatchDecoder = new TextDecoder('utf-8', { fatal: false /* malformed data -> " " (U+FFFD) */ });
       const dispatchDemuxer = AixDemuxers.createStreamDemuxer(dispatch.demuxerFormat);
       const dispatchParser = dispatch.chatGenerateParse;
 

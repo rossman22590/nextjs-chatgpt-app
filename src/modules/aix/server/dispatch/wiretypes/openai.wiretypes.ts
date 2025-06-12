@@ -627,6 +627,136 @@ export namespace OpenAIWire_API_Chat_Completions {
 
 
 //
+// Responses > Create Response
+// https://platform.openai.com/docs/api-reference/responses/create
+//
+export namespace OpenAIWire_API_Responses {
+
+  export type Request = z.infer<typeof ResponsesRequest_schema>;
+  const ResponsesRequest_schema = z.object({
+
+    // ID of the model to use. Currently, only o3-pro and o1-pro are supported.
+    model: z.string(),
+
+    // Input messages array
+    input: z.array(OpenAIWire_Messages.Message_schema),
+
+    // Text output format configuration
+    text: z.object({
+      format: z.object({
+        type: z.enum(['input_text', 'input_image', 'output_text', 'refusal', 'input_file', 'computer_screenshot', 'summary_text']),
+      }),
+    }).optional(),
+
+    // Reasoning configuration
+    reasoning: z.object({
+      effort: z.enum(['low', 'medium', 'high']),
+      summary: z.enum(['auto', 'none', 'full']).optional(),
+    }).optional(),
+
+    // A list of tools the model may call
+    tools: z.array(OpenAIWire_Tools.ToolDefinition_schema).optional(),
+
+    // Whether to store the response
+    store: z.boolean().optional(),
+
+    // Whether to return a stream of partial message deltas
+    stream: z.boolean().optional(),
+
+    // Options for streaming response
+    stream_options: z.object({
+      include_usage: z.boolean().optional(),
+    }).optional(),
+
+  });
+
+  export type Response = z.infer<typeof ResponsesResponse_schema>;
+  const ResponsesResponse_schema = z.object({
+
+    // A unique identifier for the response.
+    id: z.string(),
+
+    // The object type, which is always "response".
+    object: z.literal('response'),
+
+    // The Unix timestamp (in seconds) when the response was created.
+    created: z.number(),
+
+    // The model used for the response.
+    model: z.string(),
+
+    // The response choices.
+    choices: z.array(z.object({
+
+      // The index of the choice in the list of choices.
+      index: z.number(),
+
+      // The delta message.
+      message: OpenAIWire_Messages.AssistantMessage_schema,
+
+      // The reason the model stopped generating tokens.
+      finish_reason: z.enum(['stop', 'length', 'tool_calls', 'content_filter', 'function_call']).nullable(),
+
+    })),
+
+    // Usage statistics for the completion request.
+    usage: z.object({
+      prompt_tokens: z.number(),
+      completion_tokens: z.number(),
+      total_tokens: z.number(),
+      completion_tokens_details: z.object({
+        reasoning_tokens: z.number(),
+        audio_tokens: z.number().optional(),
+      }).optional(),
+    }).optional(),
+
+    // The system fingerprint, which represents the backend configuration.
+    system_fingerprint: z.string().optional(),
+
+  });
+
+  // Streaming chunk schema
+  export type StreamingChunk = z.infer<typeof ResponsesStreamingChunk_schema>;
+  const ResponsesStreamingChunk_schema = z.object({
+    id: z.string(),
+    object: z.literal('response.chunk'),
+    created: z.number(),
+    model: z.string(),
+    choices: z.array(z.object({
+      index: z.number(),
+      delta: z.object({
+        role: z.enum(['assistant']).optional(),
+        content: z.string().optional(),
+        tool_calls: z.array(z.object({
+          index: z.number(),
+          id: z.string().optional(),
+          type: z.literal('function').optional(),
+          function: z.object({
+            name: z.string().optional(),
+            arguments: z.string().optional(),
+          }).optional(),
+        })).optional(),
+      }),
+      finish_reason: z.enum(['stop', 'length', 'tool_calls', 'content_filter', 'function_call']).nullable(),
+    })),
+    usage: z.object({
+      prompt_tokens: z.number(),
+      completion_tokens: z.number(),
+      total_tokens: z.number(),
+      completion_tokens_details: z.object({
+        reasoning_tokens: z.number(),
+        audio_tokens: z.number().optional(),
+      }).optional(),
+    }).optional(),
+    system_fingerprint: z.string().optional(),
+  });
+
+
+
+}
+
+
+//
 // Images > Create Image
 // https://platform.openai.com/docs/api-reference/images/create
 //

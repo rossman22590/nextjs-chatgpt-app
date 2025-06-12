@@ -89,16 +89,15 @@ export const _knownOpenAIChatModels: ManualMappings = [
     // benchmarks not available yet, as of 2025-04-16 (intro)
   },
 
-  // o3-pro - (v1/responses API - UNSUPPORTED YET) 💎💰
+  // o3-pro - (v1/responses API) 💎💰
   {
-    hidden: true, // UNSUPPORTED /responses API yet
     idPrefix: 'o3-pro-2025-06-10',
-    label: 'o3 Pro (2025-06-10) [unsupported]',
-    description: 'Requires (unsupported) Responses API. Version of o3 with more compute for better responses. Provides consistently better answers for complex tasks.',
+    label: 'o3 Pro (2025-06-10)',
+    description: 'Version of o3 with more compute for better responses. Provides consistently better answers for complex tasks.',
     contextWindow: 200000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'May 31, 2024',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Reasoning],
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Reasoning, LLM_IF_HOTFIX_NoStream],
     parameterSpecs: [{ paramId: 'llmForceNoStream' }, { paramId: 'llmVndOaiReasoningEffort' }, { paramId: 'llmVndOaiRestoreMarkdown' }],
     chatPrice: { input: 20, output: 80 },
     // benchmark: has not been measured yet
@@ -106,14 +105,14 @@ export const _knownOpenAIChatModels: ManualMappings = [
   {
     idPrefix: 'o3-pro',
     label: 'o3 Pro',
-    description: 'Requires (unsupported) Responses API. Version of o3 with more compute for better responses. Points to o3-pro-2025-06-10.',
+    description: 'Version of o3 with more compute for better responses. Points to o3-pro-2025-06-10.',
     symLink: 'o3-pro-2025-06-10',
     hidden: true, // prefer versioned
     // copied from symlinked
     contextWindow: 200000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'May 31, 2024',
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Reasoning],
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Reasoning, LLM_IF_HOTFIX_NoStream],
     parameterSpecs: [{ paramId: 'llmForceNoStream' }, { paramId: 'llmVndOaiReasoningEffort' }, { paramId: 'llmVndOaiRestoreMarkdown' }],
     chatPrice: { input: 20, output: 80 },
     // benchmark: has not been measured yet
@@ -178,9 +177,8 @@ export const _knownOpenAIChatModels: ManualMappings = [
     benchmark: { cbaElo: 1305 },
   },
 
-  // o1-pro - (v1/responses API - UNSUPPORTED YET) 💎💰
+  // o1-pro - (v1/responses API) 💎💰
   {
-    hidden: true, // UNSUPPORTED /responses API yet
     idPrefix: 'o1-pro-2025-03-19',
     label: 'o1 Pro (2025-03-19)',
     description: 'A version of o1 with more compute for better responses. Provides consistently better answers for complex tasks.',
@@ -197,7 +195,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     label: 'o1 Pro',
     description: 'Version of o1 with more compute for better responses. Points to o1-pro-2025-03-19.',
     symLink: 'o1-pro-2025-03-19',
-    hidden: true, // prefer versioned
+    hidden: false, // prefer versioned
     // copied from symlinked
     contextWindow: 200000,
     maxCompletionTokens: 100000,
@@ -946,7 +944,7 @@ const openAIModelsDenyList: string[] = [
   'computer-use-preview', 'computer-use-preview-2025-03-11', // FIXME: support these
   'codex-mini-latest', // FIXME: support these
   // 'o3-pro', // FIXME: support these
-  'o1-pro', // FIXME: support these
+  // 'o1-pro', // FIXME: support these - NOW SUPPORTED via Responses API
 
   // Legacy GPT models
   'gpt-3.5-turbo-0301',
