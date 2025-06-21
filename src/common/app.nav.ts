@@ -13,7 +13,7 @@ import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import IosShareIcon from '@mui/icons-material/IosShare';
 import IosShareOutlinedIcon from '@mui/icons-material/IosShareOutlined';
 // Link icons
-import GitHubIcon from '@mui/icons-material/GitHub';
+// import GitHubIcon from '@mui/icons-material/GitHub';
 import { DiscordIcon } from '~/common/components/icons/3rdparty/DiscordIcon';
 // Modal icons
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
@@ -253,12 +253,12 @@ export const navItems: {
       icon: DiscordIcon,
       href: Brand.URIs.SupportInvite,
     },
-    {
-      type: 'extLink',
-      name: 'GitHub',
-      icon: GitHubIcon,
-      href: Brand.URIs.OpenRepo,
-    },
+    // {
+    //   type: 'extLink',
+    //   name: 'GitHub',
+    //   icon: GitHubIcon,
+    //   href: Brand.URIs.OpenRepo,
+    // },
   ],
 
 };
