@@ -14,8 +14,8 @@ export const Release = {
   TenantSlug: 'open',
 
   App: {
-    versionCode: '2.0.0-open-rc3',       // 1.92.0 sequentially...
-    versionName: 'Big-AGI 2',
+    versionCode: '6.0.0-open-rc3',       // 1.92.0 sequentially...
+    versionName: 'AI Tutor BEAM',
   },
 
   // Future compatibility
@@ -65,5 +65,5 @@ export const Release = {
 
 export const BaseProduct = {
   ReleaseNotes: '',
-  SupportForm: (_userId?: string) => 'https://github.com/enricoros/big-agi/issues',
+  SupportForm: (_userId?: string) => '#',
 } as const;
