@@ -7,6 +7,7 @@ import CodeIcon from '@mui/icons-material/Code';
 import HistoryIcon from '@mui/icons-material/History';
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
+import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 
 import { blocksRenderHTMLIFrameCss } from '~/modules/blocks/code/code-renderers/RenderCodeHtmlIFrame';
 
@@ -25,7 +26,7 @@ import { useOverlayComponents } from '~/common/layout/overlays/useOverlayCompone
 import { BringTheLove } from './BringTheLove';
 import { DesktopNavGroupBox, DesktopNavIcon, navItemClasses } from './DesktopNavIcon';
 import { InvertedBar, InvertedBarCornerItem } from '../InvertedBar';
-import { optimaOpenModels, optimaOpenPreferences, optimaToggleDrawer, useOptimaDrawerOpen, useOptimaModals } from '../useOptima';
+import { optimaActions, optimaOpenModels, optimaOpenPreferences, optimaToggleDrawer, useOptimaDrawerOpen, useOptimaDrawerPeeking, useOptimaModals } from '../useOptima';
 import { scratchClipSupported, useScratchClipVisibility } from '../scratchclip/store-scratchclip';
 
 
@@ -57,8 +58,10 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
 
   // external state
   const isDrawerOpen = useOptimaDrawerOpen();
+  const isDrawerPeeking = useOptimaDrawerPeeking();
   const { showPromisedOverlay } = useOverlayComponents();
   const { showModels, showPreferences } = useOptimaModals();
+  const { peekDrawerEnter, peekDrawerLeave } = optimaActions();
   const { isVisible: isScratchClipVisible, toggleVisibility: toggleScratchClipVisibility } = useScratchClipVisibility();
 
   // derived state
@@ -136,9 +139,10 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
             variant={isActive ? 'solid' : undefined}
             onPointerDown={isDrawerable ? optimaToggleDrawer : () => Router.push(app.landingRoute || app.route)}
             className={`${navItemClasses.typeApp} ${isActive ? navItemClasses.active : ''} ${isPaneOpen ? navItemClasses.paneOpen : ''} ${app.isDev ? navItemClasses.dev : ''}`}
+            sx={appIdx !== 0 ? undefined : { '--Icon-fontSize': '1.375rem!important' /* temp patch for the first icon, to go at 22px rather than 1.25rem (20px) */ }}
           >
-            {/*{(isActive && app.iconActive) ? <app.iconActive /> : <app.icon />}*/}
-            <app.icon />
+            {(isActive && app.iconActive) ? <app.iconActive /> : <app.icon />}
+            {/*<app.icon />*/}
           </DesktopNavIcon>
         </Tooltip>
       );
@@ -258,8 +262,11 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
       // attract the attention to the models configuration when no LLMs are available (a bit hardcoded here)
       const isAttractive = noLLMs && item.overlayId === 'models';
 
+      // skip the models configuration, unless it is required
+      if (item.overlayId === 'models' && !isAttractive) return null;
+
       return (
-        <Tooltip followCursor key={'n-m-' + item.overlayId} title={isAttractive ? 'Add Language Models - REQUIRED' : item.name}>
+        <Tooltip key={'n-m-' + item.overlayId} title={isAttractive ? 'Add Language Models - REQUIRED' : item.name}>
           <DesktopNavIcon
             variant={isActive ? 'soft' : undefined}
             onClick={showModal}
@@ -269,7 +276,7 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
           </DesktopNavIcon>
         </Tooltip>
       );
-    });
+    }).filter(component => !!component); // filter out null components
   }, [noLLMs, showModels, showPreferences]);
 
 
@@ -279,16 +286,18 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
       component={props.component}
       direction='vertical'
       sx={desktopNavBarSx}
+      onMouseEnter={appUsesDrawer ? peekDrawerEnter : undefined}
+      onMouseLeave={peekDrawerLeave}
     >
 
       <InvertedBarCornerItem>
-        <Tooltip disableInteractive title={isDrawerOpen ? 'Close Drawer' /* for Aria reasons */ : 'Open Drawer'}>
+        <Tooltip disableInteractive title={isDrawerPeeking ? 'Pin Drawer' : (isDrawerOpen ? 'Close Drawer' /* for Aria reasons */ : 'Open Drawer')}>
           <DesktopNavIcon
             disabled={!logoButtonTogglesPane}
             onPointerDown={logoButtonTogglesPane ? optimaToggleDrawer : undefined}
             className={navItemClasses.typeMenu}
           >
-            {logoButtonTogglesPane ? <MenuIcon /> : <BigAgiSquircleIcon inverted sx={{ color: 'white' }} />}
+            {logoButtonTogglesPane ? (isDrawerPeeking ? <PushPinOutlinedIcon sx={{ fontSize: 'xl', transform: 'rotate(45deg)' }} /> : <MenuIcon />) : <BigAgiSquircleIcon inverted sx={{ color: 'white' }} />}
           </DesktopNavIcon>
         </Tooltip>
       </InvertedBarCornerItem>
