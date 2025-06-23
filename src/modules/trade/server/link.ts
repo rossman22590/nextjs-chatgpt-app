@@ -114,7 +114,7 @@ export const storagePutProcedure =
         data: {
           id: agiUuid('server-storage-id'),
           ownerId: userId,
-          visibility: LinkStorageVisibility.PRIVATE, // Default to private for authenticated users
+          visibility: LinkStorageVisibility.PUBLIC, // Make shared chat links publicly accessible
           dataType,
           dataTitle,
           dataSize: JSON.stringify(dataObject).length, // data size estimate
@@ -158,7 +158,7 @@ export const publicStoragePutProcedure =
         data: {
           id: agiUuid('server-storage-id'),
           ownerId: ownerId || agiUuid('server-storage-owner'),
-          visibility: LinkStorageVisibility.UNLISTED,
+          visibility: LinkStorageVisibility.PUBLIC, // Make shared chat links publicly accessible
           dataType,
           dataTitle,
           dataSize: JSON.stringify(dataObject).length,
