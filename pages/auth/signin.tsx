@@ -24,6 +24,9 @@ import IconButton from '@mui/joy/IconButton';
 import { Brand } from '~/common/app.config';
 import { useAppStateStore } from '~/common/state/store-appstate';
 
+// Check if signup is disabled via environment variable
+const isSignupDisabled = process.env.DISABLE_SIGNUP === 'true';
+
 export default function SignIn() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -311,20 +314,24 @@ export default function SignIn() {
             </form>
           )}
 
-          <Divider sx={{ my: 4 }}>or</Divider>
+          {!isSignupDisabled && (
+            <>
+              <Divider sx={{ my: 4 }}>or</Divider>
 
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography level="body-sm" color="neutral">
-              Don&apos;t have an account?{' '}
-              <Link
-                component="button"
-                onClick={() => router.push('/auth/signup')}
-                fontWeight="md"
-              >
-                Sign up for free
-              </Link>
-            </Typography>
-          </Box>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography level="body-sm" color="neutral">
+                  Don&apos;t have an account?{' '}
+                  <Link
+                    component="button"
+                    onClick={() => router.push('/auth/signup')}
+                    fontWeight="md"
+                  >
+                    Sign up for free
+                  </Link>
+                </Typography>
+              </Box>
+            </>
+          )}
         </CardContent>
       </Card>
     </Box>

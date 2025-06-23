@@ -94,6 +94,9 @@ export const env = createEnv({
     HTTP_BASIC_AUTH_USERNAME: z.string().optional(),
     HTTP_BASIC_AUTH_PASSWORD: z.string().optional(),
 
+    // Authentication: Disable user registration
+    DISABLE_SIGNUP: z.string().optional(),
+
     // Build-time configuration (ignore)
     BIG_AGI_BUILD: z.enum(['standalone', 'static']).optional(),
 

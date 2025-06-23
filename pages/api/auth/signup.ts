@@ -12,6 +12,11 @@ const signupSchema = z.object({
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Check if signup is disabled
+  if (process.env.DISABLE_SIGNUP === 'true') {
+    return res.status(403).json({ message: 'User registration is disabled' });
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });

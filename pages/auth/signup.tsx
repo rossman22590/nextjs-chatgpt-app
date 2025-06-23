@@ -24,9 +24,19 @@ import IconButton from '@mui/joy/IconButton';
 import { Brand } from '~/common/app.config';
 import { useAppStateStore } from '~/common/state/store-appstate';
 
+// Check if signup is disabled via environment variable
+const isSignupDisabled = process.env.DISABLE_SIGNUP === 'true';
+
 export default function SignUp() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  
+  // Redirect to signin if signup is disabled
+  React.useEffect(() => {
+    if (isSignupDisabled) {
+      router.push('/auth/signin');
+    }
+  }, [router]);
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -106,8 +116,8 @@ export default function SignUp() {
     );
   }
 
-  // Don't render if already authenticated (will redirect)
-  if (status === 'authenticated') {
+  // Don't render if already authenticated (will redirect) or if signup is disabled
+  if (status === 'authenticated' || isSignupDisabled) {
     return null;
   }
 
