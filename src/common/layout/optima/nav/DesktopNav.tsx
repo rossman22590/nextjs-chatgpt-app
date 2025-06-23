@@ -1,13 +1,15 @@
 import * as React from 'react';
 import Router from 'next/router';
+import Link from 'next/link';
 
 import type { SxProps } from '@mui/joy/styles/types';
-import { Divider, Dropdown, ListDivider, ListItem, ListItemButton, ListItemDecorator, Menu, MenuButton, MenuItem, Tooltip, Typography } from '@mui/joy';
+import { Button, Divider, Dropdown, ListDivider, ListItem, ListItemButton, ListItemDecorator, Menu, MenuButton, MenuItem, Tooltip, Typography } from '@mui/joy';
 import CodeIcon from '@mui/icons-material/Code';
 import HistoryIcon from '@mui/icons-material/History';
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
+import LoginIcon from '@mui/icons-material/Login';
 
 import { blocksRenderHTMLIFrameCss } from '~/modules/blocks/code/code-renderers/RenderCodeHtmlIFrame';
 
@@ -22,6 +24,7 @@ import { checkDivider, checkVisibileIcon, NavItemApp, navItems } from '~/common/
 import { themeZIndexDesktopNav } from '~/common/app.theme';
 import { useHasLLMs } from '~/common/stores/llms/llms.hooks';
 import { useOverlayComponents } from '~/common/layout/overlays/useOverlayComponents';
+import { AuthButton } from '~/common/components/auth/AuthButton';
 
 import { BringTheLove } from './BringTheLove';
 import { DesktopNavGroupBox, DesktopNavIcon, navItemClasses } from './DesktopNavIcon';
@@ -229,22 +232,38 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
   }, [toggleScratchClipVisibility, isScratchClipVisible, releaseNotesUrl, handleShowReleaseNotes, releaseNotesShown, handleShowTechnologies, props.currentApp, isDrawerOpen]);
 
 
-  // External link items
+  // Enhanced Sign-in/out button component
+  const AuthButtonComponent = React.useMemo(() => (
+    <Tooltip title="Account" variant="soft" placement="right">
+      <AuthButton
+        variant="icon"
+        showAvatar
+        sx={{ p: 1, mb: 1 }}
+      />
+    </Tooltip>
+  ), []);
+
+  // External link items - updated to use AuthButton
   const navExtLinkItems = React.useMemo(() => {
-    return navItems.links.map((item, index) =>
-      <BringTheLove
-        key={'nav-ext-' + item.name}
-        asIcon
-        text={item.name}
-        icon={item.icon}
-        link={item.href}
-        sx={{
-          p: 1,
-          mb: index > 0 ? 1 : 0,
-        }}
-      />,
+    return (
+      <>
+        {AuthButtonComponent}
+        {navItems.links.map((item, index) =>
+          <BringTheLove
+            key={'nav-ext-' + item.name}
+            asIcon
+            text={item.name}
+            icon={item.icon}
+            link={item.href}
+            sx={{
+              p: 1,
+              mb: index > 0 ? 1 : 0,
+            }}
+          />,
+        )}
+      </>
     );
-  }, []);
+  }, [AuthButtonComponent]);
 
 
   // Modal items

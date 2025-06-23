@@ -28,6 +28,7 @@ import { getIsMobile } from '~/common/components/useMatchMedia';
 import { optimaCloseDrawer } from '~/common/layout/optima/useOptima';
 import { themeScalingMap, themeZIndexOverMobileDrawer } from '~/common/app.theme';
 import { useUIPreferencesStore } from '~/common/stores/store-ui';
+import { CloudSyncStatus } from '~/modules/trade/sync/CloudSyncStatus';
 
 import { ChatDrawerItemMemo, FolderChangeRequest } from './ChatDrawerItem';
 import { ChatFolderList } from './folders/ChatFolderList';
@@ -458,6 +459,8 @@ function ChatDrawer(props: {
 
       </CloseablePopup>
     )}
+
+    <CloudSyncStatus />
 
   </>;
 }

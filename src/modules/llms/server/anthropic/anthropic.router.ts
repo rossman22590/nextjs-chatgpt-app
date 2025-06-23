@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 
-import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
 import { env } from '~/server/env';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
@@ -157,10 +157,10 @@ const listModelsInputSchema = z.object({
 
 // Router
 
-export const llmAnthropicRouter = createTRPCRouter({
+export const llmAnthropicRouter = createTRPCRouterEdge({
 
-  /* [Anthropic] list models - https://docs.anthropic.com/claude/docs/models-overview */
-  listModels: publicProcedure
+  /* Models */
+  listModels: publicProcedureEdge
     .input(listModelsInputSchema)
     .output(ListModelsResponse_schema)
     .query(async ({ input: { access } }) => {

@@ -63,9 +63,24 @@ export namespace V4ToHeadConverters {
           delete fragment.liveFileId;
 
       // show the aborted ops: convert a Placeholder fragment [part.pt='ph'] to an Error fragment
+      // BUT only if the message has ONLY placeholder fragments (truly incomplete)
       if ((isVoidFragment(fragment) && isPlaceholderPart(fragment.part))
-        || (isContentFragment(fragment) && (fragment.part as any)?.pt === 'ph') /* NOTE: REMOVE FOR 2.0: helper during the 'void' fragment transition */)
-        m.fragments[i] = createErrorContentFragment(`${(fragment.part as any).pText} (did not complete)`);
+        || (isContentFragment(fragment) && (fragment.part as any)?.pt === 'ph') /* NOTE: REMOVE FOR 2.0: helper during the 'void' fragment transition */) {
+        
+        // Check if this message has ANY real content fragments
+        const hasRealContent = m.fragments.some(f => 
+          f !== fragment && (f.ft === 'content' || f.ft === 'attachment')
+        );
+        
+        // Only convert to error if there's no real content (truly incomplete)
+        if (!hasRealContent) {
+          m.fragments[i] = createErrorContentFragment(`${(fragment.part as any).pText} (did not complete)`);
+        } else {
+          // This message has real content, so just remove the placeholder fragment
+          m.fragments.splice(i, 1);
+          i--; // Adjust index since we modified the array
+        }
+      }
 
       // [Emergency] validate part types, can mess up in development
       if (EMERGENCY_CLEANUP_PARTS) {

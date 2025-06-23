@@ -13,6 +13,7 @@ import { imaginePromptFromTextOrThrow } from '~/modules/aifn/imagine/imagineProm
 import { elevenLabsSpeakText } from '~/modules/elevenlabs/elevenlabs.client';
 import { useAreBeamsOpen } from '~/modules/beam/store-beam.hooks';
 import { useCapabilityTextToImage } from '~/modules/t2i/t2i.client';
+import { useChatCloudSync } from '~/modules/trade/sync/chat-cloud-sync';
 
 import type { DConversation, DConversationId } from '~/common/stores/chat/chat.conversation';
 import type { OptimaBarControlMethods } from '~/common/layout/optima/bar/OptimaBarDropdown';
@@ -150,6 +151,9 @@ export function AppChat() {
 
   const { domainModelId: chatLLMId } = useModelDomain('primaryChat');
   const chatLLM = useLLM(chatLLMId) ?? null;
+
+  // Cloud sync for automatic database synchronization
+  const { isAuthenticated, syncStatus } = useChatCloudSync();
 
   const {
     // state

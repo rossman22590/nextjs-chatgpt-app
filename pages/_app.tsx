@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { MyAppProps } from 'next/app';
 import { Analytics as VercelAnalytics } from '@vercel/analytics/next';
 import { SpeedInsights as VercelSpeedInsights } from '@vercel/speed-insights/next';
+import { SessionProvider } from 'next-auth/react';
 
 import { Brand } from '~/common/app.config';
 import { apiQuery } from '~/common/util/trpc.client';
@@ -37,23 +38,25 @@ const Big_AGI_App = ({ Component, emotionCache, pageProps }: MyAppProps) => {
 
     <Head>
       <title>{Brand.Title.Common}</title>
-      <meta name='viewport' content='minimum-scale=1, initial-scale=1, width=device-width, shrink-to-fit=no' />
+      <meta name='viewport' content='minimum-scale=1, initial-scale=1, width=device-width, shrink-to-fit=no, user-scalable=no' />
     </Head>
 
-    <ProviderTheming emotionCache={emotionCache}>
-      <ProviderSingleTab>
-        <ProviderBackendCapabilities>
-          {/* ^ Backend capabilities & SSR boundary */}
-          <ErrorBoundary outer>
-            <ProviderBootstrapLogic>
-              <SnackbarInsert />
-              {getLayout(<Component {...pageProps} />)}
-              <OverlaysInsert />
-            </ProviderBootstrapLogic>
-          </ErrorBoundary>
-        </ProviderBackendCapabilities>
-      </ProviderSingleTab>
-    </ProviderTheming>
+    <SessionProvider session={pageProps.session}>
+      <ProviderTheming emotionCache={emotionCache}>
+        <ProviderSingleTab>
+          <ProviderBackendCapabilities>
+            {/* ^ Backend capabilities & SSR boundary */}
+            <ErrorBoundary outer>
+              <ProviderBootstrapLogic>
+                <SnackbarInsert />
+                {getLayout(<Component {...pageProps} />)}
+                <OverlaysInsert />
+              </ProviderBootstrapLogic>
+            </ErrorBoundary>
+          </ProviderBackendCapabilities>
+        </ProviderSingleTab>
+      </ProviderTheming>
+    </SessionProvider>
 
     {Is.Deployment.VercelFromFrontend && <VercelAnalytics debug={false} />}
     {Is.Deployment.VercelFromFrontend && <VercelSpeedInsights debug={false} sampleRate={1 / 2} />}

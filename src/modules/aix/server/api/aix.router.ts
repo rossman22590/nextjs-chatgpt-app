@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { createEmptyReadableStream, createServerDebugWireEvents, safeErrorString, serverCapitalizeFirstLetter } from '~/server/wire';
-import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { fetchResponseOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import { AixDemuxers } from '../dispatch/stream.demuxers';
@@ -23,13 +23,13 @@ import { usesResponsesAPI } from '../dispatch/chatGenerate/adapters/openai.respo
 export const AIX_SECURITY_ONLY_IN_DEV_BUILDS = process.env.NODE_ENV === 'development';
 
 
-export const aixRouter = createTRPCRouter({
+export const aixRouter = createTRPCRouterEdge({
 
   /**
    * Chat content generation, streaming, multipart.
    * Architecture: Client <-- (intake) --> Server <-- (dispatch) --> AI Service
    */
-  chatGenerateContent: publicProcedure
+  chatGenerateContent: publicProcedureEdge
     .input(z.object({
       access: AixWire_API.Access_schema,
       model: AixWire_API.Model_schema,

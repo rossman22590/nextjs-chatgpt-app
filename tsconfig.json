@@ -2,9 +2,9 @@
   "compilerOptions": {
     /* Base Options: */
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    // "skipLibCheck": true,
     "target": "es2022",
-    "allowJs": true,
+    // "allowJs": true,
     "resolveJsonModule": true,
     "moduleDetection": "force",
     "isolatedModules": true,
@@ -22,6 +22,10 @@
     "jsx": "preserve",
     "plugins": [{"name": "next"}],
     "incremental": true,
+    
+    /* JSX Support */
+    "allowJs": true,
+    "skipLibCheck": true,
 
     /* Custom options */
     "forceConsistentCasingInFileNames": true,
@@ -32,7 +36,8 @@
     "paths": {
       "~/common/*": ["src/common/*"],
       "~/modules/*": ["src/modules/*"],
-      "~/server/*": ["src/server/*"]
+      "~/server/*": ["src/server/*"],
+      "~/pages/*": ["src/pages/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts",

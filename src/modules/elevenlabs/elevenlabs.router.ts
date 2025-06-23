@@ -1,6 +1,5 @@
 import { z } from 'zod';
-
-import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { env } from '~/server/env';
 import { fetchJsonOrTRPCThrow, fetchResponseOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
@@ -32,12 +31,12 @@ const voiceSchema = z.object({
 });
 
 
-export const elevenlabsRouter = createTRPCRouter({
+export const elevenlabsRouter = createTRPCRouterEdge({
 
   /**
    * List Voices available to this API key
    */
-  listVoices: publicProcedure
+  listVoices: publicProcedureEdge
     .input(z.object({
       elevenKey: z.string().optional(),
     }))
@@ -78,7 +77,7 @@ export const elevenlabsRouter = createTRPCRouter({
   /**
    * Speech synthesis procedure using tRPC streaming
    */
-  speech: publicProcedure
+  speech: publicProcedureEdge
     .input(speechInputSchema)
     .mutation(async function* ({ input: { xiKey, text, voiceId, nonEnglish, audioStreaming, audioTurbo }, ctx }) {
 

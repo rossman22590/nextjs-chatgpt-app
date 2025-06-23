@@ -25,7 +25,7 @@ interface LinkStore {
 
 }
 
-const useShareLinkStore = create<LinkStore>()(
+export const useShareLinkStore = create<LinkStore>()(
   persist(
     (set) => ({
 

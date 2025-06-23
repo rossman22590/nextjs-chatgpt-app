@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 
-import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { fetchTextOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import { downloadYouTubeVideoData } from './youtube.server';
@@ -15,12 +15,12 @@ const inputSchema = z.object({
 });
 
 
-export const youtubeRouter = createTRPCRouter({
+export const youtubeRouter = createTRPCRouterEdge({
 
   /**
-   * Get the transcript for a YouTube video ID
+   * Extracts the transcript from a YouTube video given a video url
    */
-  getTranscript: publicProcedure
+  getTranscript: publicProcedureEdge
     .input(inputSchema)
     .query(async ({ input }) => {
       const { videoId } = input;
@@ -46,6 +46,6 @@ export const youtubeRouter = createTRPCRouter({
 
 2. Character Sheet Drafting: Craft your documented analysis into a draft of the 'You are a...' character sheet. It should encapsulate all crucial personality dimensions, along with the motivations and aspirations of the persona. Keep in mind to balance succinctness and depth of detail for each dimension. The deliverable here is a comprehensive draft of the character sheet that captures the speaker's unique essence.
 
-3. Validation and Refinement: Compare the draft character sheet with the original transcript, validating its content and ensuring it captures both the speaker’s overt characteristics and the subtler undertones. Fine-tune any areas that require clarity, have been overlooked, or require more authenticity. Use clear and illustrative examples from the transcript to refine your sheet and offer meaningful, tangible reference points. Your finalized deliverable is a coherent, comprehensive, and nuanced 'You are a...' character sheet that serves as a go-to guide for an actor recreating the persona.
+3. Validation and Refinement: Compare the draft character sheet with the original transcript, validating its content and ensuring it captures both the speaker's overt characteristics and the subtler undertones. Fine-tune any areas that require clarity, have been overlooked, or require more authenticity. Use clear and illustrative examples from the transcript to refine your sheet and offer meaningful, tangible reference points. Your finalized deliverable is a coherent, comprehensive, and nuanced 'You are a...' character sheet that serves as a go-to guide for an actor recreating the persona.
 
  */

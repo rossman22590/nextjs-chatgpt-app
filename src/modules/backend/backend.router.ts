@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { Release } from '~/common/app.release';
 
-import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { env } from '~/server/env';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
@@ -11,6 +11,11 @@ import type { BackendCapabilities } from './store-backend-capabilities';
 
 
 function sdbmHash(str: string): string {
+  // Handle undefined/null strings gracefully
+  if (!str || typeof str !== 'string') {
+    str = '';
+  }
+  
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
@@ -24,11 +29,11 @@ function generateLlmEnvConfigHash(env: Record<string, unknown>): string {
   const envAPIKeys = Object.keys(env)     // get all env keys
     .filter(key => !!env[key])            // minus the empty
     .filter(key => key.includes('_API_')) // minus the non-API keys
-    .map(key => `${key}=${env[key]}`)     // create key-value pairs
+    .map(key => `${key}=${env[key] || ''}`)     // create key-value pairs, handle undefined
     .sort();                              // ignore order
   const hashInputs = [
-    Release.Monotonics.Aix.toString(),  // triggers at every change (large downstream effect, know what you are doing)
-    Release.TenantSlug.toString(),          // triggers when branch changes
+    (Release.Monotonics.Aix || 0).toString(),  // triggers at every change (large downstream effect, know what you are doing)
+    (Release.TenantSlug || 'unknown').toString(),          // triggers when branch changes
     ...envAPIKeys,                      // triggers when env keys change
   ];
   return sdbmHash(hashInputs.join(';'));
@@ -41,10 +46,10 @@ function generateLlmEnvConfigHash(env: Record<string, unknown>): string {
  * pre-configured in the servr. In the future this will evolve to a better
  * server-side configuration system.
  */
-export const backendRouter = createTRPCRouter({
+export const backendRouter = createTRPCRouterEdge({
 
   /* List server-side capabilities (pre-configured by the deployer) */
-  listCapabilities: publicProcedure
+  listCapabilities: publicProcedureEdge
     .query(async ({ ctx: _unused }): Promise<BackendCapabilities> => {
       return {
         // llms
@@ -83,7 +88,7 @@ export const backendRouter = createTRPCRouter({
   /**
    * Exchange the OpenrRouter 'code' (from PKCS) for an OpenRouter API Key
    */
-  exchangeOpenRouterKey: publicProcedure
+  exchangeOpenRouterKey: publicProcedureEdge
     .input(z.object({ code: z.string() }))
     .query(async ({ input }) => {
       // Documented here: https://openrouter.ai/docs#oauth

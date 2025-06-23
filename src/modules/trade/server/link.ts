@@ -1,22 +1,21 @@
 import { z } from 'zod';
+import { getServerSession } from 'next-auth';
 
 import { LinkStorageDataType, LinkStorageVisibility } from '@prisma/client';
 
-import { prismaDb } from '~/server/prisma/prismaDb';
-import { publicProcedure } from '~/server/trpc/trpc.server';
+import { prisma as prismaDb } from '~/server/prisma/prisma-client';
+import { publicProcedure, protectedProcedure } from '~/server/trpc/trpc.server';
+import { authOptions } from '~/server/auth/auth.config';
 
 import { agiUuid } from '~/common/util/idUtils';
 
-
 // configuration
 const DEFAULT_EXPIRES_SECONDS = 60 * 60 * 24 * 30; // 30 days
-
 
 /// Zod schemas
 
 const dataTypesSchema = z.enum([LinkStorageDataType.CHAT_V1]);
 const dataSchema = z.object({}).passthrough();
-
 
 const storagePutInputSchema = z.object({
   ownerId: z.string().optional(),
@@ -85,24 +84,24 @@ export const storageUpdateDeletionKeyOutputSchema = z.object({
   error: z.string().optional(),
 });
 
-
 export type StoragePutSchema = z.infer<typeof storagePutOutputSchema>;
 export type StorageDeleteSchema = z.infer<typeof storageDeleteOutputSchema>;
 export type StorageUpdateDeletionKeySchema = z.infer<typeof storageUpdateDeletionKeyOutputSchema>;
-
 
 /// tRPC procedures
 
 /**
  * Writes dataObject to DB, returns ownerId, objectId, and deletionKey
+ * Protected procedure - requires authentication
  */
 export const storagePutProcedure =
-  publicProcedure
+  protectedProcedure
     .input(storagePutInputSchema)
     .output(storagePutOutputSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
 
-      const { ownerId, dataType, dataTitle, dataObject, expiresSeconds } = input;
+      const { dataType, dataTitle, dataObject, expiresSeconds } = input;
+      const userId = ctx.session.user.id;
 
       const { id: objectId, ...rest } = await prismaDb.linkStorage.create({
         select: {
@@ -114,8 +113,8 @@ export const storagePutProcedure =
         },
         data: {
           id: agiUuid('server-storage-id'),
-          ownerId: ownerId || agiUuid('server-storage-owner'),
-          visibility: LinkStorageVisibility.UNLISTED,
+          ownerId: userId,
+          visibility: LinkStorageVisibility.PRIVATE, // Default to private for authenticated users
           dataType,
           dataTitle,
           dataSize: JSON.stringify(dataObject).length, // data size estimate
@@ -137,18 +136,75 @@ export const storagePutProcedure =
 
     });
 
+/**
+ * Public version of storagePut - for compatibility with unauthenticated access
+ */
+export const publicStoragePutProcedure =
+  publicProcedure
+    .input(storagePutInputSchema)
+    .output(storagePutOutputSchema)
+    .mutation(async ({ input }) => {
+
+      const { ownerId, dataType, dataTitle, dataObject, expiresSeconds } = input;
+
+      const { id: objectId, ...rest } = await prismaDb.linkStorage.create({
+        select: {
+          id: true,
+          ownerId: true,
+          createdAt: true,
+          expiresAt: true,
+          deletionKey: true,
+        },
+        data: {
+          id: agiUuid('server-storage-id'),
+          ownerId: ownerId || agiUuid('server-storage-owner'),
+          visibility: LinkStorageVisibility.UNLISTED,
+          dataType,
+          dataTitle,
+          dataSize: JSON.stringify(dataObject).length,
+          data: dataObject,
+          expiresAt: expiresSeconds === 0
+            ? undefined
+            : new Date(Date.now() + 1000 * (expiresSeconds || DEFAULT_EXPIRES_SECONDS)),
+          deletionKey: agiUuid('server-storage-deletion-key'),
+          isDeleted: false,
+        },
+      });
+
+      return {
+        type: 'success',
+        objectId,
+        dataTitle: dataTitle || null,
+        ...rest,
+      };
+    });
 
 /**
  * Reads an object from DB, if it exists, and is not expired, and is not marked as deleted
+ * For authenticated users, restricts to their own records or public/unlisted records
  */
 export const storageGetProcedure =
   publicProcedure
     .input(storageGetInputSchema)
     .output(storageGetOutputSchema)
-    .query(async ({ input: { objectId, ownerId } }) => {
+    .query(async ({ input: { objectId, ownerId }, ctx }) => {
+      const session = await getServerSession(authOptions);
+      const userId = session?.user?.id;
+
+      // Determine visibility condition:
+      // - If user is authenticated, they can see their own records plus public/unlisted ones
+      // - If not authenticated, they can only see public/unlisted records
+      const visibilityCondition = userId
+        ? {
+            OR: [
+              { ownerId: userId },
+              { visibility: { in: [LinkStorageVisibility.PUBLIC, LinkStorageVisibility.UNLISTED] } },
+            ],
+          }
+        : { visibility: { in: [LinkStorageVisibility.PUBLIC, LinkStorageVisibility.UNLISTED] } };
 
       // read object
-      const result = await prismaDb.linkStorage.findUnique({
+      const result = await prismaDb.linkStorage.findFirst({
         select: {
           dataType: true,
           dataTitle: true,
@@ -158,12 +214,12 @@ export const storageGetProcedure =
         },
         where: {
           id: objectId,
-          ownerId: ownerId || undefined,
           isDeleted: false,
           OR: [
             { expiresAt: null },
             { expiresAt: { gt: new Date() } },
           ],
+          ...visibilityCondition,
         },
       });
 
@@ -209,23 +265,27 @@ export const storageGetProcedure =
 
     });
 
-
 /**
  * Mark a public object as deleted, if it exists, and is not expired, and is not deleted
+ * For authenticated users, restricts to their own records
  */
 export const storageMarkAsDeletedProcedure =
   publicProcedure
     .input(storageDeleteInputSchema)
     .output(storageDeleteOutputSchema)
-    .mutation(async ({ input: { objectId, ownerId, deletionKey } }) => {
+    .mutation(async ({ input: { objectId, ownerId, deletionKey }, ctx }) => {
+      const session = await getServerSession(authOptions);
+      const userId = session?.user?.id;
+      
+      // Build the where clause based on authentication status
+      const whereClause = {
+        id: objectId,
+        ...(userId ? { ownerId: userId } : { ownerId: ownerId || undefined, deletionKey }),
+        // isDeleted: false,
+      };
 
       const result = await prismaDb.linkStorage.updateMany({
-        where: {
-          id: objectId,
-          ownerId: ownerId || undefined,
-          deletionKey,
-          // isDeleted: false,
-        },
+        where: whereClause,
         data: {
           isDeleted: true,
           deletedAt: new Date(),
@@ -240,23 +300,27 @@ export const storageMarkAsDeletedProcedure =
       };
     });
 
-
 /**
  * Update the deletion Key of a public object by ID and deletion key
+ * For authenticated users, restricts to their own records
  */
 export const storageUpdateDeletionKeyProcedure =
   publicProcedure
     .input(storageUpdateDeletionKeyInputSchema)
     .output(storageUpdateDeletionKeyOutputSchema)
-    .mutation(async ({ input: { objectId, ownerId, formerKey, newKey } }) => {
+    .mutation(async ({ input: { objectId, ownerId, formerKey, newKey }, ctx }) => {
+      const session = await getServerSession(authOptions);
+      const userId = session?.user?.id;
+      
+      // Build the where clause based on authentication status
+      const whereClause = {
+        id: objectId,
+        ...(userId ? { ownerId: userId } : { ownerId: ownerId || undefined, deletionKey: formerKey }),
+        // isDeleted: false,
+      };
 
       const result = await prismaDb.linkStorage.updateMany({
-        where: {
-          id: objectId,
-          ownerId: ownerId || undefined,
-          deletionKey: formerKey,
-          // isDeleted: false,
-        },
+        where: whereClause,
         data: {
           deletionKey: newKey,
         },

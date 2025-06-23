@@ -9,6 +9,7 @@
 //
 // The database is used for:
 //  - the 'sharing' function, to let users share the chats with each other
+//  - user authentication and storing user-specific chats
 
 generator client {
   provider = "prisma-client-js"
@@ -20,13 +21,139 @@ datasource db {
   directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
 }
 
+// NextAuth Models
+model Account {
+  id                 String  @id @default(uuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  links         LinkStorage[]
+  conversations Conversation[]
+  messages      Message[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+}
+
 //
-// Storage of Linked Data
+// Chat-specific Models
+//
+model Conversation {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Conversation metadata
+  title             String?
+  autoTitle         String?
+  userSymbol        String?
+  systemPurposeId   String    @default("Generic")
+  isArchived        Boolean   @default(false)
+  isIncognito       Boolean   @default(false)
+  
+  // Timestamps
+  created           DateTime  @default(now())
+  updated           DateTime  @updatedAt
+  
+  // Relations
+  messages          Message[]
+  
+  @@index([userId, updated])
+  @@index([userId, isArchived])
+}
+
+model Message {
+  id                String        @id @default(uuid())
+  conversationId    String
+  conversation      Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Message content
+  role              MessageRole
+  content           Json          // Stores the message fragments as JSON
+  
+  // Message metadata
+  purposeId         String?
+  metadata          Json?         // Stores additional metadata as JSON
+  userFlags         String[]      @default([]) // Array of user flags
+  tokenCount        Int           @default(0)
+  
+  // Generation info (for assistant messages)
+  generator         Json?         // Stores generator info as JSON
+  
+  // State flags
+  pendingIncomplete Boolean       @default(false)
+  
+  // Timestamps
+  created           DateTime      @default(now())
+  updated           DateTime?
+  
+  @@index([conversationId, created])
+  @@index([userId, created])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+//
+// Storage of Linked Data (Legacy - keeping for backward compatibility)
 //
 model LinkStorage {
   id String @id @default(uuid())
 
   ownerId    String
+  user       User?    @relation(fields: [ownerId], references: [id])
   visibility LinkStorageVisibility
 
   dataType  LinkStorageDataType

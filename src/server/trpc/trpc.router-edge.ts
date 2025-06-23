@@ -1,4 +1,4 @@
-import { createTRPCRouter } from './trpc.server';
+import { createTRPCRouterEdge } from './trpc.server-edge';
 
 import { aixRouter } from '~/modules/aix/server/api/aix.router';
 import { backendRouter } from '~/modules/backend/backend.router';
@@ -12,9 +12,10 @@ import { prodiaRouter } from '~/modules/t2i/prodia/prodia.router';
 import { youtubeRouter } from '~/modules/youtube/youtube.router';
 
 /**
- * Primary rooter, and will be sitting on an Edge Runtime.
+ * Primary router for Edge Runtime.
+ * Uses Edge-specific tRPC configuration without NextAuth.
  */
-export const appRouterEdge = createTRPCRouter({
+export const appRouterEdge = createTRPCRouterEdge({
   aix: aixRouter,
   backend: backendRouter,
   elevenlabs: elevenlabsRouter,

@@ -2,9 +2,11 @@ import * as React from 'react';
 import Router from 'next/router';
 
 import { Box, Button, ButtonGroup, ColorPaletteProp, Sheet } from '@mui/joy';
+import LoginIcon from '@mui/icons-material/Login';
 
 import { ROUTE_APP_NEWS } from '~/common/app.routes';
 import { checkDivider, checkVisibileIcon, NavItemApp, navItems } from '~/common/app.nav';
+import { AuthButton } from '~/common/components/auth/AuthButton';
 
 import { BringTheLove } from './BringTheLove';
 import { optimaCloseDrawer, optimaOpenModels } from '../useOptima';
@@ -145,6 +147,13 @@ export function MobileNavItems(props: { currentApp?: NavItemApp }) {
         >
           Models
         </Button>
+
+        {/* Enhanced Sign in/out button */}
+        <AuthButton
+          variant="text"
+          size="sm"
+          sx={_styles.button}
+        />
 
         {/* HARDCODED: Discord */}
         <BringTheLove

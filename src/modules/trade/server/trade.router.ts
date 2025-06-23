@@ -7,7 +7,14 @@ import { fetchTextOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 import { chatGptParseConversation, chatGptSharedChatSchema } from './chatgpt';
 import { postToPasteGGOrThrow, publishToInputSchema, publishToOutputSchema } from './pastegg';
 import { storageGetProcedure, storageMarkAsDeletedProcedure, storagePutProcedure, storageUpdateDeletionKeyProcedure } from './link';
-
+import { listUserChatsProcedure } from './user-chats';
+import { 
+  saveConversationProcedure, 
+  saveMessageProcedure, 
+  getUserConversationsProcedure, 
+  deleteConversationProcedure, 
+  saveCompleteConversationProcedure 
+} from './chat-database';
 
 export const importChatGptShareInputSchema = z.union([
   z.object({
@@ -17,7 +24,6 @@ export const importChatGptShareInputSchema = z.union([
     htmlPage: z.string(),
   }),
 ]);
-
 
 export const tradeRouter = createTRPCRouter({
 
@@ -75,6 +81,11 @@ export const tradeRouter = createTRPCRouter({
   storageUpdateDeletionKey: storageUpdateDeletionKeyProcedure,
 
   /**
+   * List all chats for the authenticated user
+   */
+  listUserChats: listUserChatsProcedure,
+
+  /**
    * Publish a text file (with title, content, name) to a sharing service
    * For now only 'paste.gg' is supported
    */
@@ -101,4 +112,13 @@ export const tradeRouter = createTRPCRouter({
       };
     }),
 
+  // New Chat Database Procedures
+  saveConversation: saveConversationProcedure,
+  saveMessage: saveMessageProcedure,
+  getUserConversations: getUserConversationsProcedure,
+  deleteConversation: deleteConversationProcedure,
+  saveCompleteConversation: saveCompleteConversationProcedure,
+
 });
+
+export type TradeRouter = typeof tradeRouter;

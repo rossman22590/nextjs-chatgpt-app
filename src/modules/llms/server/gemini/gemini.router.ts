@@ -3,7 +3,7 @@ import { env } from '~/server/env';
 
 import packageJson from '../../../../../package.json';
 
-import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import { GeminiWire_API_Models_List, GeminiWire_Safety } from '~/modules/aix/server/dispatch/wiretypes/gemini.wiretypes';
@@ -86,10 +86,10 @@ const accessOnlySchema = z.object({
  * See https://github.com/google/generative-ai-js/tree/main/packages/main/src for
  * the official Google implementation.
  */
-export const llmGeminiRouter = createTRPCRouter({
+export const llmGeminiRouter = createTRPCRouterEdge({
 
-  /* [Gemini] models.list = /v1beta/models */
-  listModels: publicProcedure
+  /* Models */
+  listModels: publicProcedureEdge
     .input(accessOnlySchema)
     .output(ListModelsResponse_schema)
     .query(async ({ input }) => {

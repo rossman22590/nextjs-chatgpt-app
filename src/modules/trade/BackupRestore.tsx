@@ -18,7 +18,7 @@ import { downloadBlob } from '~/common/util/downloadUtils';
 
 
 // configuration
-const BACKUP_FILE_FORMAT = 'Big-AGI Flash File';
+const BACKUP_FILE_FORMAT = 'AI Tutor Flash File';
 const BACKUP_FORMAT_VERSION = '1.2';
 const BACKUP_FORMAT_VERSION_NUMBER = 102000;
 const WINDOW_RELOAD_DELAY = 200;
@@ -26,7 +26,7 @@ const EXCLUDED_LOCAL_STORAGE_KEYS = [
   'agi-logger-log', // the log cannot be restored as it's in-mem and being persisted while this is running
 ];
 const EXCLUDED_IDB_DATABASES = [
-  'Big-AGI', // exclude DBlobs IDB
+  'AI Tutor', // exclude DBlobs IDB
 ];
 const INCLUDED_IDB_KEYS: { [dbName: string]: { [storeName: string]: string[]; }; } = {
   'keyval-store': { 'keyval': ['app-chats'] }, // include ONLY the chats IDB
@@ -669,7 +669,7 @@ export function FlashRestore(props: { unlockRestore?: boolean }) {
       // validations
       if (!isValidBackup(data))
         throw new Error(`Invalid Flash file format. This does not appear to be a valid ${BACKUP_FILE_FORMAT}.`);
-      if (data.metadata.application !== 'Big-AGI' || !data.storage.indexedDB || !data.storage.localStorage)
+      if (data.metadata.application !== 'AI Tutor' || !data.storage.indexedDB || !data.storage.localStorage)
         throw new Error(`Incompatible Flash file. Found application "${data.metadata.application}" but expected "Big-AGI".`);
 
       // load data purely into state, and ready for confirmation
@@ -837,7 +837,7 @@ export function FlashBackup(props: {
         'full',
         event.ctrlKey, // control forces a traditional browser download - default: fileSave
         includeImages,
-        `Big-AGI-flash${includeImages ? '+images' : ''}${event.ctrlKey ? '-download' : ''}-${dateStr}.json`,
+        `AI Tutor-flash${includeImages ? '+images' : ''}${event.ctrlKey ? '-download' : ''}-${dateStr}.json`,
       );
       setBackupState(success ? 'success' : 'idle');
     } catch (error: any) {

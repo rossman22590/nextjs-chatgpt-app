@@ -1,6 +1,5 @@
 import { z } from 'zod';
-
-import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { env } from '~/server/env';
 import { fetchResponseOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
@@ -9,10 +8,10 @@ import { getPngDimensionsFromBytes, T2ICreateImageAsyncStreamOp } from '../t2i.s
 import { PRODIA_HARDCODED_MODELS } from './prodia.models';
 
 
-export const prodiaRouter = createTRPCRouter({
+export const prodiaRouter = createTRPCRouterEdge({
 
   /** [Prodia] Generate an image */
-  createImage: publicProcedure
+  createImage: publicProcedureEdge
     .input(z.object({
       prodiaKey: z.string().optional(),
       prodiaModel: z.string(),

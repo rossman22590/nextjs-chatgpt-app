@@ -1,19 +1,19 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
-import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { env } from '~/server/env';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import { Search } from './search.types';
 
 
-export const googleSearchRouter = createTRPCRouter({
+export const googleSearchRouter = createTRPCRouterEdge({
 
   /**
    * Google Search via the Google Programmable Search product
    */
-  search: publicProcedure
+  search: publicProcedureEdge
     .input(z.object({
       query: z.string(),
       items: z.number(),

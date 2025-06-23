@@ -13,9 +13,15 @@ try {
   buildHash = '2-dev';
 }
 // The following are used by/available to Release.buildInfo(...)
-process.env.NEXT_PUBLIC_BUILD_HASH = (buildHash || '').slice(0, 10);
-process.env.NEXT_PUBLIC_BUILD_PKGVER = JSON.parse('' + readFileSync(new URL('./package.json', import.meta.url))).version;
-process.env.NEXT_PUBLIC_BUILD_TIMESTAMP = new Date().toISOString();
+// Ensure buildHash is a string before calling slice
+buildHash = String(buildHash || 'unknown');
+process.env.NEXT_PUBLIC_BUILD_HASH = buildHash.slice(0, 10);
+try {
+  process.env.NEXT_PUBLIC_BUILD_PKGVER = JSON.parse('' + readFileSync(new URL('./package.json', import.meta.url))).version || 'unknown';
+} catch {
+  process.env.NEXT_PUBLIC_BUILD_PKGVER = 'unknown';
+}
+process.env.NEXT_PUBLIC_BUILD_TIMESTAMP = new Date().toISOString() || 'unknown';
 process.env.NEXT_PUBLIC_DEPLOYMENT_TYPE = process.env.NEXT_PUBLIC_DEPLOYMENT_TYPE || (process.env.VERCEL_ENV ? `vercel-${process.env.VERCEL_ENV}` : 'local'); // Docker or custom, Vercel
 console.log(` 🧠 \x1b[1mbig-AGI\x1b[0m v${process.env.NEXT_PUBLIC_BUILD_PKGVER} (@${process.env.NEXT_PUBLIC_BUILD_HASH})`);
 
@@ -45,7 +51,7 @@ let nextConfig: NextConfig = {
 
   // [puppeteer] https://github.com/puppeteer/puppeteer/issues/11052
   // NOTE: we may not be needing this anymore, as we use '@cloudflare/puppeteer'
-  serverExternalPackages: ['puppeteer-core'],
+  serverExternalPackages: ['puppeteer-core', 'crypto-browserify'],
 
   webpack: (config: any, { isServer }: { isServer: boolean }) => {
     // @mui/joy: anything material gets redirected to Joy
@@ -57,9 +63,23 @@ let nextConfig: NextConfig = {
       layers: true,
     };
 
+    // Add module rule for WebAssembly
+    config.module.rules.push({
+      test: /\.wasm$/,
+      type: 'webassembly/async'
+    });
+
     // fix warnings for async functions in the browser (https://github.com/vercel/next.js/issues/64792)
     if (!isServer) {
       config.output.environment = { ...config.output.environment, asyncFunction: true };
+      
+      // Don't resolve 'fs' module on the client to prevent errors on build
+      config.resolve.fallback = {
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: require.resolve('crypto-browserify'),
+      };
     }
 
     // prevent too many small chunks (40kb min) on 'client' packs (not 'server' or 'edge-server')

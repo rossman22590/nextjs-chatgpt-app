@@ -8,7 +8,7 @@
  */
 import type { FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
 import { ZodError } from 'zod';
-import { initTRPC } from '@trpc/server';
+import { initTRPC, TRPCError } from '@trpc/server';
 import { transformer } from '~/server/trpc/trpc.transformer';
 
 /**
@@ -18,17 +18,41 @@ import { transformer } from '~/server/trpc/trpc.transformer';
  *
  * These allow you to access things when processing a request, like the database, the session, etc.
  */
+// Define session type to avoid 'never' type issues
+type SessionWithUser = {
+  user: { id: string; name?: string; email?: string; image?: string; };
+  expires: string;
+} | null;
+
+/**
+ * Node.js Runtime Context - Supports NextAuth
+ * Used for API routes that need authentication
+ */
 export const createTRPCFetchContext = async ({ req }: FetchCreateContextFnOptions) => {
-  // const user = { name: req.headers.get('username') ?? 'anonymous' };
-  // return { req, resHeaders };
+  // Dynamic import NextAuth only when needed (Node.js runtime)
+  let session: SessionWithUser = null;
+  
+  try {
+    // Dynamic import to avoid bundling NextAuth in Edge Runtime
+    const { getServerSession } = await import('next-auth');
+    const { authOptions } = await import('~/server/auth/auth.config');
+    
+    // For cloud API routes, we can use getServerSession since they run in Node.js runtime
+    session = await getServerSession(authOptions) as SessionWithUser;
+  } catch (error) {
+    // If we're in Edge runtime or there's an error, session remains null
+    console.warn('Could not get server session, proceeding without authentication:', error);
+  }
+  
   return {
-    // only used by Backend Analytics
+    session,
+    // Request headers and signal for other functionality
     hostName: req.headers?.get('host') ?? 'localhost',
-    // enables cancelling upstream requests when the downstream request is aborted
     reqSignal: req.signal,
+    req,
+    res: null, // Note: fetch adapter doesn't have direct res object
   };
 };
-
 
 /**
  * 2. SERVER-SIDE INITIALIZATION
@@ -76,6 +100,32 @@ export const createTRPCRouter = t.router;
  * @link https://trpc.io/docs/v11/procedures
  */
 export const publicProcedure = t.procedure;
+
+/**
+ * Protected procedure
+ *
+ * This procedure ensures the user is authenticated before proceeding.
+ * If not authenticated, it will throw an UNAUTHORIZED error.
+ */
+const isAuthed = t.middleware(async ({ ctx, next }) => {
+  // Check if session exists and has a user
+  if (!ctx.session || !ctx.session.user) {
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Not authenticated' });
+  }
+  
+  // Since we've checked that ctx.session and ctx.session.user exist, TypeScript should know they're not null
+  // But we'll help it with a type assertion
+  const session = ctx.session as NonNullable<typeof ctx.session>;
+  
+  return next({
+    ctx: {
+      // Now session is properly typed
+      session: session,
+    },
+  });
+});
+
+export const protectedProcedure = t.procedure.use(isAuthed);
 
 // /**
 //  * Create a server-side caller

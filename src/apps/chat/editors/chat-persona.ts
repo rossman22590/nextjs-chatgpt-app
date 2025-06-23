@@ -122,8 +122,8 @@ export async function runPersonaOnConversationHead(
   cHandler.clearAbortController('chat-persona');
 
   if (autoTitleChat) {
-    // fire/forget, this will only set the title if it's not already set
-    void autoConversationTitle(conversationId, false);
+    // await auto-title generation to ensure it completes before sync
+    await autoConversationTitle(conversationId, false);
   }
 
   if (!hasBeenAborted && (autoSuggestDiagrams || autoSuggestHTMLUI || autoSuggestQuestions))
