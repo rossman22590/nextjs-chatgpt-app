@@ -146,16 +146,23 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
       );
     }
 
+    // Default text variant for authenticated users
     return (
       <Button
         variant="plain"
         color="neutral"
         size={size}
-        startDecorator={<LogoutIcon />}
         onClick={handleSignOut}
-        sx={sx}
+        sx={{
+          flexDirection: 'column',
+          gap: 0.75,
+          ...sx,
+        }}
       >
-        Sign Out
+        <LogoutIcon />
+        <Box component='span'>
+          Sign Out
+        </Box>
       </Button>
     );
   }
@@ -185,11 +192,17 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
       variant="plain"
       color="primary"
       size={size}
-      startDecorator={<LoginIcon />}
       onClick={handleSignIn}
-      sx={sx}
+      sx={{
+        flexDirection: 'column',
+        gap: 0.75,
+        ...sx,
+      }}
     >
-      Sign In
+      <LoginIcon />
+      <Box component='span'>
+        Sign In
+      </Box>
     </Button>
   );
 }; 

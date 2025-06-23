@@ -3,13 +3,14 @@ import Router from 'next/router';
 
 import { Box, Button, ButtonGroup, ColorPaletteProp, Sheet } from '@mui/joy';
 import LoginIcon from '@mui/icons-material/Login';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 import { ROUTE_APP_NEWS } from '~/common/app.routes';
 import { checkDivider, checkVisibileIcon, NavItemApp, navItems } from '~/common/app.nav';
 import { AuthButton } from '~/common/components/auth/AuthButton';
 
 import { BringTheLove } from './BringTheLove';
-import { optimaCloseDrawer, optimaOpenModels } from '../useOptima';
+import { optimaCloseDrawer, optimaOpenModels, optimaOpenPreferences } from '../useOptima';
 
 
 // configuration
@@ -82,16 +83,22 @@ export function MobileNavItems(props: { currentApp?: NavItemApp }) {
       optimaCloseDrawer();
   }, []);
 
+  // Only show core apps on mobile - filter out dev/hidden items
+  const coreApps = ['/', '/draw', '/chat', '/personas'];
+  
   navItems.apps.forEach((app) => {
+    // Skip if not visible or is a dev item
     if (!checkVisibileIcon(app, true, props.currentApp)) return;
+    if (app.isDev || app._delete) return;
     if (checkDivider(app)) {
       crossedDivider = true;
       return;
     }
-    // NOTE: using the 'hideOnMobile' flag instead of the crossing
-    // if (!crossedDivider)
-    visibleApps.push(app);
-    // else overflowApps.push(app);
+    
+    // Only show core apps on mobile
+    if (coreApps.includes(app.route)) {
+      visibleApps.push(app);
+    }
   });
 
   return (
@@ -124,42 +131,26 @@ export function MobileNavItems(props: { currentApp?: NavItemApp }) {
         })}
       </ButtonGroup>
 
-      {/* Group 2: Modals & Social Links */}
+      {/* Group 2: Essential Links */}
       <Box sx={_styles.linksGroup}>
-        <Button
-          size='sm'
-          color='neutral'
-          aria-selected={props.currentApp?.route === '/news'}
-          variant={props.currentApp?.route === '/news' ? (INVERT_PANE ? 'soft' : 'solid') : 'plain'}
-          onClick={() => handleNavigate(ROUTE_APP_NEWS, true)}
-          sx={_styles.button}
-        >
-          News
-        </Button>
-
-        {/* HARDCODED: Models */}
+        {/* Settings */}
         <Button
           size='sm'
           color='neutral'
           variant='plain'
-          onClick={optimaOpenModels}
+          onClick={() => optimaOpenPreferences()}
           sx={_styles.button}
         >
-          Models
+          <SettingsIcon />
+          <Box component='span'>
+            Settings
+          </Box>
         </Button>
 
         {/* Enhanced Sign in/out button */}
         <AuthButton
           variant="text"
           size="sm"
-          sx={_styles.button}
-        />
-
-        {/* HARDCODED: Discord */}
-        <BringTheLove
-          text={navItems.links[0].name}
-          icon={navItems.links[0].icon}
-          link={navItems.links[0].href}
           sx={_styles.button}
         />
       </Box>
