@@ -97,6 +97,10 @@ export const env = createEnv({
     // Authentication: Disable user registration
     DISABLE_SIGNUP: z.string().optional(),
 
+    // App Protection: Password to access the app
+    PASSWORD: z.string().optional(),
+    PASSWORD_PROTECT: z.string().optional(),
+
     // Build-time configuration (ignore)
     BIG_AGI_BUILD: z.enum(['standalone', 'static']).optional(),
 
