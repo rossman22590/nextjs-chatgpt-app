@@ -9,7 +9,7 @@ visualizations, coding, drawing, side-by-side chatting, and more -- all wrapped 
 
 Stay ahead of the curve with big-AGI. 🚀 Pros & Devs love big-AGI. 🤖
 
-[![Official Website](https://img.shields.io/badge/BIG--AGI.com-%23096bde?style=for-the-badge&logo=vercel&label=launch)](https://big-agi.com)
+[![Official Website](https://img.shields.io/badge/BIG--AGI.com-%23096bde?style=for-the-badge&logo=vercel&label=launch)](https://big-agi.com) 
 
 > 🚀 Big-AGI 2 is launching soon.
 
