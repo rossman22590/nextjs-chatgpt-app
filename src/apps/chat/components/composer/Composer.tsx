@@ -65,7 +65,7 @@ import { ButtonAttachCameraMemo, useCameraCaptureModalDialog } from './buttons/B
 import { ButtonAttachClipboardMemo } from './buttons/ButtonAttachClipboard';
 import { ButtonAttachScreenCaptureMemo } from './buttons/ButtonAttachScreenCapture';
 import { ButtonAttachWebMemo } from './buttons/ButtonAttachWeb';
-import { ButtonBeamMemo } from './buttons/ButtonBeam';
+
 import { ButtonCallMemo } from './buttons/ButtonCall';
 import { ButtonGroupDrawRepeat } from './buttons/ButtonGroupDrawRepeat';
 import { ButtonMicContinuationMemo } from './buttons/ButtonMicContinuation';
@@ -997,7 +997,7 @@ export function Composer(props: {
                 {isMobile && (showChatExtras
                     ? (composerQuickButton === 'call'
                       ? <ButtonCallMemo isMobile disabled={noConversation || noLLM} onClick={handleCallClicked} />
-                      : <ButtonBeamMemo isMobile disabled={noConversation /*|| noLLM*/} color={beamButtonColor} hasContent={!!composeText} onClick={handleSendTextBeamClicked} />)
+                      : <IconButton disabled sx={{ mr: { xs: 1, md: 2 } }} />)
                     : isDraw
                       ? <ButtonOptionsDraw isMobile onClick={handleDrawOptionsClicked} sx={{ mr: { xs: 1, md: 2 } }} />
                       : <IconButton disabled sx={{ mr: { xs: 1, md: 2 } }} />
@@ -1065,15 +1065,7 @@ export function Composer(props: {
                   </IconButton>
                 </ButtonGroup>
 
-                {/* [desktop] secondary-top buttons */}
-                {isDesktop && showChatExtras && !assistantAbortible && (
-                  <ButtonBeamMemo
-                    color={beamButtonColor}
-                    disabled={noConversation /*|| noLLM*/}
-                    hasContent={!!composeText}
-                    onClick={handleSendTextBeamClicked}
-                  />
-                )}
+
 
               </Box>
 
