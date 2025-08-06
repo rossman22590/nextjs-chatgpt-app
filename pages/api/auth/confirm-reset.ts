@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { token, password } = confirmResetSchema.parse(req.body);
 
     // Find and validate token in database
-    const resetToken = await prisma.passwordResetToken.findUnique({
+    const resetToken = await (prisma as any).passwordResetToken.findUnique({
       where: { token }
     });
     
@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Check if token is expired
     if (new Date() > resetToken.expires) {
       // Clean up expired token
-      await prisma.passwordResetToken.delete({
+      await (prisma as any).passwordResetToken.delete({
         where: { id: resetToken.id }
       });
       return res.status(400).json({ 
@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const hashedPassword = hashSync(password, 12);
 
     // Update the user's password in the Account table
-    await prisma.account.updateMany({
+    await (prisma as any).account.updateMany({
       where: {
         user: { email: resetToken.email },
         provider: 'credentials'
@@ -55,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Mark token as used and clean up
-    await prisma.passwordResetToken.update({
+    await (prisma as any).passwordResetToken.update({
       where: { id: resetToken.id },
       data: { used: true }
     });
@@ -73,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         message: 'Invalid input',
-        errors: error.errors,
+        errors: error.issues,
       });
     }
 

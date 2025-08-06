@@ -653,7 +653,7 @@ export namespace OpenAIWire_API_Chat_Completions {
 //
 export namespace OpenAIWire_API_Responses {
 
-  export type Request = z.infer<typeof ResponsesRequest_schema>;
+  export type ResponsesRequest = z.infer<typeof ResponsesRequest_schema>;
   const ResponsesRequest_schema = z.object({
 
     // ID of the model to use. Currently, only o3-pro and o1-pro are supported.
@@ -691,7 +691,7 @@ export namespace OpenAIWire_API_Responses {
 
   });
 
-  export type Response = z.infer<typeof ResponsesResponse_schema>;
+  export type ResponsesResponse = z.infer<typeof ResponsesResponse_schema>;
   const ResponsesResponse_schema = z.object({
 
     // A unique identifier for the response.
@@ -1359,8 +1359,8 @@ export namespace OpenAIWire_API_Responses {
   /// Response
 
 
-  export type Response = z.infer<typeof Response_schema>;
-  export const Response_schema = z.object({
+  export type ResponsesAPIResponse = z.infer<typeof ResponsesAPIResponse_schema>;
+  export const ResponsesAPIResponse_schema = z.object({
     object: z.literal('response'),
 
     id: z.string(), // unique ID for this response
@@ -1416,29 +1416,29 @@ export namespace OpenAIWire_API_Responses {
 
   const ResponseCreatedEvent_schema = _BaseEvent_schema.extend({
     type: z.literal('response.created'),
-    response: Response_schema,
+    response: ResponsesAPIResponse_schema,
   });
 
   const ResponseInProgress_schema = _BaseEvent_schema.extend({
     type: z.literal('response.in_progress'),
-    response: Response_schema,
+    response: ResponsesAPIResponse_schema,
   });
 
   const ResponseCompletedEvent_schema = _BaseEvent_schema.extend({
     type: z.literal('response.completed'),
-    response: Response_schema,
+    response: ResponsesAPIResponse_schema,
   });
 
   // finishes as failed
   const ResponseFailedEvent_schema = _BaseEvent_schema.extend({
     type: z.literal('response.failed'),
-    response: Response_schema,
+    response: ResponsesAPIResponse_schema,
   });
 
   // finishes as incomplete
   const ResponseIncompleteEvent_schema = _BaseEvent_schema.extend({
     type: z.literal('response.incomplete'),
-    response: Response_schema,
+    response: ResponsesAPIResponse_schema,
   });
 
   // Streaming > Output item

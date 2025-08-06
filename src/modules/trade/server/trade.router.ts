@@ -79,5 +79,29 @@ export const tradeRouter = createTRPCRouter({
    */
   storageUpdateDeletionKey: storageUpdateDeletionKeyProcedure,
 
+  /**
+   * Save a conversation to the database
+   */
+  saveConversation: saveConversationProcedure,
+
+  /**
+   * Save a message to the database
+   */
+  saveMessage: saveMessageProcedure,
+
+  /**
+   * Get all conversations for the authenticated user
+   */
+  getUserConversations: getUserConversationsProcedure,
+
+  /**
+   * Delete a conversation and all its messages
+   */
+  deleteConversation: deleteConversationProcedure,
+
+  /**
+   * Save a complete conversation with all its messages
+   */
+  saveCompleteConversation: saveCompleteConversationProcedure,
 
 });

@@ -65,5 +65,5 @@ export const Release = {
 
 export const BaseProduct = {
   ReleaseNotes: '',
-  SupportForm: (_userId?: string) => '#',
+  SupportForm: (_userId?: string) => 'https://aitutorxpixio.featurebase.app/',
 } as const;

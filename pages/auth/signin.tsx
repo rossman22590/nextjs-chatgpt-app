@@ -17,6 +17,7 @@ import {
   CircularProgress
 } from '@mui/joy';
 import LoginIcon from '@mui/icons-material/Login';
+import GoogleIcon from '@mui/icons-material/Google';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import IconButton from '@mui/joy/IconButton';
@@ -87,6 +88,20 @@ export default function SignIn() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      await signIn('google', {
+        callbackUrl: callbackUrl ? String(callbackUrl) : '/',
+      });
+    } catch (err) {
+      setError('Failed to sign in with Google. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
@@ -98,7 +113,6 @@ export default function SignIn() {
     setError(null);
 
     try {
-      // You would integrate with Supabase password reset here
       const response = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +149,7 @@ export default function SignIn() {
     );
   }
 
-  // Don't render if already authenticated (will redirect)
+  // Don&apos;t render if already authenticated (will redirect)
   if (status === 'authenticated') {
     return null;
   }
@@ -197,6 +211,26 @@ export default function SignIn() {
               {successMessage}
             </Alert>
           )}
+
+          {/* Google Sign In Button */}
+          <Button
+            variant="outlined"
+            color="neutral"
+            size="lg"
+            startDecorator={<GoogleIcon />}
+            onClick={handleGoogleSignIn}
+            disabled={isLoading}
+            sx={{
+              width: '100%',
+              borderRadius: 'md',
+              py: 1.5,
+              mb: 3,
+            }}
+          >
+            Continue with Google
+          </Button>
+
+          <Divider sx={{ my: 3 }}>or</Divider>
 
           {!showResetForm ? (
             <form onSubmit={handleSubmit}>
@@ -317,7 +351,6 @@ export default function SignIn() {
           {!isSignupDisabled && (
             <>
               <Divider sx={{ my: 4 }}>or</Divider>
-
               <Box sx={{ textAlign: 'center' }}>
                 <Typography level="body-sm" color="neutral">
                   Don&apos;t have an account?{' '}
@@ -331,6 +364,14 @@ export default function SignIn() {
                 </Typography>
               </Box>
             </>
+          )}
+
+          {isSignupDisabled && (
+            <Box sx={{ textAlign: 'center', mt: 3 }}>
+              <Typography level="body-sm" color="neutral">
+                Registration is currently disabled. Please contact an administrator for access.
+              </Typography>
+            </Box>
           )}
         </CardContent>
       </Card>

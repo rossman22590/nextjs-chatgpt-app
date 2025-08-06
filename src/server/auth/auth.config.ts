@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '~/server/prisma/prisma-client';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { z } from 'zod';
 import { JWT } from 'next-auth/jwt';
@@ -9,6 +10,10 @@ import { JWT } from 'next-auth/jwt';
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -30,7 +35,7 @@ export const authOptions: NextAuthOptions = {
         const { email, password } = result.data;
 
         // Find user by email
-        const user = await prisma.user.findUnique({
+        const user = await (prisma as any).user.findUnique({
           where: { email }
         });
 
@@ -39,7 +44,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Get the hashed password from the database
-        const userAccount = await prisma.account.findFirst({
+        const userAccount = await (prisma as any).account.findFirst({
           where: {
             userId: user.id,
             provider: 'credentials'

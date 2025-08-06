@@ -40,51 +40,97 @@ export function AppNews() {
   return (
     <Box sx={{
       flexGrow: 1,
-      display: 'flex', 
+      display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
       p: { xs: 3, md: 6 },
     }}>
       
       <Box sx={{
-        display: 'flex', 
-        flexDirection: 'column', 
+        display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        gap: 3,
+        gap: 4,
         p: 4,
         borderRadius: 'lg',
         border: '2px solid',
         borderColor: 'primary.500',
         backgroundColor: 'background.surface',
         boxShadow: 'lg',
-        maxWidth: 400,
+        maxWidth: 600,
         textAlign: 'center',
       }}>
         
-        <Typography 
-          level='h1' 
-          sx={{ 
+        <Typography
+          level='h1'
+          sx={{
             fontSize: '2.5rem',
             color: 'primary.500',
             fontWeight: 'bold',
           }}
         >
-          BETA UPDATE
+          🚀 NEW FEATURES
         </Typography>
         
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          textAlign: 'left',
+          width: '100%'
+        }}>
+          <Typography level="h3" sx={{ color: 'primary.600', mb: 1 }}>
+            What's New in This Update:
+          </Typography>
+          
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span style={{ color: '#10b981', fontSize: '1.2em' }}>☁️</span>
+              <strong>Cloud Storage:</strong> Save and sync your conversations across devices
+            </Typography>
+            
+            <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span style={{ color: '#3b82f6', fontSize: '1.2em' }}>🤖</span>
+              <strong>More AI Models:</strong> Access to latest GPT, Claude, and open-source models
+            </Typography>
+            
+            <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span style={{ color: '#8b5cf6', fontSize: '1.2em' }}>👤</span>
+              <strong>User Profiles:</strong> Personalized experience with Google OAuth authentication
+            </Typography>
+            
+            <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span style={{ color: '#f59e0b', fontSize: '1.2em' }}>📊</span>
+              <strong>Analytics:</strong> Track your usage and conversation insights
+            </Typography>
+            
+            <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span style={{ color: '#ef4444', fontSize: '1.2em' }}>🔗</span>
+              <strong>Share Links:</strong> Generate shareable links for your conversations
+            </Typography>
+            
+            <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span style={{ color: '#06b6d4', fontSize: '1.2em' }}>🛡️</span>
+              <strong>Enhanced Security:</strong> Secure authentication and data protection
+            </Typography>
+          </Box>
+        </Box>
+        
         <Button
-          variant='solid' 
-          color='primary' 
+          variant='solid'
+          color='primary'
           size='lg'
-          component={Link} 
-          href={ROUTE_INDEX} 
+          component={Link}
+          href={ROUTE_INDEX}
           noLinkStyle
           sx={{
-            minWidth: 150,
+            minWidth: 200,
             boxShadow: 'md',
+            fontSize: '1.1rem',
+            py: 1.5,
           }}
         >
-          Continue
+          Explore New Features
         </Button>
         
       </Box>

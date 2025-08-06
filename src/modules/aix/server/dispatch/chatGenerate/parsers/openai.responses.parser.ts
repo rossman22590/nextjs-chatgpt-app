@@ -13,8 +13,8 @@ const OPENAI_RESPONSES_DEBUG_EVENT_SEQUENCE = false; // true: shows the sequence
 const OPENAI_RESPONSES_SAME_PART_SPACER = '\n\n'; // true: shows the sequence of events
 
 
-type TResponse = OpenAIWire_API_Responses.Response;
-type TOutputItem = OpenAIWire_API_Responses.Response['output'][number];
+type TResponse = OpenAIWire_API_Responses.ResponsesAPIResponse;
+type TOutputItem = any; // OpenAIWire_API_Responses.Response['output'][number];
 type TEventType = OpenAIWire_API_Responses.StreamingEvent['type'];
 
 
@@ -221,7 +221,7 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
          * - .usage = null
          * - .metadata = {}
          */
-        R.setResponse(eventType, event.response);
+        R.setResponse(eventType, event.response as any);
 
         // -> Model
         pt.setModelName(event.response.model);
@@ -232,12 +232,12 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
 
       case 'response.in_progress':
         // NO CHANGES expected, since 'response.created'
-        R.setResponse(eventType, event.response);
+        R.setResponse(eventType, event.response as any);
         break;
 
       case 'response.completed':
         // CHANGE of { status, output, usage } expected
-        R.setResponse(eventType, event.response, ['status', 'output', 'usage']);
+        R.setResponse(eventType, event.response as any, ['status', 'output', 'usage']);
 
         // -> Status
         // TODO: set the terminating reason?
@@ -247,7 +247,7 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
 
         // -> Usage (incl. dtAll)
         if (event.response.usage) {
-          const metrics = _fromResponseUsage(event.response.usage, R.parserCreationTimestamp, R.timeToFirstEvent);
+          const metrics = _fromResponseUsage(event.response.usage as any, R.parserCreationTimestamp, R.timeToFirstEvent);
           if (metrics)
             pt.updateMetrics(metrics);
         }
@@ -257,7 +257,7 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
       case 'response.incomplete':
         // TODO: We haven't seen one of those events yet; we need to see what happens and parse it!
         console.warn(`[DEV] AIX: FIXME: we got a Response ${eventType}:`);
-        R.setResponse(eventType, event.response);
+        R.setResponse(eventType, event.response as any);
         break;
 
 
@@ -442,7 +442,7 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
       console.log('AIX: OpenAI-Response-NS warning:', responseData.warning);
 
     // full response parsing
-    const response = OpenAIWire_API_Responses.Response_schema.parse(responseData);
+    const response = OpenAIWire_API_Responses.ResponsesAPIResponse_schema.parse(responseData);
 
     // -> Model
     if (response.model)
@@ -450,7 +450,7 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
 
     // -> Usage
     if (response.usage) {
-      const metrics = _fromResponseUsage(response.usage, parserCreationTimestamp, undefined);
+      const metrics = _fromResponseUsage(response.usage as any, parserCreationTimestamp, undefined);
       if (metrics)
         pt.updateMetrics(metrics);
     }
@@ -623,14 +623,14 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
 }
 
 
-function _fromResponseUsage(usage: OpenAIWire_API_Responses.Response['usage'], parserCreationTimestamp: number, timeToFirstEvent: number | undefined) {
+function _fromResponseUsage(usage: OpenAIWire_API_Responses.ResponsesAPIResponse['usage'], parserCreationTimestamp: number, timeToFirstEvent: number | undefined) {
 
   // -> Stats only in some packages
   if (!usage)
     return undefined;
 
   // Require at least the completion tokens, or issue a DEV warning otherwise
-  if (usage.output_tokens === undefined) {
+  if ((usage as any).output_tokens === undefined) {
     // Warn, so we may adjust this usage parsing for Non-OpenAI APIs
     console.log('[DEV] AIX: OpenAI Responses missing completion tokens in usage', { usage });
     return undefined;
@@ -638,8 +638,8 @@ function _fromResponseUsage(usage: OpenAIWire_API_Responses.Response['usage'], p
 
   // Create the metrics update object
   const metricsUpdate: AixWire_Particles.CGSelectMetrics = {
-    TIn: usage.input_tokens ?? undefined,
-    TOut: usage.output_tokens,
+    TIn: (usage as any).input_tokens ?? undefined,
+    TOut: (usage as any).output_tokens,
     // dtInner: openAI is not reporting the time as seen by the servers
     dtAll: Date.now() - parserCreationTimestamp,
   };
@@ -647,8 +647,8 @@ function _fromResponseUsage(usage: OpenAIWire_API_Responses.Response['usage'], p
   // Input Metrics
 
   // Input redistribution: Cache Read
-  if (usage.input_tokens_details) {
-    const TCacheRead = usage.input_tokens_details.cached_tokens;
+  if ((usage as any).input_tokens_details) {
+    const TCacheRead = (usage as any).input_tokens_details.cached_tokens;
     if (TCacheRead !== undefined && TCacheRead > 0) {
       metricsUpdate.TCacheRead = TCacheRead;
       if (metricsUpdate.TIn !== undefined)
@@ -661,10 +661,10 @@ function _fromResponseUsage(usage: OpenAIWire_API_Responses.Response['usage'], p
   // Output Metrics
 
   // Output breakdown: Reasoning
-  if (usage.output_tokens_details) {
-    const details = usage.output_tokens_details || {};
+  if ((usage as any).output_tokens_details) {
+    const details = (usage as any).output_tokens_details || {};
     if (details.reasoning_tokens !== undefined)
-      metricsUpdate.TOutR = usage.output_tokens_details.reasoning_tokens;
+      metricsUpdate.TOutR = (usage as any).output_tokens_details.reasoning_tokens;
   }
 
   // TODO: Output breakdown: Audio

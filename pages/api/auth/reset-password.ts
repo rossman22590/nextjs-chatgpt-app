@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { email } = resetPasswordSchema.parse(req.body);
 
     // Check if user exists
-    const user = await prisma.user.findUnique({
+    const user = await (prisma as any).user.findUnique({
       where: { email }
     });
 
@@ -36,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const expires = new Date(Date.now() + (60 * 60 * 1000)); // 1 hour from now
 
     // Clean up old tokens for this email
-    await prisma.passwordResetToken.deleteMany({
+    await (prisma as any).passwordResetToken.deleteMany({
       where: {
         OR: [
           { email },
@@ -46,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Store the token in database
-    await prisma.passwordResetToken.create({
+    await (prisma as any).passwordResetToken.create({
       data: {
         email,
         token,
@@ -111,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         message: 'Invalid email format',
-        errors: error.errors,
+        errors: error.issues,
       });
     }
 

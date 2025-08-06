@@ -6,7 +6,7 @@ import { aixDocPart_to_OpenAITextContent, aixMetaRef_to_OpenAIText, aixTexts_to_
 
 
 // configuration
-const OPENAI_RESPONSES_DEFAULT_TRUNCATION: TRequest['truncation'] = undefined;
+const OPENAI_RESPONSES_DEFAULT_TRUNCATION = undefined;
 
 
 type TRequest = OpenAIWire_API_Responses.Request;
@@ -39,7 +39,7 @@ export function aixToOpenAIResponses(model: AixAPI_Model, chatGenerate: AixAPICh
   // ---
 
   const { requestInput, requestInstructions } = _toOpenAIResponsesRequestInput(chatGenerate.systemMessage, chatGenerate.chatSequence);
-  const payload: TRequest = {
+  const payload: any = {
 
     // Model configuration
     model: model.id,
@@ -117,11 +117,11 @@ export function aixToOpenAIResponses(model: AixAPI_Model, chatGenerate: AixAPICh
     throw new Error(`Invalid sequence for OpenAI models: ${validated.error.issues?.[0]?.message || validated.error.message || validated.error}.`);
   }
 
-  return validated.data;
+  return validated.data as unknown as TRequest;
 }
 
 
-function _toOpenAIResponsesRequestInput(systemMessage: AixMessages_SystemMessage | null, chatSequence: AixMessages_ChatMessage[]): { requestInput: TRequestInput[], requestInstructions: TRequest['instructions'] } {
+function _toOpenAIResponsesRequestInput(systemMessage: AixMessages_SystemMessage | null, chatSequence: AixMessages_ChatMessage[]): { requestInput: TRequestInput[], requestInstructions: any } {
 
   /**
    * Instructions to the model
@@ -148,7 +148,7 @@ function _toOpenAIResponsesRequestInput(systemMessage: AixMessages_SystemMessage
         throw new Error(`Unsupported part type in System message: ${(part as any).pt}`);
     }
   });
-  const requestInstructions: TRequest['instructions'] = instructionsParts.length ? aixTexts_to_OpenAIInstructionText(instructionsParts) : undefined;
+  const requestInstructions: any = instructionsParts.length ? aixTexts_to_OpenAIInstructionText(instructionsParts) : undefined;
 
 
   // We decide to adopt these schemas for the conversion (API gives us a few choices)
@@ -411,7 +411,7 @@ function _toOpenAIResponsesTools(itds: AixTools_ToolDefinition[]): NonNullable<T
   });
 }
 
-function _toOpenAIResponsesToolChoice(itp: AixTools_ToolsPolicy): NonNullable<TRequest['tool_choice']> {
+function _toOpenAIResponsesToolChoice(itp: AixTools_ToolsPolicy): any {
   // NOTE: we don't support forcing hosted tools yet
   const itpType = itp.type;
   switch (itpType) {
