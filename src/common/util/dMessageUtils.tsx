@@ -11,7 +11,7 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 
 import { SystemPurposeId, SystemPurposes } from '../../data';
 
-import { findModelVendor } from '~/modules/llms/vendors/vendors.registry';
+import { llmsGetVendorIcon } from '~/modules/llms/components/LLMVendorIcon';
 
 import type { MetricsChatGenerateCost_Md } from '~/common/stores/metrics/metrics.chatgenerate';
 import type { DMessage, DMessageGenerator, DMessageRole } from '~/common/stores/chat/chat.message';
@@ -74,7 +74,8 @@ const tooltipMetricsGridSx: SxProps = {
   // grid of 2 columns, the first fits the labels, the other expends with the values
   display: 'grid',
   gridTemplateColumns: 'auto 1fr',
-  gap: 0.5,
+  columnGap: 1,
+  rowGap: 0.5,
 };
 
 
@@ -246,7 +247,7 @@ export function useMessageAvatarLabel(
     // aix generator: details galore
     const modelId = generator.aix?.mId ?? null;
     const vendorId = generator.aix?.vId ?? null;
-    const VendorIcon = (vendorId && complexity !== 'minimal') ? findModelVendor(vendorId)?.Icon : null;
+    const VendorIcon = (vendorId && complexity !== 'minimal') ? llmsGetVendorIcon(vendorId) : null;
     const metrics = generator.metrics ? _prettyMetrics(generator.metrics, complexity) : null;
     const stopReason = generator.tokenStopReason ? _prettyTokenStopReason(generator.tokenStopReason, complexity) : null;
 
@@ -271,6 +272,7 @@ function _prettyMetrics(metrics: DMessageGenerator['metrics'], uiComplexityMode:
 
   const showWaitingTime = metrics?.dtStart !== undefined && (uiComplexityMode === 'extra' || metrics.dtStart >= 10000);
   const showSpeedSection = uiComplexityMode !== 'minimal' && (showWaitingTime || metrics?.vTOutInner !== undefined);
+  const showTimeSection = showSpeedSection && !!metrics?.dtAll;
 
   const costCode = metrics.$code ? _prettyCostCode(metrics.$code) : null;
 
@@ -309,8 +311,12 @@ function _prettyMetrics(metrics: DMessageGenerator['metrics'], uiComplexityMode:
         })</small>
       </>}
     </div>}
-    {costCode && metrics?.$c !== undefined ? <div>Costs:</div> : <div />}
+    {costCode && <div>{metrics?.$c !== undefined ? 'Costs:' : ''}</div>}
     {costCode && <div><em>{costCode}</em></div>}
+
+    {/* Time */}
+    {showTimeSection && <div>Time:</div>}
+    {showTimeSection && <div><b>{(Math.round(metrics.dtAll! / 100) / 10).toLocaleString()}</b> s</div>}
   </Box>;
 }
 
@@ -489,12 +495,13 @@ function _prettyAnthropicModelName(modelId: string): string | null {
 
   const subStr = modelId.slice(claudeIndex);
   const version =
-    subStr.includes('-5') ? '5'
-      : subStr.includes('-4') ? '4'
-        : subStr.includes('-3-7') ? '3.7'
-          : subStr.includes('-3-5') ? '3.5'
-            : subStr.includes('-3') ? '3'
-              : '?';
+    subStr.includes('-3-5') ? '3.5' // fixes the -5
+      : subStr.includes('-5') ? '5'
+        : subStr.includes('-4-1') ? '4.1'
+          : subStr.includes('-4') ? '4'
+            : subStr.includes('-3-7') ? '3.7'
+              : subStr.includes('-3') ? '3'
+                : '?';
 
   if (subStr.includes(`-opus`)) return `Claude ${version} Opus`;
   if (subStr.includes(`-sonnet`)) return `Claude ${version} Sonnet`;

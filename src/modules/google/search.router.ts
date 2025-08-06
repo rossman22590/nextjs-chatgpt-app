@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
+import * as z from 'zod/v4';
 
 import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { env } from '~/server/env';

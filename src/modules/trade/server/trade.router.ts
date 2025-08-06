@@ -1,11 +1,10 @@
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
+import * as z from 'zod/v4';
 
 import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
 import { fetchTextOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import { chatGptParseConversation, chatGptSharedChatSchema } from './chatgpt';
-import { postToPasteGGOrThrow, publishToInputSchema, publishToOutputSchema } from './pastegg';
 import { storageGetProcedure, storageMarkAsDeletedProcedure, storagePutProcedure, storageUpdateDeletionKeyProcedure } from './link';
 import { listUserChatsProcedure } from './user-chats';
 import { 
@@ -18,7 +17,7 @@ import {
 
 export const importChatGptShareInputSchema = z.union([
   z.object({
-    url: z.string().url().startsWith('https://chatgpt.com/share/'),
+    url: z.url().startsWith('https://chatgpt.com/share/'),
   }),
   z.object({
     htmlPage: z.string(),
@@ -80,45 +79,5 @@ export const tradeRouter = createTRPCRouter({
    */
   storageUpdateDeletionKey: storageUpdateDeletionKeyProcedure,
 
-  /**
-   * List all chats for the authenticated user
-   */
-  listUserChats: listUserChatsProcedure,
-
-  /**
-   * Publish a text file (with title, content, name) to a sharing service
-   * For now only 'paste.gg' is supported
-   */
-  publishTo: publicProcedure
-    .input(publishToInputSchema)
-    .output(publishToOutputSchema)
-    .mutation(async ({ input: { to, title, fileContent, fileName, origin } }) => {
-      if (to !== 'paste.gg' || !title || !fileContent || !fileName)
-        throw new Error('Invalid options');
-
-      const paste = await postToPasteGGOrThrow(title, fileName, fileContent, origin);
-      if (paste?.status !== 'success')
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `${paste?.error || 'Unknown error'}. ${paste?.message || 'Unknown cause'}`.trim(),
-        });
-
-      const result = paste.result;
-      return {
-        url: `https://paste.gg/${result.id}`,
-        expires: result.expires || 'never',
-        deletionKey: result.deletion_key || 'none',
-        created: result.created_at,
-      };
-    }),
-
-  // New Chat Database Procedures
-  saveConversation: saveConversationProcedure,
-  saveMessage: saveMessageProcedure,
-  getUserConversations: getUserConversationsProcedure,
-  deleteConversation: deleteConversationProcedure,
-  saveCompleteConversation: saveCompleteConversationProcedure,
 
 });
-
-export type TradeRouter = typeof tradeRouter;

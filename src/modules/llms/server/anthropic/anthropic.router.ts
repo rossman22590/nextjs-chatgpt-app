@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
+import * as z from 'zod/v4';
 
 import { env } from '~/server/env';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';

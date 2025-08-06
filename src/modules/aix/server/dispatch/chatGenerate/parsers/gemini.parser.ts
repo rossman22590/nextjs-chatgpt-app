@@ -121,7 +121,12 @@ export function createGeminiGenerateContentResponseParser(requestedModelName: st
 
           // <- FunctionCallPart
           case 'functionCall' in mPart:
-            pt.startFunctionCallInvocation(null, mPart.functionCall.name, 'json_object', mPart.functionCall.args ?? null);
+            let { id: fcId, name: fcName, args: fcArgs } = mPart.functionCall;
+            // Validate the function call arguments - we expect a JSON object, not just any JSON value
+            if (!fcArgs || typeof fcArgs !== 'object')
+              console.warn(`[Gemini] Invalid function call arguments: ${JSON.stringify(fcArgs)} for ${fcName}`);
+            else
+              pt.startFunctionCallInvocation(fcId ?? null, fcName, 'json_object', fcArgs);
             pt.endMessagePart();
             break;
 
@@ -163,7 +168,7 @@ export function createGeminiGenerateContentResponseParser(requestedModelName: st
       if (ENABLE_RECITATIONS_AS_CITATIONS && candidate0.citationMetadata?.citationSources?.length) {
         for (let { startIndex, endIndex, uri /*, license*/ } of candidate0.citationMetadata.citationSources) {
           // TODO: have a particle/part flag to state the purpose of a citation? (e.g. 'recitation' is weaker than 'grounding')
-          pt.appendUrlCitation('', uri || '', undefined, startIndex, endIndex, undefined);
+          pt.appendUrlCitation('', uri || '', undefined, startIndex, endIndex, undefined, undefined);
         }
       }
 
@@ -177,7 +182,7 @@ export function createGeminiGenerateContentResponseParser(requestedModelName: st
          * - include the 'renderedContent' from .searchEntryPoint
          */
         for (const { web } of candidate0.groundingMetadata.groundingChunks) {
-          pt.appendUrlCitation(web.title, web.uri, ++groundingIndexNumber, undefined, undefined, undefined);
+          pt.appendUrlCitation(web.title, web.uri, ++groundingIndexNumber, undefined, undefined, undefined, undefined);
         }
       }
 

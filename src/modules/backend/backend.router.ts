@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod/v4';
 
 import { Release } from '~/common/app.release';
 
@@ -73,7 +73,6 @@ export const backendRouter = createTRPCRouterEdge({
         hasDB: (!!env.MDB_URI) || (!!env.POSTGRES_PRISMA_URL && !!env.POSTGRES_URL_NON_POOLING),
         hasBrowsing: !!env.PUPPETEER_WSS_ENDPOINT,
         hasGoogleCustomSearch: !!env.GOOGLE_CSE_ID && !!env.GOOGLE_CLOUD_API_KEY,
-        hasImagingProdia: !!env.PRODIA_API_KEY,
         hasVoiceElevenLabs: !!env.ELEVENLABS_API_KEY,
         // hashes
         hashLlmReconfig: generateLlmEnvConfigHash(env),

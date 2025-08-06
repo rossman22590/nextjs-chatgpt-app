@@ -10,6 +10,7 @@ import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ContentCutIcon from '@mui/icons-material/ContentCut';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DifferenceIcon from '@mui/icons-material/Difference';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
@@ -225,7 +226,7 @@ export function ChatMessage(props: {
   const handleHighlightSelText = useSelHighlighterMemo(messageId, selText, contentFragments, fromAssistant, props.onMessageFragmentReplace);
 
   const textSubject = selText ? selText : fragmentFlattenedText;
-  const isSpecialT2I = textSubject.startsWith('https://images.prodia.xyz/') || textSubject.startsWith('/draw ') || textSubject.startsWith('/imagine ') || textSubject.startsWith('/img ');
+  const isSpecialT2I = textSubject.startsWith('/draw ') || textSubject.startsWith('/imagine ') || textSubject.startsWith('/img ');
   const couldDiagram = textSubject.length >= 100 && !isSpecialT2I;
   const couldImagine = textSubject.length >= 3 && !isSpecialT2I;
   const couldSpeak = couldImagine;
@@ -1101,6 +1102,14 @@ export function ChatMessage(props: {
                   closeBubble();
                 }}>
                   <FormatBoldIcon />
+                </IconButton>
+              </Tooltip>}
+              {fromAssistant && <Tooltip disableInteractive arrow placement='top' title='Cut Text'>
+                <IconButton disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
+                  handleHighlightSelText('cut');
+                  closeBubble();
+                }}>
+                  <ContentCutIcon />
                 </IconButton>
               </Tooltip>}
               {fromAssistant && <Divider />}

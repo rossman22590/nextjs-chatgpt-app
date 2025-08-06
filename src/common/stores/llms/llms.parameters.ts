@@ -142,6 +142,51 @@ export const DModelParameterRegistry = {
     initialValue: false,
   } as const,
 
+  // Perplexity-specific parameters
+
+  // llmVndPerplexityReasoningEffort - we reuse the OpenAI reasoning effort parameter
+
+  llmVndPerplexityDateFilter: {
+    label: 'Date Range',
+    type: 'enum' as const,
+    description: 'Filter results by publication date',
+    values: ['unfiltered', '1m', '3m', '6m', '1y'] as const,
+    // requiredFallback: 'unfiltered',
+  } as const,
+
+  llmVndPerplexitySearchMode: {
+    label: 'Search Mode',
+    type: 'enum' as const,
+    description: 'Type of sources to search',
+    values: ['default', 'academic'] as const,
+    // requiredFallback: 'default', // or leave unset for "unspecified"
+  } as const,
+
+  // xAI-specific parameters
+
+  llmVndXaiSearchMode: {
+    label: 'Search Mode',
+    type: 'enum' as const,
+    description: 'Controls when to use live search',
+    values: ['auto', 'on', 'off'] as const,
+    initialValue: 'auto', // we default to auto for our users, to get them search out of the box
+  } as const,
+
+  llmVndXaiSearchSources: {
+    label: 'Search Sources',
+    type: 'string' as const,
+    description: 'Comma-separated sources (web,x,news,rss)',
+    initialValue: 'web,x', // defaults to web,x as per xAI docs
+  } as const,
+
+  llmVndXaiSearchDateFilter: {
+    label: 'Search From Date',
+    type: 'enum' as const,
+    description: 'Filter search results by publication date',
+    values: ['unfiltered', '1d', '1w', '1m', '6m', '1y'] as const,
+    // requiredFallback: 'unfiltered',
+  } as const,
+
 } as const;
 
 
@@ -152,7 +197,7 @@ export interface DModelParameterSpec<T extends DModelParameterId> {
   paramId: T;
   required?: boolean;
   hidden?: boolean;
-  initialValue?: number | string | null;
+  initialValue?: boolean | number | string | null;
   // upstreamDefault?: DModelParameterValue<T>;
   /**
    * (optional, rare) Special: [min, max] range override for this parameter.

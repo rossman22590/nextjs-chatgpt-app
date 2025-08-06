@@ -28,7 +28,7 @@ export const Release = {
 
   // this is here to trigger revalidation of data, e.g. models refresh
   Monotonics: {
-    Aix: 19,
+    Aix: 23,
     NewsVersion: 192,
   },
 
@@ -58,7 +58,7 @@ export const Release = {
     timestamp: process.env.NEXT_PUBLIC_BUILD_TIMESTAMP || 'unknown',
   }),
 
-  IsNodeDevBuild: process.env.NODE_ENV === 'development',
+  IsNodeDevBuild: process.env.NODE_ENV === 'development' as const,
 
 } as const;
 

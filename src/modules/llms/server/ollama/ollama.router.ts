@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
+import * as z from 'zod/v4';
 
 import { env } from '~/server/env';
 import { fetchJsonOrTRPCThrow, fetchTextOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
@@ -213,7 +212,7 @@ export const llmOllamaRouter = createTRPCRouterEdge({
             if (model.details.quantization_level)
               firstLine += `(${model.details.quantization_level}` + ((model.details.format) ? `, ${model.details.format})` : ')');
             if (model.size)
-              firstLine += `, ${Math.round(model.size / 1024 / 1024).toLocaleString()} MB`;
+              firstLine += `, ${(model.size / 1024 / 1024 / 1024).toFixed(1)} GB`;
             if (baseModel.hasTools)
               firstLine += ' [tools]';
             if (baseModel.hasVision)

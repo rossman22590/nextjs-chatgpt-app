@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod/v4';
 import { TRPCError } from '@trpc/server';
 
 import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
@@ -22,13 +22,13 @@ import { fastAPIHeuristic, fastAPIModels } from './models/fastapi.models';
 import { fireworksAIHeuristic, fireworksAIModelsToModelDescriptions } from './models/fireworksai.models';
 import { groqModelFilter, groqModelSortFn, groqModelToModelDescription } from './models/groq.models';
 import { lmStudioModelToModelDescription, localAIModelSortFn, localAIModelToModelDescription } from './models/models.data';
-import { mistralModelsSort, mistralModelToModelDescription } from './models/mistral.models';
+import { mistralModels } from './models/mistral.models';
 import { openAIModelFilter, openAIModelToModelDescription, openAISortModels } from './models/openai.models';
 import { openPipeModelDescriptions, openPipeModelSort, openPipeModelToModelDescriptions } from './models/openpipe.models';
 import { openRouterInjectVariants, openRouterModelFamilySortFn, openRouterModelToModelDescription } from './models/openrouter.models';
-import { perplexityAIModelDescriptions, perplexityAIModelSort } from './models/perplexity.models';
+import { perplexityAIModelDescriptions, perplexityInjectVariants } from './models/perplexity.models';
 import { togetherAIModelsToModelDescriptions } from './models/together.models';
-import { wilreLocalAIModelsApplyOutputSchema, wireLocalAIModelsAvailableOutputSchema, wireLocalAIModelsListOutputSchema } from './localai.wiretypes';
+import { wireLocalAIModelsApplyOutputSchema, wireLocalAIModelsAvailableOutputSchema, wireLocalAIModelsListOutputSchema } from './localai.wiretypes';
 import { xaiModelDescriptions, xaiModelSort } from './models/xai.models';
 
 
@@ -173,8 +173,11 @@ export const llmOpenAIRouter = createTRPCRouterEdge({
       }
 
       // [Perplexity]: there's no API for models listing (upstream: https://docs.perplexity.ai/guides/model-cards)
-      if (access.dialect === 'perplexity')
-        return { models: perplexityAIModelDescriptions().sort(perplexityAIModelSort) };
+      if (access.dialect === 'perplexity') {
+        models = perplexityAIModelDescriptions()
+          .reduce(perplexityInjectVariants, [] as ModelDescriptionSchema[]);
+        return { models };
+      }
 
       // [xAI]: custom models listing
       if (access.dialect === 'xai')
@@ -234,9 +237,7 @@ export const llmOpenAIRouter = createTRPCRouterEdge({
           break;
 
         case 'mistral':
-          models = openAIModels
-            .map(mistralModelToModelDescription)
-            .sort(mistralModelsSort);
+          models = mistralModels(openAIModels);
           break;
 
         // [OpenAI]: chat-only models, custom sort, manual mapping
@@ -455,7 +456,7 @@ export const llmOpenAIRouter = createTRPCRouterEdge({
     .mutation(async ({ input: { access, galleryName, modelName } }) => {
       const galleryModelId = `${galleryName}@${modelName}`;
       const wireLocalAIModelApply = await openaiPOSTOrThrow(access, null, { id: galleryModelId }, '/models/apply');
-      return wilreLocalAIModelsApplyOutputSchema.parse(wireLocalAIModelApply);
+      return wireLocalAIModelsApplyOutputSchema.parse(wireLocalAIModelApply);
     }),
 
   /* [LocalAI] Poll for a Model download Job status */
