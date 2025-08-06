@@ -80,7 +80,7 @@ export function AppNews() {
           width: '100%'
         }}>
           <Typography level="h3" sx={{ color: 'primary.600', mb: 1 }}>
-            What's New in This Update:
+            What&apos;s New in This Update:
           </Typography>
           
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
