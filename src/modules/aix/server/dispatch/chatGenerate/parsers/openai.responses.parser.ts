@@ -296,8 +296,8 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
             break;
 
           case 'web_search_call':
-            // -> WSC: TODO
-            console.warn('[DEV] notImplemented: OpenAI Responses: web_search_call', { doneItem });
+            // -> WSC: Web search call completed but not fully processed yet
+            // This is expected behavior until full web search implementation
             break;
 
           default:
@@ -394,6 +394,16 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
         R.outputItemVisit(eventType, event.output_index, 'function_call');
         // .delta: we parse this at the end
         // .done: we parse this at the end
+        break;
+
+      // 4.4 - Web Search Call Events
+
+      case 'response.web_search_call.in_progress':
+      case 'response.web_search_call.searching':
+      case 'response.web_search_call.completed':
+        R.outputItemVisit(eventType, event.output_index, 'web_search_call');
+        // Web search events are acknowledged but not fully implemented yet
+        // This prevents "unexpected event type" warnings that cause stream closure
         break;
 
       // 1.5 - Error
@@ -602,8 +612,8 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
           break;
 
         case 'web_search_call':
-          // -> WSC: TODO
-          console.warn('[DEV] notImplemented: OpenAI Responses: web_search_call', { oItem });
+          // -> WSC: Web search call completed but not fully processed yet
+          // This is expected behavior until full web search implementation
           break;
 
         default:
