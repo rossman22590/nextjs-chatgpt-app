@@ -16,6 +16,27 @@ export async function fetchJsonOrTRPCThrow<TOut extends object = object, TBody e
   return _fetchFromTRPC<TBody, TOut>(config, async (response) => await response.json(), 'json');
 }
 
+// Extended timeout JSON fetcher for long-running operations (like OpenAI Responses API)
+export async function fetchJsonWithExtendedTimeoutOrTRPCThrow<TOut extends object = object, TBody extends object | undefined | FormData = undefined>(config: RequestConfig<TBody>): Promise<TOut> {
+  // Create an AbortController with extended timeout for long operations
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15 * 60 * 1000); // 15 minutes timeout
+  
+  try {
+    const extendedConfig = {
+      ...config,
+      signal: config.signal || controller.signal,
+    };
+    
+    const result = await _fetchFromTRPC<TBody, TOut>(extendedConfig, async (response) => await response.json(), 'json');
+    clearTimeout(timeoutId);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
 // Text fetcher
 export async function fetchTextOrTRPCThrow<TBody extends object | undefined = undefined>(config: RequestConfig<TBody>): Promise<string> {
   return _fetchFromTRPC<TBody, string>(config, async (response) => await response.text(), 'text');

@@ -18,8 +18,8 @@ export function createOpenAIResponsesAPIParserNS(): ChatGenerateParseFunction {
       
       // Handle empty or invalid response
       if (!responseText || responseText.trim().length === 0) {
-        console.error('ERROR: Empty response text received');
-        pt.setDialectTerminatingIssue('Empty response received from OpenAI Responses API', IssueSymbols.Generic);
+        console.error('ERROR: Empty response text received from OpenAI Responses API');
+        pt.setDialectTerminatingIssue('Empty response received from OpenAI Responses API. This may be due to a timeout or connection issue.', IssueSymbols.Generic);
         return;
       }
       
@@ -103,12 +103,18 @@ export function createOpenAIResponsesAPIParserNS(): ChatGenerateParseFunction {
       
       // Provide more specific error messages
       let errorMessage = 'Unknown parsing error';
-      if (error instanceof SyntaxError) {
+      const errorString = safeErrorString(error) || '';
+      
+      if (errorString.includes('timeout') || errorString.includes('HeadersTimeoutError') || errorString.includes('UND_ERR_HEADERS_TIMEOUT')) {
+        errorMessage = 'Request timed out while waiting for OpenAI Responses API. The deep research operation may have taken too long. Please try again or use a shorter query.';
+      } else if (errorString.includes('fetch failed') || errorString.includes('network') || errorString.includes('ECONNRESET')) {
+        errorMessage = 'Network error occurred while communicating with OpenAI Responses API. Please check your connection and try again.';
+      } else if (error instanceof SyntaxError) {
         errorMessage = 'Invalid JSON response from OpenAI Responses API';
       } else if (error instanceof TypeError) {
         errorMessage = 'Unexpected response structure from OpenAI Responses API';
       } else {
-        errorMessage = safeErrorString(error) || 'Unknown parsing error';
+        errorMessage = errorString || 'Unknown parsing error';
       }
       
       pt.setDialectTerminatingIssue(errorMessage, IssueSymbols.Generic);
@@ -184,7 +190,18 @@ export function createOpenAIResponsesAPIChunkParser(): ChatGenerateParseFunction
       
     } catch (error) {
       console.error('Error parsing Responses API chunk:', error);
-      pt.setDialectTerminatingIssue(safeErrorString(error) || 'unknown.', IssueSymbols.Generic);
+      
+      // Provide specific error messages for timeout scenarios
+      const errorString = safeErrorString(error) || '';
+      let errorMessage = errorString || 'unknown.';
+      
+      if (errorString.includes('timeout') || errorString.includes('HeadersTimeoutError') || errorString.includes('UND_ERR_HEADERS_TIMEOUT')) {
+        errorMessage = 'Request timed out while streaming from OpenAI Responses API. The deep research operation may have taken too long.';
+      } else if (errorString.includes('fetch failed') || errorString.includes('network') || errorString.includes('ECONNRESET')) {
+        errorMessage = 'Network error occurred while streaming from OpenAI Responses API. Please check your connection and try again.';
+      }
+      
+      pt.setDialectTerminatingIssue(errorMessage, IssueSymbols.Generic);
     }
   };
 } 

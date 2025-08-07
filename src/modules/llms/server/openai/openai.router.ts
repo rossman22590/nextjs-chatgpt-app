@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 
 import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { env } from '~/server/env';
-import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
+import { fetchJsonOrTRPCThrow, fetchJsonWithExtendedTimeoutOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 import { serverCapitalizeFirstLetter } from '~/server/wire';
 
 import type { T2ICreateImageAsyncStreamOp } from '~/modules/t2i/t2i.server';
@@ -781,7 +781,18 @@ async function openaiGETOrThrow<TOut extends object>(access: OpenAIAccessSchema,
 
 async function openaiPOSTOrThrow<TOut extends object, TPostBody extends object | FormData>(access: OpenAIAccessSchema, modelRefId: string | null, body: TPostBody, apiPath: string /*, signal?: AbortSignal*/): Promise<TOut> {
   const { headers, url } = openAIAccess(access, modelRefId, apiPath);
-  return await fetchJsonOrTRPCThrow<TOut, TPostBody>({ url, method: 'POST', headers, body, name: `OpenAI/${serverCapitalizeFirstLetter(access.dialect)}` });
+  
+  // Use extended timeout for OpenAI Responses API to prevent Headers Timeout Error
+  const isResponsesAPI = apiPath.includes('/v1/responses');
+  const fetchFunction = isResponsesAPI ? fetchJsonWithExtendedTimeoutOrTRPCThrow : fetchJsonOrTRPCThrow;
+  
+  return await fetchFunction<TOut, TPostBody>({
+    url,
+    method: 'POST',
+    headers,
+    body,
+    name: `OpenAI/${serverCapitalizeFirstLetter(access.dialect)}${isResponsesAPI ? ' Responses API' : ''}`
+  });
 }
 
 
