@@ -16,6 +16,13 @@ export function createOpenAIResponsesAPIParserNS(): ChatGenerateParseFunction {
       console.log('Raw response text length:', responseText.length);
       console.log('Raw response text preview:', responseText.substring(0, 200));
       
+      // Handle empty or invalid response
+      if (!responseText || responseText.trim().length === 0) {
+        console.error('ERROR: Empty response text received');
+        pt.setDialectTerminatingIssue('Empty response received from OpenAI Responses API', IssueSymbols.Generic);
+        return;
+      }
+      
       // Parse the response
       const response = JSON.parse(responseText);
       
@@ -92,7 +99,19 @@ export function createOpenAIResponsesAPIParserNS(): ChatGenerateParseFunction {
       
     } catch (error) {
       console.error('Error parsing Responses API response:', error);
-      pt.setDialectTerminatingIssue(safeErrorString(error) || 'unknown.', IssueSymbols.Generic);
+      console.error('Response text that caused error:', responseText?.substring(0, 500));
+      
+      // Provide more specific error messages
+      let errorMessage = 'Unknown parsing error';
+      if (error instanceof SyntaxError) {
+        errorMessage = 'Invalid JSON response from OpenAI Responses API';
+      } else if (error instanceof TypeError) {
+        errorMessage = 'Unexpected response structure from OpenAI Responses API';
+      } else {
+        errorMessage = safeErrorString(error) || 'Unknown parsing error';
+      }
+      
+      pt.setDialectTerminatingIssue(errorMessage, IssueSymbols.Generic);
     }
   };
 }

@@ -33,11 +33,13 @@ export function createChatGenerateDispatch(
     if (requestBody.__useResponsesAPI) {
       const { __useResponsesAPI, __forceNonStreaming, ...body } = requestBody;
       
-      // Check if we should force non-streaming for this specific model
-      const shouldForceNonStreaming = __forceNonStreaming || false;
+      // For deep research models on Vercel, force non-streaming to avoid stream closure issues
+      const isVercelDeployment = process.env.VERCEL === '1';
+      const isDeepResearchModel = model.id.includes('deep-research') || model.id.includes('o4-mini');
+      const shouldForceNonStreaming = __forceNonStreaming || (isVercelDeployment && isDeepResearchModel);
       const finalStreaming = shouldForceNonStreaming ? false : streaming;
       
-      console.log(`Using Responses API dispatch for model: ${model.id}, streaming: ${finalStreaming} (original: ${streaming}, forced: ${shouldForceNonStreaming})`);
+      console.log(`Using Responses API dispatch for model: ${model.id}, streaming: ${finalStreaming} (original: ${streaming}, forced: ${shouldForceNonStreaming}, vercel: ${isVercelDeployment}, deepResearch: ${isDeepResearchModel})`);
       
       return {
         request: {
