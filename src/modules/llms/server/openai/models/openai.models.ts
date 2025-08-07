@@ -352,6 +352,109 @@ export const _knownOpenAIChatModels: ManualMappings = [
     isLegacy: true,
   },
 
+  /// GPT-5 series
+
+  // GPT-5
+  {
+    isLatest: true,
+    idPrefix: 'gpt-5-2025-08-07',
+    label: 'GPT-5 (2025-08-07)',
+    description: 'Latest GPT-5 model with advanced reasoning and multimodal capabilities. Uses max_completion_tokens parameter.',
+    contextWindow: 200000,
+    maxCompletionTokens: 100000,
+    trainingDataCutoff: 'Jun 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
+    chatPrice: { input: 5, cache: { cType: 'oai-ac', read: 1.25 }, output: 20 },
+    // benchmarks: will be available soon
+  },
+  {
+    idPrefix: 'gpt-5',
+    label: 'GPT-5',
+    description: 'Latest GPT-5 model. Currently points to gpt-5-2025-08-07.',
+    symLink: 'gpt-5-2025-08-07',
+    hidden: true, // prefer versioned
+    // copied from symlinked
+    contextWindow: 200000,
+    maxCompletionTokens: 100000,
+    trainingDataCutoff: 'Jun 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
+    chatPrice: { input: 5, cache: { cType: 'oai-ac', read: 1.25 }, output: 20 },
+  },
+  {
+    idPrefix: 'openai-gpt-5',
+    label: 'OpenAI GPT-5',
+    description: 'OpenAI GPT-5 model with advanced capabilities. Uses max_completion_tokens parameter.',
+    contextWindow: 200000,
+    maxCompletionTokens: 100000,
+    trainingDataCutoff: 'Jun 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
+    chatPrice: { input: 5, cache: { cType: 'oai-ac', read: 1.25 }, output: 20 },
+  },
+
+  // GPT-5 Mini
+  {
+    isLatest: true,
+    idPrefix: 'gpt-5-mini-2025-08-07',
+    label: 'GPT-5 Mini (2025-08-07)',
+    description: 'Smaller, faster GPT-5 model optimized for efficiency. Uses max_completion_tokens parameter.',
+    contextWindow: 200000,
+    maxCompletionTokens: 100000,
+    trainingDataCutoff: 'Jun 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
+    chatPrice: { input: 1, cache: { cType: 'oai-ac', read: 0.25 }, output: 4 },
+  },
+  {
+    idPrefix: 'gpt-5-mini',
+    label: 'GPT-5 Mini',
+    description: 'Smaller, faster GPT-5 model. Currently points to gpt-5-mini-2025-08-07.',
+    symLink: 'gpt-5-mini-2025-08-07',
+    hidden: true, // prefer versioned
+    // copied from symlinked
+    contextWindow: 200000,
+    maxCompletionTokens: 100000,
+    trainingDataCutoff: 'Jun 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
+    chatPrice: { input: 1, cache: { cType: 'oai-ac', read: 0.25 }, output: 4 },
+  },
+
+  // GPT-5 Nano
+  {
+    isLatest: true,
+    idPrefix: 'gpt-5-nano-2025-08-07',
+    label: 'GPT-5 Nano (2025-08-07)',
+    description: 'Ultra-fast, cost-effective GPT-5 model for lightweight tasks. Uses max_completion_tokens parameter.',
+    contextWindow: 200000,
+    maxCompletionTokens: 100000,
+    trainingDataCutoff: 'Jun 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
+    chatPrice: { input: 0.2, cache: { cType: 'oai-ac', read: 0.05 }, output: 0.8 },
+  },
+  {
+    idPrefix: 'gpt-5-nano',
+    label: 'GPT-5 Nano',
+    description: 'Ultra-fast, cost-effective GPT-5 model. Currently points to gpt-5-nano-2025-08-07.',
+    symLink: 'gpt-5-nano-2025-08-07',
+    hidden: true, // prefer versioned
+    // copied from symlinked
+    contextWindow: 200000,
+    maxCompletionTokens: 100000,
+    trainingDataCutoff: 'Jun 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
+    chatPrice: { input: 0.2, cache: { cType: 'oai-ac', read: 0.05 }, output: 0.8 },
+  },
+
+  // GPT-5 Chat Latest
+  {
+    idPrefix: 'gpt-5-chat-latest',
+    label: 'GPT-5 Chat Latest',
+    description: 'Latest GPT-5 model optimized for chat interactions. Uses max_completion_tokens parameter.',
+    contextWindow: 200000,
+    maxCompletionTokens: 100000,
+    trainingDataCutoff: 'Jun 2024',
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
+    chatPrice: { input: 5, cache: { cType: 'oai-ac', read: 1.25 }, output: 20 },
+  },
+
   /// GPT-4.1 series
 
   // GPT-4.1
@@ -1060,6 +1163,15 @@ const _manualOrderingIdPrefixes = [
   'o1-preview-',
   'o1-mini-',
   'o1-',
+  // GPT-5 series
+  'gpt-5-20',
+  'gpt-5-mini-20',
+  'gpt-5-mini',
+  'gpt-5-nano-20',
+  'gpt-5-nano',
+  'gpt-5-chat-latest',
+  'openai-gpt-5',
+  'gpt-5-',
   // GPT-4.5
   'gpt-4.5-20',
   'gpt-4.5-preview',

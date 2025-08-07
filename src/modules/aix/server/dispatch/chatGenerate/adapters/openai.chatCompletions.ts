@@ -41,14 +41,15 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
 
   // Model incompatibilities -> Hotfixes
 
-  // [OpenAI] - o1 models
+  // [OpenAI] - o1/o3/o4/o5/gpt-5 models
   // - o1 models don't support system messages, we could hotfix this here once and for all, but we want to transfer the responsibility to the UI for better messaging to the user
-  // - o1 models also use the new 'max_completion_tokens' rather than 'max_tokens', breaking API compatibility, so we have to address it here
+  // - o1/o3/o4/o5/gpt-5 models also use the new 'max_completion_tokens' rather than 'max_tokens', breaking API compatibility, so we have to address it here
   const hotFixOpenAIOFamily = (openAIDialect === 'openai' || openAIDialect === 'azure') && (
     model.id === 'o1' || model.id.startsWith('o1-') ||
     model.id === 'o3' || model.id.startsWith('o3-') ||
     model.id === 'o4' || model.id.startsWith('o4-') ||
-    model.id === 'o5' || model.id.startsWith('o5-')
+    model.id === 'o5' || model.id.startsWith('o5-') ||
+    model.id === 'gpt-5' || model.id.startsWith('gpt-5-') || model.id.includes('gpt-5')
   );
 
   // Throw if function support is needed but missing

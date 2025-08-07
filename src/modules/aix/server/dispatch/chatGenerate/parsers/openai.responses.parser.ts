@@ -406,6 +406,14 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
         // This prevents "unexpected event type" warnings that cause stream closure
         break;
 
+      // 4.5 - Text Annotation Events (Web Search Related)
+
+      case 'response.output_text.annotation.added':
+        R.contentPartVisit(eventType, event.output_index, event.content_index);
+        // Web search annotation events are acknowledged but not fully implemented yet
+        // This prevents "unexpected event type" warnings that cause stream closure
+        break;
+
       // 1.5 - Error
 
       case 'error':
