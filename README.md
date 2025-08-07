@@ -64,7 +64,7 @@ Stay tuned. This is going to be good.
 - 1.16.2: Updates to Beam
 - 1.16.1: Support for the new OpenAI GPT-4o 2024-05-13 model
 
-### What's New in 1.16.0 · May 9, 2024 · Crystal Clear
+### What's New in 1.16.0 · May 9, 2024 · Crystal Cleard
 
 - [Beam](https://big-agi.com/blog/beam-multi-model-ai-reasoning) core and UX improvements based on user feedback
 - Chat cost estimation 💰 (enable it in Labs / hover the token counter)
