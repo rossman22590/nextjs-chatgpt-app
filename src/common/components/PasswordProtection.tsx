@@ -44,8 +44,8 @@ export const PasswordProtection: React.FC<PasswordProtectionProps> = ({ onUnlock
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Store in session storage that password was verified
-        sessionStorage.setItem('app-unlocked', 'true');
+        // Store in local storage that password was verified (persists across browser sessions)
+        localStorage.setItem('app-unlocked', 'true');
         onUnlock();
       } else {
         setError('Incorrect password. Please try again.');

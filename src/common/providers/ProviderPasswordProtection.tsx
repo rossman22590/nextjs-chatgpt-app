@@ -15,11 +15,11 @@ export const ProviderPasswordProtection: React.FC<PasswordProtectionProviderProp
       try {
         console.log('Checking password protection...');
         
-        // Check if already unlocked in this session
-        const sessionUnlocked = sessionStorage.getItem('app-unlocked') === 'true';
-        console.log('Session unlocked:', sessionUnlocked);
+        // Check if already unlocked (persistent across browser sessions)
+        const persistentUnlocked = localStorage.getItem('app-unlocked') === 'true';
+        console.log('Persistent unlocked:', persistentUnlocked);
         
-        if (sessionUnlocked) {
+        if (persistentUnlocked) {
           setIsUnlocked(true);
           setIsCheckingPassword(false);
           return;
