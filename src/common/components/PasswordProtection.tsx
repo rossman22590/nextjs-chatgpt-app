@@ -44,8 +44,10 @@ export const PasswordProtection: React.FC<PasswordProtectionProps> = ({ onUnlock
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Store in session storage that password was verified
-        sessionStorage.setItem('app-unlocked', 'true');
+        // Store in cookie that password was verified (expires in 24 hours)
+        const expirationDate = new Date();
+        expirationDate.setTime(expirationDate.getTime() + (24 * 60 * 60 * 1000)); // 24 hours
+        document.cookie = `app-unlocked=true; expires=${expirationDate.toUTCString()}; path=/; SameSite=Strict`;
         onUnlock();
       } else {
         setError('Incorrect password. Please try again.');

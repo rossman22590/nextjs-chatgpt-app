@@ -19,30 +19,34 @@ export function createChatGenerateDispatch(
 } {
   // Check if we should use the Responses API
   if (access.dialect === 'openai' && usesResponsesAPI(model)) {
-    console.log(`Using Responses API dispatch for model: ${model.id}, forcing streaming=false (was: ${streaming})`);
-    
     // Create the request using the responses API endpoint
     const { aixToOpenAIChatCompletions } = require('./adapters/openai.responsesAPI.override');
     const requestBody = aixToOpenAIChatCompletions(
-      access.dialect, 
-      model, 
-      chatGenerate, 
-      false, 
-      false  // Force streaming to false for responses API
+      access.dialect,
+      model,
+      chatGenerate,
+      false,
+      streaming  // Use the original streaming parameter
     );
     
     // Remove the special property if it exists
     if (requestBody.__useResponsesAPI) {
       const { __useResponsesAPI, __forceNonStreaming, ...body } = requestBody;
       
+      // Check if we should force non-streaming for this specific model
+      const shouldForceNonStreaming = __forceNonStreaming || false;
+      const finalStreaming = shouldForceNonStreaming ? false : streaming;
+      
+      console.log(`Using Responses API dispatch for model: ${model.id}, streaming: ${finalStreaming} (original: ${streaming}, forced: ${shouldForceNonStreaming})`);
+      
       return {
         request: {
           ...openAIAccess(access, model.id, '/v1/responses'),
-          body: body
+          body: { ...body, stream: finalStreaming }
         },
-        // Force null demuxer for responses API since it returns complete JSON
-        demuxerFormat: null,
-        chatGenerateParse: createOpenAIResponsesAPIParserNS()
+        // Use appropriate demuxer based on streaming mode
+        demuxerFormat: finalStreaming ? 'fast-sse' : null,
+        chatGenerateParse: finalStreaming ? createOpenAIResponsesAPIChunkParser() : createOpenAIResponsesAPIParserNS()
       };
     }
   }

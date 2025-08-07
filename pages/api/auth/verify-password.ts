@@ -1,52 +1,40 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { z } from 'zod';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import bcrypt from 'bcryptjs';
 
-// Validation schema for password verification
-const passwordSchema = z.object({
-  password: z.string().min(1, 'Password is required'),
-});
+// This should be set as an environment variable in production
+const APP_PASSWORD_HASH = process.env.APP_PASSWORD_HASH;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log('Password verification API called');
-  
-  // Only allow POST requests
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
-  // Check if password protection is enabled
-  const passwordProtectEnabled = process.env.PASSWORD_PROTECT === 'true';
-  const appPassword = process.env.PASSWORD;
-  
-  console.log('Password protection enabled:', passwordProtectEnabled);
-  console.log('App password configured:', !!appPassword);
-  
-  if (!passwordProtectEnabled || !appPassword) {
-    console.log('Password protection disabled or no password set - allowing access');
-    return res.status(200).json({ success: true }); // No password required
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Get password from request body
-    const { password } = req.body || {};
-    console.log('Received password:', password ? '[HIDDEN]' : 'empty');
+    const { password } = req.body;
 
-    // If no password provided (testing), return 401 to indicate protection is enabled
-    if (!password || password === '') {
-      console.log('Empty password - returning 401 to indicate protection enabled');
-      return res.status(401).json({ success: false, message: 'Password required' });
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
     }
 
-    // Check password
-    if (password === appPassword) {
-      console.log('Password correct - allowing access');
+    // If no password hash is configured, allow access (development mode)
+    if (!APP_PASSWORD_HASH) {
+      console.warn('APP_PASSWORD_HASH not configured - allowing access');
+      return res.status(200).json({ success: true });
+    }
+
+    // Verify the password against the hash
+    const isValid = await bcrypt.compare(password, APP_PASSWORD_HASH);
+
+    if (isValid) {
       return res.status(200).json({ success: true });
     } else {
-      console.log('Password incorrect - denying access');
-      return res.status(401).json({ success: false, message: 'Incorrect password' });
+      return res.status(401).json({ error: 'Invalid password' });
     }
   } catch (error) {
     console.error('Password verification error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
-} 
+}

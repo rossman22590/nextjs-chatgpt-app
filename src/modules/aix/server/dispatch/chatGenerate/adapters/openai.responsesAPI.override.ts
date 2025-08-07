@@ -24,10 +24,12 @@ interface ResponsesAPIPayload {
 
 // Function to determine if a model uses the responses API
 export function usesResponsesAPI(model: AixAPI_Model): boolean {
-  return model.id === 'o3-pro' || 
-         model.id === 'o1-pro' || 
-         model.id.startsWith('o3-pro-') || 
-         model.id.startsWith('o1-pro-');
+  return model.id === 'o3-pro' ||
+         model.id === 'o1-pro' ||
+         model.id === 'o4-mini' ||
+         model.id.startsWith('o3-pro-') ||
+         model.id.startsWith('o1-pro-') ||
+         model.id.startsWith('o4-');
 }
 
 // Function to convert Aix messages to Responses API format
@@ -158,7 +160,11 @@ export function aixToOpenAIChatCompletions(
         effort: model.vndOaiReasoningEffort || "medium",
         summary: "auto"
       },
-      tools: [],
+      tools: [
+        {
+          type: "web_search_preview"
+        }
+      ],
       store: true
     };
     
@@ -181,7 +187,10 @@ export function aixToOpenAIChatCompletions(
     
     // Add a special flag to indicate this is a Responses API payload
     (responsesPayload as any).__useResponsesAPI = true;
-    (responsesPayload as any).__forceNonStreaming = true;
+    // Only force non-streaming for models that don't support streaming in Responses API
+    if (model.id === 'o1-pro' || model.id.startsWith('o1-pro-')) {
+      (responsesPayload as any).__forceNonStreaming = true;
+    }
     
     return responsesPayload;
   }

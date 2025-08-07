@@ -22,6 +22,10 @@ import { usesResponsesAPI } from '../dispatch/chatGenerate/adapters/openai.respo
  */
 export const AIX_SECURITY_ONLY_IN_DEV_BUILDS = process.env.NODE_ENV === 'development';
 
+// Vercel timeout warning - operations approaching 12 minutes will get a warning (for 800s timeout)
+const VERCEL_TIMEOUT_WARNING_MS = 12 * 60 * 1000; // 12 minutes (for 800s/13.3min timeout)
+const isVercelDeployment = process.env.VERCEL === '1';
+
 
 export const aixRouter = createTRPCRouterEdge({
 
@@ -58,6 +62,24 @@ export const aixRouter = createTRPCRouterEdge({
 
       // Intake Transmitters
       const chatGenerateTx = new ChatGenerateTransmitter(prettyDialect, connectionOptions?.throttlePartTransmitter);
+
+      // Vercel timeout warning system
+      let vercelTimeoutWarning: NodeJS.Timeout | undefined;
+      if (isVercelDeployment) {
+        vercelTimeoutWarning = setTimeout(() => {
+          console.warn(`[AIX] Operation approaching Vercel 800-second timeout limit for ${prettyDialect}`);
+          chatGenerateTx.appendText('\n\n⚠️ **Long Operation Warning**: This operation is taking longer than expected and may timeout soon. Deep research operations can take up to 13 minutes on your current Vercel configuration.\n\n');
+          chatGenerateTx.emitParticles();
+        }, VERCEL_TIMEOUT_WARNING_MS);
+      }
+
+      // Cleanup function for timeout warning
+      const cleanupTimeoutWarning = () => {
+        if (vercelTimeoutWarning) {
+          clearTimeout(vercelTimeoutWarning);
+          vercelTimeoutWarning = undefined;
+        }
+      };
 
 
       // Profiler, if requested by the caller
@@ -151,6 +173,7 @@ export const aixRouter = createTRPCRouterEdge({
             chatGenerateTx.setRpcTerminatingIssue('dispatch-parse', ` **[Parsing Issue] ${prettyDialect}**: ${safeErrorString(error) || 'Unknown stream parsing error'}.\nInput data: ${dispatchBody}.\nPlease open a support ticket on GitHub.`, true);
         }
         _profilerCompleted?.();
+        cleanupTimeoutWarning();
         yield* chatGenerateTx.flushParticles();
         return; // exit
       }
@@ -236,6 +259,7 @@ export const aixRouter = createTRPCRouterEdge({
       } while (!chatGenerateTx.isEnded);
 
       _profilerCompleted?.();
+      cleanupTimeoutWarning();
 
       // Flush everything that's left; if we're here we have encountered a clean end condition,
       // or an error that has already been queued up for this last flush
