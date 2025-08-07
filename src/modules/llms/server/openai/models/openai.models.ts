@@ -360,7 +360,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     idPrefix: 'gpt-5-2025-08-07',
     label: 'GPT-5 (2025-08-07)',
     description: 'Latest GPT-5 model with advanced reasoning and multimodal capabilities. Uses max_completion_tokens parameter.',
-    contextWindow: 200000,
+    contextWindow: 400000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'Jun 2024',
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
@@ -374,7 +374,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     symLink: 'gpt-5-2025-08-07',
     hidden: true, // prefer versioned
     // copied from symlinked
-    contextWindow: 200000,
+    contextWindow: 400000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'Jun 2024',
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
@@ -384,7 +384,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     idPrefix: 'openai-gpt-5',
     label: 'OpenAI GPT-5',
     description: 'OpenAI GPT-5 model with advanced capabilities. Uses max_completion_tokens parameter.',
-    contextWindow: 200000,
+    contextWindow: 400000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'Jun 2024',
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
@@ -397,7 +397,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     idPrefix: 'gpt-5-mini-2025-08-07',
     label: 'GPT-5 Mini (2025-08-07)',
     description: 'Smaller, faster GPT-5 model optimized for efficiency. Uses max_completion_tokens parameter.',
-    contextWindow: 200000,
+    contextWindow: 400000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'Jun 2024',
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
@@ -410,7 +410,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     symLink: 'gpt-5-mini-2025-08-07',
     hidden: true, // prefer versioned
     // copied from symlinked
-    contextWindow: 200000,
+    contextWindow: 400000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'Jun 2024',
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
@@ -423,7 +423,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     idPrefix: 'gpt-5-nano-2025-08-07',
     label: 'GPT-5 Nano (2025-08-07)',
     description: 'Ultra-fast, cost-effective GPT-5 model for lightweight tasks. Uses max_completion_tokens parameter.',
-    contextWindow: 200000,
+    contextWindow: 400000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'Jun 2024',
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
@@ -436,7 +436,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     symLink: 'gpt-5-nano-2025-08-07',
     hidden: true, // prefer versioned
     // copied from symlinked
-    contextWindow: 200000,
+    contextWindow: 400000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'Jun 2024',
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
@@ -448,7 +448,7 @@ export const _knownOpenAIChatModels: ManualMappings = [
     idPrefix: 'gpt-5-chat-latest',
     label: 'GPT-5 Chat Latest',
     description: 'Latest GPT-5 model optimized for chat interactions. Uses max_completion_tokens parameter.',
-    contextWindow: 200000,
+    contextWindow: 400000,
     maxCompletionTokens: 100000,
     trainingDataCutoff: 'Jun 2024',
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching],
