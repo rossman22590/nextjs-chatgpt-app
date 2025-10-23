@@ -29,17 +29,18 @@ export type FormSelectOption<T extends string> = {
 export const FormSelectControl = <TValue extends string>(props: {
   title?: React.ReactNode;
   tooltip?: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
   options: Readonly<FormSelectOption<TValue>[]>;
   value?: TValue;
   onChange: (value: TValue) => void;
   placeholder?: React.ReactNode;
-  selectSx?: SxProps;
+  selectSx?: SxProps; // overrides the minimum button width, if 'maxWidth' is set
 }) => {
   const selectedOption = props.options.find(option => option.value === props.value);
 
   return (
-    <FormControl orientation='horizontal' disabled={props.disabled} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+    <FormControl size={props.size} orientation='horizontal' disabled={props.disabled} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
       {!!props.title && (
         <FormLabelStart
           title={props.title}
@@ -48,10 +49,11 @@ export const FormSelectControl = <TValue extends string>(props: {
         />
       )}
       <Select
+        size={props.size}
         value={props.value}
         onChange={(_, value) => value && props.onChange(value as TValue)}
         placeholder={props.placeholder}
-        slotProps={_selectSlotProps}
+        slotProps={!(props.selectSx as any)?.['minWidth'] ? _selectSlotProps : undefined}
         sx={props.selectSx}
       >
         {props.options.map((option, idx) => (

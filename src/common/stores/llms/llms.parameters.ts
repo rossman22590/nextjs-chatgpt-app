@@ -88,6 +88,45 @@ export const DModelParameterRegistry = {
     } as const,
   } as const,
 
+  llmVndAntWebSearch: {
+    label: 'Web Search',
+    type: 'enum' as const,
+    description: 'Enable web search for real-time information',
+    values: ['auto', 'off'] as const,
+    // No initialValue - undefined means off (same as 'off')
+  } as const,
+
+  llmVndAntWebFetch: {
+    label: 'Web Fetch',
+    type: 'enum' as const,
+    description: 'Enable fetching content from web pages and PDFs',
+    values: ['auto', 'off'] as const,
+    // No initialValue - undefined means off (same as 'off')
+  } as const,
+
+  llmVndAnt1MContext: {
+    label: '1M Context Window (Beta)',
+    type: 'boolean' as const,
+    description: 'Enable 1M token context window with premium pricing for >200K input tokens',
+    // No initialValue - undefined means off (e.g. default 200K context window)
+  } as const,
+
+  llmVndGeminiAspectRatio: {
+    label: 'Aspect Ratio',
+    type: 'enum' as const,
+    description: 'Controls the aspect ratio of generated images',
+    values: ['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9', '21:9'] as const,
+    // No initial value - when undefined, the model decides the aspect ratio
+  } as const,
+
+  llmVndGeminiGoogleSearch: {
+    label: 'Google Search',
+    type: 'enum' as const,
+    description: 'Enable Google Search grounding with optional time filter',
+    values: ['unfiltered', '1d', '1w', '1m', '6m', '1y'] as const,
+    // No initialValue - undefined means off
+  } as const,
+
   llmVndGeminiShowThoughts: {
     label: 'Show Thoughts',
     type: 'boolean' as const,
@@ -116,11 +155,27 @@ export const DModelParameterRegistry = {
     requiredFallback: 'medium',
   } as const,
 
+  llmVndOaiReasoningEffort4: {
+    label: 'Reasoning Effort',
+    type: 'enum' as const,
+    description: 'Constrains effort on reasoning for OpenAI advanced reasoning models',
+    values: ['minimal', 'low', 'medium', 'high'] as const,
+    requiredFallback: 'medium',
+  } as const,
+
   llmVndOaiRestoreMarkdown: {
     label: 'Restore Markdown',
     type: 'boolean' as const,
     description: 'Restore Markdown formatting in the output',
     initialValue: true,
+  } as const,
+
+  llmVndOaiVerbosity: {
+    label: 'Verbosity',
+    type: 'enum' as const,
+    description: 'Controls response length and detail level',
+    values: ['low', 'medium', 'high'] as const,
+    requiredFallback: 'medium',
   } as const,
 
   llmVndOaiWebSearchContext: {
@@ -140,6 +195,15 @@ export const DModelParameterRegistry = {
     type: 'boolean' as const,
     description: 'Approximate location for search results',
     initialValue: false,
+  } as const,
+
+  llmVndOaiImageGeneration: {
+    label: 'Image Generation',
+    type: 'enum' as const,
+    description: 'Image generation mode and quality',
+    values: ['mq', 'hq', 'hq_edit' /* precise input editing */, 'hq_png' /* uncompressed */] as const,
+    // No initialValue - defaults to undefined (off)
+    // No requiredFallback - this is optional
   } as const,
 
   // Perplexity-specific parameters
@@ -258,7 +322,11 @@ export function applyModelParameterInitialValues(destValues: DModelParameterValu
 }
 
 
-const _requiredParamId: DModelParameterId[] = ['llmRef', 'llmResponseTokens', 'llmTemperature'] as const;
+const _requiredParamId: DModelParameterId[] = [
+  // 'llmRef', // disabled: we know this can't have a fallback value in the registry
+  'llmResponseTokens', // DModelParameterRegistry.llmResponseTokens.requiredFallback = FALLBACK_LLM_PARAM_RESPONSE_TOKENS
+  'llmTemperature' // DModelParameterRegistry.llmTemperature.requiredFallback = FALLBACK_LLM_PARAM_TEMPERATURE
+] as const;
 
 export function getAllModelParameterValues(initialParameters: undefined | DModelParameterValues, userParameters?: DModelParameterValues): DModelParameterValues {
 
@@ -278,6 +346,9 @@ export function getAllModelParameterValues(initialParameters: undefined | DModel
 }
 
 
+/**
+ * NOTE: this is actually only used for `llmResponseTokens` from the Composer for now (!)
+ */
 export function getModelParameterValueOrThrow<T extends DModelParameterId>(
   paramId: T,
   initialValues: undefined | DModelParameterValues,

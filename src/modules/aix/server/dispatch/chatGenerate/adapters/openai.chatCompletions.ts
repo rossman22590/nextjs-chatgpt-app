@@ -3,7 +3,7 @@ import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.router'
 import { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_ChatMessage, AixMessages_SystemMessage, AixParts_DocPart, AixParts_InlineAudioPart, AixParts_MetaInReferenceToPart, AixTools_ToolDefinition, AixTools_ToolsPolicy } from '../../../api/aix.wiretypes';
 import { OpenAIWire_API_Chat_Completions, OpenAIWire_ContentParts, OpenAIWire_Messages } from '../../wiretypes/openai.wiretypes';
 
-import { approxDocPart_To_String } from './anthropic.messageCreate';
+import { aixSpillShallFlush, aixSpillSystemToUser, approxDocPart_To_String } from './adapters.common';
 
 
 //
@@ -29,28 +29,29 @@ const approxSystemMessageJoiner = '\n\n---\n\n';
 type TRequest = OpenAIWire_API_Chat_Completions.Request;
 type TRequestMessages = TRequest['messages'];
 
-export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request, jsonOutput: boolean, streaming: boolean): TRequest {
+export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model: AixAPI_Model, _chatGenerate: AixAPIChatGenerate_Request, jsonOutput: boolean, streaming: boolean): TRequest {
+
+  // Pre-process CGR - approximate spill of System to User message
+  const chatGenerate = aixSpillSystemToUser(_chatGenerate);
 
   // Dialect incompatibilities -> Hotfixes
   const hotFixAlternateUserAssistantRoles = openAIDialect === 'deepseek' || openAIDialect === 'perplexity';
   const hotFixRemoveEmptyMessages = openAIDialect === 'perplexity';
   const hotFixRemoveStreamOptions = openAIDialect === 'azure' || openAIDialect === 'mistral';
   const hotFixSquashMultiPartText = openAIDialect === 'deepseek';
-  const hotFixThrowCannotFC = openAIDialect === 'openrouter' /* OpenRouter FC support is not good (as of 2024-07-15) */ || openAIDialect === 'perplexity';
+  const hotFixThrowCannotFC =
+    // [OpenRouter] 2025-10-02: do not throw, rather let it fail if upstream has issues
+    // openAIDialect === 'openrouter' || /* OpenRouter FC support is not good (as of 2024-07-15) */
+    openAIDialect === 'perplexity';
   const hotFixVndORIncludeReasoning = openAIDialect === 'openrouter'; // [OpenRouter, 2025-01-24] has a special `include_reasoning` field to show the chain of thought
 
   // Model incompatibilities -> Hotfixes
 
   // [OpenAI] - o1/o3/o4/o5/gpt-5 models
   // - o1 models don't support system messages, we could hotfix this here once and for all, but we want to transfer the responsibility to the UI for better messaging to the user
-  // - o1/o3/o4/o5/gpt-5 models also use the new 'max_completion_tokens' rather than 'max_tokens', breaking API compatibility, so we have to address it here
-  const hotFixOpenAIOFamily = (openAIDialect === 'openai' || openAIDialect === 'azure') && (
-    model.id === 'o1' || model.id.startsWith('o1-') ||
-    model.id === 'o3' || model.id.startsWith('o3-') ||
-    model.id === 'o4' || model.id.startsWith('o4-') ||
-    model.id === 'o5' || model.id.startsWith('o5-') ||
-    model.id === 'gpt-5' || model.id.startsWith('gpt-5-') || model.id.includes('gpt-5')
-  );
+  // - o1 models also use the new 'max_completion_tokens' rather than 'max_tokens', breaking API compatibility, so we have to address it here
+  const hotFixOpenAIOFamily = (openAIDialect === 'openai' || openAIDialect === 'azure')
+    && ['gpt-6', 'gpt-5', 'o4', 'o3', 'o1'].some(_id => model.id === _id || model.id.startsWith(_id + '-'));
 
   // Throw if function support is needed but missing
   if (chatGenerate.tools?.length && hotFixThrowCannotFC)
@@ -99,16 +100,43 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     payload.top_p = model.topP;
   }
 
+  // [OpenAI] Vendor-specific output modalities configuration
+  const outputsText = model.acceptsOutputs.includes('text');
+  const outputsAudio = model.acceptsOutputs.includes('audio');
+  const outputsImages = model.acceptsOutputs.includes('image');
+  if (openAIDialect === 'openai' && (outputsAudio || outputsImages)) {
+    // set output modalities
+    const modalities = new Set(payload.modalities || []);
+    if (outputsText) modalities.add('text');
+    if (outputsAudio) modalities.add('audio');
+    // if (outputsImages) modalities.add('image');
+    payload.modalities = Array.from(modalities);
+
+    // configure audio output
+    if (outputsAudio)
+      payload.audio = {
+        voice: 'alloy', // FIXME: have the voice be selectable
+        format: 'pcm16', // only supported value for streaming
+      };
+  }
+
   // [OpenAI] Vendor-specific reasoning effort, for o1 models only as of 2024-12-24
   if (model.vndOaiReasoningEffort) {
     payload.reasoning_effort = model.vndOaiReasoningEffort;
   }
-  // [OpenAI] Vendor-specific restore markdown, for newer o1 models
-  if (model.vndOaiRestoreMarkdown) {
-    _fixVndOaiRestoreMarkdown_Inline(payload);
-  }
+
+  // --- Tools ---
+
+  // Allow/deny auto-adding hosted tools when custom tools are present
+  const hasCustomTools = chatGenerate.tools?.some(t => t.type === 'function_call');
+  const hasRestrictivePolicy = chatGenerate.toolsPolicy?.type === 'any' || chatGenerate.toolsPolicy?.type === 'function_call';
+  const skipWebSearchDueToCustomTools = hasCustomTools && hasRestrictivePolicy;
+
+  // Hosted tools
   // [OpenAI] Vendor-specific web search context and/or geolocation
-  if (model.vndOaiWebSearchContext || model.userGeolocation) {
+  // NOTE: OpenAI doesn't support web search with minimal reasoning effort
+  const skipWebSearchDueToMinimalReasoning = model.vndOaiReasoningEffort === 'minimal';
+  if ((model.vndOaiWebSearchContext || model.userGeolocation) && !skipWebSearchDueToMinimalReasoning && !skipWebSearchDueToCustomTools) {
     payload.web_search_options = {};
     if (model.vndOaiWebSearchContext)
       payload.web_search_options.search_context_size = model.vndOaiWebSearchContext;
@@ -120,6 +148,13 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
         },
       };
   }
+
+
+  // [OpenAI] Vendor-specific restore markdown, for newer o1 models
+  const skipMarkdownDueToCustomTools = hasCustomTools && hasRestrictivePolicy;
+  if (model.vndOaiRestoreMarkdown && !skipMarkdownDueToCustomTools)
+    _fixVndOaiRestoreMarkdown_Inline(payload);
+
 
   // [xAI] Vendor-specific extensions for Live Search
   if (openAIDialect === 'xai' && model.vndXaiSearchMode && model.vndXaiSearchMode !== 'off') {
@@ -136,7 +171,7 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
         .split(',')
         .map(s => s.trim())
         .filter(s => !!s);
-      
+
       // only omit sources if it's the default ('web' and 'x')
       const isDefaultSources = sources.length === 2 && sources.includes('web') && sources.includes('x');
       if (!isDefaultSources)
@@ -192,6 +227,7 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
 
   if (hotFixRemoveStreamOptions)
     payload = _fixRemoveStreamOptions(payload);
+
 
   // Preemptive error detection with server-side payload validation before sending it upstream
   const validated = OpenAIWire_API_Chat_Completions.Request_schema.safeParse(payload);
@@ -345,6 +381,10 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chat
         msg0TextParts.push(aixDocPart_to_OpenAITextContent(part));
         break;
 
+      case 'inline_image':
+        // we have already removed image parts from the system message
+        throw new Error('OpenAI ChatCompletions: images have to be in user messages, not in system message');
+
       case 'meta_cache_control':
         // ignore this breakpoint hint - Anthropic only
         break;
@@ -369,7 +409,9 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chat
 
 
   // Convert the messages
-  for (const { parts, role } of chatSequence) {
+  let allowAppend = true;
+  for (const aixMessage of chatSequence) {
+    const { parts, role } = aixMessage;
     switch (role) {
 
       case 'user':
@@ -381,20 +423,22 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chat
               const textContentPart = OpenAIWire_ContentParts.TextContentPart(part.text);
 
               // Append to existing content[], or new message
-              if (currentMessage?.role === 'user' && Array.isArray(currentMessage.content))
+              if (allowAppend && currentMessage?.role === 'user' && Array.isArray(currentMessage.content))
                 currentMessage.content.push(textContentPart);
               else
                 chatMessages.push({ role: 'user', content: hotFixPreferArrayUserContent ? [textContentPart] : textContentPart.text });
+              allowAppend = true;
               break;
 
             case 'doc':
               const docContentPart = aixDocPart_to_OpenAITextContent(part);
 
               // Append to existing content[], or new message
-              if (currentMessage?.role === 'user' && Array.isArray(currentMessage.content))
+              if (allowAppend && currentMessage?.role === 'user' && Array.isArray(currentMessage.content))
                 currentMessage.content.push(docContentPart);
               else
                 chatMessages.push({ role: 'user', content: hotFixPreferArrayUserContent ? [docContentPart] : docContentPart.text });
+              allowAppend = true;
               break;
 
             case 'inline_image':
@@ -404,10 +448,11 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chat
               const imageContentPart = OpenAIWire_ContentParts.ImageContentPart(base64DataUrl, hotFixForceImageContentPartOpenAIDetail);
 
               // Append to existing content[], or new message
-              if (currentMessage?.role === 'user' && Array.isArray(currentMessage.content))
+              if (allowAppend && currentMessage?.role === 'user' && Array.isArray(currentMessage.content))
                 currentMessage.content.push(imageContentPart);
               else
                 chatMessages.push({ role: 'user', content: [imageContentPart] });
+              allowAppend = true;
               break;
 
             case 'meta_cache_control':
@@ -426,6 +471,9 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chat
               throw new Error(`Unsupported part type in User message: ${(part as any).pt}`);
           }
         }
+
+        // If this message shall be flushed, disallow append once next
+        allowAppend = !aixSpillShallFlush(aixMessage);
         break;
 
       case 'model':

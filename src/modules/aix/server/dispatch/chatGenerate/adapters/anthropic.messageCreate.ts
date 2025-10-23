@@ -1,12 +1,13 @@
-import { escapeXml } from '~/server/wire';
-
-import type { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_ChatMessage, AixParts_DocPart, AixParts_MetaInReferenceToPart, AixTools_ToolDefinition, AixTools_ToolsPolicy } from '../../../api/aix.wiretypes';
+import type { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_ChatMessage, AixTools_ToolDefinition, AixTools_ToolsPolicy } from '../../../api/aix.wiretypes';
 import { AnthropicWire_API_Message_Create, AnthropicWire_Blocks } from '../../wiretypes/anthropic.wiretypes';
+
+import { aixSpillShallFlush, aixSpillSystemToUser, approxDocPart_To_String, approxInReferenceTo_To_XMLString } from './adapters.common';
 
 
 // configuration
 const hotFixImagePartsFirst = true;
 const hotFixMapModelImagesToUser = true;
+const hotFixDisableThinkingWhenToolsForced = true; // "Thinking may not be enabled when tool_choice forces tool use."
 
 // former fixes, now removed
 // const hackyHotFixStartWithUser = false; // 2024-10-22: no longer required
@@ -14,7 +15,10 @@ const hotFixMapModelImagesToUser = true;
 
 type TRequest = AnthropicWire_API_Message_Create.Request;
 
-export function aixToAnthropicMessageCreate(model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request, streaming: boolean): TRequest {
+export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: AixAPIChatGenerate_Request, streaming: boolean): TRequest {
+
+  // Pre-process CGR - approximate spill of System to User message
+  const chatGenerate = aixSpillSystemToUser(_chatGenerate);
 
   // Convert the system message
   let systemMessage: TRequest['system'] = undefined;
@@ -30,6 +34,10 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, chatGenerate: A
           acc.push(AnthropicWire_Blocks.TextBlock(approxDocPart_To_String(part)));
           break;
 
+        case 'inline_image':
+          // we have already removed image parts from the system message
+          throw new Error('Anthropic: images have to be in user messages, not in system message');
+
         case 'meta_cache_control':
           if (!acc.length)
             console.warn('Anthropic: cache_control without a message to attach to');
@@ -40,6 +48,7 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, chatGenerate: A
           break;
 
         default:
+          const _exhaustiveCheck: never = part;
           throw new Error(`Unsupported part type in System message: ${(part as any).pt}`);
       }
       return acc;
@@ -76,6 +85,12 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, chatGenerate: A
       }
       currentMessage.content.push(content);
     }
+
+    // Flush: interrupt batching within the same-role and finalize the current message
+    if (aixSpillShallFlush(aixMessage) && currentMessage) {
+      chatMessages.push(currentMessage);
+      currentMessage = null;
+    }
   }
   if (currentMessage)
     chatMessages.push(currentMessage);
@@ -111,7 +126,9 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, chatGenerate: A
   }
 
   // [Anthropic] Thinking Budget
-  if (model.vndAntThinkingBudget !== undefined) {
+  const areToolCallsRequired = payload.tool_choice && typeof payload.tool_choice === 'object' && (payload.tool_choice.type === 'any' || payload.tool_choice.type === 'tool');
+  const canUseThinking = !areToolCallsRequired || !hotFixDisableThinkingWhenToolsForced;
+  if (model.vndAntThinkingBudget !== undefined && canUseThinking) {
     payload.thinking = model.vndAntThinkingBudget !== null ? {
       type: 'enabled',
       budget_tokens: model.vndAntThinkingBudget < payload.max_tokens ? model.vndAntThinkingBudget : payload.max_tokens - 1,
@@ -120,6 +137,43 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, chatGenerate: A
     };
     delete payload.temperature;
   }
+
+  // --- Tools ---
+
+  // Allow/deny auto-adding hosted tools when custom tools are present
+  const hasCustomTools = chatGenerate.tools?.some(t => t.type === 'function_call');
+  const hasRestrictivePolicy = chatGenerate.toolsPolicy?.type === 'any' || chatGenerate.toolsPolicy?.type === 'function_call';
+  const skipHostedToolsDueToCustomTools = hasCustomTools && hasRestrictivePolicy;
+
+  // Hosted tools
+  if (!skipHostedToolsDueToCustomTools) {
+    const hostedTools: NonNullable<TRequest['tools']> = [];
+
+    // Web Search Tool
+    if (model.vndAntWebSearch === 'auto') {
+      hostedTools.push({
+        type: 'web_search_20250305',
+        name: 'web_search',
+        max_uses: 10, // Allow up to 10 progressive searches // FIXME: HARDCODED
+      });
+    }
+
+    // Web Fetch Tool
+    if (model.vndAntWebFetch === 'auto') {
+      hostedTools.push({
+        type: 'web_fetch_20250910',
+        name: 'web_fetch',
+        max_uses: 5, // Allow up to 5 fetches
+        citations: { enabled: true }, // Enable citations
+      });
+    }
+
+    // Merge hosted tools with custom tools
+    if (hostedTools.length > 0) {
+      payload.tools = payload.tools ? [...payload.tools, ...hostedTools] : hostedTools;
+    }
+  }
+
 
   // Preemptive error detection with server-side payload validation before sending it upstream
   const validated = AnthropicWire_API_Message_Create.Request_schema.safeParse(payload);
@@ -304,28 +358,4 @@ function _toAnthropicToolChoice(itp: AixTools_ToolsPolicy): NonNullable<TRequest
     case 'function_call':
       return { type: 'tool' as const, name: itp.function_call.name };
   }
-}
-
-
-// Approximate conversions - alternative approaches should be tried until we find the best one
-
-export function approxDocPart_To_String({ ref, data }: AixParts_DocPart /*, wrapFormat?: 'markdown-code'*/): string {
-  // NOTE: Consider a better representation here
-  //
-  // We use the 'legacy' markdown encoding, but we may consider:
-  //  - '<doc id='ref' title='title' version='version'>\n...\n</doc>'
-  //  - ```doc id='ref' title='title' version='version'\n...\n```
-  //  - # Title [id='ref' version='version']\n...\n
-  //  - ...more ideas...
-  //
-  return '```' + (ref || '') + '\n' + data.text + '\n```\n';
-}
-
-export function approxInReferenceTo_To_XMLString(irt: AixParts_MetaInReferenceToPart): string | null {
-  const refs = irt.referTo.map(r => escapeXml(r.mText));
-  if (!refs.length)
-    return null; // `<context>User provides no specific references</context>`;
-  return refs.length === 1
-    ? `<context>User refers to this in particular:<ref>${refs[0]}</ref></context>`
-    : `<context>User refers to ${refs.length} items:<ref>${refs.join('</ref><ref>')}</ref></context>`;
 }

@@ -52,6 +52,7 @@ import { useUXLabsStore } from '~/common/stores/store-ux-labs';
 
 import { BlockOpContinue } from './BlockOpContinue';
 import { BlockOpOptions, optionsExtractFromFragments_dangerModifyFragment } from './BlockOpOptions';
+import { BlockOpUpstreamResume } from './BlockOpUpstreamResume';
 import { ContentFragments } from './fragments-content/ContentFragments';
 import { DocumentAttachmentFragments } from './fragments-attachment-doc/DocumentAttachmentFragments';
 import { ImageAttachmentFragments } from './fragments-attachment-image/ImageAttachmentFragments';
@@ -220,6 +221,7 @@ export function ChatMessage(props: {
     voidFragments,          // Model-Aux, Placeholders
     contentFragments,       // Text (Markdown + Code + ... blocks), Errors, (large) Images
     nonImageAttachments,    // Document Attachments, likely the User dropped them in
+    lastFragmentIsError,
   } = useFragmentBuckets(messageFragments);
 
   const fragmentFlattenedText = React.useMemo(() => messageFragmentsReduceText(messageFragments), [messageFragments]);
@@ -760,8 +762,8 @@ export function ChatMessage(props: {
             <InReferenceToList items={messageMetadata.inReferenceTo} />
           )}
 
-          {/* Image Attachment Fragments - just for a prettier display on top of the message */}
-          {imageAttachments.length >= 1 && (
+          {/* [NOT SYSTEM, UNREAL] Image Attachment Fragments - just for a prettier display on top of the message, but is "WRONG" logically as the text comes before the image */}
+          {!fromSystem && imageAttachments.length >= 1 && (
             <ImageAttachmentFragments
               imageAttachments={imageAttachments}
               contentScaling={adjContentScaling}
@@ -826,12 +828,33 @@ export function ChatMessage(props: {
             />
           )}
 
+          {/* [SYSTEM, REAL] Image Attachment Fragments - just for a realistic display below the system instruction text/docs */}
+          {fromSystem && imageAttachments.length >= 1 && (
+            <ImageAttachmentFragments
+              imageAttachments={imageAttachments}
+              contentScaling={adjContentScaling}
+              messageRole={messageRole}
+              disabled={isEditingText}
+              onFragmentDelete={!props.onMessageFragmentDelete ? undefined : handleFragmentDelete}
+            />
+          )}
+
           {/* Continue... */}
-          {props.isBottom && messageGenerator?.tokenStopReason === 'out-of-tokens' && !!props.onMessageContinue && (
+          {props.isBottom && fromAssistant && messageGenerator?.tokenStopReason === 'out-of-tokens' && !!props.onMessageContinue && (
             <BlockOpContinue
               contentScaling={adjContentScaling}
               messageRole={messageRole}
               onContinue={handleMessageContinue}
+            />
+          )}
+
+          {/* Upstream Resume... */}
+          {props.isBottom && fromAssistant && lastFragmentIsError && messageGenerator?.upstreamHandle?.responseId && (
+            <BlockOpUpstreamResume
+              upstreamHandle={messageGenerator.upstreamHandle}
+              onResume={console.error}
+              onCancel={console.error}
+              onDelete={console.error}
             />
           )}
 

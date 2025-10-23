@@ -10,6 +10,7 @@ import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import LoginIcon from '@mui/icons-material/Login';
+import TerminalOutlinedIcon from '@mui/icons-material/TerminalOutlined';
 
 import { blocksRenderHTMLIFrameCss } from '~/modules/blocks/code/code-renderers/RenderCodeHtmlIFrame';
 
@@ -193,6 +194,10 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
               Quick Tools
             </Typography>
           </ListItem>
+          <MenuItem onClick={optimaActions().openAIXDebugger}>
+            <ListItemDecorator><TerminalOutlinedIcon /></ListItemDecorator>
+            AI Inspector
+          </MenuItem>
           <MenuItem disabled={!scratchClipSupported()} onClick={toggleScratchClipVisibility}>
             <ListItemDecorator><HistoryIcon /></ListItemDecorator>
             {isScratchClipVisible ? 'Hide ' : ''}Clipboard {scratchClipSupported() ? 'History' : '(not supported)'}

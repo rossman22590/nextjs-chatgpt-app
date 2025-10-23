@@ -1,8 +1,9 @@
 import * as React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
-import { Avatar, Badge, Box, Button, Chip, CircularProgress, Input, Sheet, Typography } from '@mui/joy';
+import { Avatar, Badge, Box, Button, Chip, CircularProgress, Sheet, Typography } from '@mui/joy';
 
+import { FormInputKey } from '~/common/components/forms/FormInputKey';
 import { TooltipOutlined } from '~/common/components/TooltipOutlined';
 import { llmsStoreActions, llmsStoreState, useModelsStore } from '~/common/stores/llms/store-llms';
 import { useShallowStabilizer } from '~/common/util/hooks/useShallowObject';
@@ -47,7 +48,9 @@ const _styles = {
     // paddingRight: 'calc(1.5 * var(--Card-padding))',
     // background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))',
     // background: 'linear-gradient(135deg, var(--joy-palette-background-level1), var(--joy-palette-background-level1))',
-    display: 'grid',
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
     gap: 'calc(0.75 * var(--Card-padding))',
   } as const,
 
@@ -126,12 +129,12 @@ function WizardProviderSetup(props: {
   const valueName = isLocal ? 'server' : 'API Key';
   const { name: vendorName } = providerVendor;
 
+  // use consistent autoCompleteId pattern: vendor-key for API keys, vendor-host for servers
+  const autoCompleteId = isLocal ? `${providerVendor.id}-host` : `${providerVendor.id}-key`;
+
 
   // handlers
 
-  const handleTextChanged = React.useCallback((e: React.ChangeEvent) => {
-    setLocalValue((e.target as HTMLInputElement).value);
-  }, []);
 
   const handleSetServiceKeyValue = React.useCallback(async () => {
 
@@ -180,11 +183,12 @@ function WizardProviderSetup(props: {
       {/*</TooltipOutlined>*/}
       {/*<TooltipOutlined title='Confirm'>*/}
       <Button
-        variant='solid' color='primary'
+        color='primary'
+        variant='solid'
         onClick={handleSetServiceKeyValue}
         // endDecorator={<CheckRoundedIcon />}
       >
-        {!serviceKeyValue ? 'Confirm' : !localValue?.trim() ? 'Clear' : 'Update'}
+        {!serviceKeyValue ? 'Save' : !localValue?.trim() ? 'Delete' : 'Update'}
       </Button>
       {/*</TooltipOutlined>*/}
     </Box>
@@ -219,30 +223,20 @@ function WizardProviderSetup(props: {
         </TooltipOutlined>
 
         {/* Main key inputs */}
-        <Box sx={{ flex: 1, display: 'grid' }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'row', gap: 0.5 }}>
 
-          {/* Line 1 */}
-          {/*{!!props.serviceLabel && (*/}
-          {/*  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>*/}
-          {/*    /!*<props.vendorIcon />*!/*/}
-          {/*    <Box>{props.serviceLabel}</Box>*/}
-          {/*  </Box>*/}
-          {/*)}*/}
+          <Box sx={{ flex: 1 }}>
+            <FormInputKey
+              noKey={isLocal}
+              autoCompleteId={autoCompleteId}
+              value={localValue ?? ''}
+              placeholder={`${vendorName} ${valueName}`}
+              onChange={setLocalValue}
+              required={false}
+            />
+          </Box>
 
-          {/* Line 2 */}
-          <Input
-            fullWidth
-            name={`wizard-settings-value-${providerVendor.id}`}
-            autoComplete='off'
-            variant='outlined'
-            value={localValue ?? ''}
-            onChange={handleTextChanged}
-            placeholder={`${vendorName} ${valueName}`}
-            type={isLocal ? undefined : 'password'}
-            // error={!isValidKey}
-            // startDecorator={<props.vendorIcon />}
-            endDecorator={endButtons}
-          />
+          {endButtons}
 
         </Box>
 

@@ -280,6 +280,7 @@ export namespace OpenAIWire_API_Chat_Completions {
       voice: z.enum([
         'ash', 'ballad', 'coral', 'sage', 'verse', // recommended
         'alloy', 'echo', 'shimmer', // discouraged
+        'marin', // new
       ]),
       format: z.enum(['wav', 'mp3', 'flac', 'opus', 'pcm16']),
     }).optional(),
@@ -290,7 +291,7 @@ export namespace OpenAIWire_API_Chat_Completions {
     stream_options: z.object({
       include_usage: z.boolean().optional(), // If set, an additional chunk will be streamed with a 'usage' field on the entire request.
     }).optional(),
-    reasoning_effort: z.enum(['low', 'medium', 'high']).optional(), // [OpenAI, 2024-12-17] [Perplexity, 2025-06-23] reasoning effort
+    reasoning_effort: z.enum(['minimal', 'low', 'medium', 'high']).optional(), // [OpenAI, 2024-12-17] [Perplexity, 2025-06-23] reasoning effort
     include_reasoning: z.boolean().optional(), // [OpenRouter, 2025-01-24] enables reasoning tokens
     reasoning: z.object({ // [OpenRouter, 2025-06-05] Reasoning parameter for Claude models
       max_tokens: z.number().int().positive(),
@@ -417,6 +418,7 @@ export namespace OpenAIWire_API_Chat_Completions {
       reasoning_tokens: z.number().optional(), // [Discord, 2024-04-10] reported missing
       // text_tokens: z.number().optional(), // [Discord, 2024-04-10] revealed as present on custom OpenAI endpoint - not using it here yet
       audio_tokens: z.number().optional(), // [OpenAI, 2024-10-01] audio tokens used in the completion (charged at a different rate)
+      // image_tokens: z.number().optional(), // [OpenRouter, 2025-10-22] first seen.. sounds likely?
       accepted_prediction_tokens: z.number().optional(), // [OpenAI, 2024-11-05] Predicted Outputs
       rejected_prediction_tokens: z.number().optional(), // [OpenAI, 2024-11-05] Predicted Outputs
     }).optional() // not present in other APIs yet
@@ -425,6 +427,26 @@ export namespace OpenAIWire_API_Chat_Completions {
     // [DeepSeek, 2024-08-02] context caching on disk
     prompt_cache_hit_tokens: z.number().optional(),
     prompt_cache_miss_tokens: z.number().optional(),
+
+    // [Perplexity, 2025-10-20] cost breakdown (object format)
+    // [OpenRouter, 2025-01-22] cost as direct number
+    cost: z.union([
+      z.number(), // OpenRouter sends cost as a number directly
+      z.looseObject({
+        input_tokens_cost: z.number().optional(),
+        output_tokens_cost: z.number().optional(),
+        request_cost: z.number().optional(),
+        total_cost: z.number().optional(),
+      }),
+    ]).nullish(),
+
+    // [OpenRouter, 2025-10-22] additional usage fields when used with Chutes
+    // is_byok: z.boolean().optional(), // Bring Your Own Key indicator
+    // cost_details: z.object({
+    //   upstream_inference_cost: z.number().optional(),
+    //   upstream_inference_prompt_cost: z.number().optional(),
+    //   upstream_inference_completions_cost: z.number().optional(),
+    // }).optional(),
   }).nullable();
 
   /**
@@ -455,8 +477,8 @@ export namespace OpenAIWire_API_Chat_Completions {
     audio: z.object({
       id: z.string(),
       data: z.string(), // Base64 encoded audio data
-      expires_at: z.number(), // Unix timestamp
       transcript: z.string().optional(),
+      expires_at: z.number(), // Unix timestamp
     }).nullable().optional(),
 
   });
@@ -559,7 +581,15 @@ export namespace OpenAIWire_API_Chat_Completions {
     role: z.literal('assistant').optional()
       .nullable(), // [Deepseek] added .nullable()
     // delta-text content
-    content: z.string().nullable().optional(),
+    content: z.string().nullish()
+      // [Mistral, 2025-10-15] Mistral SPEC-BREAKING thinking fragments
+      .or(z.array(z.object({
+        type: z.string(), // 'thinking', but relaxed
+        thinking: z.array(z.object({
+          type: z.string(),
+          text: z.string(),
+        })).optional(),
+      }))),
     // delta-reasoning content
     reasoning_content: z.string().nullable().optional(), // [Deepseek, 2025-01-20]
     reasoning: z.string().optional() // [OpenRouter, 2025-01-24]
@@ -573,6 +603,16 @@ export namespace OpenAIWire_API_Chat_Completions {
      * not documented yet in the API guide; shall improve this once defined
      */
     annotations: z.array(OpenAIWire_ContentParts.OpenAI_AnnotationObject_schema).optional(),
+    /**
+     * [OpenAI, 2024-10-17] Audio streaming
+     * NOTE: this has been observed from the stream on 2025-10-13 - seems the same as the NS version
+     */
+    audio: z.object({
+      id: z.string().optional(), // omitted in subsequent chunks
+      data: z.string().optional(), // incremental base64 audio data
+      transcript: z.string().optional(), // incremental transcript
+      expires_at: z.number().optional(), // seems to be only in the last chunk
+    }).optional(),
   });
 
   const ChunkChoice_schema = z.object({
@@ -594,8 +634,14 @@ export namespace OpenAIWire_API_Chat_Completions {
     object: z.enum([
       'chat.completion.chunk',
       'chat.completion', // [Perplexity] sent an email on 2024-07-14 to inform them about the misnomer
+      /**
+       * [Perplexity, 2025-10-20] Undocumented full-response-like message type
+       * - it's a .chunk, delta with delta='', and finish_reason set (to 'stop') and 'usage.costs' set
+       */
+      'chat.completion.done',
       '', // [Azure] bad response: the first packet communicates 'prompt_filter_results'
     ])
+      // .or(z.string()) // [Perplexity, 2025-10-20] future resiliency post perplexity still breaking the openai compatibility
       .optional(), // [FastAPI, 2025-04-24] the FastAPI dialect sadly misses the 'chat.completion.chunk' type
     id: z.string(),
 
@@ -786,11 +832,12 @@ export namespace OpenAIWire_API_Images_Generations {
   export type Request = z.infer<typeof Request_schema>;
   const Request_schema = z.object({
 
-    // 32,000 for gpt-image-1, 4,000 for dall-e-3, 1,000 for dall-e-2
+    // 32,000 for gpt-image-1/gpt-image-1-mini, 4,000 for dall-e-3, 1,000 for dall-e-2
     prompt: z.string().max(32000),
 
     model: z.enum([
       'gpt-image-1',
+      'gpt-image-1-mini',
       'dall-e-3',
       'dall-e-2', // default
     ]).optional(),
@@ -801,12 +848,12 @@ export namespace OpenAIWire_API_Images_Generations {
     // Image quality
     quality: z.enum([
       'auto',                   // default
-      'high', 'medium', 'low',  // gpt-image-1
+      'high', 'medium', 'low',  // gpt-image-1, gpt-image-1-mini
       'hd', 'standard',         // dall-e-3: hd | standard, dall-e-2: only standard
     ]).optional(),
 
     // The format in which generated images with dall-e-2 and dall-e-3 are returned.
-    //`gpt-image-1` will always return base64-encoded images and does NOT support this parameter.
+    // GPT Image models will always return base64-encoded images and do NOT support this parameter.
     response_format: z.enum(['url', 'b64_json']).optional(),
 
     // size of the generated images
@@ -827,18 +874,18 @@ export namespace OpenAIWire_API_Images_Generations {
     user: z.string().optional(),
 
 
-    // -- GPT Image 1 Specific Parameters --
+    // -- GPT Image Family Specific Parameters (gpt-image-1, gpt-image-1-mini) --
 
     // Allows to set transparency (in that case, format = png or webp)
     background: z.enum(['transparent', 'opaque', 'auto' /* default */]).optional(),
 
-    // Control the content-moderation level for images generated by gpt-image-1.
+    // Control the content-moderation level for images generated by GPT Image models.
     moderation: z.enum(['low', 'auto' /* default */]).optional(),
 
     // The format in which the generated images are returned
     output_format: z.enum(['png' /* default */, 'jpeg', 'webp']).optional(),
 
-    // WEBP/JPEG compression level for gpt-image-1
+    // WEBP/JPEG compression level for GPT Image models
     output_compression: z.number().min(0).max(100).int().optional(),
 
 
@@ -858,7 +905,7 @@ export namespace OpenAIWire_API_Images_Generations {
       url: z.url().optional(), // if the response_format is 'url' - DEPRECATED
     })),
 
-    // gpt-image-1 only
+    // GPT Image models only (gpt-image-1, gpt-image-1-mini)
     usage: z.object({
       total_tokens: z.number(),
       input_tokens: z.number(), // images + text tokens in the input prompt
@@ -884,14 +931,14 @@ export namespace OpenAIWire_API_Images_Edits {
    */
   export const Request_schema = z.object({
 
-    // 32,000 for gpt-image-1, 1,000 for dall-e-2
+    // 32,000 for gpt-image-1/gpt-image-1-mini, 1,000 for dall-e-2
     prompt: z.string().max(32000),
 
     // image: file | file[] - REQUIRED - Handled as file uploads in FormData ('image' field)
 
     // mask: file - OPTIONAL - Handled as file upload in FormData ('mask' field)
 
-    model: z.enum(['gpt-image-1', 'dall-e-2']).optional(),
+    model: z.enum(['gpt-image-1', 'gpt-image-1-mini', 'dall-e-2']).optional(),
 
     // Number of images to generate, between 1 and 10
     n: z.number().min(1).max(10).nullable().optional(),
@@ -899,11 +946,11 @@ export namespace OpenAIWire_API_Images_Edits {
     // Image quality
     quality: z.enum([
       'auto',                   // default
-      'high', 'medium', 'low',  // gpt-image-1
+      'high', 'medium', 'low',  // gpt-image-1, gpt-image-1-mini
       'standard',               // dall-e-2: only standard
     ]).optional(),
 
-    // response_format: string - OPTIONAL - Defaults to 'url'. Only for DALL-E 2. gpt-image-1 always returns b64_json.
+    // response_format: string - OPTIONAL - Defaults to 'url'. Only for DALL-E 2. GPT Image models always return b64_json.
     // OMITTED here as we'll enforce b64_json or handle it based on model if DALL-E 2 edit were supported.
 
     // size of the generated images
@@ -1089,17 +1136,88 @@ export namespace OpenAIWire_Responses_Items {
     name: z.string(), // name of the function to call
   });
 
+  // const OutputCustomToolCallItem_schema = _OutputItemBase_schema.extend({
+  //   type: z.literal('custom_tool_call'),
+  //   id: z.string(), // unique ID of the custom tool call
+  //   name: z.string(), // name of the custom tool
+  //   input: z.string().optional(), // text input to the tool
+  // });
+
   const OutputWebSearchCallItem_schema = _OutputItemBase_schema.extend({
     type: z.literal('web_search_call'),
     id: z.string(), // unique ID of the output item
-    action: z.any().optional(), // TODO: expand this later
+
+    // action may be present with `include: ['web_search_call.action.sources']`
+    action: z.union([
+
+      // Action type: 'search' - lists all the search results of a web search, once done
+      z.object({
+        type: z.literal('search'),
+        query: z.string().optional(), // query might not always be present in done event
+        sources: z.array(z.object({
+          type: z.literal('url').optional(), // source type
+          url: z.string(),
+          title: z.string().optional(),
+          snippet: z.string().optional(),
+          start_index: z.number().optional(),
+          end_index: z.number().optional(),
+        })).optional(),
+      }),
+
+      // Action type: 'open_page' - opens/visits a specific web page
+      z.object({
+        type: z.literal('open_page'),
+        url: z.string().nullable(), // URL to open (can be null in some cases)
+      }),
+
+      // Action type: 'find_in_page' - searches for a pattern within an opened page
+      z.object({
+        type: z.literal('find_in_page'),
+        pattern: z.string(), // text pattern to search for
+        url: z.string(), // URL of the page being searched
+      }),
+
+      // Future-proof: any other action type with flexible structure
+      z.any(),
+
+    ]).optional(),
   });
 
-  // const ImageGenerationCallOutput_schema = z.object({
-  //   type: z.literal('image_generation_call'),
-  //   id: z.string(), // unique ID of the image generation call (output item ID)
-  //   result: z.string().nullish(), // base64 image data
-  //   status: _OutputItemStatus_schema.optional(),
+  const OutputImageGenerationCallItem_schema = _OutputItemBase_schema.extend({
+    type: z.literal('image_generation_call'),
+    id: z.string(), // unique ID of the image generation call (output item ID)
+    result: z.string().optional(), // base64 image data when completed
+    revised_prompt: z.string().optional(), // the revised prompt used for generation
+    // BREAKING CHANGE from OpenAI - 2025-09-30
+    // redefining the following because we need 'generating' too here
+    status: z.enum([
+      'generating', // 2025-09-30: seen on OpenAI for `image_generation_call` items
+      'in_progress', 'completed', 'incomplete',
+    ]).optional(),
+    // NOTE: we also see the following in the image_generation_call item
+    // background: z.enum(['transparent', 'opaque', 'auto' /* default */]).optional(),
+    // output_format: z.enum(['png' /* default */, 'jpeg', 'webp']).optional(),
+    // quality: z.enum(['auto', 'high', 'medium', 'low']).optional(),
+  });
+
+  // const OutputCodeInterpreterCallItem_schema = _OutputItemBase_schema.extend({
+  //   type: z.literal('code_interpreter_call'),
+  //   id: z.string(),
+  //   language: z.string().optional(),
+  //   code: z.string().optional(),
+  //   result: z.string().optional(),
+  // });
+
+  // const OutputFileSearchCallItem_schema = _OutputItemBase_schema.extend({
+  //   type: z.literal('file_search_call'),
+  //   id: z.string(),
+  //   // OpenAI vector store feature - not implemented
+  // });
+
+  // const OutputMCPCallItem_schema = _OutputItemBase_schema.extend({
+  //   type: z.literal('mcp_call'),
+  //   id: z.string(),
+  //   // MCP (Model Context Protocol) calls - not implemented yet
   // });
 
   /**
@@ -1119,10 +1237,12 @@ export namespace OpenAIWire_Responses_Items {
     OutputContentItem_schema,
     OutputReasoningItem,
     OutputFunctionCallItem_schema,
+    // OutputCustomToolCallItem_schema, // plain text custom tool output
     OutputWebSearchCallItem_schema,
-    // ImageGenerationCallOutput_schema,
-    // FileSearchCallOutput_schema,
-    // WebSearchCallOutput_schema,
+    OutputImageGenerationCallItem_schema,
+    // OutputCodeInterpreterCallItem_schema,
+    // OutputFileSearchCallItem_schema,
+    // OutputMCPCallItem_schema,
     // ComputerUseCallOutput_schema,
     // CodeInterpreterCallOutput_schema,
     // LocalShellCallOutput_schema,
@@ -1238,6 +1358,18 @@ export namespace OpenAIWire_Responses_Tools {
     strict: z.boolean().optional(), // enforce strict parameter validation
   });
 
+  // const CustomTool_schema = z.object({
+  //   type: z.literal('custom'),
+  //   name: z.string(),
+  //   description: z.string().optional(),
+  //   format: z.object({
+  //     type: z.enum(['text', 'grammar']),
+  //     definition: z.string().optional(), // for grammar format
+  //     syntax: z.enum(['lark', 'regex']).optional(), // for grammar format
+  //   }).optional(),
+  // });
+
+
   // Hosted tools definitions
 
   const WebSearchTool_schema = z.object({
@@ -1252,20 +1384,63 @@ export namespace OpenAIWire_Responses_Tools {
     }).optional(),
   });
 
+  const ImageGenerationTool_schema = z.object({
+    type: z.literal('image_generation'),
+    background: z.enum(['transparent', 'opaque', 'auto']).optional(), // defaults to 'auto'
+    /**
+     * Control how much effort the model will exert to match the style and features, especially facial features, of input images.
+     * Defaults to 'low'.
+     */
+    input_fidelity: z.enum(['high', 'low']).optional(),
+    input_image_mask: z.object({
+      file_id: z.string().optional(), // File ID for the mask image
+      image_url: z.string().optional(), // Base64-encoded mask image
+    }).optional(),
+    /** 'gpt-image-1' (default), leaks suggest also 'gpt-image-0721-mini-alpha' */
+    model: z.string().optional(),
+    /** Note: 'low' is unconfirmed here. Defaults to 'auto' */
+    moderation: z.enum(['low', 'auto']).optional(),
+    output_compression: z.number().min(0).max(100).int().optional(), // defaults to 100
+    /** One of [png, webp, or jpeg]. Default: png. */
+    output_format: z.enum(['png', 'webp', 'jpeg']).optional(),
+    /** Number of partial images to generate in streaming mode, from 0 (default) to 3. */
+    partial_images: z.number().int().min(0).max(3).optional(),
+    /** Quality of the generated image. Defaults to 'auto' */
+    quality: z.enum(['low', 'medium', 'high', 'auto']).optional(),
+    /** The size of the generated image. One of 1024x1024, 1024x1536, 1536x1024, or auto. Default: auto. */
+    size: z.enum(['1024x1024', '1024x1536', '1536x1024', 'auto']).optional(),
+  });
+
+  // const CodeInterpreterTool_schema = z.object({
+  //   type: z.literal('code_interpreter'),
+  //   container: z.union([z.string(), z.object({})]), // container ID or object with file IDs
+  // });
+
+  // const FileSearchTool_schema = z.object({
+  //   type: z.literal('file_search'),
+  //   // OpenAI vector store feature - not implemented
+  // });
+
+  // const MCPTool_schema = z.object({
+  //   type: z.literal('mcp'),
+  //   // MCP (Model Context Protocol) tools - not implemented yet
+  // });
+
   // Combined tools
 
   export type Tool = z.infer<typeof Tool_schema>;
   export const Tool_schema = z.union([
     // custom function tools
     CustomFunctionTool_schema,
+    // CustomTool_schema,
     // hosted tools
     WebSearchTool_schema,
+    ImageGenerationTool_schema,
     // CodeInterpreterTool_schema,
-    // ComputerUseTool_schema,
-    // FileSearchTool_schema,
-    // ImageGenerationTool_schema,
-    // LocalShellTool_schema,
+    // FileSearchTool_schema, // OpenAI vector store - not implemented
     // MCPTool_schema,
+    // ComputerUseTool_schema,
+    // LocalShellTool_schema,
   ]);
 
   export const ToolChoice_schema = z.union([
@@ -1276,14 +1451,18 @@ export namespace OpenAIWire_Responses_Tools {
       type: z.literal('function'),
       name: z.string(),
     }),
+    z.object({ // custom tool
+      type: z.literal('custom'),
+      name: z.string(),
+    }),
     z.object({ // hosted tool
       type: z.enum([
         // 'file_search',
-        'web_search_preview',
+        'web_search_preview', 'web_search_preview_2025_03_11',
+        'image_generation',
         // 'computer_use_preview',
         // 'code_interpreter',
         // 'mcp',
-        // 'image_generation',
         // 'local_shell' ?
       ]),
     }),
@@ -1315,7 +1494,7 @@ export namespace OpenAIWire_API_Responses {
 
     // configure reasoning
     reasoning: z.object({
-      effort: z.enum(['low', 'medium', 'high']).nullish(), // defaults to 'medium'
+      effort: z.enum(['minimal', 'low', 'medium', 'high']).nullish(), // defaults to 'medium'
       summary: z.enum(['auto', 'concise', 'detailed']).nullish(),
     }).nullish(),
 
@@ -1332,6 +1511,7 @@ export namespace OpenAIWire_API_Responses {
         }),
         // z.object({ type: z.literal('json_object') }), // deprecated
       ]).optional(),
+      verbosity: z.enum(['low', 'medium', 'high']).optional(), // GPT-5 verbosity control
     }).optional(),
 
     // State management (we won't use this for stateless)
@@ -1342,13 +1522,20 @@ export namespace OpenAIWire_API_Responses {
     stream: z.boolean().nullish(),
     background: z.boolean().nullish(),
     truncation: z.enum(['auto', 'disabled']).nullish(), // defaults to 'disabled', 'auto' drops input items in the middle of the conversation.
+    include: z.array(z.enum([
+      'web_search_call.action.sources', // get web search citations
+      // 'file_search_call.results',
+      // 'message.input_image.image_url',
+      // 'computer_call_output.output.image_url',
+      // 'reasoning.encrypted_content',
+      // 'code_interpreter_call.outputs'
+    ])).optional(), // additional output to include in the response
     user: z.string().optional(), // stable identifier for your end-users
 
     // Unused
-    // include: z.array(z.string()).nullish(), // additional output to include in the response: 'file_search_call.results', 'message.input_image.image_url', 'computer_call_output.output.image_url', 'reasoning.encrypted_content', 'code_interpreter_call.outputs'
     // metadata: z.record(z.string(), z.any()).optional(), // set of 16 key-value pairs that can be attached to an object
     // service_tier: z.enum(['auto', 'default', 'flex', 'priority']).nullish(),
-    // prompt: z.object({
+    // prompt: z.object({ // reference to a prompt template and its variables
     //   id: z.string(),
     //   version: z.string().optional(),
     //   variables: z.record(z.string(), z.any()).optional(),
@@ -1366,7 +1553,9 @@ export namespace OpenAIWire_API_Responses {
     id: z.string(), // unique ID for this response
     created_at: z.number(), // unix timestamp (in seconds)
     status: z.enum(['completed', 'failed', 'in_progress', 'cancelled', 'queued', 'incomplete']),
-    incomplete_details: z.object({ reason: z.string() }).nullish(), // why the response is incomplete
+    incomplete_details: z.object({
+      reason: z.union([z.enum(['max_output_tokens']), z.string()]),
+    }).nullish(), // why the response is incomplete
     error: z.object({ code: z.string(), message: z.string() }).nullish(), // (null)
 
     model: z.string(), // model used for the response
@@ -1385,23 +1574,29 @@ export namespace OpenAIWire_API_Responses {
       total_tokens: z.number(),
     }).nullish(),
 
+    // Echo State management & API options (with defaults)
+    background: z.boolean().optional(), // (false)
+    store: z.boolean().optional(), // (true)
+
     // NOTE: the following fields seem an exact echo of what's in the request - let's ignore these for now
-    // background: ... (false)
-    // instructions: ...
-    // max_output_tokens: ...
-    // metadata: ...
-    // parallel_tool_calls: ...
-    // previous_response_id: ... (null)
-    // prompt: ...
-    // reasoning: ...
-    // service_tier: ...
-    // temperature: ...
-    // text: ...
-    // tool_choice: ...
-    // tools: ...
-    // top_p: ...
-    // truncation: ...
-    // user: ...
+    // instructions: z.string().nullable(), // null
+    // max_output_tokens: z.number(),
+    // max_tool_calls: z.number().nullable(), // null
+    // metadata: ... (optional)
+    // parallel_tool_calls: z.boolean(), // true
+    // previous_response_id: z.string().nullable(), // null
+    // prompt_cache_key: z.string().nullable(), // (optional)
+    // prompt: ... // (optional)
+    // reasoning: ... // { ... }
+    // service_tier: ... // 'auto'
+    // temperature: ... // 1
+    // text: ... // { .. }
+    // tool_choice: ... // 'auto'
+    // tools: ... // e.g. [{ type: 'web_search_preview', search_context_size: 'medium', ... }]
+    // top_logprobs: ... // 0
+    // top_p: ... // 1
+    // truncation: ... // 'disabled'
+    // user: ... // null
 
   });
 
@@ -1487,49 +1682,39 @@ export namespace OpenAIWire_API_Responses {
     text: z.string(),
   });
 
-  const OutputRefusalDeltaEvent_schema = _PartIndexedEvent_schema.extend({
-    type: z.literal('response.output_refusal.delta'),
-    delta: z.string(),
-  });
-
-  const OutputRefusalDoneEvent_schema = _PartIndexedEvent_schema.extend({
-    type: z.literal('response.output_refusal.done'),
-    refusal: z.string(),
-  });
-
   const OutputTextAnnotationAddedEvent_schema = _PartIndexedEvent_schema.extend({
     type: z.enum([
-      'response.output_text_annotation.added', // from the spec
-      'response.output_text.annotation.added', // from unsing web_search_call
+      'response.output_text.annotation.added', // from unsing web_search_call, and in the spec now
+      'response.output_text_annotation.added', // OLDER/BUGGED spec - bug report here: https://github.com/openai/openai-node/issues/1515
     ]),
     annotation_index: z.number(),
     annotation: z.any(), // TODO will spec later
   });
 
-  const OutputResponseReasoningDeltaEvent_schema = _PartIndexedEvent_schema.extend({
-    type: z.literal('response.reasoning.delta'),
+  const OutputReasoningTextDeltaEvent_schema = _PartIndexedEvent_schema.extend({
+    type: z.literal('response.reasoning_text.delta'),
     delta: z.any(), // will spec later - seems { text: string } from the spec? smells
   });
 
-  const OutputResponseReasoningDoneEvent_schema = _PartIndexedEvent_schema.extend({
-    type: z.literal('response.reasoning.done'),
+  const OutputReasoningTextDoneEvent_schema = _PartIndexedEvent_schema.extend({
+    type: z.literal('response.reasoning_text.done'),
     text: z.string(), // finalized reasoning text
+  });
+
+  const OutputRefusalDeltaEvent_schema = _PartIndexedEvent_schema.extend({
+    type: z.literal('response.refusal.delta'),
+    delta: z.string(),
+  });
+
+  const OutputRefusalDoneEvent_schema = _PartIndexedEvent_schema.extend({
+    type: z.literal('response.refusal.done'),
+    refusal: z.string(),
   });
 
   // Streaming > Output Item > Reasoning Summary
 
   const _SummaryIndexedEvent_schema = _OutputIndexedEvent_schema.extend({
     summary_index: z.number(), // identifies the reasoning summary in the output item
-  });
-
-  const OutputReasoningSummaryDeltaEvent_schema = _SummaryIndexedEvent_schema.extend({
-    type: z.literal('response.reasoning_summary.delta'),
-    delta: z.any(), // object // will spec later
-  });
-
-  const OutputReasoningSummaryDoneEvent_schema = _SummaryIndexedEvent_schema.extend({
-    type: z.literal('response.reasoning_summary.done'),
-    text: z.string(), // finalized reasoning summary text.
   });
 
   const OutputReasoningSummaryPartAddedEvent_schema = _SummaryIndexedEvent_schema.extend({
@@ -1564,6 +1749,19 @@ export namespace OpenAIWire_API_Responses {
     arguments: z.string(), // JSON string of the arguments to pass to the function
   });
 
+  // Streaming > Output Item: Custom Tool Call Input (plain text input)
+
+  // Custom tool events
+  // const OutputCustomToolCallInputDeltaEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.custom_tool_call_input.delta'),
+  //   delta: z.string(),
+  // });
+
+  // const OutputCustomToolCallInputDoneEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.custom_tool_call_input.done'),
+  //   input: z.string(),
+  // });
+
   // Streaming > Output Item: Web Search Call
 
   const OutputWebSearchCallInProgress_schema = _OutputIndexedEvent_schema.extend({
@@ -1578,12 +1776,106 @@ export namespace OpenAIWire_API_Responses {
     type: z.literal('response.web_search_call.completed'),
   });
 
-  // Streaming > Output Item: Ignoring:
-  // - file_search_call.*
-  // - web_search_call.*
-  // - image_generation_call.*
-  // - mcp_call.*, mcp_list_tools.*
-  // - code_interpreter_call.*, code_interpreter_call_code.*
+  // Streaming > Tool invoke > Image generation events
+
+  const OutputImageGenerationCallInProgressEvent_schema = _OutputIndexedEvent_schema.extend({
+    type: z.literal('response.image_generation_call.in_progress'),
+  });
+
+  const OutputImageGenerationCallGeneratingEvent_schema = _OutputIndexedEvent_schema.extend({
+    type: z.literal('response.image_generation_call.generating'),
+  });
+
+  const OutputImageGenerationCallPartialImageEvent_schema = _OutputIndexedEvent_schema.extend({
+    type: z.literal('response.image_generation_call.partial_image'),
+    partial_image_b64: z.string(), // base64 partial image
+    partial_image_index: z.number(), // 0-based index
+  });
+
+  const OutputImageGenerationCallCompletedEvent_schema = _OutputIndexedEvent_schema.extend({
+    type: z.literal('response.image_generation_call.completed'),
+  });
+
+  // Streaming > Tool invoke > File search events (OpenAI vector store - not implemented)
+
+  // const OutputFileSearchCallInProgressEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.file_search_call.in_progress'),
+  // });
+
+  // const OutputFileSearchCallSearchingEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.file_search_call.searching'),
+  // });
+
+  // const OutputFileSearchCallCompletedEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.file_search_call.completed'),
+  // });
+
+  // Streaming > Tool invoke > Code interpreter events (basic implementation)
+
+  // const OutputCodeInterpreterCallInProgressEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.code_interpreter_call.in_progress'),
+  // });
+
+  // const OutputCodeInterpreterCallInterpretingEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.code_interpreter_call.interpreting'),
+  // });
+
+  // const OutputCodeInterpreterCallCompletedEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.code_interpreter_call.completed'),
+  // });
+
+  // const OutputCodeInterpreterCallCodeDeltaEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.code_interpreter_call_code.delta'),
+  //   delta: z.string(),
+  // });
+
+  // const OutputCodeInterpreterCallCodeDoneEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.code_interpreter_call_code.done'),
+  //   code: z.string(),
+  // });
+
+  // Streaming > Tool invoke > MCP events (basic implementation)
+
+  // const OutputMCPCallInProgressEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.mcp_call.in_progress'),
+  // });
+
+  // const OutputMCPCallCompletedEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.mcp_call.completed'),
+  // });
+
+  // const OutputMCPCallFailedEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.mcp_call.failed'),
+  // });
+
+  // const OutputMCPCallArgumentsDeltaEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.mcp_call_arguments.delta'),
+  //   delta: z.string(),
+  // });
+
+  // const OutputMCPCallArgumentsDoneEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.mcp_call_arguments.done'),
+  //   arguments: z.string(),
+  // });
+
+  // const OutputMCPListToolsInProgressEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.mcp_list_tools.in_progress'),
+  // });
+
+  // const OutputMCPListToolsCompletedEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.mcp_list_tools.completed'),
+  // });
+
+  // const OutputMCPListToolsFailedEvent_schema = _OutputIndexedEvent_schema.extend({
+  //   type: z.literal('response.mcp_list_tools.failed'),
+  // });
+
+  // Streaming > Control? > Response queued
+
+  // const ResponseQueuedEvent_schema = _BaseEvent_schema.extend({
+  //   type: z.literal('response.queued'),
+  //   response: Response_schema,
+  // });
 
   // Error event
   const ErrorEvent_schema = _BaseEvent_schema.extend({
@@ -1606,33 +1898,77 @@ export namespace OpenAIWire_API_Responses {
   // Combined streaming event
   export type StreamingEvent = z.infer<typeof StreamingEvent_schema>;
   export const StreamingEvent_schema = z.discriminatedUnion('type', [
+    // Core lifecycle events
     ResponseCreatedEvent_schema,
     ResponseInProgress_schema,
     ResponseCompletedEvent_schema,
     ResponseFailedEvent_schema,
     ResponseIncompleteEvent_schema,
+    // ResponseQueuedEvent_schema,
+
+    // Output item events
     OutputItemAddedEvent_schema,
     OutputItemDoneEvent_schema,
+
+    // Content part events
     ContentPartAddedEvent_schema,
     ContentPartDoneEvent_schema,
     OutputTextDeltaEvent_schema,
     OutputTextDoneEvent_schema,
+    OutputTextAnnotationAddedEvent_schema,
+    OutputReasoningTextDeltaEvent_schema,
+    OutputReasoningTextDoneEvent_schema,
     OutputRefusalDeltaEvent_schema,
     OutputRefusalDoneEvent_schema,
-    OutputTextAnnotationAddedEvent_schema,
-    OutputResponseReasoningDeltaEvent_schema,
-    OutputResponseReasoningDoneEvent_schema,
-    OutputReasoningSummaryDeltaEvent_schema,
-    OutputReasoningSummaryDoneEvent_schema,
+
+    // Reasoning events
     OutputReasoningSummaryPartAddedEvent_schema,
     OutputReasoningSummaryPartDoneEvent_schema,
     OutputReasoningSummaryTextDeltaEvent_schema,
     OutputReasoningSummaryTextDoneEvent_schema,
+
+    // Tool invoke > Function call events
     FunctionCallArgumentsDeltaEvent_schema,
     FunctionCallArgumentsDoneEvent_schema,
+
+    // Tool invoke > Custom tool events
+    // OutputCustomToolCallInputDeltaEvent_schema,
+    // OutputCustomToolCallInputDoneEvent_schema,
+
+    // Tool invoke > Web search events
     OutputWebSearchCallInProgress_schema,
     OutputWebSearchCallSearching_schema,
     OutputWebSearchCallCompleted_schema,
+
+    // Tool invoke > Image generation events
+    OutputImageGenerationCallInProgressEvent_schema,
+    OutputImageGenerationCallGeneratingEvent_schema,
+    OutputImageGenerationCallPartialImageEvent_schema,
+    OutputImageGenerationCallCompletedEvent_schema,
+
+    // Tool invoke > File Search events
+    // OutputFileSearchCallInProgressEvent_schema, // OpenAI vector store - not implemented
+    // OutputFileSearchCallSearchingEvent_schema, // OpenAI vector store - not implemented
+    // OutputFileSearchCallCompletedEvent_schema, // OpenAI vector store - not implemented
+
+    // Tool invoke > Code Interpreter events
+    // OutputCodeInterpreterCallInProgressEvent_schema,
+    // OutputCodeInterpreterCallInterpretingEvent_schema,
+    // OutputCodeInterpreterCallCompletedEvent_schema,
+    // OutputCodeInterpreterCallCodeDeltaEvent_schema,
+    // OutputCodeInterpreterCallCodeDoneEvent_schema,
+
+    // Tool invoke > MCP events
+    // OutputMCPCallInProgressEvent_schema,
+    // OutputMCPCallCompletedEvent_schema,
+    // OutputMCPCallFailedEvent_schema,
+    // OutputMCPCallArgumentsDeltaEvent_schema,
+    // OutputMCPCallArgumentsDoneEvent_schema,
+    // OutputMCPListToolsInProgressEvent_schema,
+    // OutputMCPListToolsCompletedEvent_schema,
+    // OutputMCPListToolsFailedEvent_schema,
+
+    // Error events
     ErrorEvent_schema,
   ]);
 

@@ -2,6 +2,12 @@
 import { createEnv } from '../modules/3rdparty/t3-env';
 import * as z from 'zod/v4';
 
+
+// Helper to make some variables required only in production
+const isProd = process.env.NODE_ENV === 'production';
+const requireOnProd = isProd ? z.string() : z.string().optional();
+
+
 export const env = createEnv({
 
   /*
@@ -29,6 +35,10 @@ export const env = createEnv({
     // LLM: Azure OpenAI
     AZURE_OPENAI_API_ENDPOINT: z.url().optional(),
     AZURE_OPENAI_API_KEY: z.string().optional(),
+    // The following do not need to be set
+    AZURE_OPENAI_DISABLE_V1: z.string().optional(), // next-gen API is active by default, default: false
+    AZURE_OPENAI_API_VERSION: z.string().optional(), // traditional API still used for non-response models, default: '2025-04-01-preview'
+    AZURE_DEPLOYMENTS_API_VERSION: z.string().optional(), // default: '2023-03-15-preview'
 
     // LLM: Anthropic
     ANTHROPIC_API_KEY: z.string().optional(),

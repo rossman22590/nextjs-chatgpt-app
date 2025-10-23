@@ -12,8 +12,9 @@ by release.
 
 ### What's New in 1.16.1...1.16.9 · Jan 21, 2025 (patch releases)
 
-- 1.16.9: Docker Gemini fix (R1 models are supported in Big-AGI 2)
-- 1.16.8: OpenAI ChatGPT-4o Latest (o1 models are supported in Big-AGI 2)
+- 1.16.10: OpenRouter models support
+- 1.16.9: Docker Gemini fix, R1 models support
+- 1.16.8: OpenAI ChatGPT-4o Latest, o1 models support
 - 1.16.7: OpenAI support for GPT-4o 2024-08-06
 - 1.16.6: Groq support for Llama 3.1 models
 - 1.16.5: GPT-4o Mini support
@@ -47,7 +48,7 @@ by release.
 ### What's New in 1.15.0 · April 1, 2024 · Beam
 
 - ⚠️ [**Beam**: the multi-model AI chat](https://big-agi.com/blog/beam-multi-model-ai-reasoning). find better answers, faster - a game-changer for brainstorming, decision-making, and creativity. [#443](https://github.com/enricoros/big-AGI/issues/443)
-- Managed Deployments **Auto-Configuration**: simplify the UI mdoels setup with backend-set models. [#436](https://github.com/enricoros/big-AGI/issues/436)
+- Managed Deployments **Auto-Configuration**: simplify the UI models setup with backend-set models. [#436](https://github.com/enricoros/big-AGI/issues/436)
 - Message **Starring ⭐**: star important messages within chats, to attach them later. [#476](https://github.com/enricoros/big-AGI/issues/476)
 - Enhanced the default Persona
 - Fixes to Gemini models and SVGs, improvements to UI and icons

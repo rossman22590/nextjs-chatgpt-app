@@ -245,6 +245,7 @@ export namespace AixWire_Content {
     parts: z.array(z.discriminatedUnion('pt', [
       AixWire_Parts.TextPart_schema,
       AixWire_Parts.DocPart_schema, // Jan 10, 2025: added support for Docs in AIX system
+      AixWire_Parts.InlineImagePart_schema, // Sept 12, 2025: added support for Inline Images in AIX system
       AixWire_Parts.MetaCacheControl_schema,
     ])),
   });
@@ -371,8 +372,8 @@ export namespace AixWire_Tooling {
   /**
    * Policy for tools that the model can use:
    * - auto: can use a tool or not (default, same as not specifying a policy)
-   * - any: must use one tool at least
-   * - function_call: must use a specific Function Tool
+   * - any: MUST use one tool at least
+   * - function_call: MUST use a specific Function Tool
    * - none: same as not giving the model any tool [REMOVED - just give no tools]
    */
   export const ToolsPolicy_schema = z.discriminatedUnion('type', [
@@ -405,12 +406,19 @@ export namespace AixWire_API {
     topP: z.number().min(0).max(1).optional(),
     forceNoStream: z.boolean().optional(),
     vndAntThinkingBudget: z.number().nullable().optional(),
+    vndAntWebSearch: z.enum(['auto']).optional(),
+    vndAntWebFetch: z.enum(['auto']).optional(),
+    vndAnt1MContext: z.boolean().optional(),
+    vndGeminiAspectRatio: z.enum(['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9', '21:9']).optional(),
+    vndGeminiGoogleSearch: z.enum(['unfiltered', '1d', '1w', '1m', '6m', '1y']).optional(),
     vndGeminiShowThoughts: z.boolean().optional(),
     vndGeminiThinkingBudget: z.number().optional(),
     vndOaiResponsesAPI: z.boolean().optional(),
-    vndOaiReasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
+    vndOaiReasoningEffort: z.enum(['minimal', 'low', 'medium', 'high']).optional(),
     vndOaiRestoreMarkdown: z.boolean().optional(),
+    vndOaiVerbosity: z.enum(['low', 'medium', 'high']).optional(),
     vndOaiWebSearchContext: z.enum(['low', 'medium', 'high']).optional(),
+    vndOaiImageGeneration: z.enum(['mq', 'hq', 'hq_edit', 'hq_png']).optional(),
     vndPerplexityDateFilter: z.enum(['unfiltered', '1m', '3m', '6m', '1y']).optional(),
     vndPerplexitySearchMode: z.enum(['default', 'academic']).optional(),
     vndXaiSearchMode: z.enum(['auto', 'on', 'off']).optional(),
@@ -470,6 +478,7 @@ export namespace AixWire_API {
   export const ConnectionOptions_schema = z.object({
     debugDispatchRequest: z.boolean().optional(),
     debugProfilePerformance: z.boolean().optional(),
+    enableResumability: z.boolean().optional(), // enable response storage for resumability (first found in the OpenAI Responses API)
     throttlePartTransmitter: z.number().optional(), // in ms
     // retry: z.number().optional(),
     // retryDelay: z.number().optional(),
@@ -534,7 +543,8 @@ export namespace AixWire_Particles {
     | { cg: 'issue', issueId: CGIssueId, issueText: string }
     | { cg: 'set-metrics', metrics: CGSelectMetrics }
     | { cg: 'set-model', name: string }
-    | { cg: '_debugDispatchRequest', security: 'dev-env', dispatchRequest: { url: string, headers: string, body: string } } // may generalize this in the future
+    | { cg: 'set-upstream-handle', handle: { uht: 'vnd.oai.responses', responseId: string, expiresAt: number | null } }
+    | { cg: '_debugDispatchRequest', security: 'dev-env', dispatchRequest: { url: string, headers: string, body: string, bodySize: number } } // may generalize this in the future
     | { cg: '_debugProfiler', measurements: Record<string, number | string>[] };
 
   export type CGEndReason =     // the reason for the end of the chat generation
@@ -556,11 +566,13 @@ export namespace AixWire_Particles {
   export type GCTokenStopReason =
     | 'ok'                      // clean, including reaching 'stop sequences'
     | 'ok-tool_invocations'     // clean & tool invocations
+    | 'ok-pause_continue'       // clean, but paused (e.g. Anthropic server tools like web search) - requires continuation
     // premature:
-    | 'cg-issue'                // [1][2] chat-generation issue (see CGIssueId)
+    | 'cg-issue'                // [1][2] chat-generation issue (see CGIssueId, mostly a dispatch or dialect issue)
     | 'client-abort-signal'     // the client aborted - likely a user/auto initiation
     | 'filter-content'          // content filter (e.g. profanity)
     | 'filter-recitation'       // recitation filter (e.g. recitation)
+    | 'filter-refusal'          // safety refusal filter (e.g. Anthropic safety concerns)
     | 'out-of-tokens';          // got out of tokens
 
   /**
@@ -586,6 +598,9 @@ export namespace AixWire_Particles {
 
     // v = Tokens/s
     vTOutInner?: number,  // TOut / dtInner
+
+    // $c = Cents of USD
+    $cReported?: number,  // Total cost in cents as reported by provider (e.g. Perplexity usage.cost.total_cost)
   };
 
   // TextParticle / PartParticle - keep in line with the DMessage*Part counterparts
@@ -608,6 +623,7 @@ export namespace AixWire_Particles {
     | { p: 'cer', id: string, error: DMessageToolResponsePart['error'], result: string, executor: 'gemini_auto_inline', environment: DMessageToolResponsePart['environment'] }
     | { p: 'ia', mimeType: string, a_b64: string, label?: string, generator?: string, durationMs?: number } // inline audio, complete
     | { p: 'ii', mimeType: string, i_b64: string, label?: string, generator?: string, prompt?: string } // inline image, complete
-    | { p: 'urlc', title: string, url: string, num?: number, from?: number, to?: number, text?: string, pubTs?: number }; // url citation - pubTs: publication timestamp
+    | { p: 'urlc', title: string, url: string, num?: number, from?: number, to?: number, text?: string, pubTs?: number } // url citation - pubTs: publication timestamp
+    | { p: 'vp', text: string, mot: 'search-web' | 'gen-image' }; // void placeholder - temporary status text that gets wiped when real content arrives
 
 }
