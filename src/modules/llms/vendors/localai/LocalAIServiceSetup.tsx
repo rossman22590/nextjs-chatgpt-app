@@ -61,14 +61,14 @@ export function LocalAIServiceSetup(props: { serviceId: DModelsServiceId }) {
         </Typography>
 
         <ExpanderControlledBox expanded={checkboxExpanded}>
-          <Typography level='title-sm' sx={{ mt: 2 }}>LocalAI integration status:</Typography>
+          <Typography level='title-sm' sx={{ mt: 2 }}>Supported features:</Typography>
           <Typography level='body-xs' sx={{ whiteSpace: 'break-spaces', mt: 0.5, ml: '1px' }}>
             ✅{'  '}<Link href='https://localai.io/features/text-generation/' target='_blank'>Text generation</Link> with GPTs<br />
             ✅{'  '}<Link href='https://localai.io/features/openai-functions/' target='_blank'>Function calling</Link> by GPTs<br />
             ✅{'  '}<Link href='https://localai.io/models/' target='_blank'>Model Gallery</Link><br />
             ✅{'  '}<Link href='https://localai.io/features/gpt-vision/' target='_blank'>Vision API</Link> for image chats<br />
             ✅{'  '}<Link href='https://localai.io/features/constrained_grammars/' target='_blank'>JSON output</Link><br />
-            ✖️{'  '}<Link href='https://localai.io/features/image-generation' target='_blank'>Image generation</Link> with stable diffusion<br />
+            ✅{'  '}<Link href='https://localai.io/features/image-generation' target='_blank'>Image generation</Link> (stablediffusion, dreamshaper, sd-3.5-large/medium-ggml)<br />
             ✖️{'  '}<Link href='https://localai.io/features/audio-to-text/' target='_blank'>Speech transcription</Link><br />
             ✖️{'  '}<Link href='https://localai.io/features/text-to-audio/' target='_blank'>Text to speech</Link><br />
             ✖️{'  '}<Link href='https://localai.io/features/embeddings/' target='_blank'>Embeddings generation</Link><br />
@@ -92,7 +92,7 @@ export function LocalAIServiceSetup(props: { serviceId: DModelsServiceId }) {
       autoCompleteId='localai-api-key' label='Optional API Key'
       placeholder='...'
       required={false}
-      rightLabel={backendHasKey ? '✔️ already set in server' : undefined}
+      rightLabel={backendHasKey ? 'Already set in server' : undefined}
       value={localAIKey} onChange={value => updateSettings({ localAIKey: value })}
     />
 

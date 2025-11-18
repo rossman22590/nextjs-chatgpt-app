@@ -8,8 +8,9 @@
  */
 import type { FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
 import * as z from 'zod/v4';
-import { initTRPC, TRPCError } from '@trpc/server';
-import { transformer } from '~/server/trpc/trpc.transformer';
+import { initTRPC } from '@trpc/server';
+import { transformer } from './trpc.transformer';
+import { TRPCFetcherError } from './trpc.router.fetchers';
 
 
 /**
@@ -38,19 +39,19 @@ type SessionWithUser = {
 export const createTRPCFetchContext = async ({ req }: FetchCreateContextFnOptions) => {
   // Dynamic import NextAuth only when needed (Node.js runtime)
   let session: SessionWithUser = null;
-  
+
   try {
     // Dynamic import to avoid bundling NextAuth in Edge Runtime
     const { getServerSession } = await import('next-auth');
     const { authOptions } = await import('~/server/auth/auth.config');
-    
+
     // For cloud API routes, we can use getServerSession since they run in Node.js runtime
     session = await getServerSession(authOptions) as SessionWithUser;
   } catch (error) {
     // If we're in Edge runtime or there's an error, session remains null
     console.warn('Could not get server session, proceeding without authentication:', error);
   }
-  
+
   return {
     session,
     // Request headers and signal for other functionality
@@ -72,10 +73,22 @@ const t = initTRPC.context<typeof createTRPCFetchContext>().create({
   // server transformer - serialize: -> client, deserialize: <- client
   transformer: transformer,
   errorFormatter({ shape, error }) {
+
+    // Important: remove the 'stack' from the error data to avoid leaking internals and shorten the payload
+    const { stack, ...nonStackData } = shape.data;
+
+    // Enable client-side decisions: communicate fetcher/network error details downstream
+    const fetcherError = error instanceof TRPCFetcherError ? {
+      aixFCategory: error.category,
+      aixFHttpStatus: error.httpStatus ?? null,
+      aixFNetError: error.connErrorName ?? null,
+    } : {};
+
     return {
       ...shape,
       data: {
-        ...shape.data,
+        ...nonStackData,
+        ...fetcherError,
         zodError:
           error.cause instanceof z.ZodError ? z.treeifyError(error.cause) : null,
       },
@@ -109,30 +122,15 @@ export const createTRPCRouter = t.router;
 export const publicProcedure = t.procedure;
 
 /**
- * Protected procedure
+ * Edge procedures for the AI inference Edge network:
+ * - AIX streaming endpoints
+ * - specific endpoints: Anthropic, Gemini, Ollama, OpenAI
  *
- * This procedure ensures the user is authenticated before proceeding.
- * If not authenticated, it will throw an UNAUTHORIZED error.
+ * Open for now, as these are pass-through with service keys inside the request usually.
+ * May be closed in the future if key material is on the server-side procedure, in which case
+ * authentication will be required.
  */
-const isAuthed = t.middleware(async ({ ctx, next }) => {
-  // Check if session exists and has a user
-  if (!ctx.session || !ctx.session.user) {
-    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Not authenticated' });
-  }
-  
-  // Since we've checked that ctx.session and ctx.session.user exist, TypeScript should know they're not null
-  // But we'll help it with a type assertion
-  const session = ctx.session as NonNullable<typeof ctx.session>;
-  
-  return next({
-    ctx: {
-      // Now session is properly typed
-      session: session,
-    },
-  });
-});
-
-export const protectedProcedure = t.procedure.use(isAuthed);
+export const edgeProcedure = t.procedure;
 
 // /**
 //  * Create a server-side caller

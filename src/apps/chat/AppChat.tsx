@@ -22,7 +22,7 @@ import { ConversationsManager } from '~/common/chat-overlay/ConversationsManager
 import { ErrorBoundary } from '~/common/components/ErrorBoundary';
 import { getLLMContextTokens, LLM_IF_ANT_PromptCaching, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
 import { OptimaDrawerIn, OptimaPanelIn, OptimaToolbarIn } from '~/common/layout/optima/portals/OptimaPortalsIn';
-import { PanelResizeInset } from '~/common/components/panes/GoodPanelResizeHandler';
+import { PanelResizeInset } from '~/common/components/PanelResizeInset';
 import { Release } from '~/common/app.release';
 import { ScrollToBottom } from '~/common/scroll-to-bottom/ScrollToBottom';
 import { ScrollToBottomButton } from '~/common/scroll-to-bottom/ScrollToBottomButton';
@@ -111,7 +111,7 @@ const composerOpenSx: SxProps = {
 
 const composerOpenMobileSx: SxProps = {
   zIndex: 21, // allocates the surface, possibly enables shadow if we like
-  pt: 0.5, // have some breathing room
+  py: 0.5, // have some breathing room
   // boxShadow: '0px -1px 8px -2px rgba(0, 0, 0, 0.4)',
   ...composerOpenSx,
 } as const;
@@ -190,6 +190,7 @@ export function AppChat() {
   const beamOpenStoreInFocusedPane = focusedPaneIndex === null ? null
     : !beamsOpens?.[focusedPaneIndex] ? null
       : paneBeamStores?.[focusedPaneIndex] ?? null;
+  const focusedChatBeamOpen = focusedPaneIndex !== null && !!beamsOpens?.[focusedPaneIndex];
 
   const {
     // focused
@@ -483,7 +484,7 @@ export function AppChat() {
   );
 
 
-  // Disabled by default, as it lags the opening of the drawer and immediatly vanishes during the closing animation
+  // Disabled by default, as it lags the opening of the drawer and immediately vanishes during the closing animation
   const isDrawerOpen = true; // useOptimaDrawerOpen();
 
   const drawerContent = React.useMemo(() => !isDrawerOpen ? null :
@@ -493,6 +494,7 @@ export function AppChat() {
         activeFolderId={activeFolderId}
         chatPanesConversationIds={paneUniqueConversationIds}
         disableNewButton={disableNewButton}
+        focusedChatBeamOpen={focusedChatBeamOpen}
         onConversationActivate={handleOpenConversationInFocusedPane}
         onConversationBranch={handleConversationBranch}
         onConversationNew={handleConversationNewInFocusedPane}
@@ -501,7 +503,7 @@ export function AppChat() {
         onConversationsImportDialog={handleConversationImportDialog}
         setActiveFolderId={setActiveFolderId}
       />,
-    [activeFolderId, disableNewButton, focusedPaneConversationId, handleConversationBranch, handleConversationExport, handleConversationImportDialog, handleConversationNewInFocusedPane, handleDeleteConversations, handleOpenConversationInFocusedPane, isDrawerOpen, paneUniqueConversationIds],
+    [activeFolderId, disableNewButton, focusedChatBeamOpen, focusedPaneConversationId, handleConversationBranch, handleConversationExport, handleConversationImportDialog, handleConversationNewInFocusedPane, handleDeleteConversations, handleOpenConversationInFocusedPane, isDrawerOpen, paneUniqueConversationIds],
   );
 
   const focusedChatPanelContent = React.useMemo(() => !focusedPaneConversationId ? null :
@@ -527,7 +529,7 @@ export function AppChat() {
   React.useEffect(() => {
     // Debug: open a null chat
     if (Release.IsNodeDevBuild && intent.initialConversationId === 'null')
-      openConversationInFocusedPane(null! /* for debugging purporse */);
+      openConversationInFocusedPane(null! /* for debugging purpose */);
     // Open the initial conversation if set
     else if (intent.initialConversationId)
       openConversationInFocusedPane(intent.initialConversationId);
@@ -655,7 +657,7 @@ export function AppChat() {
               setFocusedPaneIndex(idx);
             }}
             onCollapse={() => {
-              // NOTE: despite the delay to try to let the draggin settle, there seems to be an issue with the Pane locking the screen
+              // NOTE: despite the delay to try to let the dragging settle, there seems to be an issue with the Pane locking the screen
               // setTimeout(() => removePane(idx), 50);
               // more than 2 will result in an assertion from the framework
               if (chatPanes.length === 2) removePane(idx);
@@ -682,7 +684,7 @@ export function AppChat() {
                 // NOTE: this is a workaround for the 'stuck-after-collapse-close' issue. We will collapse the 'other' pane, which
                 // will get it removed (onCollapse), and somehow this pane will be stuck with a pointerEvents: 'none' style, which de-facto
                 // disables further interaction with the chat. This is a workaround to re-enable the pointer events.
-                // The root cause seems to be a Dragstate not being reset properly, however the pointerEvents has been set since 0.0.56 while
+                // The root cause seems to be a Drag state not being reset properly, however the pointerEvents has been set since 0.0.56 while
                 // it was optional before: https://github.com/bvaughn/react-resizable-panels/issues/241
                 pointerEvents: 'auto',
               }),
