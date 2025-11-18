@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useSession } from 'next-auth/react';
 import { useShallow } from 'zustand/react/shallow';
 
 import type { SxProps } from '@mui/joy/styles/types';
@@ -24,6 +25,7 @@ import { useChatStore } from '~/common/stores/chat/store-chats';
 import { useChipBoolean } from '~/common/components/useChipBoolean';
 import { useModelDomain } from '~/common/stores/llms/hooks/useModelDomain';
 import { useUIPreferencesStore } from '~/common/stores/store-ui';
+import { apiAsyncNode } from '~/common/util/trpc.client';
 
 import { usePurposeStore } from './store-purposes';
 
@@ -125,6 +127,30 @@ export function PersonaSelector(props: {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [filteredIDs, setFilteredIDs] = React.useState<SystemPurposeId[] | null>(null);
   const [editMode, setEditMode] = React.useState(false);
+  const [showBuiltins, setShowBuiltins] = React.useState<boolean>(true);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const read = () => setShowBuiltins(window.localStorage.getItem('personaShowBuiltins') !== 'false');
+    read();
+    const onStorage = (e: StorageEvent) => { if (e.key === 'personaShowBuiltins') read(); };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  const { data: session } = useSession();
+  const isAuthenticated = !!session?.user;
+  const [userPersonas, setUserPersonas] = React.useState<Array<{
+    id: string;
+    name: string | null;
+    systemPrompt: string;
+    pictureUrl: string | null;
+    symbol?: string | null;
+    inputProvenance: any | null;
+    inputText: string | null;
+    llmLabel: string | null;
+    created: Date;
+    updated: Date;
+  }>>([]);
+  const [loadingPersonas, setLoadingPersonas] = React.useState(false);
 
 
   // external state
@@ -172,8 +198,11 @@ export function PersonaSelector(props: {
   // Handlers
 
   const handlePurposeChanged = React.useCallback((purposeId: SystemPurposeId | null) => {
-    if (purposeId && setSystemPurposeId)
+    if (purposeId && setSystemPurposeId) {
       setSystemPurposeId(props.conversationId, purposeId);
+      // Clear custom symbol so built-in symbol shows in titles
+      useChatStore.getState().setUserSymbol(props.conversationId, null);
+    }
   }, [props.conversationId, setSystemPurposeId]);
 
   const handleAppendTranscriptAsMessage = React.useCallback((messageText: string) => {
@@ -199,6 +228,26 @@ export function PersonaSelector(props: {
   }, [props.conversationId, setSystemPurposeId]);
 
   const toggleEditMode = React.useCallback(() => setEditMode(on => !on), []);
+
+  const handleApplyPersona = React.useCallback((systemPrompt: string, symbol?: string | null) => {
+    if (setSystemPurposeId) {
+      SystemPurposes['Custom'].systemMessage = systemPrompt;
+      setSystemPurposeId(props.conversationId, 'Custom');
+      if (symbol)
+        useChatStore.getState().setUserSymbol(props.conversationId, symbol);
+    }
+  }, [props.conversationId, setSystemPurposeId]);
+
+  React.useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    setLoadingPersonas(true);
+    apiAsyncNode.persona.list.query()
+      .then((items) => { if (!cancelled) setUserPersonas(items); })
+      .catch(() => { if (!cancelled) setUserPersonas([]); })
+      .finally(() => { if (!cancelled) setLoadingPersonas(false); });
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
 
 
   // Search (filtering)
@@ -296,8 +345,29 @@ export function PersonaSelector(props: {
           </Tooltip>
         </Box>
 
-        {/* Personas Tiles */}
-        {visiblePurposeIDs.map((spId: SystemPurposeId) => {
+        {/* My Personas (from DB) */}
+        {!!userPersonas.length && (
+          <>
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <Typography level='body-sm'>My Personas</Typography>
+            </Box>
+            {userPersonas.map(p => (
+              <Tile
+                key={`user-persona-${p.id}`}
+                text={p.name || p.llmLabel || 'Persona'}
+                imageUrl={p.pictureUrl || undefined}
+                symbol={p.symbol || (p.pictureUrl ? undefined : '🎭')}
+                isActive={false}
+                isEditMode={false}
+                isHidden={false}
+                onClick={() => handleApplyPersona(p.systemPrompt, p.symbol)}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Personas Tiles (built-ins); can be hidden via dashboard switch */}
+        {showBuiltins && visiblePurposeIDs.map((spId: SystemPurposeId) => {
           const isActive = systemPurposeId === spId;
           const systemPurpose = SystemPurposes[spId];
           return (

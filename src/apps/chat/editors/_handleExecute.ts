@@ -72,6 +72,7 @@ export async function _handleExecute(chatExecuteMode: ChatExecuteMode, conversat
       return await runPersonaOnConversationHead(chatLLMId, conversationId);
 
     case 'beam-content':
+      if (process.env.NEXT_PUBLIC_BEAM === 'false') return true;
       const updatedInputHistory = cHandler.historyViewHeadOrThrow('chat-beam-execute');
       cHandler.beamInvoke(updatedInputHistory, [], null);
       return true;

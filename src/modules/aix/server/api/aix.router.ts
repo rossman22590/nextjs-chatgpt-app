@@ -259,13 +259,13 @@ export async function* chatGenerateContentImpl(
 }
 
 
-export const aixRouter = createTRPCRouter({
+export const aixRouter = createTRPCRouterEdge({
 
   /**
    * Chat content generation, streaming, multipart.
    * Architecture: Client <-- (intake) --> Server <-- (dispatch) --> AI Service
    */
-  chatGenerateContent: publicProcedure
+  chatGenerateContent: publicProcedureEdge
     .input(chatGenerateContentInputSchema)
     .mutation(async function* ({ input, ctx }) {
 

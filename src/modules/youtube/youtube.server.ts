@@ -38,54 +38,91 @@ export async function downloadYouTubeVideoData(videoId: string, fetchTextFn: (ur
   // 1. find the captions URL within the video HTML page
   const html = await fetchTextFn(`https://www.youtube.com/watch?v=${videoId}`);
 
-  const captionsUrlEnc = extractFromTo(html, 'https://www.youtube.com/api/timedtext', '"', 'Captions URL');
-  const captionsUrl = decodeURIComponent(captionsUrlEnc.replaceAll('\\u0026', '&'));
+  // Robustly extract captions base URL
+  let captionsUrl: string | null = null;
+  try {
+    // Preferred: parse ytInitialPlayerResponse JSON and read captionTracks[0].baseUrl
+    const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]*?\});/);
+    if (m && m[1]) {
+      const pr = JSON.parse(m[1]);
+      const tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      if (Array.isArray(tracks) && tracks.length) captionsUrl = tracks[0]?.baseUrl || null;
+    }
+  } catch {
+    // ignore and fallback
+  }
+  if (!captionsUrl) {
+    // Fallback: legacy substring extraction
+    try {
+      const captionsUrlEnc = extractFromTo(html, 'https://www.youtube.com/api/timedtext', '"', 'Captions URL');
+      captionsUrl = decodeURIComponent(captionsUrlEnc.replaceAll('\\u0026', '&'));
+    } catch {
+      captionsUrl = null;
+    }
+  }
 
-  const thumbnailUrl = extractFromTo(html, 'https://i.ytimg.com/vi/', '"', 'Thumbnail URL').replaceAll('maxres', 'hq');
-  const videoTitle = decodeHtmlEntities(extractFromTo(html, '<title>', '</title>', 'Video Title').slice(7).replaceAll(' - YouTube', '').trim());
-  const videoDescription = extractFromTo(html, ',"shortDescription":"', '","', 'Video Description').slice(21);
+  // Basic metadata (best-effort)
+  let thumbnailUrl = 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg';
+  try {
+    thumbnailUrl = extractFromTo(html, 'https://i.ytimg.com/vi/', '"', 'Thumbnail URL').replaceAll('maxres', 'hq');
+  } catch {}
+  let videoTitle = 'YouTube Video';
+  try {
+    videoTitle = decodeHtmlEntities(extractFromTo(html, '<title>', '</title>', 'Video Title').slice(7).replaceAll(' - YouTube', '').trim());
+  } catch {}
+  let videoDescription = '';
+  try {
+    videoDescription = extractFromTo(html, ',"shortDescription":"', '","', 'Video Description').slice(21);
+  } catch {}
 
   // 2. fetch the captions
   // note: the desktop player appends this much: &fmt=json3&xorb=2&xobt=3&xovt=3&cbr=Chrome&cbrver=114.0.0.0&c=WEB&cver=2.20230628.07.00&cplayer=UNIPLAYER&cos=Windows&cosver=10.0&cplatform=DESKTOP
-  const captions = await fetchTextFn(captionsUrl + `&fmt=json3`);
+  if (!captionsUrl)
+    throw new Error('[YouTube API Issue] Could not find captions');
+  const tryParseTranscript = (body: string): string | null => {
+    // JSON (srv3)
+    try {
+      const json: any = JSON.parse(body);
+      const events: any[] | undefined = Array.isArray(json?.events) ? json.events : undefined;
+      if (events && events.length)
+        return events.flatMap(ev => ev.segs ?? []).map((s: any) => s.utf8).join('');
+    } catch {}
+    // XML timedtext
+    const texts = Array.from(body.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/gi)).map(m => m[1]);
+    if (texts.length) {
+      return texts
+        .map(t => decodeHtmlEntities(t.replace(/\n/g, ' ').replace(/<[^>]+>/g, '')))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    // VTT
+    if (/^WEBVTT/m.test(body)) {
+      const lines = body.split(/\r?\n/);
+      const text = lines.filter(l => !/^\d+$/.test(l) && !/-->/.test(l) && !/^WEBVTT/.test(l) && l.trim().length)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (text) return text;
+    }
+    return null;
+  };
 
-  // parse json
-  let captionsJson: any;
-  try {
-    captionsJson = JSON.parse(captions);
-  } catch (e) {
-    console.error(e);
+  // Try multiple formats to maximize success
+  const fmtVariants = captionsUrl.includes('fmt=') ? [''] : ['&fmt=srv3', '&fmt=json3', '&fmt=vtt', '&fmt=srv2', '&fmt=srv1'];
+  let transcript: string | null = null;
+  for (const suffix of fmtVariants) {
+    const url = suffix ? captionsUrl + suffix : captionsUrl;
+    try {
+      const body = await fetchTextFn(url);
+      transcript = tryParseTranscript(body);
+      if (transcript) break;
+    } catch {
+      // try next
+    }
+  }
+  if (!transcript)
     throw new Error('[YouTube API Issue] Could not parse the captions');
-  }
-
-  // validate object
-  const youtubeTranscriptionSchema = z.object({
-    wireMagic: z.literal('pb3'),
-    events: z.array(
-      z.object({
-        tStartMs: z.number(),
-        dDurationMs: z.number().optional(),
-        aAppend: z.number().optional(),
-        segs: z.array(
-          z.object({
-            utf8: z.string(),
-            tOffsetMs: z.number().optional(),
-          }),
-        ).optional(),
-      }),
-    ),
-  });
-  const safeData = youtubeTranscriptionSchema.safeParse(captionsJson);
-  if (!safeData.success) {
-    console.error(safeData.error);
-    throw new Error('[YouTube API Issue] Could not verify the captions');
-  }
-
-  // 3. flatten to text
-  const transcript = safeData.data.events
-    .flatMap(event => event.segs ?? [])
-    .map(seg => seg.utf8)
-    .join('');
 
   // 4. fetch and process the thumbnail image
   let thumbnailImage: YouTubeVideoData['thumbnailImage'] = null;

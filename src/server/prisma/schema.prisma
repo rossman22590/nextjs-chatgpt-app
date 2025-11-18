@@ -59,6 +59,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   links         LinkStorage[]
+  personas      Persona[]
   conversations Conversation[]
   messages      Message[]
 }
@@ -145,6 +146,32 @@ enum MessageRole {
   USER
   ASSISTANT
   SYSTEM
+}
+
+//
+// Personas
+//
+model Persona {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name            String?
+  description     String?
+  systemPrompt    String
+  symbol          String?
+  pictureUrl      String?
+  instructionHints Json?
+  data             Json?
+  aiSettings       Json?
+  inputProvenance Json?
+  inputText       String?
+  llmLabel        String?
+
+  created         DateTime @default(now())
+  updated         DateTime @updatedAt
+
+  @@index([userId, updated])
 }
 
 //

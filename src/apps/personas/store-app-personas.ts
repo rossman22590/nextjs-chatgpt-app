@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { agiUuid } from '~/common/util/idUtils';
+import { apiAsyncNode } from '~/common/util/trpc.client';
 import { useShallow } from 'zustand/react/shallow';
 
 
@@ -65,10 +66,27 @@ const useAppPersonasStore = create<AppPersonasStore>()(persist(
           systemPrompt,
           creationDate: new Date().toISOString(),
           inputProvenance,
-          // to save bytes, do not save input text when from YouTube
           inputText: inputProvenance?.type === 'youtube' ? '' : inputText,
           llmLabel,
         };
+
+        // fire-and-forget persist to cloud (swallow errors; local always wins for creator)
+        (async () => {
+          try {
+            await apiAsyncNode.persona.create.mutate({
+              id: undefined,
+              name: newPersona.name,
+              systemPrompt: newPersona.systemPrompt,
+              pictureUrl: newPersona.pictureUrl,
+              inputProvenance: newPersona.inputProvenance ?? undefined,
+              inputText: newPersona.inputText,
+              llmLabel: newPersona.llmLabel,
+            });
+          } catch (e) {
+            console.error('Persona cloud save failed', e);
+          }
+        })();
+
         return {
           simplePersonas: [
             newPersona,

@@ -152,13 +152,13 @@ export const navItems: {
       icon: () => null,
     },
     {
-      name: 'Create Personas',
+      name: 'Persona Manager',
       mobileName: 'Personas',
-      icon: Diversity2Icon, // was: Outlined.. but they look the same
-      // iconActive: Diversity2Icon,
+      icon: Diversity2Icon,
       type: 'app',
       route: '/personas',
       hideBar: true,
+      barTitle: 'Persona Manager',
     },
     {
       name: 'Compare Text',

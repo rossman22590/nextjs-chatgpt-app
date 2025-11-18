@@ -1079,7 +1079,7 @@ export function Composer(props: {
                 </ButtonGroup>
 
                 {/* [desktop] secondary-top buttons */}
-                {isDesktop && showChatExtras && !assistantAbortible && (
+                {isDesktop && showChatExtras && !assistantAbortible && (process.env.NEXT_PUBLIC_BEAM !== 'false') && (
                   <ButtonBeamMemo
                     color={beamButtonColor}
                     disabled={noConversation /*|| noLLM*/}

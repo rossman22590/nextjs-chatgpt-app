@@ -2,7 +2,7 @@ import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.router'
 import type { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_SystemMessage, AixMessages_ChatMessage } from '../../../api/aix.wiretypes';
 import { OpenAIWire_API_Chat_Completions } from '../../wiretypes/openai.wiretypes';
 import { aixToOpenAIChatCompletions as originalAixToOpenAIChatCompletions } from './openai.chatCompletions';
-import { approxDocPart_To_String } from './anthropic.messageCreate';
+import { approxDocPart_To_String } from './adapters.common';
 
 // Define the type for the Responses API payload
 interface ResponsesAPIPayload {
