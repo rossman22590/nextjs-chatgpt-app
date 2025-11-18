@@ -173,13 +173,7 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
           sx={{ minWidth: 260 }}
         >
 
-          <MenuItem component='a' variant='solid' color='primary' href={bigAgiProUrl} target='_blank' sx={{ minHeight: 40 }}>
-            {/*<ListItemDecorator>New</ListItemDecorator>*/}
-            {/*<ListItemDecorator><RocketLaunchRounded /></ListItemDecorator>*/}
-            Big-AGI Pro
-            {/*✨*/}
-            <ArrowOutwardRoundedIcon sx={{ ml: 'auto' }} />
-          </MenuItem>
+
 
           <ListDivider />
 
@@ -225,14 +219,14 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
               Support
             </Typography>
           </ListItem>
-          <MenuItem component='a' href={BaseProduct.SupportForm()} target='_blank'>
+          {/* <MenuItem component='a' href={BaseProduct.SupportForm()} target='_blank'>
             <ListItemDecorator>🔥</ListItemDecorator>
             <div>
               Improve Big-AGI
               <FormHelperText>AI fixes what you report</FormHelperText>
             </div>
             <ArrowOutwardRoundedIcon sx={{ ml: 'auto' }} />
-          </MenuItem>
+          </MenuItem> */}
           {!!releaseNotesUrl && (
             <MenuItem onClick={handleShowReleaseNotes}>
               <ListItemDecorator>

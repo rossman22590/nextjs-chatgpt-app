@@ -43,6 +43,8 @@ export const useChatCloudSync = () => {
   
   // Track which conversations have been synced to avoid duplicate operations
   const syncedConversationsRef = useRef<Map<string, CloudSyncMetadata>>(new Map());
+  const completedCountRef = useRef<Map<string, number>>(new Map());
+  const periodicSyncRunningRef = useRef(false);
   
   // Helper function to convert DMessage role to database enum
   const convertMessageRole = (role: string): 'USER' | 'ASSISTANT' | 'SYSTEM' => {
@@ -59,10 +61,11 @@ export const useChatCloudSync = () => {
     if (!conversation || conversation._isIncognito) return;
     
     try {
-      console.log(`💾 Saving conversation "${conversation.userTitle || conversation.autoTitle || 'Untitled'}" to database...`);
-      
-      // First, save the conversation metadata
-      const conversationResult = await apiAsyncNode.trade.saveConversation.mutate({
+      if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+        console.log(`💾 Saving conversation "${conversation.userTitle || conversation.autoTitle || 'Untitled'}" (batched) to database...`);
+
+      // Build payloads for batched save
+      const conversationPayload = {
         id: conversation.id,
         title: conversation.userTitle,
         autoTitle: conversation.autoTitle,
@@ -72,61 +75,131 @@ export const useChatCloudSync = () => {
         isIncognito: conversation._isIncognito || false,
         created: conversation.created,
         updated: conversation.updated || undefined,
+      } as const;
+
+      const messagesPayload = (conversation.messages || []).map((message): any => {
+        const hasRealContent = message.fragments && message.fragments.length > 0 &&
+          message.fragments.some(f => f.ft === 'content' || f.ft === 'attachment');
+        const isActuallyComplete = hasRealContent && !message.pendingIncomplete;
+        return {
+          id: message.id,
+          conversationId: conversation.id,
+          role: convertMessageRole(message.role),
+          content: message.fragments,
+          purposeId: message.purposeId,
+          metadata: message.metadata,
+          userFlags: message.userFlags || [],
+          tokenCount: message.tokenCount || 0,
+          generator: message.generator,
+          pendingIncomplete: !isActuallyComplete,
+          created: message.created,
+          updated: message.updated || undefined,
+        };
       });
-      
-      if (conversationResult.success) {
-        console.log(`✅ Conversation saved to database`);
-        
-        // Then, save all messages in the conversation
-        if (conversation.messages && conversation.messages.length > 0) {
-          for (const message of conversation.messages) {
+
+      // Try single batched request first
+      try {
+        const result = await apiAsyncNode.trade.saveCompleteConversation.mutate({
+          conversation: conversationPayload,
+          messages: messagesPayload,
+        });
+
+        if (result?.success) {
+          if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+            console.log(`✅ Saved conversation and ${messagesPayload.length} messages (batched)`);
+
+          // Update sync metadata
+          syncedConversationsRef.current.set(conversation.id, {
+            localId: conversation.id,
+            cloudId: conversation.id,
+            lastSyncedAt: Date.now()
+          });
+
+          return true;
+        }
+      } catch (batchedError) {
+        console.warn('⚠️ Batch save failed, falling back to per-message save:', batchedError);
+
+        // Fallback: save conversation, then messages individually
+        const conversationResult = await apiAsyncNode.trade.saveConversation.mutate(conversationPayload);
+        if (conversationResult?.success) {
+          for (const msg of messagesPayload) {
             try {
-              // Check if message is actually complete - if it has content and no placeholder fragments, it's complete
-              const hasRealContent = message.fragments && message.fragments.length > 0 && 
-                message.fragments.some(f => f.ft === 'content' || f.ft === 'attachment');
-              const isActuallyComplete = hasRealContent && !message.pendingIncomplete;
-              
-              await apiAsyncNode.trade.saveMessage.mutate({
-                id: message.id,
-                conversationId: conversation.id,
-                role: convertMessageRole(message.role),
-                content: message.fragments, // Store fragments as JSON
-                purposeId: message.purposeId,
-                metadata: message.metadata,
-                userFlags: message.userFlags || [],
-                tokenCount: message.tokenCount || 0,
-                generator: message.generator,
-                pendingIncomplete: !isActuallyComplete, // Force false if message has real content
-                created: message.created,
-                updated: message.updated || undefined, // Convert null to undefined
-              });
-              
-              console.log(`💬 Saved message ${message.id} (${message.role})`);
-            } catch (messageError) {
-              console.error(`❌ Error saving message ${message.id}:`, messageError);
+              await apiAsyncNode.trade.saveMessage.mutate(msg);
+            } catch (msgErr) {
+              console.error('❌ Fallback: error saving message', msg.id, msgErr);
             }
           }
-          
-          console.log(`✅ Saved ${conversation.messages.length} messages for conversation "${conversation.userTitle || conversation.autoTitle || 'Untitled'}"`);
+
+          syncedConversationsRef.current.set(conversation.id, {
+            localId: conversation.id,
+            cloudId: conversation.id,
+            lastSyncedAt: Date.now()
+          });
+
+          return true;
         }
-        
-        // Update sync metadata
-        syncedConversationsRef.current.set(conversation.id, {
-          localId: conversation.id,
-          cloudId: conversation.id, // Using the same ID for simplicity
-          lastSyncedAt: Date.now()
-        });
-        
-        return true;
       }
+      // If neither batched nor fallback succeeded
+      return false;
     } catch (error) {
       console.error('❌ Error saving conversation to database:', error);
       return false;
     }
-    
-    return false;
   }, []);
   
+  // Auto-sync immediately when a message completes in a conversation
+  useEffect(() => {
+    if (!isAuthenticated || !userId) return;
+
+    conversations.forEach((conversation) => {
+      if (!conversation || conversation._isIncognito) return;
+
+      const completeCount = (conversation.messages || []).reduce((acc, m) => {
+        const hasRealContent = !!(m.fragments && m.fragments.length && m.fragments.some(f => (f as any).ft === 'content' || (f as any).ft === 'attachment'));
+        const complete = hasRealContent && !m.pendingIncomplete;
+        return acc + (complete ? 1 : 0);
+      }, 0);
+
+      const prev = completedCountRef.current.get(conversation.id) || 0;
+      if (completeCount > prev) {
+        completedCountRef.current.set(conversation.id, completeCount);
+
+        const last = syncedConversationsRef.current.get(conversation.id)?.lastSyncedAt || 0;
+        const now = Date.now();
+        if (now - last > 1500) {
+          void saveConversationToDatabase(conversation);
+        }
+      }
+    });
+  }, [conversations, isAuthenticated, userId, saveConversationToDatabase]);
+
+  // Periodic 30s sync as a safety net
+  useEffect(() => {
+    if (!isAuthenticated || !userId) return;
+
+    const interval = setInterval(() => {
+      if (periodicSyncRunningRef.current) return;
+      periodicSyncRunningRef.current = true;
+      (async () => {
+        try {
+          for (const conversation of conversations) {
+            if (!conversation || conversation._isIncognito) continue;
+            const last = syncedConversationsRef.current.get(conversation.id)?.lastSyncedAt || 0;
+            const updatedAt = conversation.updated || conversation.created;
+            if (updatedAt > last) {
+              await saveConversationToDatabase(conversation);
+            }
+          }
+        } finally {
+          periodicSyncRunningRef.current = false;
+        }
+      })();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, userId, conversations, saveConversationToDatabase]);
+
   // Function to load conversations from the new database structure
   const loadConversationsFromDatabase = useCallback(async () => {
     if (!session?.user?.email) {
@@ -134,7 +207,8 @@ export const useChatCloudSync = () => {
       return;
     }
     
-    console.log('📚 Loading conversations from database...');
+      if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+        console.log('📚 Loading conversations from database...');
     
     try {
       // Fetch all user conversations from the new database structure
@@ -208,7 +282,8 @@ export const useChatCloudSync = () => {
             lastSyncedAt: Date.now()
           });
           
-          console.log(`📥 Added new conversation from database: ${cloudConversation.userTitle || cloudConversation.autoTitle || 'Untitled'}`);
+          if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+            console.log(`📥 Added new conversation from database: ${cloudConversation.userTitle || cloudConversation.autoTitle || 'Untitled'}`);
         } else {
           // Conversation exists locally, check which is newer
           const localUpdatedAt = existingConversation.updated || existingConversation.created;
@@ -226,7 +301,8 @@ export const useChatCloudSync = () => {
               lastSyncedAt: Date.now()
             });
             
-            console.log(`🔄 Updated existing conversation from database: ${cloudConversation.userTitle || cloudConversation.autoTitle || 'Untitled'}`);
+            if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+              console.log(`🔄 Updated existing conversation from database: ${cloudConversation.userTitle || cloudConversation.autoTitle || 'Untitled'}`);
           }
         }
       }
@@ -234,7 +310,8 @@ export const useChatCloudSync = () => {
       // If we have new or updated chats, update the store
       if (hasNewChats) {
         useChatStore.setState({ conversations: Array.from(newConversationMap.values()) });
-        console.log(`✅ Updated local chat store with ${dbConversations.length} conversations from database`);
+        if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+          console.log(`✅ Updated local chat store with ${dbConversations.length} conversations from database`);
       }
       
     } catch (error) {
@@ -246,11 +323,13 @@ export const useChatCloudSync = () => {
   useEffect(() => {
     // Skip if not authenticated
     if (!isAuthenticated || !userId) {
-      console.log('User not authenticated, skipping database sync setup');
+      if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+        console.log('User not authenticated, skipping database sync setup');
       return;
     }
 
-    console.log('🔧 Setting up database sync for authenticated user:', userId);
+    if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+      console.log('🔧 Setting up database sync for authenticated user:', userId);
     
     // Initialize link storage owner ID if not already set
     if (!linkStorageOwnerId) {
@@ -292,7 +371,8 @@ export const useChatCloudSync = () => {
         // Skip conversations with incomplete messages (thinking animation/auto-title generation in progress)
         const hasIncompleteMessages = conversation.messages.some(msg => msg.pendingIncomplete);
         if (hasIncompleteMessages) {
-          console.log(`⏳ Skipping sync for conversation with thinking/incomplete messages: "${conversation.userTitle || conversation.autoTitle || 'Untitled'}"`);
+          if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+            console.log(`⏳ Skipping sync for conversation with thinking/incomplete messages: "${conversation.userTitle || conversation.autoTitle || 'Untitled'}"`);
           return;
         }
         
@@ -301,15 +381,17 @@ export const useChatCloudSync = () => {
         
         // If we've never synced this conversation or it's been updated since last sync
         if (!syncData || (conversationUpdatedAt && conversationUpdatedAt > syncData.lastSyncedAt)) {
-          console.log(`🚀 Auto-syncing conversation "${conversation.userTitle || conversation.autoTitle || 'Untitled'}" to database...`);
+          if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+            console.log(`🚀 Auto-syncing conversation "${conversation.userTitle || conversation.autoTitle || 'Untitled'}" to database...`);
           
           const success = await saveConversationToDatabase(conversation);
           if (success) {
-            console.log(`✅ Successfully synced conversation to database`);
+            if (process.env.NODE_ENV !== 'production' && (process.env.DEBUG_CLOUD_SYNC === 'true' || process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC === 'true'))
+              console.log(`✅ Successfully synced conversation to database`);
           }
         }
       });
-    }, 1000); // 1 second debounce to batch rapid changes
+    }, 3000); // Debounce more aggressively to reduce request load
     
     // Cleanup timeout on effect cleanup
     return () => clearTimeout(debounceTimeout);

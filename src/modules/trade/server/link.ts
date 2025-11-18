@@ -1,4 +1,4 @@
-import * as z from 'zod/v4';
+import * as z from 'zod';
 import { getServerSession } from 'next-auth';
 
 import { LinkStorageDataType, LinkStorageVisibility } from '@prisma/client';

@@ -1,6 +1,6 @@
 // noinspection ES6PreferShortImport - because the build would not find this file with ~/...
 import { createEnv } from '../modules/3rdparty/t3-env';
-import * as z from 'zod/v4';
+import * as z from 'zod';
 
 
 // Helper to make some variables required only in production
@@ -131,6 +131,9 @@ export const env = createEnv({
     // Frontend: server to use for PlantUML rendering
     NEXT_PUBLIC_PLANTUML_SERVER_URL: z.url().optional(),
 
+    // Enable verbose cloud sync logging in dev (opt-in)
+    NEXT_PUBLIC_DEBUG_CLOUD_SYNC: z.enum(['true', 'false']).optional(),
+
   },
 
   // matches user expectations - see https://github.com/enricoros/big-AGI/issues/279
@@ -140,6 +143,7 @@ export const env = createEnv({
   experimental__runtimeEnv: {
     NEXT_PUBLIC_GA4_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID,
     NEXT_PUBLIC_PLANTUML_SERVER_URL: process.env.NEXT_PUBLIC_PLANTUML_SERVER_URL,
+    NEXT_PUBLIC_DEBUG_CLOUD_SYNC: process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC,
   },
 });
 

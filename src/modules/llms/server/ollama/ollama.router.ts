@@ -1,6 +1,7 @@
-import * as z from 'zod/v4';
+import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { env } from '~/server/env';
 import { fetchTextOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 import { serverCapitalizeFirstLetter } from '~/server/wire';

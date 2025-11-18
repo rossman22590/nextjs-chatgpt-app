@@ -1,4 +1,4 @@
-import * as z from 'zod/v4';
+import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 
 import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
@@ -162,7 +162,7 @@ const moderationInputSchema = z.object({
 export const llmOpenAIRouter = createTRPCRouterEdge({
 
   /* [OpenAI] List the Models available */
-  listModels: publicProcedure
+  listModels: publicProcedureEdge
     .input(listModelsInputSchema)
     .output(ListModelsResponse_schema)
 

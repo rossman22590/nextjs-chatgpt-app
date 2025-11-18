@@ -20,16 +20,17 @@ const personaInputSchema = z.object({
   llmLabel: z.string().optional(),
 });
 
-const personaUpdateSchema = personaInputSchema.extend({
-  id: z.string().uuid(),
-}).partial({ systemPrompt: false });
+// For updates: all fields optional except id and systemPrompt which are required
+const personaUpdateSchema = personaInputSchema
+  .partial()
+  .required({ id: true, systemPrompt: true });
 
 export const personaRouter = createTRPCRouter({
   /** Create a new persona for the authenticated user */
   create: protectedProcedure
     .input(personaInputSchema)
     .mutation(async ({ input, ctx }) => {
-      const userId = ctx.session.user.id;
+      const userId = ctx.session!.user.id;
 
       const persona = await prisma.persona.create({
         data: {
@@ -71,7 +72,7 @@ export const personaRouter = createTRPCRouter({
       updated: z.date(),
     })))
     .query(async ({ ctx }) => {
-      const userId = ctx.session.user.id;
+      const userId = ctx.session!.user.id;
       const personas = await prisma.persona.findMany({
         where: { userId },
         orderBy: { updated: 'desc' },
@@ -98,7 +99,7 @@ export const personaRouter = createTRPCRouter({
   update: protectedProcedure
     .input(personaUpdateSchema)
     .mutation(async ({ input, ctx }) => {
-      const userId = ctx.session.user.id;
+      const userId = ctx.session!.user.id;
 
       const { count } = await prisma.persona.updateMany({
         where: { id: input.id, userId },
@@ -127,7 +128,7 @@ export const personaRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
-      const userId = ctx.session.user.id;
+      const userId = ctx.session!.user.id;
       const { count } = await prisma.persona.deleteMany({ where: { id: input.id, userId } });
       if (count !== 1)
         throw new Error('Persona not found or not owned by user');

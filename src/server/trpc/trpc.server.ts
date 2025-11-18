@@ -7,8 +7,9 @@
  * need to use are documented accordingly near the end.
  */
 import type { FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
-import * as z from 'zod/v4';
+import * as z from 'zod';
 import { initTRPC } from '@trpc/server';
+import { TRPCError } from '@trpc/server';
 import { transformer } from './trpc.transformer';
 import { TRPCFetcherError } from './trpc.router.fetchers';
 
@@ -131,6 +132,23 @@ export const publicProcedure = t.procedure;
  * authentication will be required.
  */
 export const edgeProcedure = t.procedure;
+
+/**
+ * Protected procedure (Node.js runtime only)
+ * Ensures a valid authenticated session is present.
+ */
+type AuthedContext = Omit<ChatGenerateContentContext, 'session'> & {
+  session: NonNullable<ChatGenerateContentContext['session']>;
+};
+
+const isAuthed = t.middleware(({ ctx, next }) => {
+  const session = ctx.session;
+  if (!session?.user?.id)
+    throw new TRPCError({ code: 'UNAUTHORIZED' });
+  return next({ ctx: { ...ctx, session } as AuthedContext });
+});
+
+export const protectedProcedure = t.procedure.use(isAuthed);
 
 // /**
 //  * Create a server-side caller

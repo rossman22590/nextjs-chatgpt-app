@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import * as z from 'zod/v4';
+import * as z from 'zod';
 
 import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
 import { fetchTextOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';

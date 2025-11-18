@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { MessageRole } from '@prisma/client';
 import { prisma } from '~/server/prisma/prisma-client';
 import { protectedProcedure } from '~/server/trpc/trpc.server';
@@ -42,9 +43,14 @@ const getConversationsSchema = z.object({
 export const saveConversationProcedure = protectedProcedure
   .input(saveConversationSchema)
   .mutation(async ({ input, ctx }) => {
-    const userId = ctx.session.user.id;
+    const userId = ctx.session!.user.id;
     
     try {
+      // Ownership guard: if conversation exists and isn't owned by user, deny
+      const existing = await prisma.conversation.findUnique({ where: { id: input.id }, select: { userId: true } });
+      if (existing && existing.userId !== userId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Conversation not owned by user.' });
+
       const conversation = await prisma.conversation.upsert({
         where: { id: input.id },
         update: {
@@ -73,7 +79,8 @@ export const saveConversationProcedure = protectedProcedure
       return { success: true, conversationId: conversation.id };
     } catch (error) {
       console.error('❌ Error saving conversation:', error);
-      throw new Error('Failed to save conversation');
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to save conversation' });
     }
   });
 
@@ -83,9 +90,19 @@ export const saveConversationProcedure = protectedProcedure
 export const saveMessageProcedure = protectedProcedure
   .input(saveMessageSchema)
   .mutation(async ({ input, ctx }) => {
-    const userId = ctx.session.user.id;
+    const userId = ctx.session!.user.id;
     
     try {
+      // Verify conversation exists and is owned by the user
+      const convo = await prisma.conversation.findUnique({ where: { id: input.conversationId }, select: { userId: true } });
+      if (!convo || convo.userId !== userId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Conversation not found or not owned by user.' });
+
+      // If message exists, ensure ownership and same conversation
+      const existingMsg = await prisma.message.findUnique({ where: { id: input.id }, select: { userId: true, conversationId: true } });
+      if (existingMsg && (existingMsg.userId !== userId || existingMsg.conversationId !== input.conversationId))
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Message not owned by user or mismatched conversation.' });
+
       const message = await prisma.message.upsert({
         where: { id: input.id },
         update: {
@@ -115,11 +132,13 @@ export const saveMessageProcedure = protectedProcedure
         },
       });
 
-      console.log(`✅ Saved message ${input.id} to database`);
+      if (process.env.NODE_ENV !== 'production' && process.env.DEBUG_CLOUD_SYNC === 'true')
+        console.log(`✅ Saved message ${input.id} to database`);
       return { success: true, messageId: message.id };
     } catch (error) {
       console.error('❌ Error saving message:', error);
-      throw new Error('Failed to save message');
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to save message' });
     }
   });
 
@@ -129,7 +148,7 @@ export const saveMessageProcedure = protectedProcedure
 export const getUserConversationsProcedure = protectedProcedure
   .input(getConversationsSchema)
   .query(async ({ input, ctx }) => {
-    const userId = ctx.session.user.id;
+    const userId = ctx.session!.user.id;
     
     try {
       const conversations = await prisma.conversation.findMany({
@@ -161,7 +180,7 @@ export const getUserConversationsProcedure = protectedProcedure
 export const deleteConversationProcedure = protectedProcedure
   .input(z.object({ conversationId: z.string() }))
   .mutation(async ({ input, ctx }) => {
-    const userId = ctx.session.user.id;
+    const userId = ctx.session!.user.id;
     
     try {
       // Verify ownership and delete
@@ -189,38 +208,54 @@ export const saveCompleteConversationProcedure = protectedProcedure
     messages: z.array(saveMessageSchema),
   }))
   .mutation(async ({ input, ctx }) => {
-    const userId = ctx.session.user.id;
-    
-    try {
-      await prisma.$transaction(async (tx) => {
-        // Save conversation
-        await tx.conversation.upsert({
-          where: { id: input.conversation.id },
-          update: {
-            title: input.conversation.title,
-            autoTitle: input.conversation.autoTitle,
-            userSymbol: input.conversation.userSymbol,
-            systemPurposeId: input.conversation.systemPurposeId,
-            isArchived: input.conversation.isArchived,
-            updated: input.conversation.updated ? new Date(input.conversation.updated) : new Date(),
-          },
-          create: {
-            id: input.conversation.id,
-            userId,
-            title: input.conversation.title,
-            autoTitle: input.conversation.autoTitle,
-            userSymbol: input.conversation.userSymbol,
-            systemPurposeId: input.conversation.systemPurposeId,
-            isArchived: input.conversation.isArchived,
-            isIncognito: input.conversation.isIncognito,
-            created: new Date(input.conversation.created),
-            updated: input.conversation.updated ? new Date(input.conversation.updated) : new Date(input.conversation.created),
-          },
-        });
+    const userId = ctx.session!.user.id;
 
-        // Save all messages
-        for (const messageData of input.messages) {
-          await tx.message.upsert({
+    try {
+      // Upsert conversation first (outside an interactive transaction)
+      await prisma.conversation.upsert({
+        where: { id: input.conversation.id },
+        update: {
+          title: input.conversation.title,
+          autoTitle: input.conversation.autoTitle,
+          userSymbol: input.conversation.userSymbol,
+          systemPurposeId: input.conversation.systemPurposeId,
+          isArchived: input.conversation.isArchived,
+          updated: input.conversation.updated ? new Date(input.conversation.updated) : new Date(),
+        },
+        create: {
+          id: input.conversation.id,
+          userId,
+          title: input.conversation.title,
+          autoTitle: input.conversation.autoTitle,
+          userSymbol: input.conversation.userSymbol,
+          systemPurposeId: input.conversation.systemPurposeId,
+          isArchived: input.conversation.isArchived,
+          isIncognito: input.conversation.isIncognito,
+          created: new Date(input.conversation.created),
+          updated: input.conversation.updated ? new Date(input.conversation.updated) : new Date(input.conversation.created),
+        },
+      });
+
+      if (!input.messages?.length)
+        return { success: true, conversationId: input.conversation.id, messageCount: 0 };
+
+      // Ownership and conversation guard for existing messages (bulk)
+      const ids = input.messages.map(m => m.id);
+      const existing = await prisma.message.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, userId: true, conversationId: true },
+      });
+      for (const em of existing) {
+        if (em.userId !== userId || em.conversationId !== input.conversation.id)
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Message not owned by user or mismatched conversation.' });
+      }
+
+      // Chunked upserts to avoid long transactions
+      const BATCH_SIZE = 25;
+      for (let i = 0; i < input.messages.length; i += BATCH_SIZE) {
+        const chunk = input.messages.slice(i, i + BATCH_SIZE);
+        const ops = chunk.map(messageData =>
+          prisma.message.upsert({
             where: { id: messageData.id },
             update: {
               content: messageData.content,
@@ -234,7 +269,7 @@ export const saveCompleteConversationProcedure = protectedProcedure
             },
             create: {
               id: messageData.id,
-              conversationId: messageData.conversationId,
+              conversationId: input.conversation.id,
               userId,
               role: messageData.role as MessageRole,
               content: messageData.content,
@@ -247,14 +282,28 @@ export const saveCompleteConversationProcedure = protectedProcedure
               created: new Date(messageData.created),
               updated: messageData.updated ? new Date(messageData.updated) : undefined,
             },
-          });
+          })
+        );
+        try {
+          await prisma.$transaction(ops, { timeout: 8000, maxWait: 3000 });
+        } catch (txErr: any) {
+          // Fallback: run sequential upserts when transaction times out or is unavailable
+          const code = (txErr && (txErr.code || txErr?.meta?.code)) || '';
+          if (code === 'P2028' || ('' + txErr?.message).toLowerCase().includes('transaction')) {
+            for (const op of ops) {
+              try { await op; } catch (opErr) { console.error('Upsert failed (sequential):', opErr); }
+            }
+          } else {
+            throw txErr;
+          }
         }
-      });
+      }
 
       console.log(`✅ Saved complete conversation ${input.conversation.id} with ${input.messages.length} messages`);
       return { success: true, conversationId: input.conversation.id, messageCount: input.messages.length };
     } catch (error) {
       console.error('❌ Error saving complete conversation:', error);
-      throw new Error('Failed to save complete conversation');
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to save complete conversation' });
     }
   }); 

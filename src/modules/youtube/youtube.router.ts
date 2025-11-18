@@ -2,7 +2,7 @@
 // This subsystem is responsible for fetching the transcript of a YouTube video.
 // It is used by the Big-AGI Persona Creator to create a character sheet.
 
-import * as z from 'zod/v4';
+import * as z from 'zod';
 
 import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 import { fetchTextOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';

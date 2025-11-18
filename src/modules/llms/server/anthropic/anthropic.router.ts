@@ -1,4 +1,4 @@
-import * as z from 'zod/v4';
+import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 
 import { env } from '~/server/env';
@@ -191,14 +191,14 @@ export const llmAnthropicRouter = createTRPCRouterEdge({
     }),
 
   /* [Anthropic] list skills - https://docs.anthropic.com/en/docs/build-with-claude/skills-api */
-  listSkills: publicProcedure
+  listSkills: publicProcedureEdge
     .input(z.object({ access: anthropicAccessSchema }))
     .query(async ({ input: { access } }) => {
       return await anthropicGETOrThrow(access, '/v1/skills', { enableSkills: true });
     }),
 
   /* [Anthropic] get skill details */
-  getSkill: publicProcedure
+  getSkill: publicProcedureEdge
     .input(z.object({
       access: anthropicAccessSchema,
       skillId: z.string(),
@@ -208,7 +208,7 @@ export const llmAnthropicRouter = createTRPCRouterEdge({
     }),
 
   /* [Anthropic] get file metadata - for Skills-generated files */
-  getFileMetadata: publicProcedure
+  getFileMetadata: publicProcedureEdge
     .input(z.object({
       access: anthropicAccessSchema,
       fileId: z.string(),
@@ -218,7 +218,7 @@ export const llmAnthropicRouter = createTRPCRouterEdge({
     }),
 
   /* [Anthropic] download file - for Skills-generated files */
-  downloadFile: publicProcedure
+  downloadFile: publicProcedureEdge
     .input(z.object({
       access: anthropicAccessSchema,
       fileId: z.string(),

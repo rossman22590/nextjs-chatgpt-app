@@ -10,23 +10,26 @@ const handlerNodeRoutes = (req: Request) => fetchRequestHandler({
   req,
   createContext: createTRPCFetchContext,
   onError: async function({ path, error, type, ctx }) {
+    const isNoisyBodyParse = typeof error?.message === 'string' && error.message.includes('Unexpected end of JSON input');
 
-    // -> DEV error logging
-    if (process.env.NODE_ENV === 'development')
+    // -> DEV error logging (silence noisy JSON body parse spam)
+    if (process.env.NODE_ENV === 'development' && !isNoisyBodyParse)
       console.error(`❌ tRPC-cloud failed on ${path ?? 'unk-path'}: ${error.message}`);
 
-    // -> Capture node errors
-    await posthogCaptureServerException(error, {
-      domain: 'trpc-onerror',
-      runtime: 'nodejs',
-      endpoint: path ?? 'unknown',
-      method: req.method,
-      url: req.url,
-      additionalProperties: {
-        errorCode: error.code,
-        errorType: type,
-      },
-    });
+    // -> Capture node errors (skip noisy body-parse spam)
+    if (!isNoisyBodyParse) {
+      await posthogCaptureServerException(error, {
+        domain: 'trpc-onerror',
+        runtime: 'nodejs',
+        endpoint: path ?? 'unknown',
+        method: req.method,
+        url: req.url,
+        additionalProperties: {
+          errorCode: error.code,
+          errorType: type,
+        },
+      });
+    }
   },
 });
 

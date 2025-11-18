@@ -1,4 +1,4 @@
-import * as z from 'zod/v4';
+import * as z from 'zod';
 
 import { createServerDebugWireEvents, serverCapitalizeFirstLetter } from '~/server/wire';
 import { createTRPCRouter, edgeProcedure } from '~/server/trpc/trpc.server';
