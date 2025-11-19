@@ -285,7 +285,7 @@ export const saveCompleteConversationProcedure = protectedProcedure
           })
         );
         try {
-          await prisma.$transaction(ops, { timeout: 8000, maxWait: 3000 });
+          await prisma.$transaction(ops);
         } catch (txErr: any) {
           // Fallback: run sequential upserts when transaction times out or is unavailable
           const code = (txErr && (txErr.code || txErr?.meta?.code)) || '';

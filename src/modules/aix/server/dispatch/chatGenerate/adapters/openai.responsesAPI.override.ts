@@ -22,6 +22,17 @@ interface ResponsesAPIPayload {
   [key: string]: any;
 }
 
+// Map extended effort values to Responses API accepted values
+function mapReasoningEffort(effort?: string): "low" | "medium" | "high" {
+  switch ((effort || '').toLowerCase()) {
+    case 'high': return 'high';
+    case 'medium': return 'medium';
+    // Treat 'minimal' (and any unknown) as 'low' to satisfy the API contract
+    case 'low':
+    default: return 'low';
+  }
+}
+
 // Function to determine if a model uses the responses API
 export function usesResponsesAPI(model: AixAPI_Model): boolean {
   return model.id === 'o3-pro' || 
@@ -155,7 +166,7 @@ export function aixToOpenAIChatCompletions(
         }
       },
       reasoning: {
-        effort: model.vndOaiReasoningEffort || "medium",
+        effort: mapReasoningEffort((model as any).vndOaiReasoningEffort),
         summary: "auto"
       },
       tools: [],

@@ -36,8 +36,8 @@ function sanitizeUrlForDisplay(url: string | null): string {
 }
 
 
-type TResponse = OpenAIWire_API_Responses.Response;
-type TOutputItem = OpenAIWire_API_Responses.Response['output'][number];
+type TResponse = OpenAIWire_API_Responses.ResponsesAPIResponse;
+type TOutputItem = OpenAIWire_API_Responses.ResponsesAPIResponse['output'][number];
 type TEventType = OpenAIWire_API_Responses.StreamingEvent['type'];
 
 
@@ -265,7 +265,7 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
          * - .usage = null
          * - .metadata = {}
          */
-        R.setResponse(eventType, event.response as any);
+        R.setResponse(eventType, event.response);
 
         // -> Model
         pt.setModelName(event.response.model);
@@ -286,12 +286,12 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
 
       case 'response.in_progress':
         // NO CHANGES expected, since 'response.created'
-        R.setResponse(eventType, event.response as any);
+        R.setResponse(eventType, event.response);
         break;
 
       case 'response.completed':
         // CHANGE of { status, output, usage } expected
-        R.setResponse(eventType, event.response as any, ['status', 'output', 'usage']);
+        R.setResponse(eventType, event.response, ['status', 'output', 'usage']);
 
         // -> Status: determine stop reason based on streamed content
         pt.setTokenStopReason(R.hasFunctionCalls ? 'ok-tool_invocations' : 'ok');
@@ -301,7 +301,7 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
 
         // -> Usage (incl. dtAll)
         if (event.response.usage) {
-          const metrics = _fromResponseUsage(event.response.usage as any, R.parserCreationTimestamp, R.timeToFirstEvent);
+          const metrics = _fromResponseUsage(event.response.usage, R.parserCreationTimestamp, R.timeToFirstEvent);
           if (metrics)
             pt.updateMetrics(metrics);
         }
@@ -632,7 +632,7 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
 
     // -> Usage
     if (response.usage) {
-      const metrics = _fromResponseUsage(response.usage as any, parserCreationTimestamp, undefined);
+      const metrics = _fromResponseUsage(response.usage, parserCreationTimestamp, undefined);
       if (metrics)
         pt.updateMetrics(metrics);
     }
@@ -837,7 +837,7 @@ function _fromResponseUsage(usage: OpenAIWire_API_Responses.ResponsesAPIResponse
     return undefined;
 
   // Require at least the completion tokens, or issue a DEV warning otherwise
-  if ((usage as any).output_tokens === undefined) {
+  if (usage.output_tokens === undefined) {
     // Warn, so we may adjust this usage parsing for Non-OpenAI APIs
     console.log('[DEV] AIX: OpenAI Responses missing completion tokens in usage', { usage });
     return undefined;
@@ -845,8 +845,8 @@ function _fromResponseUsage(usage: OpenAIWire_API_Responses.ResponsesAPIResponse
 
   // Create the metrics update object
   const metricsUpdate: AixWire_Particles.CGSelectMetrics = {
-    TIn: (usage as any).input_tokens ?? undefined,
-    TOut: (usage as any).output_tokens,
+    TIn: usage.input_tokens ?? undefined,
+    TOut: usage.output_tokens,
     // dtInner: openAI is not reporting the time as seen by the servers
     dtAll: Date.now() - parserCreationTimestamp,
   };
@@ -854,8 +854,8 @@ function _fromResponseUsage(usage: OpenAIWire_API_Responses.ResponsesAPIResponse
   // Input Metrics
 
   // Input redistribution: Cache Read
-  if ((usage as any).input_tokens_details) {
-    const TCacheRead = (usage as any).input_tokens_details.cached_tokens;
+  if (usage.input_tokens_details) {
+    const TCacheRead = usage.input_tokens_details.cached_tokens;
     if (TCacheRead !== undefined && TCacheRead > 0) {
       metricsUpdate.TCacheRead = TCacheRead;
       if (metricsUpdate.TIn !== undefined)
@@ -868,10 +868,10 @@ function _fromResponseUsage(usage: OpenAIWire_API_Responses.ResponsesAPIResponse
   // Output Metrics
 
   // Output breakdown: Reasoning
-  if ((usage as any).output_tokens_details) {
-    const details = (usage as any).output_tokens_details || {};
+  if (usage.output_tokens_details) {
+    const details = usage.output_tokens_details || {};
     if (details.reasoning_tokens !== undefined)
-      metricsUpdate.TOutR = (usage as any).output_tokens_details.reasoning_tokens;
+      metricsUpdate.TOutR = usage.output_tokens_details.reasoning_tokens;
   }
 
   // TODO: Output breakdown: Audio
@@ -912,7 +912,7 @@ function _forwardResponseError(parsedData: any, pt: IParticleTransmitter) {
  * IMPORTANT: These are HIGH-QUALITY citations (2-3 per response) that were actually
  * used in generating the response. Different from bulk web search sources (20+ results).
  */
-function _forwardTextAnnotation(pt: IParticleTransmitter, annotation: Exclude<Extract<Extract<OpenAIWire_API_Responses.Response['output'][number], { type: 'message' }>['content'][number], { type: 'output_text' }>['annotations'], undefined>[number], annotationIndex: number): void {
+function _forwardTextAnnotation(pt: IParticleTransmitter, annotation: Exclude<Extract<Extract<OpenAIWire_API_Responses.ResponsesAPIResponse['output'][number], { type: 'message' }>['content'][number], { type: 'output_text' }>['annotations'], undefined>[number], annotationIndex: number): void {
   switch (annotation?.type) {
     case 'url_citation':
       pt.appendUrlCitation(
@@ -941,7 +941,7 @@ function _forwardTextAnnotation(pt: IParticleTransmitter, annotation: Exclude<Ex
  * - sources: ALL search results (e.g., 20 URLs) - bulk data for special web search fragments
  * - citations: High-quality links (2-3) via annotations in message content
  */
-function _forwardWebSearchCallItem(pt: IParticleTransmitter, webSearchCall: Extract<OpenAIWire_API_Responses.Response['output'][number], { type: 'web_search_call' }>): void {
+function _forwardWebSearchCallItem(pt: IParticleTransmitter, webSearchCall: Extract<OpenAIWire_API_Responses.ResponsesAPIResponse['output'][number], { type: 'web_search_call' }>): void {
   const { action } = webSearchCall;
   switch (action?.type) {
     case 'search':

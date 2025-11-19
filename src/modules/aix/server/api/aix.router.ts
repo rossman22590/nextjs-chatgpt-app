@@ -1,7 +1,7 @@
 import * as z from 'zod';
 
 import { createServerDebugWireEvents, serverCapitalizeFirstLetter } from '~/server/wire';
-import { createTRPCRouter, edgeProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
 
 import { AixAPI_Access, AixAPI_Context_ChatGenerate, AixWire_API, AixWire_API_ChatContentGenerate } from './aix.wiretypes';
 import { PerformanceProfiler } from '../dispatch/PerformanceProfiler';
@@ -52,13 +52,13 @@ function _createDebugConfig(access: AixAPI_Access, options: undefined | { debugD
 
 // --- AIX tRPC Router ---
 
-export const aixRouter = createTRPCRouter({
+export const aixRouter = createTRPCRouterEdge({
 
   /**
    * Chat content generation, streaming, multipart.
    * Architecture: Client <-- (intake) --> Server <-- (dispatch) --> AI Service
    */
-  chatGenerateContent: edgeProcedure
+  chatGenerateContent: publicProcedureEdge
     .input(z.object({
       access: AixWire_API.Access_schema,
       model: AixWire_API.Model_schema,
@@ -78,7 +78,7 @@ export const aixRouter = createTRPCRouter({
    * Chat content generation RESUME, streaming only.
    * Reconnects to an in-progress response by its ID - OpenAI Responses API only.
    */
-  reattachContent: edgeProcedure
+  reattachContent: publicProcedureEdge
     .input(z.object({
       access: AixWire_API.Access_schema,
       resumeHandle: AixWire_API.ResumeHandle_schema, // resume has a handle instead of 'model + chatGenerate'
