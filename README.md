@@ -1,4 +1,4 @@
-# BIG-AGI 🧠 
+# BIG-AGI 🧠  
 
 Welcome to big-AGI, the AI suite for professionals that need function, form,
 simplicity, and speed. Powered by the latest models from 15 vendors and
