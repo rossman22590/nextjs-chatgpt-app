@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { randomUUID } from 'crypto';
 import { MessageRole } from '@prisma/client';
 import { prisma } from '~/server/prisma/prisma-client';
 import { protectedProcedure } from '~/server/trpc/trpc.server';
@@ -46,34 +47,48 @@ export const saveConversationProcedure = protectedProcedure
     const userId = ctx.session!.user.id;
     
     try {
-      // Ownership guard: if conversation exists and isn't owned by user, deny
+      // Ownership guard: if conversation exists and isn't owned by user, auto-fork to a new ID
       const existing = await prisma.conversation.findUnique({ where: { id: input.id }, select: { userId: true } });
-      if (existing && existing.userId !== userId)
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Conversation not owned by user.' });
+      const convIdToUse = existing && existing.userId !== userId ? randomUUID() : input.id;
 
-      const conversation = await prisma.conversation.upsert({
-        where: { id: input.id },
-        update: {
-          title: input.title,
-          autoTitle: input.autoTitle,
-          userSymbol: input.userSymbol,
-          systemPurposeId: input.systemPurposeId,
-          isArchived: input.isArchived,
-          updated: input.updated ? new Date(input.updated) : new Date(),
-        },
-        create: {
-          id: input.id,
-          userId,
-          title: input.title,
-          autoTitle: input.autoTitle,
-          userSymbol: input.userSymbol,
-          systemPurposeId: input.systemPurposeId,
-          isArchived: input.isArchived,
-          isIncognito: input.isIncognito,
-          created: new Date(input.created),
-          updated: input.updated ? new Date(input.updated) : new Date(input.created),
-        },
-      });
+      const conversation = existing && existing.userId !== userId
+        ? await prisma.conversation.create({
+          data: {
+            id: convIdToUse,
+            userId,
+            title: input.title,
+            autoTitle: input.autoTitle,
+            userSymbol: input.userSymbol,
+            systemPurposeId: input.systemPurposeId,
+            isArchived: input.isArchived,
+            isIncognito: input.isIncognito,
+            created: new Date(input.created),
+            updated: input.updated ? new Date(input.updated) : new Date(input.created),
+          },
+        })
+        : await prisma.conversation.upsert({
+          where: { id: convIdToUse },
+          update: {
+            title: input.title,
+            autoTitle: input.autoTitle,
+            userSymbol: input.userSymbol,
+            systemPurposeId: input.systemPurposeId,
+            isArchived: input.isArchived,
+            updated: input.updated ? new Date(input.updated) : new Date(),
+          },
+          create: {
+            id: convIdToUse,
+            userId,
+            title: input.title,
+            autoTitle: input.autoTitle,
+            userSymbol: input.userSymbol,
+            systemPurposeId: input.systemPurposeId,
+            isArchived: input.isArchived,
+            isIncognito: input.isIncognito,
+            created: new Date(input.created),
+            updated: input.updated ? new Date(input.updated) : new Date(input.created),
+          },
+        });
 
       console.log(`✅ Saved conversation ${input.id} to database`);
       return { success: true, conversationId: conversation.id };
@@ -211,51 +226,85 @@ export const saveCompleteConversationProcedure = protectedProcedure
     const userId = ctx.session!.user.id;
 
     try {
-      // Upsert conversation first (outside an interactive transaction)
-      await prisma.conversation.upsert({
-        where: { id: input.conversation.id },
-        update: {
-          title: input.conversation.title,
-          autoTitle: input.conversation.autoTitle,
-          userSymbol: input.conversation.userSymbol,
-          systemPurposeId: input.conversation.systemPurposeId,
-          isArchived: input.conversation.isArchived,
-          updated: input.conversation.updated ? new Date(input.conversation.updated) : new Date(),
-        },
-        create: {
-          id: input.conversation.id,
-          userId,
-          title: input.conversation.title,
-          autoTitle: input.conversation.autoTitle,
-          userSymbol: input.conversation.userSymbol,
-          systemPurposeId: input.conversation.systemPurposeId,
-          isArchived: input.conversation.isArchived,
-          isIncognito: input.conversation.isIncognito,
-          created: new Date(input.conversation.created),
-          updated: input.conversation.updated ? new Date(input.conversation.updated) : new Date(input.conversation.created),
-        },
-      });
+      // Determine conversation ID to use (auto-fork if existing belongs to another user)
+      const existingConv = await prisma.conversation.findUnique({ where: { id: input.conversation.id }, select: { userId: true } });
+      const convIdToUse = existingConv && existingConv.userId !== userId ? randomUUID() : input.conversation.id;
+
+      if (existingConv && existingConv.userId !== userId) {
+        await prisma.conversation.create({
+          data: {
+            id: convIdToUse,
+            userId,
+            title: input.conversation.title,
+            autoTitle: input.conversation.autoTitle,
+            userSymbol: input.conversation.userSymbol,
+            systemPurposeId: input.conversation.systemPurposeId,
+            isArchived: input.conversation.isArchived,
+            isIncognito: input.conversation.isIncognito,
+            created: new Date(input.conversation.created),
+            updated: input.conversation.updated ? new Date(input.conversation.updated) : new Date(input.conversation.created),
+          },
+        });
+      } else {
+        await prisma.conversation.upsert({
+          where: { id: convIdToUse },
+          update: {
+            title: input.conversation.title,
+            autoTitle: input.conversation.autoTitle,
+            userSymbol: input.conversation.userSymbol,
+            systemPurposeId: input.conversation.systemPurposeId,
+            isArchived: input.conversation.isArchived,
+            updated: input.conversation.updated ? new Date(input.conversation.updated) : new Date(),
+          },
+          create: {
+            id: convIdToUse,
+            userId,
+            title: input.conversation.title,
+            autoTitle: input.conversation.autoTitle,
+            userSymbol: input.conversation.userSymbol,
+            systemPurposeId: input.conversation.systemPurposeId,
+            isArchived: input.conversation.isArchived,
+            isIncognito: input.conversation.isIncognito,
+            created: new Date(input.conversation.created),
+            updated: input.conversation.updated ? new Date(input.conversation.updated) : new Date(input.conversation.created),
+          },
+        });
+      }
 
       if (!input.messages?.length)
-        return { success: true, conversationId: input.conversation.id, messageCount: 0 };
+        return { success: true, conversationId: convIdToUse, messageCount: 0 };
 
-      // Ownership and conversation guard for existing messages (bulk)
+      // Find existing messages to detect collisions
       const ids = input.messages.map(m => m.id);
-      const existing = await prisma.message.findMany({
+      const existingMsgs = await prisma.message.findMany({
         where: { id: { in: ids } },
         select: { id: true, userId: true, conversationId: true },
       });
-      for (const em of existing) {
-        if (em.userId !== userId || em.conversationId !== input.conversation.id)
-          throw new TRPCError({ code: 'FORBIDDEN', message: 'Message not owned by user or mismatched conversation.' });
-      }
+      const existingMap = new Map(existingMsgs.map(m => [m.id, m] as const));
 
       // Chunked upserts to avoid long transactions
       const BATCH_SIZE = 25;
       for (let i = 0; i < input.messages.length; i += BATCH_SIZE) {
         const chunk = input.messages.slice(i, i + BATCH_SIZE);
-        const ops = chunk.map(messageData =>
-          prisma.message.upsert({
+        const ops = chunk.map(messageData => {
+          const collision = messageData.id ? existingMap.get(messageData.id) : undefined;
+          const isCollision = !!collision && (collision.userId !== userId || collision.conversationId !== convIdToUse);
+          if (isCollision) {
+            // Create new message (new ID auto-generated) under forked/current conversation
+            const { id: _omit, conversationId: _omit2, ...rest } = messageData as any;
+            return prisma.message.create({
+              data: {
+                ...rest,
+                conversationId: convIdToUse,
+                userId,
+                role: messageData.role as MessageRole,
+                created: new Date(messageData.created),
+                updated: messageData.updated ? new Date(messageData.updated) : undefined,
+              },
+            });
+          }
+          // Upsert normally
+          return prisma.message.upsert({
             where: { id: messageData.id },
             update: {
               content: messageData.content,
@@ -269,7 +318,7 @@ export const saveCompleteConversationProcedure = protectedProcedure
             },
             create: {
               id: messageData.id,
-              conversationId: input.conversation.id,
+              conversationId: convIdToUse,
               userId,
               role: messageData.role as MessageRole,
               content: messageData.content,
@@ -282,8 +331,8 @@ export const saveCompleteConversationProcedure = protectedProcedure
               created: new Date(messageData.created),
               updated: messageData.updated ? new Date(messageData.updated) : undefined,
             },
-          })
-        );
+          });
+        });
         try {
           await prisma.$transaction(ops);
         } catch (txErr: any) {
@@ -299,8 +348,8 @@ export const saveCompleteConversationProcedure = protectedProcedure
         }
       }
 
-      console.log(`✅ Saved complete conversation ${input.conversation.id} with ${input.messages.length} messages`);
-      return { success: true, conversationId: input.conversation.id, messageCount: input.messages.length };
+      console.log(`✅ Saved complete conversation ${convIdToUse} with ${input.messages.length} messages`);
+      return { success: true, conversationId: convIdToUse, messageCount: input.messages.length };
     } catch (error) {
       console.error('❌ Error saving complete conversation:', error);
       if (error instanceof TRPCError) throw error;
