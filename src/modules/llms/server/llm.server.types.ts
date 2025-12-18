@@ -77,23 +77,42 @@ const ModelParameterSpec_schema = z.object({
   paramId: z.enum([
     'llmTopP',
     'llmForceNoStream',
+    // Anthropic
     'llmVndAnt1MContext',
+    'llmVndAntEffort',
+    'llmVndAntSkills',
     'llmVndAntThinkingBudget',
     'llmVndAntWebFetch',
     'llmVndAntWebSearch',
+    // Gemini
     'llmVndGeminiAspectRatio',
+    'llmVndGeminiCodeExecution',
+    'llmVndGeminiComputerUse',
     'llmVndGeminiGoogleSearch',
+    'llmVndGeminiImageSize',
+    'llmVndGeminiMediaResolution',
     'llmVndGeminiShowThoughts',
     'llmVndGeminiThinkingBudget',
+    'llmVndGeminiThinkingLevel',
+    // 'llmVndGeminiUrlContext',
+    // Moonshot
+    'llmVndMoonshotWebSearch',
+    // OpenAI
     'llmVndOaiReasoningEffort',
     'llmVndOaiReasoningEffort4',
+    'llmVndOaiReasoningEffort52',
+    'llmVndOaiReasoningEffort52Pro',
     'llmVndOaiRestoreMarkdown',
     'llmVndOaiVerbosity',
     'llmVndOaiWebSearchContext',
     'llmVndOaiWebSearchGeolocation',
     'llmVndOaiImageGeneration',
+    // OpenRouter
+    'llmVndOrtWebSearch',
+    // Perplexity
     'llmVndPerplexityDateFilter',
     'llmVndPerplexitySearchMode',
+    // xAI
     'llmVndXaiSearchMode',
     'llmVndXaiSearchSources',
     'llmVndXaiSearchDateFilter',
@@ -113,7 +132,7 @@ export const ModelDescription_schema = z.object({
   updated: z.number().optional(),
   description: z.string(),
   contextWindow: z.number().nullable(),
-  interfaces: z.array(z.enum(LLMS_ALL_INTERFACES)),
+  interfaces: z.array(z.union([z.enum(LLMS_ALL_INTERFACES), z.string()])), // backward compatibility: to not Break client-side interface parsing on newer server
   parameterSpecs: z.array(ModelParameterSpec_schema).optional(),
   maxCompletionTokens: z.number().optional(),
   // rateLimits: rateLimitsSchema.optional(),

@@ -1,4 +1,4 @@
-import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.router';
+import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.access';
 
 import { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_ChatMessage, AixMessages_SystemMessage, AixTools_ToolDefinition, AixTools_ToolsPolicy } from '../../../api/aix.wiretypes';
 import { OpenAIWire_API_Responses, OpenAIWire_Responses_Items, OpenAIWire_Responses_Tools } from '../../wiretypes/openai.wiretypes';
@@ -27,7 +27,6 @@ export function aixToOpenAIResponses(
   openAIDialect: OpenAIDialects,
   model: AixAPI_Model,
   _chatGenerate: AixAPIChatGenerate_Request,
-  jsonOutput: boolean,
   streaming: boolean,
   enableResumability: boolean,
 ): TRequest {
@@ -40,11 +39,9 @@ export function aixToOpenAIResponses(
   const isOpenAIChatGPT = ['gpt-5-chat'].some(_id => model.id === _id || model.id.startsWith(_id + '-'));
   const isOpenAIComputerUse = model.id.includes('computer-use');
   const isOpenAIO1Pro = model.id === 'o1-pro' || model.id.startsWith('o1-pro-');
-  const isOpenAIDeepResearch = model.id.includes('-deep-research');
 
   const hotFixNoTemperature = isOpenAIOFamily && !isOpenAIChatGPT;
   const hotFixNoTruncateAuto = isOpenAIComputerUse;
-  const hotFixForceWebSearchTool = isOpenAIDeepResearch;
 
   const isDialectAzure = openAIDialect === 'azure';
 
@@ -52,6 +49,10 @@ export function aixToOpenAIResponses(
   // construct the request payload
   // NOTE: the zod parsing will remove the undefined values from the upstream request, enabling an easier construction
   // ---
+
+  // constrained output modes - both JSON and tool invocations
+  // const strictJsonOutput = !!model.strictJsonOutput;
+  const strictToolInvocations = !!model.strictToolInvocations;
 
   const { requestInput, requestInstructions } = _toOpenAIResponsesRequestInput(chatGenerate.systemMessage, chatGenerate.chatSequence);
   const payload: any = {
@@ -67,7 +68,7 @@ export function aixToOpenAIResponses(
     input: requestInput,
 
     // Tools
-    tools: chatGenerate.tools && _toOpenAIResponsesTools(chatGenerate.tools),
+    tools: chatGenerate.tools && _toOpenAIResponsesTools(chatGenerate.tools, strictToolInvocations),
     tool_choice: chatGenerate.toolsPolicy && _toOpenAIResponsesToolChoice(chatGenerate.toolsPolicy),
     // parallel_tool_calls: undefined, // response if unset: true
 
@@ -100,15 +101,18 @@ export function aixToOpenAIResponses(
     payload.top_p = model.topP;
   }
 
-  // JSON output: not implemented yet - will need a schema definition (similar to the tool args definition)
-  if (jsonOutput) {
-    console.warn('[DEV] notImplemented: responses: jsonOutput');
-    // payload.text = {
-    //   format: {
-    //     type: 'json_schema',
-    //   },
-    // };
-  }
+  // Structured Outputs - JSON output grammar
+  if (model.strictJsonOutput)
+    payload.text = {
+      ...payload.text,
+      format: {
+        type: 'json_schema',
+        name: model.strictJsonOutput.name || 'response',
+        description: model.strictJsonOutput.description,
+        schema: model.strictJsonOutput.schema,
+        strict: true,
+      },
+    };
 
   // GPT-5 Verbosity: Add to existing text config or create new one
   if (model.vndOaiVerbosity) {
@@ -126,14 +130,15 @@ export function aixToOpenAIResponses(
   const skipHostedToolsDueToCustomTools = hasCustomTools && hasRestrictivePolicy;
 
   // Tool: Web Search: for search and deep research models
-  const requestWebSearchTool = hotFixForceWebSearchTool || !!model.vndOaiWebSearchContext || !!model.userGeolocation;
+  const requestWebSearchTool = !!model.vndOaiWebSearchContext || !!model.userGeolocation;
   if (requestWebSearchTool && !skipHostedToolsDueToCustomTools) {
     /**
-     * NOTE: as of 2025-09-12, we still get the "Hosted tool 'web_search_preview' is not supported with gpt-5-mini-2025-08-07"
+     * NOTE: as of 2025-09-12, we still get the "Hosted tool 'web_search' is not supported with gpt-5-mini-2025-08-07"
      *       warning from Azure OpenAI V1. We shall check in the future if this is resolved.
      */
     if (isDialectAzure) {
-      // Azure OpenAI doesn't support web search tool yet (as of Aug 2025)
+      // [2025-11-18] Azure OpenAI still doesn't support web search tool yet - confirmed
+      // [2025-09-12] Azure OpenAI doesn't support web search tool yet, and we also remove the "parameter" so we shall not come here
       console.log('[DEV] Azure OpenAI Responses: skipping web search tool due to Azure limitations');
     } else if (payload.reasoning?.effort === 'minimal') {
       // Web search is not supported when the reasoning effort is 'minimal'
@@ -144,12 +149,13 @@ export function aixToOpenAIResponses(
       if (!payload.tools?.length)
         payload.tools = [];
       const webSearchTool: TRequestTool = {
-        type: 'web_search_preview',
+        type: 'web_search',
         search_context_size: model.vndOaiWebSearchContext ?? undefined,
         user_location: model.userGeolocation && {
           type: 'approximate',
           ...model.userGeolocation, // .city, .country, .region, .timezone
         },
+        external_web_access: true, // true: live internet access, false: cache-only
       };
       payload.tools.push(webSearchTool);
 
@@ -164,26 +170,30 @@ export function aixToOpenAIResponses(
   // Tool: Image Generation: configurable per model
   const requestImageGenerationTool = !!model.vndOaiImageGeneration;
   if (requestImageGenerationTool && !skipHostedToolsDueToCustomTools) {
-    if (isDialectAzure) {
-      // Azure OpenAI may not support image generation tool yet
-      console.log('[DEV] Azure OpenAI Responses: skipping image generation tool due to Azure limitations');
-    } else {
-      // Add the image generation tool to the request
-      if (!payload.tools?.length)
-        payload.tools = [];
+    /**
+     * [2025-11-18] Azure OpenAI Image Generation limitations:
+     * - does not support image generation tool at all ({"type":"error","error":{"type":"invalid_request_error","code":null,"message":"There was an issue with your request. Please check your inputs and try again","param":null}})
+     * - does not support WebP output format
+     */
+    const azureImageWorkarounds = isDialectAzure;
+    if (azureImageWorkarounds)
+      console.warn('[DEV] Azure OpenAI Responses: trying image generation tool despite Azure limitations');
 
-      // Map enum values to tool configuration
-      const imageMode = model.vndOaiImageGeneration;
-      const imageGenerationTool: Extract<TRequestTool, { type: 'image_generation' }> = {
-        type: 'image_generation',
-        ...(imageMode === 'mq' ? { quality: 'medium' } : { /* quality: 'high' -- auto */ }),
-        // ...(imageMode === 'hq' ? ... auto ... ),
-        ...(imageMode === 'hq_edit' && { input_fidelity: 'high' }),
-        ...(imageMode !== 'hq_png' && { output_format: 'webp' }),
-        moderation: 'low',
-      };
-      payload.tools.push(imageGenerationTool);
-    }
+    // Add the image generation tool to the request
+    if (!payload.tools?.length)
+      payload.tools = [];
+
+    // Map enum values to tool configuration
+    const imageMode = model.vndOaiImageGeneration;
+    const imageGenerationTool: Extract<TRequestTool, { type: 'image_generation' }> = {
+      type: 'image_generation',
+      ...(imageMode === 'mq' ? { quality: 'medium' } : { /* quality: 'high' -- auto */ }),
+      // ...(imageMode === 'hq' ? ... auto ... ),
+      ...(imageMode === 'hq_edit' && { input_fidelity: 'high' }),
+      ...(imageMode !== 'hq_png' && !azureImageWorkarounds && { output_format: 'webp' }),
+      moderation: 'low',
+    };
+    payload.tools.push(imageGenerationTool);
   }
 
 
@@ -477,7 +487,7 @@ function _toOpenAIResponsesRequestInput(systemMessage: AixMessages_SystemMessage
   };
 }
 
-function _toOpenAIResponsesTools(itds: AixTools_ToolDefinition[]): NonNullable<TRequestTool[]> {
+function _toOpenAIResponsesTools(itds: AixTools_ToolDefinition[], strictToolInvocations: boolean): NonNullable<TRequestTool[]> {
   return itds.map(itd => {
     const itdType = itd.type;
     switch (itdType) {
@@ -492,7 +502,9 @@ function _toOpenAIResponsesTools(itds: AixTools_ToolDefinition[]): NonNullable<T
             type: 'object',
             properties: input_schema?.properties ?? {},
             required: input_schema?.required,
+            ...(strictToolInvocations ? { additionalProperties: false } : {}), // required for strict tool invocations
           },
+          ...(strictToolInvocations ? { strict: true } : {}), // enable strict (grammar-constrained) tool invocation inputs
         };
 
       case 'code_execution':

@@ -7,6 +7,8 @@ import TelegramIcon from '@mui/icons-material/Telegram';
 import { ChatMessageMemo } from '../../../apps/chat/components/message/ChatMessage';
 
 import type { DLLMId } from '~/common/stores/llms/llms.types';
+import type { DMessageFragment, DMessageFragmentId } from '~/common/stores/chat/chat.fragments';
+import type { DMessageId } from '~/common/stores/chat/chat.message';
 import { messageFragmentsReduceText } from '~/common/stores/chat/chat.message';
 
 import { GoodTooltip } from '~/common/components/GoodTooltip';
@@ -59,6 +61,7 @@ export function Fusion(props: {
   const [llmOrNull, llmComponent, llmVendorIcon] = useLLMSelect(llmId, setLlmId, {
     label: '',
     disabled: isFusing,
+    showStarFilter: true,
   });
 
   // hide selector when fusion starts
@@ -102,6 +105,20 @@ export function Fusion(props: {
   const handleToggleFusionGather = React.useCallback(() => {
     toggleFusionGathering(props.fusionId);
   }, [props.fusionId, toggleFusionGathering]);
+
+  const handleFragmentDelete = React.useCallback((messageId: DMessageId, fragmentId: DMessageFragmentId) => {
+    const { fusions, fusionDeleteFragment } = props.beamStore.getState();
+    const fusion = fusions.find(f => f.outputDMessage?.id === messageId);
+    if (fusion)
+      fusionDeleteFragment(fusion.fusionId, fragmentId);
+  }, [props.beamStore]);
+
+  const handleFragmentReplace = React.useCallback((messageId: DMessageId, fragmentId: DMessageFragmentId, newFragment: DMessageFragment) => {
+    const { fusions, fusionReplaceFragment } = props.beamStore.getState();
+    const fusion = fusions.find(f => f.outputDMessage?.id === messageId);
+    if (fusion)
+      fusionReplaceFragment(fusion.fusionId, fragmentId, newFragment);
+  }, [props.beamStore]);
 
   // escape hatch: no factory, no fusion - nothing to do
   if (!fusion || !factory)
@@ -167,6 +184,8 @@ export function Fusion(props: {
               hideAvatar
               showUnsafeHtmlCode={true}
               adjustContentScaling={-1}
+              onMessageFragmentDelete={handleFragmentDelete}
+              onMessageFragmentReplace={handleFragmentReplace}
               sx={!cardScrolling ? beamCardMessageSx : beamCardMessageScrollingSx}
             />
           )}

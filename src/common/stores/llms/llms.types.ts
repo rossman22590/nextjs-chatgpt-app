@@ -51,6 +51,7 @@ export interface DLLM {
   userParameters?: DModelParameterValues; // user has set these parameters
   userContextTokens?: DLLMContextTokens;       // user override for context window
   userMaxOutputTokens?: DLLMMaxOutputTokens;   // user override for max output tokens
+  userPricing?: DModelPricing;                 // user override for model pricing
 }
 
 
@@ -121,6 +122,18 @@ export function getLLMMaxOutputTokens(llm: DLLM | null): DLLMMaxOutputTokens | u
   return llm.userMaxOutputTokens ?? llm.maxOutputTokens;
 }
 
+/**
+ * Returns the effective pricing for a model.
+ * Checks user override first, then falls back to model default.
+ */
+export function getLLMPricing(llm: DLLM | null): DModelPricing | undefined {
+  if (!llm)
+    return undefined; // undefined if no model
+
+  // Check user override first, then fall back to model default
+  return llm.userPricing ?? llm.pricing;
+}
+
 
 /// Interfaces ///
 
@@ -129,6 +142,7 @@ export type DModelInterfaceV1 =
   | 'oai-chat'
   | 'oai-chat-fn'
   | 'oai-chat-json'
+  | 'ant-tools-search'
   | 'oai-chat-vision'
   | 'oai-chat-reasoning'
   | 'oai-complete'
@@ -153,6 +167,7 @@ export type DModelInterfaceV1 =
 export const LLM_IF_OAI_Chat: DModelInterfaceV1 = 'oai-chat';
 export const LLM_IF_OAI_Fn: DModelInterfaceV1 = 'oai-chat-fn';
 export const LLM_IF_OAI_Json: DModelInterfaceV1 = 'oai-chat-json'; // for Structured Outputs (or JSON mode at worst)
+export const LLM_IF_ANT_ToolsSearch: DModelInterfaceV1 = 'ant-tools-search';
 // export const LLM_IF_OAI_JsonSchema: ... future?
 export const LLM_IF_OAI_Vision: DModelInterfaceV1 = 'oai-chat-vision';
 export const LLM_IF_OAI_Reasoning: DModelInterfaceV1 = 'oai-chat-reasoning';
@@ -180,6 +195,7 @@ export const LLMS_ALL_INTERFACES = [
   LLM_IF_OAI_Vision,          // GREAT TO HAVE - image inputs
   LLM_IF_OAI_Fn,              // IMPORTANT - support for function calls
   LLM_IF_OAI_Json,            // not used for now: structured outputs
+  LLM_IF_ANT_ToolsSearch,     // Anthropic tool: Tools Search
   // Generalized capabilities
   LLM_IF_OAI_Reasoning,       // COSMETIC ONLY - may show a 'brain' icon in supported screens
   LLM_IF_Outputs_Audio,       // COSMETIC ONLY FOR NOW - Models that generate audio output (TTS models)

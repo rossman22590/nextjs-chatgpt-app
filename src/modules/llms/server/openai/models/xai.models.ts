@@ -5,14 +5,53 @@ import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 import { LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision, LLM_IF_Tools_WebSearch } from '~/common/stores/llms/llms.types';
 
 import type { ModelDescriptionSchema } from '../../llm.server.types';
-import { fromManualMapping, KnownModel, ManualMappings } from './models.data';
-import { openAIAccess, OpenAIAccessSchema } from '../openai.router';
+import { fromManualMapping, KnownModel, ManualMappings } from '../../models.mappings';
+import { openAIAccess, OpenAIAccessSchema } from '../openai.access';
 
 
 // Known xAI Models - Manual Mappings
 // List on: https://docs.x.ai/docs/models?cluster=us-east-1
-// Verified: 2025-10-15
+// Verified: 2025-11-19
+
+// Tiered pricing for Grok 4.1 Fast models (both reasoning and non-reasoning)
+const PRICE_41 = {
+  input: [{ upTo: 128000, price: 0.2 }, { upTo: null, price: 0.4 }],
+  output: [{ upTo: 128000, price: 0.5 }, { upTo: null, price: 1.0 }],
+  cache: { cType: 'oai-ac' as const, read: 0.05 },
+};
+
+// Tiered pricing for Grok 4.0 Fast models (both reasoning and non-reasoning)
+const PRICE_40 = {
+  input: [{ upTo: 128000, price: 0.2 }, { upTo: null, price: 0.4 }],
+  output: [{ upTo: 128000, price: 0.5 }, { upTo: null, price: 1.0 }],
+  cache: { cType: 'oai-ac' as const, read: 0.05 },
+};
+
 const _knownXAIChatModels: ManualMappings = [
+
+  // Grok 4.1
+  {
+    idPrefix: 'grok-4-1-fast-reasoning',
+    label: 'Grok 4.1 Fast Reasoning',
+    description: 'Next generation frontier multimodal model optimized for high-performance agentic tool calling with a 2M token context window. Trained specifically for real-world enterprise use cases with exceptional performance on agentic workflows.',
+    contextWindow: 2000000,
+    maxCompletionTokens: undefined,
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Vision, LLM_IF_Tools_WebSearch, LLM_IF_OAI_Reasoning],
+    parameterSpecs: [{ paramId: 'llmVndXaiSearchMode' }, { paramId: 'llmVndXaiSearchSources' }, { paramId: 'llmVndXaiSearchDateFilter' }],
+    chatPrice: PRICE_41,
+    benchmark: { cbaElo: 1483 }, // grok-4-1-fast-reasoning
+  },
+  {
+    idPrefix: 'grok-4-1-fast-non-reasoning',
+    label: 'Grok 4.1 Fast', // 'Grok 4.1 Fast Non-Reasoning'
+    description: 'Next generation frontier multimodal model optimized for high-performance agentic tool calling with a 2M token context window. Non-reasoning variant for instant responses.',
+    contextWindow: 2000000,
+    maxCompletionTokens: undefined,
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Vision, LLM_IF_Tools_WebSearch],
+    parameterSpecs: [{ paramId: 'llmVndXaiSearchMode' }, { paramId: 'llmVndXaiSearchSources' }, { paramId: 'llmVndXaiSearchDateFilter' }],
+    chatPrice: PRICE_41,
+    benchmark: { cbaElo: 1465 }, // grok-4-1-fast-non-reasoning
+  },
 
   // Grok 4
   {
@@ -23,8 +62,8 @@ const _knownXAIChatModels: ManualMappings = [
     maxCompletionTokens: undefined,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Vision, LLM_IF_Tools_WebSearch, LLM_IF_OAI_Reasoning],
     parameterSpecs: [{ paramId: 'llmVndXaiSearchMode' }, { paramId: 'llmVndXaiSearchSources' }, { paramId: 'llmVndXaiSearchDateFilter' }],
-    chatPrice: { input: 0.2, output: 0.5, cache: { cType: 'oai-ac', read: 0.05 } }, // Price increases for >128K tokens: input $0.40, output $1.00
-    benchmark: { cbaElo: 1420 }, // Similar to grok-4-0709, slight adjustment for cost model
+    chatPrice: PRICE_40,
+    benchmark: { cbaElo: 1420 },
   },
   {
     idPrefix: 'grok-4-fast-non-reasoning',
@@ -34,8 +73,8 @@ const _knownXAIChatModels: ManualMappings = [
     maxCompletionTokens: undefined,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Vision, LLM_IF_Tools_WebSearch],
     parameterSpecs: [{ paramId: 'llmVndXaiSearchMode' }, { paramId: 'llmVndXaiSearchSources' }, { paramId: 'llmVndXaiSearchDateFilter' }],
-    chatPrice: { input: 0.2, output: 0.5, cache: { cType: 'oai-ac', read: 0.05 } }, // Price increases for >128K tokens: input $0.40, output $1.00
-    benchmark: { cbaElo: 1420 - 2 }, // slightly lower than reasoning variant
+    chatPrice: PRICE_40,
+    benchmark: { cbaElo: 1409 },
   },
   {
     idPrefix: 'grok-4-0709',
@@ -46,7 +85,7 @@ const _knownXAIChatModels: ManualMappings = [
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_Vision, LLM_IF_Tools_WebSearch, LLM_IF_OAI_Reasoning],
     parameterSpecs: [{ paramId: 'llmVndXaiSearchMode' }, { paramId: 'llmVndXaiSearchSources' }, { paramId: 'llmVndXaiSearchDateFilter' }],
     chatPrice: { input: 3, output: 15, cache: { cType: 'oai-ac', read: 0.75 } },
-    benchmark: { cbaElo: 1415 }, // grok-4-0709
+    benchmark: { cbaElo: 1415 + 6 }, // grok-4-0709 (+6 to stay on top of the fast)
   },
 
   // Grok 3
@@ -140,9 +179,10 @@ const _knownXAIChatModels: ManualMappings = [
     interfaces: [],
   },
   {
+    hidden: true, // Not listed in official docs as of 2025-10-28
     idPrefix: 'grok-2-1212',
     label: 'Grok 2 (1212)',
-    description: 'xAI model grok-2-1212 with text input capabilities. Supports text generation with a 131,072 token context window.',
+    description: 'xAI model grok-2-1212 with text input capabilities. Supports text generation with a 131,072 token context window. (Not available as of October 2025)',
     contextWindow: 131072,
     maxCompletionTokens: undefined,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json],
@@ -178,7 +218,7 @@ const _knownXAIChatModels: ManualMappings = [
 
 
 // xAI Model Descriptions
-export async function xaiModelDescriptions(access: OpenAIAccessSchema): Promise<ModelDescriptionSchema[]> {
+export async function xaiFetchModelDescriptions(access: OpenAIAccessSchema): Promise<ModelDescriptionSchema[]> {
 
   // List models
   const { headers, url } = openAIAccess(access, null, '/v1/language-models');
@@ -248,6 +288,8 @@ export async function xaiModelDescriptions(access: OpenAIAccessSchema): Promise<
 
 // manual sort order - your desired order
 const _xaiIdStartsWithOrder = [
+  'grok-4-1-fast-reasoning',
+  'grok-4-1-fast-non-reasoning',
   'grok-code-fast-1',
   'grok-4-fast-reasoning',
   'grok-4-fast-non-reasoning',

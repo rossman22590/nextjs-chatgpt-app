@@ -35,6 +35,7 @@ GROQ_API_KEY=
 LOCALAI_API_HOST=
 LOCALAI_API_KEY=
 MISTRAL_API_KEY=
+MOONSHOT_API_KEY=
 OLLAMA_API_HOST=
 OPENPIPE_API_KEY=
 OPENROUTER_API_KEY=
@@ -105,6 +106,7 @@ requiring the user to enter an API key
 | `LOCALAI_API_HOST`          | Sets the URL of the LocalAI server, or defaults to http://127.0.0.1:8080                                       | Optional                                                          |
 | `LOCALAI_API_KEY`           | The (Optional) API key for LocalAI                                                                             | Optional                                                          |
 | `MISTRAL_API_KEY`           | The API key for Mistral                                                                                        | Optional                                                          |
+| `MOONSHOT_API_KEY`          | The API key for Moonshot AI                                                                                    | Optional                                                          |
 | `OLLAMA_API_HOST`           | Changes the backend host for the Ollama vendor. See [config-local-ollama.md](config-local-ollama.md)           |                                                                   |
 | `OPENPIPE_API_KEY`          | The API key for OpenPipe                                                                                       | Optional                                                          |
 | `OPENROUTER_API_KEY`        | The API key for OpenRouter                                                                                     | Optional                                                          |
@@ -130,10 +132,11 @@ Enable the app to Talk, Draw, and Google things up.
 
 | Variable                   | Description                                                                                                             |
 |:---------------------------|:------------------------------------------------------------------------------------------------------------------------|
-| **Text-To-Speech**         | [ElevenLabs](https://elevenlabs.io/) is a high quality speech synthesis service                                         |
+| **Text-To-Speech**         | ElevenLabs, OpenAI TTS, LocalAI, and browser Web Speech API are supported                                               |
 | `ELEVENLABS_API_KEY`       | ElevenLabs API Key - used for calls, etc.                                                                               |
 | `ELEVENLABS_API_HOST`      | Custom host for ElevenLabs                                                                                              |
 | `ELEVENLABS_VOICE_ID`      | Default voice ID for ElevenLabs                                                                                         |
+|                            | *Note: OpenAI TTS and LocalAI TTS reuse credentials from your configured LLM services (no separate env vars needed)*   |
 | **Google Custom Search**   | [Google Programmable Search Engine](https://programmablesearchengine.google.com/about/)  produces links to pages        |
 | `GOOGLE_CLOUD_API_KEY`     | Google Cloud API Key, used with the '/react' command - [Link to GCP](https://console.cloud.google.com/apis/credentials) |
 | `GOOGLE_CSE_ID`            | Google Custom/Programmable Search Engine ID - [Link to PSE](https://programmablesearchengine.google.com/)               |

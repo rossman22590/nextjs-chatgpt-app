@@ -59,14 +59,12 @@ const _frontendPkgVersion = _frontendBuild.pkgVersion ?? 'open/main';
 export const newsFrontendTimestamp = _frontendBuild.timestamp;
 
 export const DevNewsItem: NewsItem = {
-  versionCode: _frontendPkgVersion,
+  versionCode: 'DEV',
   versionName: 'Development Build',
   versionDate: undefined,
   items: [
     { text: <>You&apos;re running an unsupported <B>developer build</B> of Big-AGI Open {_frontendPkgVersion}</> },
-    { text: <>This branch carries breaking features that are subject to change</> },
     { text: <>Please report screenshots of breakages and console error messages</> },
-    { text: <>Do not use, no cloud backups</> },
     { text: <ExternalLink href='https://big-agi.com'>Back to the official version</ExternalLink> },
   ],
 } as const;
@@ -74,9 +72,24 @@ export const DevNewsItem: NewsItem = {
 // news and feature surfaces
 export const NewsItems: NewsItem[] = [
   {
+    versionCode: '2.0.2',
+    versionName: 'Heavy Critters',
+    versionDate: new Date('2025-12-01T06:00:00Z'), // 2.0.2
+    // versionDate: new Date('2025-11-24T23:30:00Z'), // 2.0.1
+    items: [
+      { text: <><B>New in 2.0.2</B> Speech synthesis with Web Speech, LocalAI, OpenAI and more</> },
+      { text: <><B>Opus 4.5</B>, <B>Gemini 3 Pro</B>, <B>Nano Banana Pro</B>, <B>Grok 4.1</B>, <B>GPT-5.1</B>, <B>Kimi K2</B></> },
+      { text: <><B>Image Generation</B> with Azure and LocalAI providers, in addition to OpenAI</> },
+      { text: <>Enhanced <B>OpenRouter</B> integration with auto-capabilities and reasoning</> },
+      { text: <>Call transcripts, generate persona images, search button in beams</> },
+      { text: <>Starred models, errors resilience, 278 fixes</> },
+      { text: <ExternalLink href='https://github.com/enricoros/big-agi/issues/new?template=ai-triage.yml'>AI-Automatic feature development</ExternalLink> },
+    ],
+  },
+  {
     versionCode: '2.0.0',
     versionName: 'Open',
-    versionDate: new Date('2025-10-06T15:00:00Z'),
+    versionDate: new Date('2025-10-31T15:00:00Z'),
     versionCoverImage: coverV200,
     items: [
       { text: <><B wow>Big-AGI Open</B> is ready and more productive and faster than ever, with:</> },

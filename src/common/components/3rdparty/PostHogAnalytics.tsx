@@ -9,10 +9,10 @@ export const hasPostHogAnalytics = !!process.env.NEXT_PUBLIC_POSTHOG_KEY;
 
 
 // global to survive route changes
-let _posthog: undefined | PostHog | null = undefined; // underined: not loaded, null: loading or opt-out, PostHog: loaded
+let _posthog: undefined | PostHog | null = undefined; // undefined: not loaded, null: loading or opt-out, PostHog: loaded
 
 
-// unused yet
+// noinspection JSUnusedGlobalSymbols - unused yet
 export function posthogAnalyticsOptOut() {
   if (isBrowser) {
     localStorage.setItem('app-analytics-posthog-optout', 'true');
@@ -20,10 +20,10 @@ export function posthogAnalyticsOptOut() {
   }
 }
 
-// unused yet
-export function posthogCaptureEvent(eventName: string, properties?: Properties) {
+export function posthogCaptureEvent(eventName: string, properties?: Properties, options?: { sendInstantly?: boolean }) {
   if (isBrowser && hasPostHogAnalytics) {
-    _posthog?.capture(eventName, properties);
+    // For events before navigation (e.g., login button clicks), send immediately
+    _posthog?.capture(eventName, properties, options?.sendInstantly ? { send_instantly: true } : undefined);
   }
 }
 
@@ -33,8 +33,9 @@ export function posthogCaptureException(error: Error | unknown, additionalProper
   }
 }
 
-
-// unused yet
+/**
+ * Posthog Identify - Login
+ */
 export function posthogUser(userId: string, userProperties?: Record<string, any>) {
   if (isBrowser && hasPostHogAnalytics) {
     _posthog?.identify(userId, {
@@ -43,6 +44,14 @@ export function posthogUser(userId: string, userProperties?: Record<string, any>
       ...userProperties,
     });
   }
+}
+
+/**
+ * Posthog Reset - Logout
+ */
+export function posthogReset() {
+  if (isBrowser && hasPostHogAnalytics)
+    _posthog?.reset();
 }
 
 

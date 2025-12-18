@@ -1,4 +1,4 @@
-import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.router';
+import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.access';
 
 import { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_ChatMessage, AixMessages_SystemMessage, AixParts_DocPart, AixParts_InlineAudioPart, AixParts_MetaInReferenceToPart, AixTools_ToolDefinition, AixTools_ToolsPolicy } from '../../../api/aix.wiretypes';
 import { OpenAIWire_API_Chat_Completions, OpenAIWire_ContentParts, OpenAIWire_Messages } from '../../wiretypes/openai.wiretypes';
@@ -29,7 +29,7 @@ const approxSystemMessageJoiner = '\n\n---\n\n';
 type TRequest = OpenAIWire_API_Chat_Completions.Request;
 type TRequestMessages = TRequest['messages'];
 
-export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model: AixAPI_Model, _chatGenerate: AixAPIChatGenerate_Request, jsonOutput: boolean, streaming: boolean): TRequest {
+export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model: AixAPI_Model, _chatGenerate: AixAPIChatGenerate_Request, streaming: boolean): TRequest {
 
   // Pre-process CGR - approximate spill of System to User message
   const chatGenerate = aixSpillSystemToUser(_chatGenerate);
@@ -38,12 +38,10 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
   const hotFixAlternateUserAssistantRoles = openAIDialect === 'deepseek' || openAIDialect === 'perplexity';
   const hotFixRemoveEmptyMessages = openAIDialect === 'perplexity';
   const hotFixRemoveStreamOptions = openAIDialect === 'azure' || openAIDialect === 'mistral';
-  const hotFixSquashMultiPartText = openAIDialect === 'deepseek';
   const hotFixThrowCannotFC =
     // [OpenRouter] 2025-10-02: do not throw, rather let it fail if upstream has issues
     // openAIDialect === 'openrouter' || /* OpenRouter FC support is not good (as of 2024-07-15) */
     openAIDialect === 'perplexity';
-  const hotFixVndORIncludeReasoning = openAIDialect === 'openrouter'; // [OpenRouter, 2025-01-24] has a special `include_reasoning` field to show the chain of thought
 
   // Model incompatibilities -> Hotfixes
 
@@ -61,8 +59,6 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
   let chatMessages = _toOpenAIMessages(chatGenerate.systemMessage, chatGenerate.chatSequence, hotFixOpenAIOFamily);
 
   // Apply hotfixes
-  if (hotFixSquashMultiPartText)
-    chatMessages = _fixSquashMultiPartText(chatMessages);
 
   if (hotFixRemoveEmptyMessages)
     chatMessages = _fixRemoveEmptyMessages(chatMessages);
@@ -71,11 +67,15 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     chatMessages = _fixAlternateUserAssistantRoles(chatMessages);
 
 
+  // constrained output modes - both JSON and tool invocations
+  // const strictJsonOutput = !!model.strictJsonOutput;
+  const strictToolInvocations = !!model.strictToolInvocations;
+
   // Construct the request payload
   let payload: TRequest = {
     model: model.id,
     messages: chatMessages,
-    tools: chatGenerate.tools && _toOpenAITools(chatGenerate.tools),
+    tools: chatGenerate.tools && _toOpenAITools(chatGenerate.tools, strictToolInvocations),
     tool_choice: chatGenerate.toolsPolicy && _toOpenAIToolChoice(openAIDialect, chatGenerate.toolsPolicy),
     parallel_tool_calls: undefined,
     max_tokens: model.maxTokens !== undefined ? model.maxTokens : undefined,
@@ -84,15 +84,19 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     n: hotFixOnlySupportN1 ? undefined : 0, // NOTE: we choose to not support this at the API level - most downstram ecosystem supports 1 only, which is the default
     stream: streaming,
     stream_options: streaming ? { include_usage: true } : undefined,
-    response_format: jsonOutput ? { type: 'json_object' } : undefined,
+    response_format: model.strictJsonOutput ? {
+      type: 'json_schema',
+      json_schema: {
+        name: model.strictJsonOutput.name || 'response',
+        description: model.strictJsonOutput.description,
+        schema: model.strictJsonOutput.schema,
+        strict: true,
+      },
+    } : undefined,
     seed: undefined,
     stop: undefined,
     user: undefined,
   };
-
-  // [OpenRouter, 2025-01-24]
-  if (hotFixVndORIncludeReasoning)
-    payload.include_reasoning = true;
 
   // Top-P instead of temperature
   if (model.topP !== undefined) {
@@ -156,6 +160,15 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     _fixVndOaiRestoreMarkdown_Inline(payload);
 
 
+  // [OpenRouter] Vendor-specific web search (native or Exa)
+  if (openAIDialect === 'openrouter' && model.vndOrtWebSearch === 'auto')
+    payload.plugins = [...(payload.plugins || []), {
+      id: 'web',
+      // engine is optional - when undefined, OpenRouter uses native for supported models, falls back to Exa
+      // max_results: 5, // could be configurable in the future
+      // search_prompt: undefined, // could be configurable in the future
+    }];
+
   // [xAI] Vendor-specific extensions for Live Search
   if (openAIDialect === 'xai' && model.vndXaiSearchMode && model.vndXaiSearchMode !== 'off') {
     const search_parameters: any = {
@@ -187,6 +200,15 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     payload.search_parameters = search_parameters;
   }
 
+  // [Moonshot] Kimi's $web_search builtin function
+  if (openAIDialect === 'moonshot' && model.vndMoonshotWebSearch === 'auto' && !skipWebSearchDueToCustomTools)
+    payload.tools = [...(payload.tools || []), {
+      type: 'builtin_function',
+      function: {
+        name: '$web_search',
+      },
+    }];
+
   // [Perplexity] Vendor-specific extensions for search models
   if (openAIDialect === 'perplexity') {
     // Reasoning effort (reuses OpenAI parameter)
@@ -206,20 +228,35 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     }
   }
 
-  // [OpenRouter] -> [Anthropic] via OpenAI API - https://openrouter.ai/docs/use-cases/reasoning-tokens
-  if (openAIDialect === 'openrouter' && model.vndAntThinkingBudget !== undefined) {
+  // [OpenRouter, 2025-11-11] Unified reasoning parameter - supports both token-based and effort-based control
+  if (openAIDialect === 'openrouter') {
 
-    // vndAntThinkingBudget's presence indicates a user preference:
-    // - [x] a number, which is the budget in tokens
-    // - [ ] null: shall disable thinking, but openrouter does not support this?
-    if (model.vndAntThinkingBudget === null) {
-      // simply not setting the reasoning field downgrades this to a non-thinking model
-      // console.warn('OpenRouter does not support disabling thinking of Anthropic models. Using default.');
-    } else {
-      payload.reasoning = {
-        max_tokens: model.vndAntThinkingBudget || 1024,
-      };
+    // Anthropic via OpenRouter
+    if (model.vndAntThinkingBudget !== undefined) {
+      // vndAntThinkingBudget's presence indicates a user preference:
+      // - a number: explicit token budget (1024-32000)
+      // - null: disable thinking (don't set reasoning field)
+      if (model.vndAntThinkingBudget === null) {
+        // If null, don't set reasoning field at all (disables thinking)
+      } else
+        payload.reasoning = { max_tokens: model.vndAntThinkingBudget || 8192 };
     }
+    // Gemini via OpenRouter
+    else if (model.vndGeminiThinkingBudget !== undefined)
+      payload.reasoning = { max_tokens: model.vndGeminiThinkingBudget || 8192 };
+    // OpenAI via OpenRouter
+    else if (model.vndOaiReasoningEffort && model.vndOaiReasoningEffort !== 'minimal' && model.vndOaiReasoningEffort !== 'none')
+      payload.reasoning = { effort: model.vndOaiReasoningEffort };
+
+    // FIX double-reasoning request - remove reasoning_effort after transferring it to reasoning (unless already set)
+    if (payload.reasoning_effort && payload.reasoning_effort !== 'minimal' && payload.reasoning_effort !== 'none') {
+      // we don't know which one takes precedence, so we prioritize .reasoning (OpenRouter) even if .reasoning_effort (OpenAI) is present
+      if (!payload.reasoning)
+        payload.reasoning = { effort: payload.reasoning_effort };
+      // Fix for `Only one of "reasoning" and "reasoning_effort" may be provided`
+      delete payload.reasoning_effort;
+    }
+
   }
 
   if (hotFixOpenAIOFamily)
@@ -308,17 +345,6 @@ function _fixRequestForOpenAIO1_maxCompletionTokens(payload: TRequest): TRequest
 function _fixRemoveStreamOptions(payload: TRequest): TRequest {
   const { stream_options, parallel_tool_calls, ...rest } = payload;
   return rest;
-}
-
-function _fixSquashMultiPartText(chatMessages: TRequestMessages): TRequestMessages {
-  // Convert multi-part text messages to single strings for older OpenAI dialects
-  return chatMessages.reduce((acc, message) => {
-    if (message.role === 'user' && Array.isArray(message.content))
-      acc.push({ role: message.role, content: message.content.filter(part => part.type === 'text').map(textPart => textPart.text).filter(text => !!text).join(hotFixSquashTextSeparator) });
-    else
-      acc.push(message);
-    return acc;
-  }, [] as TRequestMessages);
 }
 
 function _fixVndOaiRestoreMarkdown_Inline(payload: TRequest) {
@@ -595,7 +621,7 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chat
   return chatMessages;
 }
 
-function _toOpenAITools(itds: AixTools_ToolDefinition[]): NonNullable<TRequest['tools']> {
+function _toOpenAITools(itds: AixTools_ToolDefinition[], strictToolInvocations: boolean): NonNullable<TRequest['tools']> {
   return itds.map(itd => {
     const itdType = itd.type;
     switch (itdType) {
@@ -611,7 +637,9 @@ function _toOpenAITools(itds: AixTools_ToolDefinition[]): NonNullable<TRequest['
               type: 'object',
               properties: input_schema?.properties ?? {},
               required: input_schema?.required,
+              ...(strictToolInvocations ? { additionalProperties: false } : {}), // required for strict tool invocations
             },
+            ...(strictToolInvocations ? { strict: true } : {}), // enable strict (grammar-constrained) tool invocation inputs
           },
         };
 

@@ -1,5 +1,7 @@
 import type { IModelVendor } from '../IModelVendor';
-import type { OpenAIAccessSchema } from '../../server/openai/openai.router';
+import type { OpenAIAccessSchema } from '../../server/openai/openai.access';
+
+import { getLLMPricing } from '~/common/stores/llms/llms.types';
 
 import { ModelVendorOpenAI } from '../openai/openai.vendor';
 
@@ -11,6 +13,7 @@ export const isValidOpenRouterKey = (apiKey?: string) => !!apiKey && apiKey.star
 export interface DOpenRouterServiceSettings {
   oaiKey: string;
   oaiHost: string;
+  csf?: boolean;
 }
 
 /**
@@ -28,10 +31,14 @@ export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, Ope
   id: 'openrouter',
   name: 'OpenRouter',
   displayRank: 40,
+  displayGroup: 'popular',
   location: 'cloud',
   instanceLimit: 1,
   hasFreeModels: true,
   hasServerConfigKey: 'hasLlmOpenRouter',
+
+  /// client-side-fetch ///
+  csfAvailable: _csfOpenRouterAvailable,
 
   // functions
   initializeSetup: (): DOpenRouterServiceSettings => ({
@@ -40,6 +47,7 @@ export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, Ope
   }),
   getTransportAccess: (partialSetup): OpenAIAccessSchema => ({
     dialect: 'openrouter',
+    clientSideFetch: _csfOpenRouterAvailable(partialSetup) && !!partialSetup?.csf,
     oaiKey: partialSetup?.oaiKey || '',
     oaiOrg: '',
     oaiHost: partialSetup?.oaiHost || '',
@@ -51,7 +59,7 @@ export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, Ope
   rateLimitChatGenerate: async (llm) => {
     const now = Date.now();
     const elapsed = now - nextGenerationTs;
-    const wait = llm.pricing?.chat?._isFree
+    const wait = getLLMPricing(llm)?.chat?._isFree
       ? 5000 + 100 /* 5 seconds for free call, plus some safety margin */
       : 100;
 
@@ -72,3 +80,7 @@ export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, Ope
 
 // rate limit timestamp
 let nextGenerationTs = 0;
+
+function _csfOpenRouterAvailable(s?: Partial<DOpenRouterServiceSettings>) {
+  return !!s?.oaiKey;
+}

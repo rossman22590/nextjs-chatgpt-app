@@ -44,6 +44,7 @@ export function AppNews() {
       justifyContent: 'center',
       alignItems: 'center',
       p: { xs: 3, md: 6 },
+      // backgroundColor: 'background.level2'
     }}>
       
       <Box sx={{

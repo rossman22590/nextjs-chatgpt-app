@@ -1,3 +1,5 @@
+import type { AixAPI_Access } from '~/modules/aix/server/api/aix.wiretypes';
+
 import { ModelVendorAlibaba } from './alibaba/alibaba.vendor';
 import { ModelVendorAnthropic } from './anthropic/anthropic.vendor';
 import { ModelVendorAzure } from './azure/azure.vendor';
@@ -7,6 +9,7 @@ import { ModelVendorGroq } from './groq/groq.vendor';
 import { ModelVendorLMStudio } from './lmstudio/lmstudio.vendor';
 import { ModelVendorLocalAI } from './localai/localai.vendor';
 import { ModelVendorMistral } from './mistral/mistral.vendor';
+import { ModelVendorMoonshot } from './moonshot/moonshot.vendor';
 import { ModelVendorOllama } from './ollama/ollama.vendor';
 import { ModelVendorOpenAI } from './openai/openai.vendor';
 import { ModelVendorOpenPipe } from './openpipe/openpipe.vendor';
@@ -28,6 +31,7 @@ export type ModelVendorId =
   | 'lmstudio'
   | 'localai'
   | 'mistral'
+  | 'moonshot'
   | 'ollama'
   | 'openai'
   | 'openpipe'
@@ -48,6 +52,7 @@ const MODEL_VENDOR_REGISTRY: Record<ModelVendorId, IModelVendor> = {
   lmstudio: ModelVendorLMStudio,
   localai: ModelVendorLocalAI,
   mistral: ModelVendorMistral,
+  moonshot: ModelVendorMoonshot,
   ollama: ModelVendorOllama,
   openai: ModelVendorOpenAI,
   openpipe: ModelVendorOpenPipe,
@@ -64,7 +69,7 @@ export function findAllModelVendors(): IModelVendor[] {
   return modelVendors;
 }
 
-export function findModelVendor<TServiceSettings extends object = {}, TAccess = unknown>(
+export function findModelVendor<TServiceSettings extends object = {}, TAccess = AixAPI_Access>(
   vendorId?: ModelVendorId,
 ): IModelVendor<TServiceSettings, TAccess> | null {
   return vendorId ? (MODEL_VENDOR_REGISTRY[vendorId] as IModelVendor<TServiceSettings, TAccess>) ?? null : null;

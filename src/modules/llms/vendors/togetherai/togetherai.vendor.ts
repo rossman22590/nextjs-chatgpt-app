@@ -1,5 +1,5 @@
 import type { IModelVendor } from '../IModelVendor';
-import type { OpenAIAccessSchema } from '../../server/openai/openai.router';
+import type { OpenAIAccessSchema } from '../../server/openai/openai.access';
 
 import { ModelVendorOpenAI } from '../openai/openai.vendor';
 
@@ -8,15 +8,20 @@ interface DTogetherAIServiceSettings {
   togetherKey: string;
   togetherHost: string;
   togetherFreeTrial: boolean;
+  csf?: boolean;
 }
 
 export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, OpenAIAccessSchema> = {
   id: 'togetherai',
   name: 'Together AI',
   displayRank: 34,
+  displayGroup: 'cloud',
   location: 'cloud',
   instanceLimit: 1,
   hasServerConfigKey: 'hasLlmTogetherAI',
+
+  /// client-side-fetch ///
+  csfAvailable: _csfTogetherAIAvailable,
 
   // functions
   initializeSetup: () => ({
@@ -29,6 +34,7 @@ export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, Ope
   },
   getTransportAccess: (partialSetup) => ({
     dialect: 'togetherai',
+    clientSideFetch: _csfTogetherAIAvailable(partialSetup) && !!partialSetup?.csf,
     oaiKey: partialSetup?.togetherKey || '',
     oaiOrg: '',
     oaiHost: partialSetup?.togetherHost || '',
@@ -61,3 +67,7 @@ export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, Ope
 
 // rate limit timestamp
 let nextGenerationTs = 0;
+
+function _csfTogetherAIAvailable(s?: Partial<DTogetherAIServiceSettings>) {
+  return !!s?.togetherKey;
+}

@@ -21,7 +21,6 @@ import InsertLinkIcon from '@mui/icons-material/InsertLink';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
-import RecordVoiceOverOutlinedIcon from '@mui/icons-material/RecordVoiceOverOutlined';
 import ReplayIcon from '@mui/icons-material/Replay';
 import ReplyAllRoundedIcon from '@mui/icons-material/ReplyAllRounded';
 import ReplyRoundedIcon from '@mui/icons-material/ReplyRounded';
@@ -40,11 +39,12 @@ import { CloseablePopup } from '~/common/components/CloseablePopup';
 import { DMessage, DMessageId, DMessageUserFlag, DMetaReferenceItem, MESSAGE_FLAG_AIX_SKIP, MESSAGE_FLAG_NOTIFY_COMPLETE, MESSAGE_FLAG_STARRED, MESSAGE_FLAG_VND_ANT_CACHE_AUTO, MESSAGE_FLAG_VND_ANT_CACHE_USER, messageFragmentsReduceText, messageHasUserFlag } from '~/common/stores/chat/chat.message';
 import { KeyStroke } from '~/common/components/KeyStroke';
 import { MarkHighlightIcon } from '~/common/components/icons/MarkHighlightIcon';
+import { PhVoice } from '~/common/components/icons/phosphor/PhVoice';
 import { Release } from '~/common/app.release';
 import { TooltipOutlined } from '~/common/components/TooltipOutlined';
 import { adjustContentScaling, themeScalingMap, themeZIndexChatBubble } from '~/common/app.theme';
 import { avatarIconSx, makeMessageAvatarIcon, messageBackground, useMessageAvatarLabel } from '~/common/util/dMessageUtils';
-import { copyToClipboard } from '~/common/util/clipboardUtils';
+import { copyToClipboard, copyToClipboardHtmlMinusColors } from '~/common/util/clipboardUtils';
 import { createTextContentFragment, DMessageFragment, DMessageFragmentId, updateFragmentWithEditedText } from '~/common/stores/chat/chat.fragments';
 import { useFragmentBuckets } from '~/common/stores/chat/hooks/useFragmentBuckets';
 import { useUIPreferencesStore } from '~/common/stores/store-ui';
@@ -217,15 +217,15 @@ export function ChatMessage(props: {
   const isVndAndCacheUser = !!props.showAntPromptCaching && messageHasUserFlag(props.message, MESSAGE_FLAG_VND_ANT_CACHE_USER);
 
   const {
+    annotationFragments,    // Web Citations, References (rendered at top)
+    interleavedFragments,   // Reasoning, Placeholders, Text, Code, Tools (interleaved in temporal order)
     imageAttachments,       // Stamp-sized Images
-    voidFragments,          // Model-Aux, Placeholders
-    contentFragments,       // Text (Markdown + Code + ... blocks), Errors, (large) Images
     nonImageAttachments,    // Document Attachments, likely the User dropped them in
     lastFragmentIsError,
   } = useFragmentBuckets(messageFragments);
 
   const fragmentFlattenedText = React.useMemo(() => messageFragmentsReduceText(messageFragments), [messageFragments]);
-  const handleHighlightSelText = useSelHighlighterMemo(messageId, selText, contentFragments, fromAssistant, props.onMessageFragmentReplace);
+  const handleHighlightSelText = useSelHighlighterMemo(messageId, selText, interleavedFragments.filter(f => f.ft === 'content'), fromAssistant, props.onMessageFragmentReplace);
 
   const textSubject = selText ? selText : fragmentFlattenedText;
   const isSpecialT2I = textSubject.startsWith('/draw ') || textSubject.startsWith('/imagine ') || textSubject.startsWith('/img ');
@@ -315,7 +315,12 @@ export function ChatMessage(props: {
   const handleCloseOpsMenu = React.useCallback(() => setOpsMenuAnchor(null), []);
 
   const handleOpsCopy = (e: React.MouseEvent) => {
-    copyToClipboard(textSubject, 'Text');
+    const html = blocksRendererRef.current?.innerHTML;
+    if (html) {
+      // same as ChatMessageList.handleCopyHTMLWithoutColors
+      copyToClipboardHtmlMinusColors(html, textSubject, 'Message');
+    } else
+      copyToClipboard(textSubject, 'Text');
     e.preventDefault();
     handleCloseOpsMenu();
     closeContextMenu();
@@ -579,9 +584,9 @@ export function ChatMessage(props: {
 
   const lookForOptions = props.onMessageContinue !== undefined && props.isBottom === true && messageGenerator?.tokenStopReason !== 'out-of-tokens' && fromAssistant && !messagePendingIncomplete && !isEditingText && uiComplexityMode !== 'minimal' && false;
 
-  const { fragments: renderContentFragments, options: continuationOptions } = React.useMemo(() => {
-    return optionsExtractFromFragments_dangerModifyFragment(lookForOptions, contentFragments);
-  }, [contentFragments, lookForOptions]);
+  const { fragments: renderInterleavedFragments, options: continuationOptions } = React.useMemo(() => {
+    return optionsExtractFromFragments_dangerModifyFragment(lookForOptions, interleavedFragments);
+  }, [interleavedFragments, lookForOptions]);
 
 
   // style
@@ -589,7 +594,7 @@ export function ChatMessage(props: {
 
   const listItemSx: SxProps = React.useMemo(() => ({
     // vars
-    '--AGI-overlay-start-opacity': uiComplexityMode === 'extra' ? 0.1 : 0,
+    // '--AGI-overlay-start-opacity': uiComplexityMode === 'extra' ? 0.1 : 0, // disabled - looks worse
 
     // style
     backgroundColor: backgroundColor,
@@ -773,20 +778,23 @@ export function ChatMessage(props: {
             />
           )}
 
-          {/* Void Fragments */}
-          {voidFragments.length >= 1 && (
+          {/* Annotation Fragments (absolute top: citations, references) */}
+          {annotationFragments.length >= 1 && (
             <VoidFragments
-              voidFragments={voidFragments}
-              nonVoidFragmentsCount={renderContentFragments.length}
+              voidFragments={annotationFragments}
+              nonVoidFragmentsCount={interleavedFragments.filter(f => f.ft === 'content').length}
               contentScaling={adjContentScaling}
               uiComplexityMode={uiComplexityMode}
               messageRole={messageRole}
+              messagePendingIncomplete={messagePendingIncomplete}
+              onFragmentDelete={!props.onMessageFragmentDelete ? undefined : handleFragmentDelete}
+              onFragmentReplace={!props.onMessageFragmentReplace ? undefined : handleFragmentReplace}
             />
           )}
 
-          {/* Content Fragments */}
+          {/* Interleaved Fragments (reasoning + content in temporal order) */}
           <ContentFragments
-            contentFragments={renderContentFragments}
+            contentFragments={renderInterleavedFragments}
             showEmptyNotice={!messageFragments.length && !messagePendingIncomplete}
 
             contentScaling={adjContentScaling}
@@ -794,6 +802,8 @@ export function ChatMessage(props: {
             fitScreen={props.fitScreen}
             isMobile={props.isMobile}
             messageRole={messageRole}
+            messageGeneratorLlmId={messageGenerator?.mgt === 'aix' ? messageGenerator.aix?.mId : undefined}
+            messagePendingIncomplete={messagePendingIncomplete}
             optiAllowSubBlocksMemo={!!messagePendingIncomplete}
             disableMarkdownText={disableMarkdown || fromUser /* User messages are edited as text. Try to have them in plain text. NOTE: This may bite. */}
             showUnsafeHtmlCode={props.showUnsafeHtmlCode}
@@ -1022,7 +1032,7 @@ export function ChatMessage(props: {
           )}
           {!!props.onTextSpeak && (
             <MenuItem onClick={handleOpsSpeak} disabled={!couldSpeak || props.isSpeaking}>
-              <ListItemDecorator>{props.isSpeaking ? <CircularProgress size='sm' /> : <RecordVoiceOverOutlinedIcon />}</ListItemDecorator>
+              <ListItemDecorator>{props.isSpeaking ? <CircularProgress size='sm' /> : <PhVoice />}</ListItemDecorator>
               Speak
             </MenuItem>
           )}
@@ -1150,7 +1160,7 @@ export function ChatMessage(props: {
               </Tooltip>}
               {!!props.onTextSpeak && <Tooltip disableInteractive arrow placement='top' title='Speak'>
                 <IconButton color='success' onClick={handleOpsSpeak} disabled={!couldSpeak || props.isSpeaking}>
-                  {!props.isSpeaking ? <RecordVoiceOverOutlinedIcon /> : <CircularProgress sx={{ '--CircularProgress-size': '16px' }} />}
+                  {!props.isSpeaking ? <PhVoice /> : <CircularProgress sx={{ '--CircularProgress-size': '16px' }} />}
                 </IconButton>
               </Tooltip>}
               {(!!props.onTextDiagram || !!props.onTextImagine || !!props.onTextSpeak) && <Divider />}
@@ -1190,7 +1200,7 @@ export function ChatMessage(props: {
             Auto-Draw
           </MenuItem>}
           {!!props.onTextSpeak && <MenuItem onClick={handleOpsSpeak} disabled={!couldSpeak || props.isSpeaking}>
-            <ListItemDecorator>{props.isSpeaking ? <CircularProgress size='sm' /> : <RecordVoiceOverOutlinedIcon />}</ListItemDecorator>
+            <ListItemDecorator>{props.isSpeaking ? <CircularProgress size='sm' /> : <PhVoice />}</ListItemDecorator>
             Speak
           </MenuItem>}
         </CloseablePopup>
