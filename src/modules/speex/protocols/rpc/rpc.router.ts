@@ -1,4 +1,4 @@
-import { createTRPCRouter, edgeProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, edgeProcedure } from '~/server/trpc/trpc.server-edge';
 
 import { SpeexSpeechParticle, SpeexWire, SpeexWire_Access, SpeexWire_ListVoices_Output, SpeexWire_Voice } from './rpc.wiretypes';
 import { listVoicesElevenLabs, synthesizeElevenLabs } from './synthesize-elevenlabs';
@@ -18,7 +18,7 @@ interface SynthesizeBackendFnParams<TSpeexAccess extends SpeexWire_Access> {
 export type SynthesizeBackendFn<TSpeexAccess extends SpeexWire_Access> = (params: SynthesizeBackendFnParams<TSpeexAccess>) => AsyncGenerator<SpeexSpeechParticle>;
 
 
-export const speexRouter = createTRPCRouter({
+export const speexRouter = createTRPCRouterEdge({
 
   /**
    * Speech synthesis - streaming AsyncGenerator

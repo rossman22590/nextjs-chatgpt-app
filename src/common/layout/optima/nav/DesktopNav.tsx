@@ -225,14 +225,14 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
               Support
             </Typography>
           </ListItem>
-          <MenuItem component='a' href={BaseProduct.SupportForm()} target='_blank'>
+          {/* <MenuItem component='a' href={BaseProduct.SupportForm()} target='_blank'>
             <ListItemDecorator>🔥</ListItemDecorator>
             <div>
               Improve Big-AGI
               <FormHelperText>AI fixes what you report</FormHelperText>
             </div>
             <ArrowOutwardRoundedIcon sx={{ ml: 'auto' }} />
-          </MenuItem>
+          </MenuItem> */}
           {!!releaseNotesUrl && (
             <MenuItem onClick={handleShowReleaseNotes}>
               <ListItemDecorator>

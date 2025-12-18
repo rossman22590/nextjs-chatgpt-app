@@ -36,8 +36,8 @@ function sanitizeUrlForDisplay(url: string | null): string {
 }
 
 
-type TResponse = OpenAIWire_API_Responses.Response;
-type TOutputItem = OpenAIWire_API_Responses.Response['output'][number];
+type TResponse = OpenAIWire_API_Responses.ResponsesAPIResponse;
+type TOutputItem = OpenAIWire_API_Responses.ResponsesAPIResponse['output'][number];
 type TEventType = OpenAIWire_API_Responses.StreamingEvent['type'];
 
 
@@ -124,6 +124,9 @@ class ResponseParserStateMachine {
       console.warn(`[DEV] AIX: ${label} - output item enter index/type mismatch: expected ${expectedIndex}/${outputType}, got ${this.#inOutputIndex}/${this.#inOutputType}`);
     this.#inOutputIndex = outputIndex;
     this.#inOutputType = outputType;
+    // Reset part-specific indices when entering a new output item
+    this.#contentIndex = undefined;
+    this.#summaryIndex = undefined;
   }
 
   outputItemExit(label: TEventType, outputIndex: number, outputType: TOutputItem['type']) {
@@ -228,7 +231,7 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
 
   const R = new ResponseParserStateMachine();
 
-  return function(pt: IParticleTransmitter, eventData: string) {
+  return function (pt: IParticleTransmitter, eventData: string) {
 
     // throws on malformed event data
     const chunkData = JSON.parse(eventData);
@@ -571,26 +574,26 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
 
       default:
         const _exhaustiveCheck: never = eventType;
-      // noinspection FallThroughInSwitchStatementJS
-      // case 'response.file_search_call.in_progress': // OpenAI vector store - not implemented
-      // case 'response.file_search_call.searching': // OpenAI vector store - not implemented
-      // case 'response.file_search_call.completed': // OpenAI vector store - not implemented
-      // case 'response.code_interpreter_call.in_progress':
-      // case 'response.code_interpreter_call.interpreting':
-      // case 'response.code_interpreter_call.completed':
-      // case 'response.code_interpreter_call_code.delta':
-      // case 'response.code_interpreter_call_code.done':
-      // case 'response.mcp_call.in_progress':
-      // case 'response.mcp_call.completed':
-      // case 'response.mcp_call.failed':
-      // case 'response.mcp_call_arguments.delta':
-      // case 'response.mcp_call_arguments.done':
-      // case 'response.mcp_list_tools.in_progress':
-      // case 'response.mcp_list_tools.completed':
-      // case 'response.mcp_list_tools.failed':
-      // case 'response.custom_tool_call_input.delta':
-      // case 'response.custom_tool_call_input.done':
-      // case 'response.queued':
+        // noinspection FallThroughInSwitchStatementJS
+        // case 'response.file_search_call.in_progress': // OpenAI vector store - not implemented
+        // case 'response.file_search_call.searching': // OpenAI vector store - not implemented
+        // case 'response.file_search_call.completed': // OpenAI vector store - not implemented
+        // case 'response.code_interpreter_call.in_progress':
+        // case 'response.code_interpreter_call.interpreting':
+        // case 'response.code_interpreter_call.completed':
+        // case 'response.code_interpreter_call_code.delta':
+        // case 'response.code_interpreter_call_code.done':
+        // case 'response.mcp_call.in_progress':
+        // case 'response.mcp_call.completed':
+        // case 'response.mcp_call.failed':
+        // case 'response.mcp_call_arguments.delta':
+        // case 'response.mcp_call_arguments.done':
+        // case 'response.mcp_list_tools.in_progress':
+        // case 'response.mcp_list_tools.completed':
+        // case 'response.mcp_list_tools.failed':
+        // case 'response.custom_tool_call_input.delta':
+        // case 'response.custom_tool_call_input.done':
+        // case 'response.queued':
         // FIXME: if we're here, we prob needed to implement the part
         console.warn('[DEV] AIX: OpenAI Responses: unexpected event type:', eventType);
         break;
@@ -607,7 +610,7 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
 
   const parserCreationTimestamp = Date.now();
 
-  return function(pt: IParticleTransmitter, eventData: string) {
+  return function (pt: IParticleTransmitter, eventData: string) {
 
     // Throws on malformed event data
     const responseData = JSON.parse(eventData);
@@ -912,7 +915,7 @@ function _forwardResponseError(parsedData: any, pt: IParticleTransmitter) {
  * IMPORTANT: These are HIGH-QUALITY citations (2-3 per response) that were actually
  * used in generating the response. Different from bulk web search sources (20+ results).
  */
-function _forwardTextAnnotation(pt: IParticleTransmitter, annotation: Exclude<Extract<Extract<OpenAIWire_API_Responses.Response['output'][number], { type: 'message' }>['content'][number], { type: 'output_text' }>['annotations'], undefined>[number], annotationIndex: number): void {
+function _forwardTextAnnotation(pt: IParticleTransmitter, annotation: Exclude<Extract<Extract<OpenAIWire_API_Responses.ResponsesAPIResponse['output'][number], { type: 'message' }>['content'][number], { type: 'output_text' }>['annotations'], undefined>[number], annotationIndex: number): void {
   switch (annotation?.type) {
     case 'url_citation':
       pt.appendUrlCitation(
@@ -941,7 +944,7 @@ function _forwardTextAnnotation(pt: IParticleTransmitter, annotation: Exclude<Ex
  * - sources: ALL search results (e.g., 20 URLs) - bulk data for special web search fragments
  * - citations: High-quality links (2-3) via annotations in message content
  */
-function _forwardWebSearchCallItem(pt: IParticleTransmitter, webSearchCall: Extract<OpenAIWire_API_Responses.Response['output'][number], { type: 'web_search_call' }>): void {
+function _forwardWebSearchCallItem(pt: IParticleTransmitter, webSearchCall: Extract<OpenAIWire_API_Responses.ResponsesAPIResponse['output'][number], { type: 'web_search_call' }>): void {
   const { action } = webSearchCall;
   switch (action?.type) {
     case 'search':

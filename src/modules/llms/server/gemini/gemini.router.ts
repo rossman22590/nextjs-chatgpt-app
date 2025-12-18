@@ -1,6 +1,6 @@
 import * as z from 'zod/v4';
 
-import { createTRPCRouter, edgeProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, edgeProcedure } from '~/server/trpc/trpc.server-edge';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import { ListModelsResponse_schema } from '../llm.server.types';

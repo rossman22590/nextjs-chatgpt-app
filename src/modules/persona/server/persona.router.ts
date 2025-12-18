@@ -22,7 +22,9 @@ const personaInputSchema = z.object({
 
 const personaUpdateSchema = personaInputSchema.extend({
   id: z.string().uuid(),
-}).partial({ systemPrompt: false });
+}).omit({ systemPrompt: true }).partial().extend({
+  systemPrompt: z.string().min(1), // systemPrompt is required
+});
 
 export const personaRouter = createTRPCRouter({
   /** Create a new persona for the authenticated user */

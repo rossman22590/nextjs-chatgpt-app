@@ -1,22 +1,17 @@
 import type { AixAPI_Access, AixAPI_Model, AixAPIChatGenerate_Request } from '../../api/aix.wiretypes';
-import type { AixDemuxers } from '../stream.demuxers';
-import { createChatGenerateDispatch as originalCreateChatGenerateDispatch } from './chatGenerate.dispatch';
-import { ChatGenerateParseFunction } from './chatGenerate.dispatch';
+import { createChatGenerateDispatch as originalCreateChatGenerateDispatch, ChatGenerateDispatch } from './chatGenerate.dispatch';
 import { usesResponsesAPI } from './adapters/openai.responsesAPI.override';
-import { createOpenAIResponsesAPIParserNS, createOpenAIResponsesAPIChunkParser } from './parsers/openai.responsesAPI.parser';
-import { openAIAccess } from '~/modules/llms/server/openai/openai.router';
+import { createOpenAIResponsesAPIParserNS } from './parsers/openai.responsesAPI.parser';
+import { openAIAccess } from '~/modules/llms/server/openai/openai.access';
 
 // Override the createChatGenerateDispatch function
 export function createChatGenerateDispatch(
   access: AixAPI_Access, 
   model: AixAPI_Model, 
   chatGenerate: AixAPIChatGenerate_Request, 
-  streaming: boolean
-): {
-  request: { url: string, headers: HeadersInit, body: object },
-  demuxerFormat: AixDemuxers.StreamDemuxerFormat;
-  chatGenerateParse: ChatGenerateParseFunction;
-} {
+  streaming: boolean,
+  enableResumability: boolean
+): ChatGenerateDispatch {
   // Check if we should use the Responses API
   if (access.dialect === 'openai' && usesResponsesAPI(model)) {
     console.log(`Using Responses API dispatch for model: ${model.id}, forcing streaming=false (was: ${streaming})`);
@@ -27,7 +22,6 @@ export function createChatGenerateDispatch(
       access.dialect, 
       model, 
       chatGenerate, 
-      false, 
       false  // Force streaming to false for responses API
     );
     
@@ -38,6 +32,7 @@ export function createChatGenerateDispatch(
       return {
         request: {
           ...openAIAccess(access, model.id, '/v1/responses'),
+          method: 'POST',
           body: body
         },
         // Force null demuxer for responses API since it returns complete JSON
@@ -48,5 +43,5 @@ export function createChatGenerateDispatch(
   }
   
   // For all other cases, use the original function
-  return originalCreateChatGenerateDispatch(access, model, chatGenerate, streaming);
+  return originalCreateChatGenerateDispatch(access, model, chatGenerate, streaming, enableResumability);
 } 

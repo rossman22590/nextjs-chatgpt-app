@@ -52,6 +52,12 @@ export const createTRPCRouterEdge = tEdge.router;
 export const publicProcedureEdge = tEdge.procedure;
 
 /**
+ * Edge procedure alias used by edge routers.
+ * Keeps naming consistent with existing code while staying edge-safe.
+ */
+export const edgeProcedure = publicProcedureEdge;
+
+/**
  * Protected procedure that always throws in Edge Runtime
  * Since Edge Runtime doesn't support NextAuth, protected operations should be disabled
  */

@@ -1,6 +1,6 @@
 import * as z from 'zod/v4';
 
-import { createTRPCRouter, edgeProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, edgeProcedure } from '~/server/trpc/trpc.server-edge';
 
 import { _createDebugConfig } from '../dispatch/chatGenerate/chatGenerate.debug';
 import { createChatGenerateDispatch, createChatGenerateResumeDispatch } from '../dispatch/chatGenerate/chatGenerate.dispatch';

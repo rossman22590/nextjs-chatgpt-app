@@ -1,4 +1,4 @@
-import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.router';
+import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.access';
 import type { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_SystemMessage, AixMessages_ChatMessage } from '../../../api/aix.wiretypes';
 import { OpenAIWire_API_Chat_Completions } from '../../wiretypes/openai.wiretypes';
 import { aixToOpenAIChatCompletions as originalAixToOpenAIChatCompletions } from './openai.chatCompletions';
@@ -122,7 +122,6 @@ export function aixToOpenAIChatCompletions(
   openAIDialect: OpenAIDialects, 
   model: AixAPI_Model, 
   chatGenerate: AixAPIChatGenerate_Request, 
-  jsonOutput: boolean, 
   streaming: boolean
 ): any {
   // Check if we should use the responses API
@@ -134,6 +133,22 @@ export function aixToOpenAIChatCompletions(
     
     // Convert messages to Responses API format
     const inputMessages = convertToResponsesAPIFormat(systemMessage, chatSequence);
+
+    const reasoningEffort: ResponsesAPIPayload['reasoning']['effort'] = (() => {
+      switch (model.vndOaiReasoningEffort) {
+        case 'low':
+        case 'medium':
+        case 'high':
+          return model.vndOaiReasoningEffort;
+        case 'minimal':
+        case 'none':
+          return 'low';
+        case 'xhigh':
+          return 'high';
+        default:
+          return 'medium';
+      }
+    })();
     
     // Create the responses API payload
     const responsesPayload: ResponsesAPIPayload = {
@@ -155,7 +170,7 @@ export function aixToOpenAIChatCompletions(
         }
       },
       reasoning: {
-        effort: model.vndOaiReasoningEffort || "medium",
+        effort: reasoningEffort,
         summary: "auto"
       },
       tools: [],
@@ -187,5 +202,5 @@ export function aixToOpenAIChatCompletions(
   }
   
   // For all other models, use the original function
-  return originalAixToOpenAIChatCompletions(openAIDialect, model, chatGenerate, jsonOutput, streaming);
+  return originalAixToOpenAIChatCompletions(openAIDialect, model, chatGenerate, streaming);
 } 
