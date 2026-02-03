@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import type { WebpackConfigContext } from 'next/dist/server/config-shared';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
@@ -35,7 +36,7 @@ buildType && console.log(` 🧠 big-AGI: building for ${buildType}...\n`);
 
 /** @type {import('next').NextConfig} */
 let nextConfig: NextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: !process.env.NO_STRICT_MODE, // default: enabled
 
   // [exports] https://nextjs.org/docs/advanced-features/static-html-export
   ...(buildType && {
@@ -53,7 +54,7 @@ let nextConfig: NextConfig = {
   // NOTE: we may not be needing this anymore, as we use '@cloudflare/puppeteer'
   serverExternalPackages: ['puppeteer-core', 'crypto-browserify'],
 
-  webpack: (config: any, { isServer }: { isServer: boolean }) => {
+  webpack: (config: any, { isServer, webpack /*, dev, nextRuntime*/ }: WebpackConfigContext) => {
     // @mui/joy: anything material gets redirected to Joy
     config.resolve.alias['@mui/material'] = '@mui/joy';
 
@@ -70,7 +71,28 @@ let nextConfig: NextConfig = {
     });
 
     // fix warnings for async functions in the browser (https://github.com/vercel/next.js/issues/64792)
+    // client-side bundling
     if (!isServer) {
+      /**
+       * AIX client-side
+       * We replace certain server-only modules with client-side mocks, to reuse the exact same imports
+       * while avoiding importing server-only code which would break the build or break at runtime.
+       */
+      const serverToClientMocks: ReadonlyArray<[RegExp, string]> = [
+        [/\/posthog\.server/, '/posthog.client-mock'],
+        [/\/env\.server/, '/env.client-mock'],
+      ];
+      config.plugins = [
+        ...config.plugins,
+        ...serverToClientMocks.map(([pattern, replacement]) =>
+          new webpack.NormalModuleReplacementPlugin(pattern, (resource: any) => {
+            // console.log(' 🧠 [WEBPACK REPLACEMENT]:', resource.request, '->', resource.request.replace(pattern, replacement));
+            resource.request = resource.request.replace(pattern, replacement);
+          }),
+        ),
+      ];
+
+      // cosmetic: fix warnings for (absent!) top-level awaits in the browser (https://github.com/vercel/next.js/issues/64792)
       config.output.environment = { ...config.output.environment, asyncFunction: true };
       
       // Don't resolve 'fs' module on the client to prevent errors on build
@@ -128,26 +150,11 @@ let nextConfig: NextConfig = {
   // },
 };
 
-// Validate environment variables, if set at build time. Will be actually read and used at runtime.
-import { verifyBuildTimeVars } from '~/server/env';
-verifyBuildTimeVars();
+// Validate environment variables at build time, if required. Server env vars will be actually read and used at runtime (cloud/edge).
+import { env as validateEnv } from '~/server/env.server';
+void validateEnv; // Triggers env validation - throws if required vars are missing
 
-// PostHog error reporting with source maps for production builds
-import { withPostHogConfig } from '@posthog/nextjs-config';
-if (process.env.POSTHOG_API_KEY && process.env.POSTHOG_ENV_ID) {
-  console.log(' 🧠 \x1b[1mbig-AGI\x1b[0m: building with PostHog issue reporting and source maps...');
-  nextConfig = withPostHogConfig(nextConfig, {
-    personalApiKey: process.env.POSTHOG_API_KEY,
-    envId: process.env.POSTHOG_ENV_ID,
-    host: 'https://us.i.posthog.com', // backtrace upload host
-    sourcemaps: {
-      enabled: process.env.NODE_ENV === 'production',
-      project: 'big-agi',
-      version: process.env.NEXT_PUBLIC_BUILD_HASH,
-      deleteAfterUpload: false, // false: leave them in the tree, which would also help debugging of open-source installs
-    },
-  });
-}
+// PostHog error reporting disabled (not used in this deployment)
 
 // conditionally enable the nextjs bundle analyzer
 import withBundleAnalyzer from '@next/bundle-analyzer';

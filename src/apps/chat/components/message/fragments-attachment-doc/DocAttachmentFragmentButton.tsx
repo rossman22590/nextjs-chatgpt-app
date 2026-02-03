@@ -7,13 +7,13 @@ import CodeIcon from '@mui/icons-material/Code';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import RecordVoiceOverOutlinedIcon from '@mui/icons-material/RecordVoiceOverOutlined';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import TextureIcon from '@mui/icons-material/Texture';
 
 import { ContentScaling, themeScalingMap } from '~/common/app.theme';
 import { DMessageAttachmentFragment, DMessageFragmentId, DVMimeType, isDocPart } from '~/common/stores/chat/chat.fragments';
 import { LiveFileIcon } from '~/common/livefile/liveFile.icons';
+import { PhVoice } from '~/common/components/icons/phosphor/PhVoice';
 import { TooltipOutlined } from '~/common/components/TooltipOutlined';
 import { ellipsizeMiddle } from '~/common/util/textUtils';
 import { useLiveFileMetadata } from '~/common/livefile/useLiveFileMetadata';
@@ -22,6 +22,15 @@ import { useLiveFileMetadata } from '~/common/livefile/useLiveFileMetadata';
 // configuration
 export const DocSelColor: ColorPaletteProp = 'primary';
 const DocUnselColor: ColorPaletteProp = 'primary';
+
+
+const _styles = {
+  label: {
+    whiteSpace: 'nowrap',
+    fontWeight: 'md',
+    minWidth: 48,
+  },
+} as const;
 
 
 export function buttonIconForFragment(part: DMessageAttachmentFragment['part']): React.ComponentType<any> {
@@ -41,7 +50,7 @@ export function buttonIconForFragment(part: DMessageAttachmentFragment['part']):
                 case 'image':
                   return ImageOutlinedIcon;
                 case 'audio':
-                  return RecordVoiceOverOutlinedIcon;
+                  return PhVoice;
                 default:
                   const _exhaustiveCheck: never = assetType;
                   return TextureIcon; // missing zync asset type
@@ -146,9 +155,13 @@ export function DocAttachmentFragmentButton(props: {
   if (!isDocPart(fragment.part))
     return 'Unexpected: ' + fragment.part.pt;
 
-  const buttonText = ellipsizeMiddle(fragment.part.l1Title || fragment.title || 'Document', 28 /* totally arbitrary length */);
-
   const Icon = isSelected ? EditRoundedIcon : buttonIconForFragment(fragment.part);
+
+  const fullTitle = fragment.part.l1Title || fragment.title || 'Document';
+  const buttonText = ellipsizeMiddle(fullTitle, 28 /* totally arbitrary length */);
+  const showFilenameTooltip = fullTitle !== buttonText;
+
+  const labelContent = <Box sx={_styles.label}>{buttonText}</Box>;
 
   return (
     <Button
@@ -171,9 +184,10 @@ export function DocAttachmentFragmentButton(props: {
         </Box>
       )}
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', paddingX: '0.5rem' }}>
-        <Box sx={{ whiteSpace: 'nowrap', fontWeight: 'md', minWidth: 48 }}>
-          {buttonText}
-        </Box>
+        {showFilenameTooltip
+          ? <TooltipOutlined title={<span style={{ wordBreak: 'break-all' }}>{fullTitle}</span>}>{labelContent}</TooltipOutlined>
+          : labelContent
+        }
         {/*<Box sx={{ fontSize: 'xs', fontWeight: 'sm' }}>*/}
         {/*  {fragment.caption}*/}
         {/*</Box>*/}

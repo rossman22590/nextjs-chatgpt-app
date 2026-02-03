@@ -170,7 +170,10 @@ export function BlockPartModelAnnotations(props: {
     return null;
 
   return (
-    <Box>
+    <Box
+      data-agi-no-copy // do not copy these buttons: has its own copy functionality
+      sx={{ mx: 1.5 }}
+    >
 
       {/* Row of favicons */}
       <Button

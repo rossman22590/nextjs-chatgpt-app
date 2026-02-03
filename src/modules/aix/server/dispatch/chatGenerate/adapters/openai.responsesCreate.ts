@@ -1,4 +1,6 @@
-import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.router';
+import * as z from 'zod/v4';
+
+import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.access';
 
 import { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_ChatMessage, AixMessages_SystemMessage, AixTools_ToolDefinition, AixTools_ToolsPolicy } from '../../../api/aix.wiretypes';
 import { OpenAIWire_API_Responses, OpenAIWire_Responses_Items, OpenAIWire_Responses_Tools } from '../../wiretypes/openai.wiretypes';
@@ -27,7 +29,6 @@ export function aixToOpenAIResponses(
   openAIDialect: OpenAIDialects,
   model: AixAPI_Model,
   _chatGenerate: AixAPIChatGenerate_Request,
-  jsonOutput: boolean,
   streaming: boolean,
   enableResumability: boolean,
 ): TRequest {
@@ -39,7 +40,6 @@ export function aixToOpenAIResponses(
   const isOpenAIOFamily = ['gpt-6', 'gpt-5', 'o4', 'o3', 'o1'].some(_id => model.id === _id || model.id.startsWith(_id + '-'));
   const isOpenAIChatGPT = ['gpt-5-chat'].some(_id => model.id === _id || model.id.startsWith(_id + '-'));
   const isOpenAIComputerUse = model.id.includes('computer-use');
-  const isOpenAIO1Pro = model.id === 'o1-pro' || model.id.startsWith('o1-pro-');
 
   const hotFixNoTemperature = isOpenAIOFamily && !isOpenAIChatGPT;
   const hotFixNoTruncateAuto = isOpenAIComputerUse;
@@ -50,6 +50,10 @@ export function aixToOpenAIResponses(
   // construct the request payload
   // NOTE: the zod parsing will remove the undefined values from the upstream request, enabling an easier construction
   // ---
+
+  // constrained output modes - both JSON and tool invocations
+  // const strictJsonOutput = !!model.strictJsonOutput;
+  const strictToolInvocations = !!model.strictToolInvocations;
 
   const { requestInput, requestInstructions } = _toOpenAIResponsesRequestInput(chatGenerate.systemMessage, chatGenerate.chatSequence);
   const payload: any = {
@@ -65,14 +69,15 @@ export function aixToOpenAIResponses(
     input: requestInput,
 
     // Tools
-    tools: chatGenerate.tools && _toOpenAIResponsesTools(chatGenerate.tools),
+    tools: chatGenerate.tools && _toOpenAIResponsesTools(chatGenerate.tools, strictToolInvocations),
     tool_choice: chatGenerate.toolsPolicy && _toOpenAIResponsesToolChoice(chatGenerate.toolsPolicy),
     // parallel_tool_calls: undefined, // response if unset: true
 
     // Operations Config
     reasoning: !model.vndOaiReasoningEffort ? undefined : {
       effort: model.vndOaiReasoningEffort,
-      summary: !isOpenAIO1Pro ? 'detailed' : 'auto', // elevated from 'auto' (o1-pro still at 'auto')
+      // 'none' = omit (for unverified orgs), 'detailed' = explicit, undefined = default per model
+      ...(model.vndOaiReasoningSummary !== 'none' ? { summary: model.vndOaiReasoningSummary } : {}),
     },
 
     // Output Config
@@ -98,15 +103,18 @@ export function aixToOpenAIResponses(
     payload.top_p = model.topP;
   }
 
-  // JSON output: not implemented yet - will need a schema definition (similar to the tool args definition)
-  if (jsonOutput) {
-    console.warn('[DEV] notImplemented: responses: jsonOutput');
-    // payload.text = {
-    //   format: {
-    //     type: 'json_schema',
-    //   },
-    // };
-  }
+  // Structured Outputs - JSON output grammar
+  if (model.strictJsonOutput)
+    payload.text = {
+      ...payload.text,
+      format: {
+        type: 'json_schema',
+        name: model.strictJsonOutput.name || 'response',
+        description: model.strictJsonOutput.description,
+        schema: model.strictJsonOutput.schema,
+        strict: true,
+      },
+    };
 
   // GPT-5 Verbosity: Add to existing text config or create new one
   if (model.vndOaiVerbosity) {
@@ -190,6 +198,28 @@ export function aixToOpenAIResponses(
     payload.tools.push(imageGenerationTool);
   }
 
+  // Tool: Code Interpreter: Python code execution in sandboxed container ($0.03/container)
+  const requestCodeInterpreterTool = model.vndOaiCodeInterpreter === 'auto';
+  if (requestCodeInterpreterTool && !skipHostedToolsDueToCustomTools) {
+    if (isDialectAzure) {
+      console.log('[DEV] Azure OpenAI Responses: skipping code interpreter tool due to Azure limitations');
+    } else {
+      // Add the code interpreter tool to the request
+      if (!payload.tools?.length)
+        payload.tools = [];
+
+      payload.tools.push({
+        type: 'code_interpreter',
+        container: { type: 'auto' }, // auto-create/reuse container
+      });
+
+      // Include code execution outputs in the response
+      const extendedInclude = new Set(payload.include);
+      extendedInclude.add('code_interpreter_call.outputs');
+      payload.include = Array.from(extendedInclude);
+    }
+  }
+
 
   // [OpenAI] Vendor-specific restore markdown, for GPT-5 models and recent 'o' models
   const skipMarkdownDueToCustomTools = hasCustomTools && hasRestrictivePolicy;
@@ -201,8 +231,8 @@ export function aixToOpenAIResponses(
   // this includes stripping 'undefined' fields
   const validated = OpenAIWire_API_Responses.Request_schema.safeParse(payload);
   if (!validated.success) {
-    console.warn('[DEV] OpenAI: invalid Responses request payload. Error:', { error: validated.error });
-    throw new Error(`Invalid sequence for OpenAI models: ${validated.error.issues?.[0]?.message || validated.error.message || validated.error}.`);
+    console.warn('[DEV] OpenAI: invalid Responses request payload. Error:', { valError: validated.error });
+    throw new Error(`Invalid request for OpenAI models: ${z.prettifyError(validated.error)}`);
   }
 
   return validated.data as unknown as TRequest;
@@ -481,7 +511,7 @@ function _toOpenAIResponsesRequestInput(systemMessage: AixMessages_SystemMessage
   };
 }
 
-function _toOpenAIResponsesTools(itds: AixTools_ToolDefinition[]): NonNullable<TRequestTool[]> {
+function _toOpenAIResponsesTools(itds: AixTools_ToolDefinition[], strictToolInvocations: boolean): NonNullable<TRequestTool[]> {
   return itds.map(itd => {
     const itdType = itd.type;
     switch (itdType) {
@@ -496,7 +526,9 @@ function _toOpenAIResponsesTools(itds: AixTools_ToolDefinition[]): NonNullable<T
             type: 'object',
             properties: input_schema?.properties ?? {},
             required: input_schema?.required,
+            ...(strictToolInvocations ? { additionalProperties: false } : {}), // required for strict tool invocations
           },
+          ...(strictToolInvocations ? { strict: true } : {}), // enable strict (grammar-constrained) tool invocation inputs
         };
 
       case 'code_execution':

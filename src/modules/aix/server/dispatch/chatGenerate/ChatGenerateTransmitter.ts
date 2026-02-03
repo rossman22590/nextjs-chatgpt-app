@@ -1,6 +1,8 @@
 import { SERVER_DEBUG_WIRE } from '~/server/wire';
 import { serverSideId } from '~/server/trpc/trpc.nanoid';
 
+import { objectDeepCloneWithStringLimit, objectEstimateJsonSize } from '~/common/util/objectUtils';
+
 import type { AixWire_Particles } from '../../api/aix.wiretypes';
 
 import type { IParticleTransmitter, ParticleServerLogLevel } from './parsers/IParticleTransmitter';
@@ -8,7 +10,8 @@ import type { IParticleTransmitter, ParticleServerLogLevel } from './parsers/IPa
 
 // configuration
 const ENABLE_EXTRA_DEV_MESSAGES = true;
-const DEBUG_REQUEST_MAX_BODY_LENGTH = 100_000;
+const DEBUG_REQUEST_MAX_STRING_BYTES = 2048;
+
 /**
  * This is enabled by default because probabilistically unlikely -- however there will be false positives/negatives.
  *
@@ -128,16 +131,9 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
   }
 
   addDebugRequest(hideSensitiveData: boolean, url: string, headers: HeadersInit, body?: object) {
-    const bodyStr = body === undefined ? '' : JSON.stringify(body, null, 2);
-
-    // ellipsize large bodies (e.g., many base64 images) to avoid huge debug packets
-    let processedBody = bodyStr;
-    if (bodyStr.length > DEBUG_REQUEST_MAX_BODY_LENGTH) {
-      const omittedCount = bodyStr.length - DEBUG_REQUEST_MAX_BODY_LENGTH;
-      const ellipsis = `\n...[${omittedCount.toLocaleString()} chars omitted]...\n`;
-      const half = Math.floor((DEBUG_REQUEST_MAX_BODY_LENGTH - ellipsis.length) / 2);
-      processedBody = bodyStr.slice(0, half) + ellipsis + bodyStr.slice(-half);
-    }
+    // Ellipsize individual strings in the body object (e.g., base64 images) to reduce debug packet size
+    const ellipsizedBody = body ? objectDeepCloneWithStringLimit(body, 'aix.addDebugRequest', DEBUG_REQUEST_MAX_STRING_BYTES) : undefined;
+    const processedBody = ellipsizedBody ? JSON.stringify(ellipsizedBody, null, 2) : '';
 
     this.transmissionQueue.push({
       cg: '_debugDispatchRequest',
@@ -146,7 +142,7 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
         url: url,
         headers: hideSensitiveData ? '(hidden sensitive data)' : JSON.stringify(headers, null, 2),
         body: processedBody,
-        bodySize: body === undefined ? 0 : JSON.stringify(body).length, // actual size, without pretty-printing or truncation
+        bodySize: body ? objectEstimateJsonSize(body, 'aix.addDebugRequest') : 0,
       },
     });
   }
@@ -207,7 +203,7 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
   }
 
   /** Appends reasoning text, which is its own kind of content */
-  appendReasoningText(textChunk: string, weak?: Extract<AixWire_Particles.PartParticleOp, { p: 'tr_' }>['weak']) {
+  appendReasoningText(textChunk: string, options?: { weak?: 'tag', restart?: boolean }) {
     // NOTE: don't skip on empty chunks, as we want to transition states
     // if there was another Part in the making, queue it
     if (this.currentPart)
@@ -215,7 +211,8 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
     this.currentPart = {
       p: 'tr_',
       _t: textChunk,
-      ...(weak ? { weak } : {}),
+      ...(options?.weak ? { weak: options.weak } : {}),
+      ...(options?.restart ? { restart: true } : {}),
     };
     // [throttle] send it immediately for now
     this._queueParticleS();
@@ -268,12 +265,12 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
         const closingIdx = remaining.indexOf('</think>');
         if (closingIdx >= 0) {
           const reasoningText = remaining.substring(0, closingIdx);
-          this.appendReasoningText(reasoningText, 'tag');
+          this.appendReasoningText(reasoningText, { weak: 'tag' });
           this.isThinkingText = false;
           remaining = remaining.substring(closingIdx + '</think>'.length);
           // this is the only branch that can still loop
         } else {
-          this.appendReasoningText(remaining, 'tag');
+          this.appendReasoningText(remaining, { weak: 'tag' });
           return;
         }
       } else {
@@ -385,7 +382,7 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
   }
 
   /** Creates a CE request part, flushing the previous one if needed, and completes it */
-  addCodeExecutionInvocation(id: string | null, language: string, code: string, author: 'gemini_auto_inline') {
+  addCodeExecutionInvocation(id: string | null, language: string, code: string, author: 'gemini_auto_inline' | 'code_interpreter') {
     this.endMessagePart();
     this.transmissionQueue.push({
       p: 'cei',
@@ -397,7 +394,7 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
   }
 
   /** Creates a CE result part, flushing the previous one if needed, and completes it */
-  addCodeExecutionResponse(id: string | null, error: boolean | string, result: string, executor: 'gemini_auto_inline', environment: 'upstream') {
+  addCodeExecutionResponse(id: string | null, error: boolean | string, result: string, executor: 'gemini_auto_inline' | 'code_interpreter', environment: 'upstream') {
     this.endMessagePart();
     this.transmissionQueue.push({
       p: 'cer',
@@ -440,6 +437,19 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
       text,
       mot,
     } satisfies Extract<AixWire_Particles.PartParticleOp, { p: 'vp' }>);
+  }
+
+  /**
+   * Sends vendor-specific state modifier for the last emitted part.
+   * This attaches opaque protocol state (e.g., Gemini thoughtSignature) without polluting core part schemas.
+   */
+  sendSetVendorState(vendor: string, state: Record<string, unknown>) {
+    // queue vendor state particle immediately after the content part has been queued (and if text, it will be emitted sooner anyway)
+    this.transmissionQueue.push({
+      p: 'svs',
+      vendor,
+      state,
+    } satisfies Extract<AixWire_Particles.PartParticleOp, { p: 'svs' }>);
   }
 
   /** Communicates the model name to the client */

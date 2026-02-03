@@ -3,10 +3,10 @@ import * as z from 'zod';
 // Used to align Particles to the Typescript definitions from the frontend-side, on 'chat.fragments.ts'
 import type { DMessageToolResponsePart } from '~/common/stores/chat/chat.fragments';
 
-import { anthropicAccessSchema } from '~/modules/llms/server/anthropic/anthropic.router';
-import { geminiAccessSchema } from '~/modules/llms/server/gemini/gemini.router';
-import { ollamaAccessSchema } from '~/modules/llms/server/ollama/ollama.router';
-import { openAIAccessSchema } from '~/modules/llms/server/openai/openai.router';
+import { anthropicAccessSchema } from '~/modules/llms/server/anthropic/anthropic.access';
+import { geminiAccessSchema } from '~/modules/llms/server/gemini/gemini.access';
+import { ollamaAccessSchema } from '~/modules/llms/server/ollama/ollama.access';
+import { openAIAccessSchema } from '~/modules/llms/server/openai/openai.access';
 
 
 //
@@ -93,14 +93,28 @@ export namespace OpenAPI_Schema {
 
 export namespace AixWire_Parts {
 
+  /** Parts that come from the model shall inherit this, so they can echo-back vendor data */
+  const _BasePart_schema = z.object({
+
+    /** DMessageFragment.vendorState <- model-generated, vendor-specific opaque state (protocol continuity, not content) */
+    _vnd: z.object({
+      gemini: z.object({
+        thoughtSignature: z.string().optional(),
+      }).optional(),
+    }).optional(),
+    // _vnd: z.record(z.string(), z.unknown()).optional(),
+
+  });
+
+
   // User Input Parts
 
-  export const TextPart_schema = z.object({
+  export const TextPart_schema = _BasePart_schema.extend({
     pt: z.literal('text'),
     text: z.string(),
   });
 
-  export const InlineAudioPart_schema = z.object({
+  export const InlineAudioPart_schema = _BasePart_schema.extend({
     pt: z.literal('inline_audio'),
     /**
      * Minimal audio format support for browser compatibility:
@@ -116,7 +130,7 @@ export namespace AixWire_Parts {
   });
 
   // NOTE: different from DMessageImageRefPart, in that the image data is inlined rather than being referred to
-  export const InlineImagePart_schema = z.object({
+  export const InlineImagePart_schema = _BasePart_schema.extend({
     pt: z.literal('inline_image'),
     /**
      * The MIME type of the image.
@@ -172,12 +186,12 @@ export namespace AixWire_Parts {
 
   const _CodeExecutionInvocation_schema = z.object({
     type: z.literal('code_execution'),
-    variant: z.literal('gemini_auto_inline').optional(),
+    variant: z.enum(['gemini_auto_inline', 'code_interpreter']).optional(),
     language: z.string().optional(),
     code: z.string(),
   });
 
-  export const ToolInvocationPart_schema = z.object({
+  export const ToolInvocationPart_schema = _BasePart_schema.extend({
     pt: z.literal('tool_invocation'),
     id: z.string(),
     invocation: z.discriminatedUnion('type', [
@@ -200,7 +214,7 @@ export namespace AixWire_Parts {
     // _variant: z.literal('gemini_auto_inline').optional(),
   });
 
-  export const ToolResponsePart_schema = z.object({
+  export const ToolResponsePart_schema = _BasePart_schema.extend({
     pt: z.literal('tool_response'),
     id: z.string(),
     response: z.discriminatedUnion('type', [
@@ -213,6 +227,7 @@ export namespace AixWire_Parts {
 
   // Model Auxiliary Part (for thinking blocks)
 
+  // NOTE: not a _BasePart_schema for now, may become if we put the vndAnt attributes there
   export const ModelAuxPart_schema = z.object({
     pt: z.literal('ma'),
     aType: z.literal('reasoning'),
@@ -321,6 +336,14 @@ export namespace AixWire_Tooling {
       properties: z.record(z.string(), OpenAPI_Schema.Object_schema),
       required: z.array(z.string()).optional(),
     }).optional(),
+
+    /**
+     * WARNING: Anthropic-ONLY for now - support for "Programmatic Tool Calling" - 2 new fields:
+     * - allowed_callers: which contexts can invoke this tool, where 'direct' is the model itself, and 'code_execution' is when invoked from a container, and even both
+     * - input_examples: array of example input objects that demonstrate format conventions, nested object population, etc.
+     */
+    allowed_callers: z.array(z.enum(['direct', 'code_execution'])).optional(),
+    input_examples: z.array(z.record(z.string(), z.any())).optional(),
   });
 
   const _FunctionCallTool_schema = z.object({
@@ -337,7 +360,7 @@ export namespace AixWire_Tooling {
      * For now we are supporting a single provider:
      * - gemini_auto_inline: Google Gemini, auto-invoked, and inline (runs the code and goes back to the model to continue the generation)
      */
-    variant: z.enum(['gemini_auto_inline']),
+    variant: z.enum(['gemini_auto_inline', 'code_interpreter']),
   });
 
   /// Tool Definition
@@ -407,29 +430,67 @@ export namespace AixWire_API {
     maxTokens: z.number().min(1).optional(),
     topP: z.number().min(0).max(1).optional(),
     forceNoStream: z.boolean().optional(),
+
+    // Cross-vendor Structured Outputs
+
+    /**
+     * Constrain model response to a JSON schema for data extraction. Response will be valid JSON. Schema limitations vary by vendor.
+     * Supported: Anthropic (output_format), OpenAI (response_format), Gemini (responseSchema)
+     */
+    strictJsonOutput: z.object({
+      name: z.string().optional(),        // Required by OpenAI, optional elsewhere
+      description: z.string().optional(), // Helps model understand the schema's purpose
+      schema: z.any(),                    // JSON Schema object
+    }).optional(),
+
+    /**
+     * Enable strict schema validation for tool/function call invocations. Guarantees tool inputs exactly match the input_schema. Eliminates validation/retry logic.
+     * Supported: Anthropic (strict:true), OpenAI (strict:true). Gemini: not supported yet.
+     */
+    strictToolInvocations: z.boolean().optional(),
+
+    // Anthropic
     vndAnt1MContext: z.boolean().optional(),
+    vndAntEffort: z.enum(['low', 'medium', 'high']).optional(),
     vndAntSkills: z.string().optional(),
     vndAntThinkingBudget: z.number().nullable().optional(),
+    vndAntToolSearch: z.enum(['regex', 'bm25']).optional(), // Tool Search Tool variant
     vndAntWebFetch: z.enum(['auto']).optional(),
     vndAntWebSearch: z.enum(['auto']).optional(),
+    // Gemini
     vndGeminiAspectRatio: z.enum(['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9', '21:9']).optional(),
+    vndGeminiCodeExecution: z.enum(['auto']).optional(),
     vndGeminiComputerUse: z.enum(['browser']).optional(),
     vndGeminiGoogleSearch: z.enum(['unfiltered', '1d', '1w', '1m', '6m', '1y']).optional(),
+    vndGeminiImageSize: z.enum(['1K', '2K', '4K']).optional(),
+    vndGeminiMediaResolution: z.enum(['mr_high', 'mr_medium', 'mr_low']).optional(),
     vndGeminiShowThoughts: z.boolean().optional(),
-    vndGeminiThinkingBudget: z.number().optional(),
+    vndGeminiThinkingBudget: z.number().optional(), // old param
+    // Gemini 3 thinking level: Pro supports high/low, Flash supports all 4 levels
+    vndGeminiThinkingLevel: z.enum(['high', 'medium', 'low', 'minimal']).optional(), // new param
+    vndGeminiUrlContext: z.enum(['auto']).optional(),
+    // Moonshot
     vndMoonshotWebSearch: z.enum(['auto']).optional(),
+    // OpenAI
+    vndOaiCodeInterpreter: z.enum(['off', 'auto']).optional(),
+    vndOaiImageGeneration: z.enum(['mq', 'hq', 'hq_edit', 'hq_png']).optional(),
     vndOaiResponsesAPI: z.boolean().optional(),
-    vndOaiReasoningEffort: z.enum(['minimal', 'low', 'medium', 'high']).optional(),
+    vndOaiReasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']).optional(),
+    vndOaiReasoningSummary: z.enum(['none', 'detailed']).optional(),
     vndOaiRestoreMarkdown: z.boolean().optional(),
     vndOaiVerbosity: z.enum(['low', 'medium', 'high']).optional(),
     vndOaiWebSearchContext: z.enum(['low', 'medium', 'high']).optional(),
-    vndOaiImageGeneration: z.enum(['mq', 'hq', 'hq_edit', 'hq_png']).optional(),
+    // OpenRouter
     vndOrtWebSearch: z.enum(['auto']).optional(),
+    // Perplexity
     vndPerplexityDateFilter: z.enum(['unfiltered', '1m', '3m', '6m', '1y']).optional(),
     vndPerplexitySearchMode: z.enum(['default', 'academic']).optional(),
-    vndXaiSearchMode: z.enum(['auto', 'on', 'off']).optional(),
-    vndXaiSearchSources: z.string().optional(),
-    vndXaiSearchDateFilter: z.enum(['unfiltered', '1d', '1w', '1m', '6m', '1y']).optional(),
+    // xAI
+    vndXaiCodeExecution: z.enum(['off', 'auto']).optional(),
+    vndXaiSearchInterval: z.enum(['unfiltered', '1d', '1w', '1m', '6m', '1y']).optional(),
+    vndXaiWebSearch: z.enum(['off', 'auto']).optional(),
+    vndXaiXSearch: z.enum(['off', 'auto']).optional(),
+    vndXaiXSearchHandles: z.string().optional(),
     /**
      * [OpenAI, 2025-03-11] This is the generic version of the `web_search_options.user_location` field
      * This AIX field mimics on purpose: https://platform.openai.com/docs/api-reference/chat/create
@@ -504,6 +565,11 @@ export namespace AixWire_API {
      * Request profiling data for a streaming call: time spent preparing, connecting, waiting, receiving, etc. Fulfillment is decided by the server, and won't be available on 'production' builds.
      */
     debugProfilePerformance: z.boolean().optional(),
+
+    /**
+     * Applies a JSON override to the dispatch request body.
+     */
+    debugRequestBodyOverride: z.record(z.string(), z.unknown()).optional(),
 
     /**
      * Request a resumable connection, if the model/service supports it.
@@ -644,7 +710,7 @@ export namespace AixWire_Particles {
 
   export type PartParticleOp =
     | { p: '❤' } // heart beat
-    | { p: 'tr_', _t: string, weak?: 'tag' } // reasoning text, incremental; could be a 'weak' detection, e.g. heuristic from '<think>' rather than API-provided
+    | { p: 'tr_', _t: string, weak?: 'tag', restart?: boolean } // reasoning text, incremental; could be a 'weak' detection, e.g. heuristic from '<think>' rather than API-provided
     | { p: 'trs', signature: string } // reasoning signature
     | { p: 'trr_', _data: string } // reasoning raw (or redacted) data
     // | { p: 'ii', mimeType: string, i_b64?: string /* never undefined */ }
@@ -653,11 +719,12 @@ export namespace AixWire_Particles {
     // | { p: '_di', i_text: string }
     | { p: 'fci', id: string, name: string, i_args?: string /* never undefined */ }
     | { p: '_fci', _args: string }
-    | { p: 'cei', id: string, language: string, code: string, author: 'gemini_auto_inline' }
-    | { p: 'cer', id: string, error: DMessageToolResponsePart['error'], result: string, executor: 'gemini_auto_inline', environment: DMessageToolResponsePart['environment'] }
+    | { p: 'cei', id: string, language: string, code: string, author: 'gemini_auto_inline' | 'code_interpreter' }
+    | { p: 'cer', id: string, error: DMessageToolResponsePart['error'], result: string, executor: 'gemini_auto_inline' | 'code_interpreter', environment: DMessageToolResponsePart['environment'] }
     | { p: 'ia', mimeType: string, a_b64: string, label?: string, generator?: string, durationMs?: number } // inline audio, complete
     | { p: 'ii', mimeType: string, i_b64: string, label?: string, generator?: string, prompt?: string } // inline image, complete
     | { p: 'urlc', title: string, url: string, num?: number, from?: number, to?: number, text?: string, pubTs?: number } // url citation - pubTs: publication timestamp
+    | { p: 'svs', vendor: string, state: Record<string, unknown> } // set vendor state - applies to the last emitted part (opaque protocol state)
     | { p: 'vp', text: string, mot: 'search-web' | 'gen-image' | 'code-exec' }; // void placeholder - temporary status text that gets wiped when real content arrives
 
 }

@@ -1,6 +1,36 @@
 import type { ModelDescriptionSchema } from './llm.server.types';
 
 
+// -- Dev model definitions check --
+
+/**
+ * DEV: Checks for stale and optionally unknown model definitions (exact match).
+ * - Stale: defined locally but not returned by API (should remove)
+ * - Unknown: in API but not defined locally (should add)
+ *
+ * @param vendor - Vendor name for logging
+ * @param apiIds - Model IDs from the API
+ * @param knownIds - Model IDs defined locally
+ * @param options - Optional: { checkUnknown: boolean, apiFilter: (id) => boolean }
+ */
+export function llmDevCheckModels_DEV(vendor: string, apiIds: string[], knownIds: string[], options?: { checkUnknown?: boolean; apiFilter?: (id: string) => boolean }): void {
+  const { checkUnknown = true, apiFilter } = options || {};
+
+  // Stale: known but not in API
+  const stale = knownIds.filter(k => !apiIds.includes(k));
+  if (stale.length)
+    console.log(`[DEV] ${vendor}: stale model defs (remove): [ ${stale.join(', ')} ]`);
+
+  // Unknown: in API but not known
+  if (checkUnknown) {
+    const filtered = apiFilter ? apiIds.filter(apiFilter) : apiIds;
+    const unknown = filtered.filter(a => !knownIds.includes(a));
+    if (unknown.length)
+      console.log(`[DEV] ${vendor}: unknown models (add): [ ${unknown.join(', ')} ]`);
+  }
+}
+
+
 // -- Manual model mappings: types and helper --
 
 export type ManualMappings = (KnownModel | KnownLink)[];
@@ -24,6 +54,10 @@ type KnownLink = {
 } & Partial<Omit<ModelDescriptionSchema, 'id' | 'created' | 'updated'>>;
 
 
+/**
+ * Converts a KnownModel to ModelDescriptionSchema. Used by OpenAI-style vendors.
+ * NOTE: Keep optional fields in sync with geminiModelToModelDescription (gemini.models.ts)
+ */
 export function fromManualMapping(mappings: (KnownModel | KnownLink)[], upstreamModelId: string, created: undefined | number, updated: undefined | number, fallback: KnownModel, disableSymlinkLooks?: boolean): ModelDescriptionSchema {
 
   // model resolution outputs
@@ -112,10 +146,10 @@ export function fromManualMapping(mappings: (KnownModel | KnownLink)[], upstream
   // apply optional fields
   if (m.parameterSpecs) md.parameterSpecs = m.parameterSpecs;
   if (m.maxCompletionTokens) md.maxCompletionTokens = m.maxCompletionTokens;
-  if (m.trainingDataCutoff) md.trainingDataCutoff = m.trainingDataCutoff;
   if (m.benchmark) md.benchmark = m.benchmark;
   if (m.chatPrice) md.chatPrice = m.chatPrice;
   if (m.hidden) md.hidden = true;
+  if (m.initialTemperature !== undefined) md.initialTemperature = m.initialTemperature;
 
   return md;
 }

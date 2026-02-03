@@ -19,10 +19,12 @@ const FIXUP_MAX_OUTPUT = true;
 const orModelFamilyOrder = [
   // Leading models/organizations (based on capabilities and popularity)
   'anthropic/', 'deepseek/', 'google/', 'openai/', 'x-ai/',
+  // Upcoming
+  'moonshotai/', 'z-ai/', 'qwen/',
   // Other major providers
   'mistralai/', 'meta-llama/', 'amazon/', 'cohere/',
   // Specialized/AI companies
-  'moonshotai/', 'perplexity/', 'qwen/', 'inflection/',
+  'perplexity/', 'inflection/',
   // Research/open models
   'nvidia/', 'microsoft/', 'nousresearch/', 'openchat/', // 'huggingfaceh4/',
   // Community/other providers
@@ -149,13 +151,35 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
   ];
 
   if (model.id.startsWith('anthropic/') && interfaces.includes(LLM_IF_OAI_Reasoning))
-    parameterSpecs.push({ paramId: 'llmVndAntThinkingBudget', initialValue: null });
+    parameterSpecs.push({ paramId: 'llmVndAntThinkingBudget', initialValue: null /* default: non-reasoning variant, thinking off */ });
 
   if (model.id.startsWith('google/') && interfaces.includes(LLM_IF_OAI_Reasoning))
     parameterSpecs.push({ paramId: 'llmVndGeminiThinkingBudget' });
 
+  // [OpenRouter, 2025-12-31] Add Gemini image generation params for Google models with image output
+  if (model.id.startsWith('google/') && interfaces.includes(LLM_IF_Outputs_Image)) {
+    parameterSpecs.push({ paramId: 'llmVndGeminiAspectRatio' });
+    // NOTE: temporarily disable the size, as the returned data is a > 16MB pic which will cause issues
+    // to the Zod parser, with "Maximum call stack size exceeded"
+    // parameterSpecs.push({ paramId: 'llmVndGeminiImageSize' });
+  }
+
   if (model.id.startsWith('openai/') && interfaces.includes(LLM_IF_OAI_Reasoning))
     parameterSpecs.push({ paramId: 'llmVndOaiReasoningEffort' });
+
+  // [OpenRouter, 2025-01-20] xAI/Grok reasoning effort support
+  if (model.id.startsWith('x-ai/') && interfaces.includes(LLM_IF_OAI_Reasoning))
+    parameterSpecs.push({ paramId: 'llmVndOaiReasoningEffort' });
+
+  // [OpenRouter, 2025-01-20] DeepSeek reasoning effort support
+  if (model.id.startsWith('deepseek/') && interfaces.includes(LLM_IF_OAI_Reasoning))
+    parameterSpecs.push({ paramId: 'llmVndOaiReasoningEffort' });
+
+  // [OpenRouter, 2025-01-20] Verbosity parameter - controls response length and detail level
+  // - Anthropic: only Claude Opus 4.5 supports effort (maps to output_config.effort)
+  // - OpenAI: GPT-5 family supports verbosity
+  if (model.id.startsWith('anthropic/claude-opus-4.5') || model.id.startsWith('openai/gpt-5'))
+    parameterSpecs.push({ paramId: 'llmVndOaiVerbosity' /* 3-levels verbosity */ });
 
 
   // -- Hidden --
@@ -172,7 +196,6 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
     description: model.description?.length > 280 ? model.description.slice(0, 277) + '...' : model.description,
     contextWindow,
     maxCompletionTokens,
-    // trainingDataCutoff: ...
     interfaces,
     // benchmark: ...
     chatPrice,
@@ -181,34 +204,49 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
   });
 }
 
+/**
+ * Inject model variants for OpenRouter models.
+ *
+ * Unlike other providers that use the centralized createVariantInjector() from llm.server.variants.ts,
+ * OpenRouter uses dynamic variant creation based on model properties (vendor prefix, interfaces).
+ * This is because OpenRouter aggregates models from multiple vendors and needs provider-specific logic.
+ *
+ * For static variant maps, prefer using createVariantInjector() or createMultiVariantInjector().
+ */
 export function openRouterInjectVariants(models: ModelDescriptionSchema[], model: ModelDescriptionSchema): ModelDescriptionSchema[] {
-  // keep the same list of models
-  models.push(model);
 
-  // inject thinking variants for Anthropic thinking models
-  // NOTE: we flipped the logic of some thinking/non-thinking models
+  // OR->Anthropic: inject thinking variants
   if (model.id.includes('anthropic/') && model.interfaces.includes(LLM_IF_OAI_Reasoning)) {
 
-    // create a thinking variant for the model, by setting 'idVariant' and modifying the label/description
+    // thinking variant: keep reasoning interface, enable thinking budget (shows 🧠 icon)
     const thinkingVariant: ModelDescriptionSchema = {
       ...model,
       idVariant: 'thinking',
       label: `${model.label.replace(' (thinking)', '')} (thinking)`,
       description: `(configurable thinking) ${model.description}`,
-      interfaces: model.interfaces.filter(i => i !== LLM_IF_OAI_Reasoning),
-      // this is what makes it a thinking variant
+      // keep LLM_IF_OAI_Reasoning for the thinking variant
       parameterSpecs: model.parameterSpecs?.map(param =>
         param.paramId !== 'llmVndAntThinkingBudget' ? param : {
           ...param,
           initialValue: 8192,
-          // initialValue: null, // disable thinking
         }),
     };
-
     models.push(thinkingVariant);
+
+    // base model: remove reasoning interface and thinking budget param (no 🧠 icon)
+    const baseModel: ModelDescriptionSchema = {
+      ...model,
+      interfaces: model.interfaces.filter(i => i !== LLM_IF_OAI_Reasoning),
+      // NOTE: the following line removes the thinking budget param entirely, instead of keeping it with initialValue: null
+      parameterSpecs: model.parameterSpecs?.filter(p => p.paramId !== 'llmVndAntThinkingBudget'),
+    };
+    models.push(baseModel);
+
+    return models;
   }
 
-  // no more variants to inject for now
+  // default
+  models.push(model);
   return models;
 }
 

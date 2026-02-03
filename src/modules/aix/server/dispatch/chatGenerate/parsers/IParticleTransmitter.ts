@@ -23,7 +23,7 @@ export interface IParticleTransmitter {
   appendText(textChunk: string): void;
 
   /** Appends reasoning text, creating a part if missing [throttled] */
-  appendReasoningText(textChunk: string, weak?: 'tag'): void;
+  appendReasoningText(textChunk: string, options?: { weak?: 'tag', restart?: boolean }): void;
 
   /** Sets a reasoning signature, associated with the current reasoning text */
   setReasoningSignature(signature: string): void;
@@ -53,10 +53,10 @@ export interface IParticleTransmitter {
   appendFunctionCallInvocationArgs(id: string | null, argsJsonChunk: string): void;
 
   /** Creates a CE request part, flushing the previous one if needed, and completes it */
-  addCodeExecutionInvocation(id: string | null, language: string, code: string, author: 'gemini_auto_inline'): void;
+  addCodeExecutionInvocation(id: string | null, language: string, code: string, author: 'gemini_auto_inline' | 'code_interpreter'): void;
 
   /** Creates a CE result part, flushing the previous one if needed, and completes it */
-  addCodeExecutionResponse(id: string | null, error: boolean | string, result: string, executor: 'gemini_auto_inline', environment: 'upstream'): void;
+  addCodeExecutionResponse(id: string | null, error: boolean | string, result: string, executor: 'gemini_auto_inline' | 'code_interpreter', environment: 'upstream'): void;
 
   /** Adds a URL citation part */
   appendUrlCitation(title: string, url: string, citationNumber?: number, startIndex?: number, endIndex?: number, textSnippet?: string, pubTs?: number): void;
@@ -68,6 +68,12 @@ export interface IParticleTransmitter {
 
   /** Sends a void placeholder particle - temporary status that gets wiped when real content arrives */
   sendVoidPlaceholder(mot: 'search-web' | 'gen-image' | 'code-exec', text: string): void;
+
+  /**
+   * Sends vendor-specific state modifier for the last emitted part.
+   * Used to attach opaque protocol state (e.g., Gemini thoughtSignature) without polluting core part schemas.
+   */
+  sendSetVendorState(vendor: string, state: unknown): void;
 
   // Non-parts data //
 

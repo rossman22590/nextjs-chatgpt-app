@@ -1,5 +1,5 @@
 import type { IModelVendor } from '../IModelVendor';
-import type { OpenAIAccessSchema } from '../../server/openai/openai.router';
+import type { OpenAIAccessSchema } from '../../server/openai/openai.access';
 
 import { ModelVendorOpenAI } from '../openai/openai.vendor';
 
@@ -8,6 +8,7 @@ interface DTogetherAIServiceSettings {
   togetherKey: string;
   togetherHost: string;
   togetherFreeTrial: boolean;
+  csf?: boolean;
 }
 
 export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, OpenAIAccessSchema> = {
@@ -19,6 +20,9 @@ export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, Ope
   instanceLimit: 1,
   hasServerConfigKey: 'hasLlmTogetherAI',
 
+  /// client-side-fetch ///
+  csfAvailable: _csfTogetherAIAvailable,
+
   // functions
   initializeSetup: () => ({
     togetherKey: '',
@@ -26,15 +30,15 @@ export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, Ope
     togetherFreeTrial: false,
   }),
   validateSetup: (setup) => {
-    return setup.togetherKey?.length >= 64;
+    return setup.togetherKey?.length >= 50;
   },
   getTransportAccess: (partialSetup) => ({
     dialect: 'togetherai',
+    clientSideFetch: _csfTogetherAIAvailable(partialSetup) && !!partialSetup?.csf,
     oaiKey: partialSetup?.togetherKey || '',
     oaiOrg: '',
     oaiHost: partialSetup?.togetherHost || '',
     heliKey: '',
-    moderationCheck: false,
   }),
 
   // there is delay for Together Free API calls
@@ -62,3 +66,7 @@ export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, Ope
 
 // rate limit timestamp
 let nextGenerationTs = 0;
+
+function _csfTogetherAIAvailable(s?: Partial<DTogetherAIServiceSettings>) {
+  return !!s?.togetherKey;
+}

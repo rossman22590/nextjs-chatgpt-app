@@ -1,5 +1,6 @@
 import * as z from 'zod';
 
+import type { DModelParameterId } from '~/common/stores/llms/llms.parameters'; // imported for making sure we sync
 import { LLMS_ALL_INTERFACES } from '~/common/stores/llms/llms.types';
 
 
@@ -18,10 +19,8 @@ export type ModelDescriptionSchema = z.infer<typeof ModelDescription_schema>;
 /// Benchmark
 
 const BenchmarksScores_schema = z.object({
-  cbaElo: z.number().optional(),
-  cbaMmlu: z.number().optional(),
-  // heCode: z.number().optional(), // HumanEval, code, 0-shot
-  // vqaMmmu: z.number().optional(), // Visual Question Answering, MMMU, 0-shot
+  cbaElo: z.number().optional(), // Chat Bot Arena ELO score
+  // removed others for now to reduce noise - also maybe we shall have a mapping table instead
 });
 
 
@@ -77,31 +76,51 @@ const ModelParameterSpec_schema = z.object({
   paramId: z.enum([
     'llmTopP',
     'llmForceNoStream',
+    // Anthropic
     'llmVndAnt1MContext',
+    'llmVndAntEffort',
     'llmVndAntSkills',
     'llmVndAntThinkingBudget',
     'llmVndAntWebFetch',
     'llmVndAntWebSearch',
+    // Gemini
     'llmVndGeminiAspectRatio',
+    'llmVndGeminiCodeExecution',
     'llmVndGeminiComputerUse',
     'llmVndGeminiGoogleSearch',
+    'llmVndGeminiImageSize',
+    'llmVndGeminiMediaResolution',
     'llmVndGeminiShowThoughts',
     'llmVndGeminiThinkingBudget',
+    'llmVndGeminiThinkingLevel',
+    'llmVndGeminiThinkingLevel4',
+    // 'llmVndGeminiUrlContext',
+    // Moonshot
+    'llmVndMoonReasoningEffort',
     'llmVndMoonshotWebSearch',
+    // OpenAI
     'llmVndOaiReasoningEffort',
     'llmVndOaiReasoningEffort4',
+    'llmVndOaiReasoningEffort52',
+    'llmVndOaiReasoningEffort52Pro',
     'llmVndOaiRestoreMarkdown',
     'llmVndOaiVerbosity',
     'llmVndOaiWebSearchContext',
     'llmVndOaiWebSearchGeolocation',
     'llmVndOaiImageGeneration',
+    'llmVndOaiCodeInterpreter',
+    // OpenRouter
     'llmVndOrtWebSearch',
+    // Perplexity
     'llmVndPerplexityDateFilter',
     'llmVndPerplexitySearchMode',
-    'llmVndXaiSearchMode',
-    'llmVndXaiSearchSources',
-    'llmVndXaiSearchDateFilter',
-  ]),
+    // xAI
+    'llmVndXaiCodeExecution',
+    'llmVndXaiSearchInterval',
+    'llmVndXaiWebSearch',
+    'llmVndXaiXSearch',
+    'llmVndXaiXSearchHandles',
+  ] satisfies DModelParameterId[]),
   required: z.boolean().optional(),
   hidden: z.boolean().optional(),
   initialValue: z.number().or(z.string()).or(z.boolean()).nullable().optional(),
@@ -113,19 +132,19 @@ export const ModelDescription_schema = z.object({
   id: z.string(),
   idVariant: z.string().optional(), // only used on the client by '_createDLLMFromModelDescription' to instantiate 'unique' copies of the same model
   label: z.string(),
-  created: z.number().optional(),
-  updated: z.number().optional(),
+  created: z.int().optional(),
+  updated: z.int().optional(),
   description: z.string(),
-  contextWindow: z.number().nullable(),
-  interfaces: z.array(z.enum(LLMS_ALL_INTERFACES)),
+  contextWindow: z.int().nullable(),
+  interfaces: z.array(z.union([z.enum(LLMS_ALL_INTERFACES), z.string()])), // backward compatibility: to not Break client-side interface parsing on newer server
   parameterSpecs: z.array(ModelParameterSpec_schema).optional(),
-  maxCompletionTokens: z.number().optional(),
+  maxCompletionTokens: z.int().optional(), // initial parameter value for 'llmResponseTokens'
   // rateLimits: rateLimitsSchema.optional(),
-  trainingDataCutoff: z.string().optional(),
   benchmark: BenchmarksScores_schema.optional(),
   chatPrice: PricingChatGenerate_schema.optional(),
   hidden: z.boolean().optional(),
-  // TODO: add inputTypes/Kinds..
+  // parameter initializers for vendor-specific defaults
+  initialTemperature: z.number().nullish(), // vendor-specific initial 'llmTemperature' (e.g. Gemini has 1.0)
 });
 
 

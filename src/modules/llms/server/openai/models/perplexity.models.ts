@@ -1,10 +1,33 @@
 import type { ModelDescriptionSchema } from '../../llm.server.types';
+import { createVariantInjector, ModelVariantMap } from '../../llm.server.variants';
 
 import { LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning, LLM_IF_Tools_WebSearch } from '~/common/stores/llms/llms.types';
 
 
 // configuration
 const PERPLEXITY_ENABLE_VARIANTS = false; // enable variants for Perplexity models
+
+
+// Perplexity Model Variants (variants appear before base model)
+const _hardcodedPerplexityVariants: ModelVariantMap = !PERPLEXITY_ENABLE_VARIANTS ? {} : {
+
+  // Academic deep research variant
+  'sonar-deep-research': {
+    idVariant: 'academic',
+    label: 'Sonar Deep Research (Academic)',
+    description: 'Expert-level research model with academic sources only. Searches scholarly databases, peer-reviewed papers, and academic publications. 128k context.',
+    parameterSpecs: [
+      // Fixed parameters for academic search
+      { paramId: 'llmVndOaiWebSearchContext', initialValue: 'medium', hidden: true },
+      { paramId: 'llmVndPerplexitySearchMode', initialValue: 'academic', hidden: true },
+      { paramId: 'llmForceNoStream', initialValue: true, hidden: true },
+      // Free parameters
+      // { paramId: 'llmVndOaiReasoningEffort', initialValue: 'medium' },
+      { paramId: 'llmVndPerplexityDateFilter' },
+    ],
+  },
+
+};
 
 
 const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
@@ -25,7 +48,7 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
     chatPrice: {
       input: 2,
       output: 8,
-      // Full pricing: $2/1M input, $8/1M output, $2/1M citations, $5/1k searches, $3/1M reasoning tokens
+      // Additional: $2/1M citations, $5/1k searches, $3/1M reasoning tokens
     },
   },
 
@@ -44,24 +67,7 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
     chatPrice: {
       input: 2,
       output: 8,
-      // Per-request pricing: $14(High), $10(Medium), $6(Low) per 1k requests
-    },
-  },
-  {
-    id: 'sonar-reasoning',
-    label: 'Sonar Reasoning',
-    description: 'Fast, real-time reasoning model for quick problem-solving with search. 128k context.',
-    contextWindow: 128000,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning, LLM_IF_Tools_WebSearch],
-    parameterSpecs: [
-      { paramId: 'llmVndOaiWebSearchContext', initialValue: 'low' }, // REUSE!
-      { paramId: 'llmVndPerplexitySearchMode' },
-      { paramId: 'llmVndPerplexityDateFilter' },
-    ],
-    chatPrice: {
-      input: 1,
-      output: 5,
-      // Per-request pricing: $12(High), $8(Medium), $5(Low) per 1k requests
+      // Additional per-request: $6(Low) - $14(High) per 1k requests by search context size
     },
   },
 
@@ -81,7 +87,7 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
     chatPrice: {
       input: 3,
       output: 15,
-      // Per-request pricing: $14(High), $10(Medium), $6(Low) per 1k requests
+      // Additional per-request: $6(Low) - $14(High) per 1k requests by search context size
     },
   },
   {
@@ -98,53 +104,23 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
     chatPrice: {
       input: 1,
       output: 1,
-      // Per-request pricing: $12(High), $8(Medium), $5(Low) per 1k requests
+      // Additional per-request: $5(Low) - $12(High) per 1k requests by search context size
     },
   },
 
-  // Deprecated Models (removed August 2025)
-  // {
-  //   id: 'r1-1776',
-  //   label: 'R1-1776',
-  //   description: 'DEPRECATED: Removed August 2025. Use Sonar Reasoning Pro instead.',
-  //   contextWindow: 128000,
-  //   interfaces: [LLM_IF_OAI_Chat],
-  //   chatPrice: {
-  //     input: 2,
-  //     output: 8,
-  //   },
-  // },
+  // Deprecated Models
+  // - sonar-reasoning: Removed December 2025. Use Sonar Reasoning Pro instead.
+  // - r1-1776: Removed August 2025. Use Sonar Reasoning Pro instead.
+  // - llama-3.1-sonar-*-128k-online aliases: Removed February 2025.
 
 ];
 
-export function perplexityInjectVariants(models: ModelDescriptionSchema[], model: ModelDescriptionSchema): ModelDescriptionSchema[] {
-
-  // Variant: academic deep research
-  if (PERPLEXITY_ENABLE_VARIANTS && model.id === 'sonar-deep-research') {
-    models.push({
-      ...model,
-      idVariant: 'academic',
-      label: 'Sonar Deep Research (Academic)',
-      description: 'Expert-level research model with academic sources only. Searches scholarly databases, peer-reviewed papers, and academic publications. 128k context.',
-      parameterSpecs: [
-        // Fixed parameters for academic search
-        { paramId: 'llmVndOaiWebSearchContext', initialValue: 'medium', hidden: true },
-        { paramId: 'llmVndPerplexitySearchMode', initialValue: 'academic', hidden: true },
-        { paramId: 'llmForceNoStream', initialValue: true, hidden: true },
-        // Free parameters
-        // { paramId: 'llmVndOaiReasoningEffort', initialValue: 'medium' },
-        { paramId: 'llmVndPerplexityDateFilter' },
-      ],
-    } satisfies ModelDescriptionSchema);
-  }
-
-  // Add the base model
-  models.push(model);
-
-  return models;
-}
 
 export function perplexityHardcodedModelDescriptions() {
   // Returns the list of known Perplexity models
   return _knownPerplexityChatModels;
+}
+
+export function perplexityInjectVariants(acc: ModelDescriptionSchema[], model: ModelDescriptionSchema): ModelDescriptionSchema[] {
+  return createVariantInjector(_hardcodedPerplexityVariants, 'before')(acc, model);
 }

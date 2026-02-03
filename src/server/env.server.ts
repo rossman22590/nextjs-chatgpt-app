@@ -1,4 +1,12 @@
-// noinspection ES6PreferShortImport - because the build would not find this file with ~/...
+/**
+ * Server-side environment variables centralized access and validation.
+ * Replaced with env.client-mock.ts on client builds via webpack.
+ */
+// [client-side] throw immediately if imported
+if (typeof window !== 'undefined')
+  throw new Error('[DEV] env.server: server module should never be imported on the client.');
+
+// noinspection ES6PreferShortImport - because this is included by `next.config.ts` and build would not find this file with ~/...
 import { createEnv } from '../modules/3rdparty/t3-env';
 import * as z from 'zod';
 
@@ -112,6 +120,10 @@ export const env = createEnv({
     PASSWORD: z.string().optional(),
     PASSWORD_PROTECT: z.string().optional(),
 
+    // AIX: Strict parsing mode - if omitted: strict in dev (throws on unknown API values), tolerant in prod (warns)
+    // Set to 'true' to force strict mode in production (useful for debugging API drift)
+    AIX_STRICT_PARSING: z.enum(['true']).optional(),
+
     // Build-time configuration (ignore)
     BIG_AGI_BUILD: z.enum(['standalone', 'static']).optional(),
 
@@ -121,12 +133,17 @@ export const env = createEnv({
    * Environment variables available on the client (and server).
    * You'll get type errors if these are not prefixed with NEXT_PUBLIC_.
    *
+   * This is here basically for validation, but seems to not be used anywhere in the client code.
+   *
    * NOTE: they must be set at build time, not runtime(!)
    */
   client: {
 
     // Frontend: Google Analytics GA4 Measurement ID
     NEXT_PUBLIC_GA4_MEASUREMENT_ID: z.string().optional(),
+
+    // Google Drive Picker: download files from Google Drive
+    NEXT_PUBLIC_GOOGLE_DRIVE_CLIENT_ID: z.string().optional(),
 
     // Frontend: server to use for PlantUML rendering
     NEXT_PUBLIC_PLANTUML_SERVER_URL: z.url().optional(),
@@ -142,17 +159,9 @@ export const env = createEnv({
   // with Noext.JS >= 13.4.4 we'd only need to destructure client variables
   experimental__runtimeEnv: {
     NEXT_PUBLIC_GA4_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID,
+    NEXT_PUBLIC_GOOGLE_DRIVE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_DRIVE_CLIENT_ID,
     NEXT_PUBLIC_PLANTUML_SERVER_URL: process.env.NEXT_PUBLIC_PLANTUML_SERVER_URL,
     NEXT_PUBLIC_DEBUG_CLOUD_SYNC: process.env.NEXT_PUBLIC_DEBUG_CLOUD_SYNC,
   },
 });
 
-/**
- * Dummy function to validate any build-time environment variables.
- * Does nothing really, but forces the creation of the `env` object.
- *
- * At runtime the `env` object is actually used.
- */
-export function verifyBuildTimeVars(): number {
-  return Object.keys(env).length;
-}

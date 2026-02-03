@@ -8,9 +8,12 @@ import type { DModelsServiceId } from '~/common/stores/llms/llms.service.types';
 import { ExpanderAccordion } from '~/common/components/ExpanderAccordion';
 import { FormInputKey } from '~/common/components/forms/FormInputKey';
 import { InlineError } from '~/common/components/InlineError';
+import { isLocalUrl } from '~/common/util/urlUtils';
 import { Link } from '~/common/components/Link';
+import { SetupFormClientSideToggle } from '~/common/components/forms/SetupFormClientSideToggle';
 import { SetupFormRefetchButton } from '~/common/components/forms/SetupFormRefetchButton';
 import { VideoPlayerYouTube } from '~/common/components/VideoPlayerYouTube';
+import { useToggleableBoolean } from '~/common/util/hooks/useToggleableBoolean';
 
 import { useLlmUpdateModels } from '../../llm.client.hooks';
 import { useServiceSetup } from '../useServiceSetup';
@@ -20,12 +23,16 @@ import { ModelVendorLMStudio } from './lmstudio.vendor';
 
 export function LMStudioServiceSetup(props: { serviceId: DModelsServiceId }) {
 
+  // state
+  const advanced = useToggleableBoolean();
+
   // external state
   const { service, serviceAccess, updateSettings } =
     useServiceSetup(props.serviceId, ModelVendorLMStudio);
 
   // derived state
-  const { oaiHost } = serviceAccess;
+  const { clientSideFetch, oaiHost } = serviceAccess;
+  const showAdvanced = advanced.on || !!clientSideFetch;
 
   // validate if url is a well formed proper url with zod
   const urlSchema = z.url().startsWith('http');
@@ -62,7 +69,15 @@ export function LMStudioServiceSetup(props: { serviceId: DModelsServiceId }) {
       value={oaiHost} onChange={value => updateSettings({ oaiHost: value })}
     />
 
-    <SetupFormRefetchButton refetch={refetch} disabled={!shallFetchSucceed || isFetching} loading={isFetching} error={isError} />
+    {showAdvanced && <SetupFormClientSideToggle
+      visible={!!oaiHost}
+      checked={!!clientSideFetch}
+      onChange={on => updateSettings({ csf: on })}
+      helpText='Connect directly to LM Studio from your browser. Requires CORS to be enabled in LM Studio.'
+      localHostDetected={isLocalUrl(oaiHost)}
+    />}
+
+    <SetupFormRefetchButton refetch={refetch} disabled={!shallFetchSucceed || isFetching} loading={isFetching} error={isError} advanced={advanced} />
 
     {isError && <InlineError error={error} />}
 

@@ -1,22 +1,25 @@
 import * as React from 'react';
 
 import type { SxProps } from '@mui/joy/styles/types';
-import { Box, Chip, ColorPaletteProp, FormControl, IconButton, ListDivider, ListItemDecorator, Option, optionClasses, Select, SelectSlotsAndSlotProps, SvgIconProps, VariantProp } from '@mui/joy';
+import { Chip, ColorPaletteProp, FormControl, IconButton, ListDivider, ListItem, ListItemButton, ListItemDecorator, Option, optionClasses, Select, SelectSlotsAndSlotProps, SvgIconProps, VariantProp } from '@mui/joy';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoModeIcon from '@mui/icons-material/AutoMode';
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
-import type { IModelVendor } from '~/modules/llms/vendors/IModelVendor';
 import { findModelVendor } from '~/modules/llms/vendors/vendors.registry';
 import { llmsGetVendorIcon, LLMVendorIcon } from '~/modules/llms/components/LLMVendorIcon';
 
 import type { DModelDomainId } from '~/common/stores/llms/model.domains.types';
+import type { DModelsServiceId } from '~/common/stores/llms/llms.service.types';
 import { DLLM, DLLMId, getLLMPricing, LLM_IF_OAI_Reasoning, LLM_IF_Outputs_Audio, LLM_IF_Outputs_Image, LLM_IF_Tools_WebSearch } from '~/common/stores/llms/llms.types';
 import { PhGearSixIcon } from '~/common/components/icons/phosphor/PhGearSixIcon';
-import { StarredNoXL2 } from '~/common/components/StarIcons';
+import { StarIconUnstyled, StarredNoXL2 } from '~/common/components/StarIcons';
 import { TooltipOutlined } from '~/common/components/TooltipOutlined';
-import { getChatLLMId, llmsStoreActions } from '~/common/stores/llms/store-llms';
+import { findModelsServiceOrNull, getChatLLMId, llmsStoreActions } from '~/common/stores/llms/store-llms';
 import { optimaActions, optimaOpenModels } from '~/common/layout/optima/useOptima';
+import { useUIPreferencesStore } from '~/common/stores/store-ui';
 import { useVisibleLLMs } from '~/common/stores/llms/llms.hooks';
 
 import { FormLabelStart } from './FormLabelStart';
@@ -58,12 +61,23 @@ const _styles = {
     backgroundColor: 'background.popup',
     boxShadow: 'xs',
   },
-  listVendor: {
-    // see OptimaBarDropdown's _styles.separator
+  listFooter: {
+    // '--ListItem-minHeight': '2.25rem',
+    borderTop: '1px solid',
+    borderTopColor: 'divider',
+    // pb: 0,
+    position: 'sticky',
+    bottom: 0,
+    backgroundColor: 'background.surface',
+    zIndex: 1,
+  },
+  listServiceHeaderButton: {
     fontSize: 'sm',
-    color: 'text.tertiary',
-    textAlign: 'center',
-    my: 0.75,
+    fontWeight: 'md',
+    justifyContent: 'space-between',
+  },
+  listServiceHeaderExpand: {
+    fontSize: 'md',
   },
   listConfSep: {
     mb: 0,
@@ -73,7 +87,7 @@ const _styles = {
   },
 } as const satisfies Record<string, SxProps>;
 
-const _slotProps: SelectSlotsAndSlotProps<false>['slotProps'] = {
+const _slotProps = {
   // see the OptimaBarDropdown.listbox for a well made customization (max-height, max-width, etc.)
   listbox: {
     sx: {
@@ -116,7 +130,7 @@ const _slotProps: SelectSlotsAndSlotProps<false>['slotProps'] = {
       minWidth: '6rem',
     } as const,
   } as const,
-} as const;
+} as const satisfies SelectSlotsAndSlotProps<false>['slotProps'];
 
 
 interface LLMSelectOptions {
@@ -130,6 +144,7 @@ interface LLMSelectOptions {
   isHorizontal?: boolean;
   autoRefreshDomain?: DModelDomainId;
   appendConfigureModels?: boolean; // appends a bottom option to open the Models panel
+  showStarFilter?: boolean; // show a button to filter starred models only
 }
 
 /**
@@ -145,17 +160,60 @@ export function useLLMSelect(
   options: LLMSelectOptions,
 ): [DLLM | null, React.JSX.Element | null, React.FunctionComponent<SvgIconProps> | undefined] {
 
+  // options
+  const { label, larger = false, disabled = false, placeholder = LLM_TEXT_PLACEHOLDER, isHorizontal = false, autoRefreshDomain, appendConfigureModels = false, showStarFilter = false } = options;
+
   // state
   const [controlledOpen, setControlledOpen] = React.useState(false);
+  const [collapsedServices, setCollapsedServices] = React.useState<Set<DModelsServiceId>>(new Set());
 
   // external state
-  const _filteredLLMs = useVisibleLLMs(llmId);
+  const starredOnly = useUIPreferencesStore(state => showStarFilter && state.showModelsStarredOnly);
+  // const modelsStarredOnTop = useUIPreferencesStore(state => state.modelsStarredOnTop); // unsupported, this creates some issues with groups I believe
+  const { llms: _filteredLLMs, hasStarred } = useVisibleLLMs(llmId, starredOnly, false);
 
   // derived state
-  const { label, larger = false, disabled = false, placeholder = LLM_TEXT_PLACEHOLDER, isHorizontal = false, autoRefreshDomain, appendConfigureModels = false } = options;
   const noIcons = false; //smaller;
   const llm = !llmId ? null : _filteredLLMs.find(llm => llm.id === llmId) ?? null;
   const isReasoning = !LLM_SELECT_SHOW_REASONING_ICON ? false : llm?.interfaces?.includes(LLM_IF_OAI_Reasoning) ?? false;
+
+
+  // handlers
+
+  const toggleServiceCollapse = React.useCallback((serviceId: DModelsServiceId) => {
+    setCollapsedServices(prev => {
+      const next = new Set(prev);
+      if (next.has(serviceId)) next.delete(serviceId);
+      else next.add(serviceId);
+      return next;
+    });
+  }, []);
+
+
+  // Scroll preservation: MUI's useSelect auto-scrolls to highlighted item when options change - we want to preserve scroll instead
+
+  const listboxRef = React.useRef<HTMLUListElement>(null);
+
+  const listboxSlotPropsStable = React.useMemo(() => ({
+    ..._slotProps,
+    listbox: { ..._slotProps.listbox, ref: listboxRef },
+  }), []);
+
+  React.useLayoutEffect(() => {
+    // restore scroll after collapse/expand - snapshot before MUI scrolls, restore via double RAF
+    const el = listboxRef.current;
+    if (!el) return;
+    const scrollTop = el.scrollTop;
+    const raf = requestAnimationFrame(() => {
+      // usually works, especially on expansion
+      el.scrollTop = scrollTop;
+      return requestAnimationFrame(() => {
+        // fixes the collapse too
+        el.scrollTop = scrollTop;
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [collapsedServices]);
 
 
   // memo LLM Options
@@ -163,22 +221,40 @@ export function useLLMSelect(
   const optimizeToSingleVisibleId = (!controlledOpen && _filteredLLMs.length > LLM_SELECT_REDUCE_OPTIONS) ? llmId : null; // id to keep visible when optimizing
 
   const optionsArray = React.useMemo(() => {
+    // check if we have multiple services (to show collapsible headers)
+    const hasMultipleServices = _filteredLLMs.some((llm, i, arr) => i > 0 && llm.sId !== arr[i - 1].sId);
+
     // create the option items
-    let formerVendor: IModelVendor | null = null;
+    let prevServiceId: DModelsServiceId | null = null;
     return _filteredLLMs.reduce((acc, llm, _index) => {
 
       if (optimizeToSingleVisibleId && llm.id !== optimizeToSingleVisibleId)
         return acc;
 
-      const vendor = findModelVendor(llm.vId);
-      const vendorChanged = vendor !== formerVendor;
-      if (vendorChanged)
-        formerVendor = vendor;
+      const serviceVendor = findModelVendor(llm.vId);
+      const isServiceCollapsed = hasMultipleServices && collapsedServices.has(llm.sId);
 
-      // add separators if the vendor changed (and more than one vendor)
-      const addSeparator = vendorChanged && formerVendor !== null;
-      if (addSeparator && !optimizeToSingleVisibleId)
-        acc.push(<Box key={'llm-sep-' + llm.id} sx={_styles.listVendor}>{vendor?.name}</Box>);
+      // add collapsible service headers when changing services
+      if (hasMultipleServices && llm.sId !== prevServiceId) {
+        if (!optimizeToSingleVisibleId) {
+          const serviceLabel = findModelsServiceOrNull(llm.sId)?.label || serviceVendor?.name || llm.sId;
+          acc.push(
+            <ListItem key={'llm-sep-' + llm.sId}>
+              <ListItemButton onClick={() => toggleServiceCollapse(llm.sId)} sx={_styles.listServiceHeaderButton}>
+                {/*{serviceVendor?.id && <ListItemDecorator><LLMVendorIcon vendorId={serviceVendor.id} /></ListItemDecorator>}*/}
+                <div />
+                {isServiceCollapsed ? <i>{serviceLabel}</i> : serviceLabel}
+                {isServiceCollapsed ? <ExpandMoreIcon sx={_styles.listServiceHeaderExpand} /> : <ExpandLessIcon sx={_styles.listServiceHeaderExpand} />}
+              </ListItemButton>
+            </ListItem>,
+          );
+        }
+        prevServiceId = llm.sId;
+      }
+
+      // skip models if service is collapsed (but always show selected model)
+      if (isServiceCollapsed && llm.id !== llmId)
+        return acc;
 
       let features = '';
       const isNotSymlink = !llm.label.startsWith('🔗');
@@ -186,6 +262,8 @@ export function useLLMSelect(
       if (isNotSymlink) {
         // check features
         if (seemsFree) features += 'free ';
+        if (llm.isUserClone)
+          features += '➕ '; // is clone
         if (llm.interfaces.includes(LLM_IF_OAI_Reasoning))
           features += '🧠 '; // can reason
         if (llm.interfaces.includes(LLM_IF_Tools_WebSearch))
@@ -209,7 +287,7 @@ export function useLLMSelect(
         >
           {!noIcons && (
             <ListItemDecorator>
-              {llm.userStarred ? <StarredNoXL2 /> : vendor?.id ? <LLMVendorIcon vendorId={vendor.id} /> : null}
+              {(llm.userStarred && !starredOnly) ? <StarredNoXL2 /> : serviceVendor?.id ? <LLMVendorIcon vendorId={serviceVendor.id} /> : null}
             </ListItemDecorator>
           )}
           {/*<Tooltip title={llm.description}>*/}
@@ -228,7 +306,7 @@ export function useLLMSelect(
                 // variant='outlined'
                 onClick={(e) => {
                   e.stopPropagation();
-                  optimaActions().openModelOptions(llm.id);
+                  optimaActions().openModelOptions(llm.id, 'parameters');
                 }}
                 sx={_styles.configButton}
               >
@@ -244,7 +322,7 @@ export function useLLMSelect(
 
       return acc;
     }, [] as React.JSX.Element[]);
-  }, [_filteredLLMs, llmId, noIcons, optimizeToSingleVisibleId]);
+  }, [_filteredLLMs, collapsedServices, llmId, noIcons, optimizeToSingleVisibleId, starredOnly, toggleServiceCollapse]);
 
 
   const onSelectChange = React.useCallback((_event: unknown, value: DLLMId | null) => {
@@ -273,7 +351,7 @@ export function useLLMSelect(
         listboxOpen={controlledOpen}
         onListboxOpenChange={hasNoModels ? optimaOpenModels : setControlledOpen}
         placeholder={hasNoModels ? LLM_TEXT_CONFIGURE : placeholder}
-        slotProps={_slotProps}
+        slotProps={listboxSlotPropsStable}
         endDecorator={autoRefreshDomain ?
           <TooltipOutlined title='Auto-select the model'>
             <IconButton onClick={() => llmsStoreActions().assignDomainModelId(autoRefreshDomain, null)}>
@@ -297,10 +375,26 @@ export function useLLMSelect(
           </Option>
         )}
 
+        {/* Star Filter Toggle - shown at the top of the list only if visible */}
+        {showStarFilter && hasStarred && !optimizeToSingleVisibleId && (
+          <ListItem key='star-filter-toggle' sx={_styles.listFooter}>
+            <ListItemButton
+              variant={starredOnly ? 'soft' : 'plain'}
+              onClick={useUIPreferencesStore.getState().toggleShowModelsStarredOnly}
+              // sx={{ backgroundColor: 'background.surface', position: 'sticky', top: 0, zIndex: 1 }}
+            >
+              <ListItemDecorator>
+                <StarIconUnstyled isStarred={starredOnly} />
+              </ListItemDecorator>
+              {starredOnly ? 'Showing: Starred' : 'Showing: All'}
+            </ListItemButton>
+          </ListItem>
+        )}
+
       </Select>
       {/*</Box>*/}
     </FormControl>
-  ), [appendConfigureModels, autoRefreshDomain, controlledOpen, disabled, hasNoModels, isHorizontal, isReasoning, label, larger, llmId, onSelectChange, optimizeToSingleVisibleId, options.color, options.sx, options.variant, optionsArray, placeholder, showNoOptions]);
+  ), [appendConfigureModels, autoRefreshDomain, controlledOpen, disabled, hasNoModels, hasStarred, isHorizontal, isReasoning, label, larger, listboxSlotPropsStable, llmId, onSelectChange, optimizeToSingleVisibleId, options.color, options.sx, options.variant, optionsArray, placeholder, showNoOptions, showStarFilter, starredOnly]);
 
   // Memo the vendor icon for the chat LLM
   const chatLLMVendorIconFC = React.useMemo(() => {
