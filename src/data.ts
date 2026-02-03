@@ -613,3 +613,4 @@ execute <Init>`,
     call: { starters: ['What\'s the task?', 'What can I do?', 'Ready for your task.', 'Yes?'] },
     voices: { elevenLabs: { voiceId: 'flq6f7yk4E4fJM5XTYuZ' } },
   },
+} as const;

@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { Release } from '~/common/app.release';
 
 import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
-import { env } from '~/server/env';
+import { env } from '~/server/env.server';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 // critical to make sure we `import type` here

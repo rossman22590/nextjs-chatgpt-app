@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
 import { createTRPCRouterEdge, publicProcedureEdge } from '~/server/trpc/trpc.server-edge';
-import { env } from '~/server/env';
+import { env } from '~/server/env.server';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import { Search } from './search.types';
