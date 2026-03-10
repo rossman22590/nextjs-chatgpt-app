@@ -18,6 +18,7 @@ interface CloudSyncMetadata {
 
 const SYNC_DEBOUNCE_MS = 1000;
 const REQUEUE_DEBOUNCE_MS = 250;
+const CLOUD_LOAD_BATCH_SIZE = 50;
 
 
 function convertMessageRole(role: string): 'USER' | 'ASSISTANT' | 'SYSTEM' {
@@ -67,6 +68,85 @@ function indexConversationStamps(conversations: DConversation[]): Map<string, nu
     indexed.set(conversation.id, getConversationSyncStamp(conversation));
   });
   return indexed;
+}
+
+
+function textFromMessage(message: DMessage | undefined): string {
+  if (!message?.fragments?.length)
+    return '';
+
+  return message.fragments
+    .map(fragment => {
+      if (fragment.ft === 'content')
+        return JSON.stringify(fragment.part ?? '');
+      if (fragment.ft === 'attachment')
+        return JSON.stringify(fragment.part ?? 'attachment');
+      return '';
+    })
+    .join('|')
+    .slice(0, 240);
+}
+
+
+function normalizeConversationTitle(conversation: DConversation): string {
+  return (conversation.userTitle || conversation.autoTitle || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+
+function duplicateConversationKey(conversation: DConversation): string {
+  const firstMessage = conversation.messages[0];
+  const lastMessage = conversation.messages[conversation.messages.length - 1];
+  return [
+    normalizeConversationTitle(conversation),
+    conversation.systemPurposeId,
+    conversation.messages.length,
+    firstMessage?.role || '',
+    textFromMessage(firstMessage),
+    lastMessage?.role || '',
+    textFromMessage(lastMessage),
+  ].join('::');
+}
+
+
+function scoreConversationForDisplay(conversation: DConversation): number {
+  return (
+    getConversationSyncStamp(conversation) * 10
+    + conversation.messages.length
+    + (conversation.userTitle ? 2 : 0)
+    + (conversation.autoTitle ? 1 : 0)
+  );
+}
+
+
+function dedupeConversationsForDisplay(conversations: DConversation[]): { visible: DConversation[]; hiddenIds: Set<string> } {
+  const winners = new Map<string, DConversation>();
+  const hiddenIds = new Set<string>();
+
+  for (const conversation of conversations) {
+    const key = duplicateConversationKey(conversation);
+    const currentWinner = winners.get(key);
+    if (!currentWinner) {
+      winners.set(key, conversation);
+      continue;
+    }
+
+    const candidateWins = scoreConversationForDisplay(conversation) > scoreConversationForDisplay(currentWinner);
+    if (candidateWins) {
+      hiddenIds.add(currentWinner.id);
+      hiddenIds.delete(conversation.id);
+      winners.set(key, conversation);
+    } else {
+      hiddenIds.add(conversation.id);
+    }
+  }
+
+  return {
+    visible: conversations.filter(conversation => !hiddenIds.has(conversation.id)),
+    hiddenIds,
+  };
 }
 
 
@@ -206,7 +286,22 @@ export const useChatCloudSync = () => {
     console.log('[cloud-sync] Loading conversations from database');
 
     try {
-      const dbConversations = await apiAsyncNode.trade.getUserConversations.query({});
+      const dbConversations: any[] = [];
+      let offset = 0;
+
+      while (true) {
+        const page = await apiAsyncNode.trade.getUserConversations.query({
+          limit: CLOUD_LOAD_BATCH_SIZE,
+          offset,
+        });
+
+        dbConversations.push(...page);
+
+        if (page.length < CLOUD_LOAD_BATCH_SIZE)
+          break;
+
+        offset += CLOUD_LOAD_BATCH_SIZE;
+      }
       const { conversations: localConversations } = useChatStore.getState();
       const localConversationMap = new Map<string, DConversation>();
       localConversations.forEach(conversation => {
@@ -275,13 +370,25 @@ export const useChatCloudSync = () => {
         }
       }
 
-      const finalConversations = hasStoreChanges ? Array.from(newConversationMap.values()) : localConversations;
+      const mergedConversations = hasStoreChanges ? Array.from(newConversationMap.values()) : localConversations;
+      const { visible: finalConversations, hiddenIds } = dedupeConversationsForDisplay(mergedConversations);
+
+      hiddenIds.forEach(conversationId => {
+        syncMap.delete(conversationId);
+      });
+
       observedConversationStampsRef.current = indexConversationStamps(finalConversations);
       hydrationCompleteRef.current = true;
+
+      if (hiddenIds.size)
+        console.log(`[cloud-sync] Hiding ${hiddenIds.size} probable duplicate conversations from the local view`);
 
       if (hasStoreChanges) {
         useChatStore.setState({ conversations: finalConversations });
         console.log(`[cloud-sync] Updated local chat store with ${dbConversations?.length || 0} conversations`);
+      } else if (finalConversations.length !== localConversations.length) {
+        useChatStore.setState({ conversations: finalConversations });
+        console.log('[cloud-sync] Removed probable duplicate conversations from the local view');
       } else {
         console.log('[cloud-sync] Cloud hydration complete with no local store changes');
       }
