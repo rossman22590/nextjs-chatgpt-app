@@ -9,7 +9,7 @@ import TokenIcon from '@mui/icons-material/DataUsage';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import EditIcon from '@mui/icons-material/Edit';
 
-import { apiQueryCloud } from '~/common/util/trpc.client';
+import { apiAsyncNode } from '~/common/util/trpc.client';
 
 
 // Stat card component
@@ -39,28 +39,38 @@ function fmtCost(cents: number | null | undefined): string {
 
 
 // User detail modal
-function UserDetailModal(props: { userId: string; onClose: () => void }) {
-  const { data: usage, isLoading } = apiQueryCloud.admin.getUserUsage.useQuery({ userId: props.userId });
-  const { data: logs } = apiQueryCloud.admin.getUserLogs.useQuery({ userId: props.userId, limit: 20 });
-  const utils = apiQueryCloud.useUtils();
-
+function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh: () => void }) {
+  const [usage, setUsage] = React.useState<any>(null);
+  const [logs, setLogs] = React.useState<any[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [editingLimit, setEditingLimit] = React.useState(false);
   const [limitValue, setLimitValue] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
 
-  const setLimit = apiQueryCloud.admin.setTokenLimit.useMutation({
-    onSuccess: () => {
-      utils.admin.getUserUsage.invalidate({ userId: props.userId });
-      utils.admin.listUsers.invalidate();
-      setEditingLimit(false);
-    },
-  });
+  const loadData = React.useCallback(() => {
+    setIsLoading(true);
+    Promise.all([
+      apiAsyncNode.admin.getUserUsage.query({ userId: props.userId }),
+      apiAsyncNode.admin.getUserLogs.query({ userId: props.userId, limit: 20 }),
+    ]).then(([u, l]) => {
+      setUsage(u);
+      setLogs(l);
+    }).catch(() => {}).finally(() => setIsLoading(false));
+  }, [props.userId]);
+
+  React.useEffect(() => { loadData(); }, [loadData]);
 
   const handleSetLimit = () => {
     const val = limitValue.trim();
-    setLimit.mutate({
+    setSaving(true);
+    apiAsyncNode.admin.setTokenLimit.mutate({
       userId: props.userId,
       tokenLimit: val === '' || val === '0' ? null : parseInt(val, 10) || null,
-    });
+    }).then(() => {
+      setEditingLimit(false);
+      loadData();
+      props.onRefresh();
+    }).catch(() => {}).finally(() => setSaving(false));
   };
 
   return (
@@ -85,7 +95,7 @@ function UserDetailModal(props: { userId: string; onClose: () => void }) {
                       onChange={e => setLimitValue(e.target.value)}
                       sx={{ width: 150 }}
                     />
-                    <Button size='sm' onClick={handleSetLimit} loading={setLimit.isPending}>Save</Button>
+                    <Button size='sm' onClick={handleSetLimit} loading={saving}>Save</Button>
                     <Button size='sm' variant='plain' onClick={() => setEditingLimit(false)}>Cancel</Button>
                   </Box>
                 ) : (
@@ -156,32 +166,59 @@ function UserDetailModal(props: { userId: string; onClose: () => void }) {
 
 export function AppAdmin() {
   const { data: session } = useSession();
-  const { data: isAdminData, isLoading: checkingAdmin } = apiQueryCloud.admin.isAdmin.useQuery(
-    undefined, { enabled: !!session?.user },
-  );
-  const { data: globalStats } = apiQueryCloud.admin.globalStats.useQuery(
-    undefined, { enabled: !!isAdminData?.isAdmin },
-  );
-  const { data: usersData } = apiQueryCloud.admin.listUsers.useQuery(
-    undefined, { enabled: !!isAdminData?.isAdmin },
-  );
-  const { data: topUsers } = apiQueryCloud.admin.topUsers.useQuery(
-    undefined, { enabled: !!isAdminData?.isAdmin },
-  );
+
+  // All state that was previously from React Query hooks
+  const [checkingAdmin, setCheckingAdmin] = React.useState(true);
+  const [isAdmin, setIsAdmin] = React.useState(false);
+  const [globalStats, setGlobalStats] = React.useState<any>(null);
+  const [usersData, setUsersData] = React.useState<any>(null);
+  const [topUsers, setTopUsers] = React.useState<any[]>([]);
 
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedUserId, setSelectedUserId] = React.useState<string | null>(null);
   const [bulkLimit, setBulkLimit] = React.useState('');
+  const [bulkSaving, setBulkSaving] = React.useState(false);
 
-  const utils = apiQueryCloud.useUtils();
-  const setAllLimits = apiQueryCloud.admin.setAllTokenLimits.useMutation({
-    onSuccess: (data) => {
-      utils.admin.listUsers.invalidate();
-      utils.admin.globalStats.invalidate();
-      setBulkLimit('');
-      alert('Updated ' + data.updated + ' users');
-    },
-  });
+  // Load all admin data
+  const loadAllData = React.useCallback(() => {
+    if (!isAdmin) return;
+    Promise.all([
+      apiAsyncNode.admin.globalStats.query(),
+      apiAsyncNode.admin.listUsers.query(),
+      apiAsyncNode.admin.topUsers.query(),
+    ]).then(([stats, users, top]) => {
+      setGlobalStats(stats);
+      setUsersData(users);
+      setTopUsers(top);
+    }).catch(() => {});
+  }, [isAdmin]);
+
+  // Check admin status on mount
+  React.useEffect(() => {
+    if (!session?.user) { setCheckingAdmin(false); return; }
+    setCheckingAdmin(true);
+    apiAsyncNode.admin.isAdmin.query()
+      .then(res => {
+        setIsAdmin(res.isAdmin);
+      })
+      .catch(() => setIsAdmin(false))
+      .finally(() => setCheckingAdmin(false));
+  }, [session?.user]);
+
+  // Load data once admin is confirmed
+  React.useEffect(() => { loadAllData(); }, [loadAllData]);
+
+  const handleSetAllLimits = (tokenLimit: number | null) => {
+    setBulkSaving(true);
+    apiAsyncNode.admin.setAllTokenLimits.mutate({ tokenLimit })
+      .then(data => {
+        setBulkLimit('');
+        alert('Updated ' + data.updated + ' users');
+        loadAllData();
+      })
+      .catch(() => alert('Failed to update limits'))
+      .finally(() => setBulkSaving(false));
+  };
 
   // Auth gate
   if (!session?.user)
@@ -198,14 +235,14 @@ export function AppAdmin() {
       </Box>
     );
 
-  if (!isAdminData?.isAdmin)
+  if (!isAdmin)
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <Typography level='h4' color='danger'>Access denied. Admin privileges required.</Typography>
       </Box>
     );
 
-  const filteredUsers = usersData?.users.filter(u =>
+  const filteredUsers = usersData?.users.filter((u: any) =>
     !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
@@ -273,12 +310,12 @@ export function AppAdmin() {
           <Button
             size='sm'
             color='warning'
-            loading={setAllLimits.isPending}
+            loading={bulkSaving}
             onClick={() => {
               const val = parseInt(bulkLimit, 10);
               if (!val || val <= 0) return alert('Enter a valid number');
               if (confirm('Set ' + val.toLocaleString() + ' tokens/month for ALL users?'))
-                setAllLimits.mutate({ tokenLimit: val });
+                handleSetAllLimits(val);
             }}
           >
             Apply to All Users
@@ -287,10 +324,10 @@ export function AppAdmin() {
             size='sm'
             variant='soft'
             color='success'
-            loading={setAllLimits.isPending}
+            loading={bulkSaving}
             onClick={() => {
               if (confirm('Remove token limit for ALL users (unlimited)?'))
-                setAllLimits.mutate({ tokenLimit: null });
+                handleSetAllLimits(null);
             }}
           >
             Set All Unlimited
@@ -323,7 +360,7 @@ export function AppAdmin() {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers?.map(user => (
+            {filteredUsers?.map((user: any) => (
               <tr key={user.id}>
                 <td><Typography level='body-sm'>{user.name || 'Unnamed'}</Typography></td>
                 <td><Typography level='body-xs'>{user.email}</Typography></td>
@@ -348,7 +385,7 @@ export function AppAdmin() {
 
       {/* User Detail Modal */}
       {selectedUserId && (
-        <UserDetailModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
+        <UserDetailModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} onRefresh={loadAllData} />
       )}
     </Box>
   );

@@ -46,8 +46,12 @@ export const usageRouter = createTRPCRouter({
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { tokenLimit: true },
+        select: { tokenLimit: true, email: true },
       });
+
+      // Admin is always unlimited
+      if (user?.email === 'rcohen@mytsi.org')
+        return { allowed: true, limit: null, used: 0, remaining: null };
 
       // No limit set = unlimited
       if (!user?.tokenLimit)
