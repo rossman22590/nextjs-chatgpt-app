@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { 
   Box, 
+  Button,
   Card, 
   CardContent, 
   Typography, 
@@ -22,6 +23,7 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import MessageIcon from '@mui/icons-material/Message';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 import {
   Chart as ChartJS,
@@ -150,9 +152,9 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
   const [analytics, setAnalytics] = React.useState<AnalyticsData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
 
-  React.useEffect(() => {
-    const fetchAnalytics = async () => {
+  const fetchAnalytics = React.useCallback(async () => {
       try {
         setLoading(true);
         const conversations = await apiAsyncNode.trade.getUserConversations.query({});
@@ -427,15 +429,22 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
         };
 
         setAnalytics(analyticsData);
+        setLastUpdated(new Date());
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load analytics');
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchAnalytics();
   }, [userId]);
+
+  React.useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  const handleRefresh = React.useCallback(() => {
+    setError(null);
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   const formatCost = (cost: number) => {
     if (cost === 0) return '$0.00';
@@ -631,6 +640,23 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
+      {/* Header with refresh */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography level="body-xs" color="neutral">
+          {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : ''}
+        </Typography>
+        <Button
+          variant="outlined"
+          color="neutral"
+          size="sm"
+          startDecorator={<RefreshIcon />}
+          loading={loading}
+          onClick={handleRefresh}
+        >
+          Refresh
+        </Button>
+      </Box>
+
       {/* Overview Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid xs={12} sm={6} md={3}>

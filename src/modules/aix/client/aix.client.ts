@@ -588,13 +588,14 @@ function _updateGeneratorCostsInPlace(generator: DMessageGenerator, llm: DLLM, d
   metricsStoreAddChatGenerate(costs, inputTokens, outputTokens, llm, debugCostSource);
 
   // Log usage to server (fire-and-forget, best-effort)
+  // Use max of computed vs reported cost to avoid double-counting (they represent the same cost from different sources)
   apiAsyncNode.usage.logUsage.mutate({
     modelId: logLlmRefId,
     vendorId: llm.vId,
     serviceName: llm.sId || undefined,
     inputTokens,
     outputTokens,
-    costCents: (costs.$c || 0) + (costs.$cReported || 0),
+    costCents: Math.max(costs.$c || 0, costs.$cReported || 0),
     operation: debugCostSource.includes('beam') ? 'beam' : debugCostSource.includes('call') ? 'call' : 'chat',
   }).catch(() => { /* best-effort, ignore auth/network errors */ });
 }

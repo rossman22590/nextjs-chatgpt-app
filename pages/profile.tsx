@@ -27,6 +27,7 @@ import SecurityIcon from '@mui/icons-material/Security';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 import { Brand } from '~/common/app.config';
 import { AuthButton } from '~/common/components/auth/AuthButton';
@@ -50,15 +51,30 @@ export default function Profile() {
   const [limitInfo, setLimitInfo] = React.useState<CheckLimitData | null>(null);
   const [monthlyHistory, setMonthlyHistory] = React.useState<MonthlyHistoryData | null>(null);
   const [myLogs, setMyLogs] = React.useState<MyLogsData | null>(null);
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const refreshUsageData = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const [usage, limit, history, logs] = await Promise.all([
+        apiAsyncNode.usage.myUsage.query(),
+        apiAsyncNode.usage.checkLimit.query(),
+        apiAsyncNode.usage.myMonthlyHistory.query({ months: 6 }),
+        apiAsyncNode.usage.myLogs.query({ limit: 10 }),
+      ]);
+      setMyUsage(usage);
+      setLimitInfo(limit);
+      setMonthlyHistory(history);
+      setMyLogs(logs);
+    } catch { /* ignore */ }
+    setRefreshing(false);
+  }, []);
 
   React.useEffect(() => {
     if (status === 'authenticated') {
-      apiAsyncNode.usage.myUsage.query().then(setMyUsage).catch(() => {});
-      apiAsyncNode.usage.checkLimit.query().then(setLimitInfo).catch(() => {});
-      apiAsyncNode.usage.myMonthlyHistory.query({ months: 6 }).then(setMonthlyHistory).catch(() => {});
-      apiAsyncNode.usage.myLogs.query({ limit: 10 }).then(setMyLogs).catch(() => {});
+      refreshUsageData();
     }
-  }, [status]);
+  }, [status, refreshUsageData]);
 
   // Redirect if not authenticated
   React.useEffect(() => {
@@ -241,9 +257,21 @@ export default function Profile() {
                 <Divider sx={{ my: 3 }} />
 
                 {/* Token Credits */}
-                <Typography level="h3" sx={{ mb: 2 }}>
-                  Token Credits
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography level="h3">
+                    Token Credits
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    color="neutral"
+                    size="sm"
+                    startDecorator={<RefreshIcon />}
+                    loading={refreshing}
+                    onClick={refreshUsageData}
+                  >
+                    Refresh
+                  </Button>
+                </Box>
                 {myUsage ? (() => {
                   const limit = myUsage.tokenLimit;
                   const used = myUsage.thisMonth._sum.totalTokens ?? 0;

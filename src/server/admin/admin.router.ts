@@ -21,18 +21,14 @@ export const adminRouter = createTRPCRouter({
       return { isAdmin: ctx.session.user.email === ADMIN_EMAIL };
     }),
 
-  // List all users with usage stats
+  // List all users with usage stats and this month's token usage
   listUsers: isAdmin
-    .input(z.object({
-      cursor: z.string().optional(),
-      limit: z.number().min(1).max(100).default(50),
-    }).optional())
-    .query(async ({ input }) => {
-      const limit = input?.limit ?? 50;
+    .query(async () => {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
       const users = await prisma.user.findMany({
-        take: limit + 1,
-        ...(input?.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
-        orderBy: { id: 'asc' },
+        orderBy: { name: 'asc' },
         select: {
           id: true,
           name: true,
@@ -43,13 +39,19 @@ export const adminRouter = createTRPCRouter({
         },
       });
 
-      let nextCursor: string | undefined;
-      if (users.length > limit) {
-        const extra = users.pop()!;
-        nextCursor = extra.id;
-      }
+      // Get this month's usage per user in one query
+      const monthlyUsage = await prisma.usageLog.groupBy({
+        by: ['userId'],
+        where: { createdAt: { gte: monthStart } },
+        _sum: { totalTokens: true, inputTokens: true, outputTokens: true, costCents: true },
+        _count: true,
+      });
+      const usageMap = new Map(monthlyUsage.map(u => [u.userId, u]));
 
-      return { users, nextCursor };
+      return users.map(user => ({
+        ...user,
+        monthUsage: usageMap.get(user.id) ?? null,
+      }));
     }),
 
   // Get usage summary for a specific user (current month + all time)
