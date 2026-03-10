@@ -31,11 +31,26 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { Brand } from '~/common/app.config';
 import { AuthButton } from '~/common/components/auth/AuthButton';
 import { UserAnalytics } from '~/common/components/analytics/UserAnalytics';
+import { apiAsyncNode } from '~/common/util/trpc.client';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import LinearProgress from '@mui/joy/LinearProgress';
+
+type MyUsageData = Awaited<ReturnType<typeof apiAsyncNode.usage.myUsage.query>>;
+type CheckLimitData = Awaited<ReturnType<typeof apiAsyncNode.usage.checkLimit.query>>;
 
 export default function Profile() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState(0);
+  const [myUsage, setMyUsage] = React.useState<MyUsageData | null>(null);
+  const [limitInfo, setLimitInfo] = React.useState<CheckLimitData | null>(null);
+
+  React.useEffect(() => {
+    if (status === 'authenticated') {
+      apiAsyncNode.usage.myUsage.query().then(setMyUsage).catch(() => {});
+      apiAsyncNode.usage.checkLimit.query().then(setLimitInfo).catch(() => {});
+    }
+  }, [status]);
 
   // Redirect if not authenticated
   React.useEffect(() => {
@@ -214,6 +229,52 @@ export default function Profile() {
                     </Box>
                   </ListItem> */}
                 </List>
+
+                <Divider sx={{ my: 3 }} />
+
+                {/* Token Credits */}
+                <Typography level="h3" sx={{ mb: 2 }}>
+                  Token Credits
+                </Typography>
+                {myUsage ? (() => {
+                  const limit = myUsage.tokenLimit;
+                  const used = myUsage.thisMonth._sum.totalTokens ?? 0;
+                  const remaining = limit ? Math.max(0, limit - used) : null;
+                  const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
+                  return (
+                    <Card variant='soft' color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'} sx={{ mb: 2 }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                          <DataUsageIcon />
+                          <Typography level='title-md'>
+                            {remaining != null ? remaining.toLocaleString() + ' tokens remaining' : 'Unlimited tokens'}
+                          </Typography>
+                        </Box>
+                        {limit ? (
+                          <>
+                            <LinearProgress
+                              determinate
+                              value={pct}
+                              color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'}
+                              sx={{ my: 1, height: 10, borderRadius: 5 }}
+                            />
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography level='body-xs'>{used.toLocaleString()} used</Typography>
+                              <Typography level='body-xs'>{limit.toLocaleString()} limit / month</Typography>
+                            </Box>
+                          </>
+                        ) : (
+                          <Typography level='body-sm'>No monthly token limit set on your account.</Typography>
+                        )}
+                        <Typography level='body-xs' sx={{ mt: 1 }}>
+                          {myUsage.thisMonth._count} requests this month
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  );
+                })() : (
+                  <CircularProgress size='sm' />
+                )}
 
                 <Divider sx={{ my: 3 }} />
 

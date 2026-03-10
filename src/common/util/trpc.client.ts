@@ -110,6 +110,24 @@ export const apiAsyncNode = createTRPCClient<AppRouterCloud>({
   ],
 });
 
+/** Typesafe React Query hooks for the tRPC Cloud (Node.js) API */
+export const apiQueryCloud = createTRPCNext<AppRouterCloud>({
+  config() {
+    return {
+      queryClient: reactQueryClientSingleton(),
+      links: [
+        loggerLink({ enabled: enableLoggerLink }),
+        httpLink({
+          url: `${getBaseUrl()}/api/cloud`,
+          transformer: transformer,
+        }),
+      ],
+    };
+  },
+  ssr: false,
+  transformer: transformer,
+});
+
 /** Node/Streaming API: typesafe async generator hooks */
 export const apiStreamNode = createTRPCClient<AppRouterCloud>({
   links: [

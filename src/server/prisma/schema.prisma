@@ -56,12 +56,14 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  tokenLimit    Int?      @default(2000000) // default 2M/month, null = unlimited (admin override)
   accounts      Account[]
   sessions      Session[]
   links         LinkStorage[]
   personas      Persona[]
   conversations Conversation[]
   messages      Message[]
+  usageLogs     UsageLog[]
 }
 
 model VerificationToken {
@@ -215,4 +217,35 @@ enum LinkStorageVisibility {
 
 enum LinkStorageDataType {
   CHAT_V1
+}
+
+//
+// Usage Tracking
+//
+model UsageLog {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // What was used
+  modelId       String   // e.g. 'gpt-4o', 'claude-sonnet-4'
+  vendorId      String?  // e.g. 'openai', 'anthropic', 'openrouter'
+  serviceName   String?  // display label of the service
+
+  // Token counts
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  totalTokens   Int      @default(0)
+
+  // Cost (cents)
+  costCents     Float    @default(0)
+
+  // Context
+  operation     String   @default("chat") // 'chat', 'beam', 'call', etc.
+
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId])
+  @@index([createdAt])
 }

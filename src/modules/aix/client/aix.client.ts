@@ -12,6 +12,7 @@ import { getAixInspectorEnabled } from '~/common/stores/store-ui';
 import { llmChatPricing_adjusted } from '~/common/stores/llms/llms.pricing';
 import { metricsStoreAddChatGenerate } from '~/common/stores/metrics/store-metrics';
 import { stripUndefined } from '~/common/util/objectUtils';
+import { apiAsyncNode } from '~/common/util/trpc.client';
 import { webGeolocationCached } from '~/common/util/webGeolocationUtils';
 
 // NOTE: pay particular attention to the "import type", as this is importing from the server-side Zod definitions
@@ -216,6 +217,17 @@ export async function aixChatGenerateContent_DMessage_FromConversation(
   };
 
   try {
+
+    // Check token limit before proceeding (best-effort, skip on error)
+    try {
+      const limitCheck = await apiAsyncNode.usage.checkLimit.query();
+      if (!limitCheck.allowed)
+        throw new Error(`Monthly token limit reached (${limitCheck.used?.toLocaleString()} / ${limitCheck.limit?.toLocaleString()} tokens used). Contact your admin to increase your limit.`);
+    } catch (limitError: any) {
+      // Only throw if it's our limit error, ignore network/auth errors
+      if (limitError?.message?.includes('token limit'))
+        throw limitError;
+    }
 
     // Aix ChatGenerate Request
     const aixChatContentGenerateRequest: AixAPIChatGenerate_Request = {
@@ -574,6 +586,17 @@ function _updateGeneratorCostsInPlace(generator: DMessageGenerator, llm: DLLM, d
   const inputTokens = (m?.TIn || 0) + (m?.TCacheRead || 0) + (m?.TCacheWrite || 0);
   const outputTokens = (m?.TOut || 0) /* + (m?.TOutR || 0) THIS IS A BREAKDOWN, IT'S ALREADY IN */;
   metricsStoreAddChatGenerate(costs, inputTokens, outputTokens, llm, debugCostSource);
+
+  // Log usage to server (fire-and-forget, best-effort)
+  apiAsyncNode.usage.logUsage.mutate({
+    modelId: logLlmRefId,
+    vendorId: llm.vId,
+    serviceName: llm.sId || undefined,
+    inputTokens,
+    outputTokens,
+    costCents: (costs.$c || 0) + (costs.$cReported || 0),
+    operation: debugCostSource.includes('beam') ? 'beam' : debugCostSource.includes('call') ? 'call' : 'chat',
+  }).catch(() => { /* best-effort, ignore auth/network errors */ });
 }
 
 
