@@ -360,28 +360,29 @@ function ChatDrawer(props: {
           }}
         />
 
-        {/* New Chat Button */}
+        {/* New Chat Button - flat solid color, white text */}
         <Button
           color="primary"
-          // variant='outlined'
-          variant={disableNewButton ? undefined : 'soft'}
+          variant="solid"
           disabled={disableNewButton}
           onClick={handleButtonNew}
           sx={{
-            // ...PageDrawerTallItemSx,
             justifyContent: 'flex-start',
             padding: '0px 0.75rem',
-
-            // style
-            border: '1px solid',
-            borderColor: 'neutral.outlinedBorder',
             borderRadius: 'sm',
-            '--ListItemDecorator-size': 'calc(2.5rem - 1px)', // compensate for the border
-            // keep text/icon from going grey when disabled
-            ...(disableNewButton && {
-              color: 'primary.softColor',
-              '& .MuiListItemDecorator-root': { color: 'primary.softColor' },
-            }),
+            '--ListItemDecorator-size': 'calc(2.5rem - 1px)',
+            // override the theme gradient with a flat color
+            background: '#a020f0',
+            color: '#fff',
+            boxShadow: 'none',
+            '&:hover': {
+              background: '#8916d6',
+              boxShadow: 'none',
+            },
+            '&:active': {
+              background: '#7112b5',
+            },
+            '& .MuiListItemDecorator-root': { color: '#fff' },
           }}
         >
           <ListItemDecorator><AddIcon sx={{ fontSize: '' }} /></ListItemDecorator>

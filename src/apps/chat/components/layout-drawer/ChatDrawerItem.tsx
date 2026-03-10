@@ -244,7 +244,7 @@ function ChatDrawerItem(props: {
             }}
           />
         ) : (
-          <Typography sx={isNew && !isActive ? { opacity: 0.4, filter: 'grayscale(0.75)' } : undefined}>
+          <Typography sx={isNew ? { opacity: 0.4, filter: 'grayscale(0.75)' } : undefined}>
             {personaSymbol}
           </Typography>
         )}

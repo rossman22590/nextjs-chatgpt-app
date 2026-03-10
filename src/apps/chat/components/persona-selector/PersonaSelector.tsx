@@ -108,7 +108,16 @@ function Tile(props: {
       >
         {props.symbol}
       </Avatar>
-      <div>
+      <div style={{
+        width: '100%',
+        fontSize: '0.7rem',
+        lineHeight: 1.2,
+        textAlign: 'center',
+        overflowWrap: 'break-word',
+        wordBreak: 'break-word',
+        hyphens: 'auto',
+        padding: '0 2px',
+      }}>
         {props.text}
       </div>
     </Button>

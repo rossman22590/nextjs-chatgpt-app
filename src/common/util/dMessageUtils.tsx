@@ -28,10 +28,12 @@ const ANIM_BUSY_PAINTING = 'https://i.giphy.com/media/5t9ujj9cMisyVjUZ0m/giphy.w
 const ANIM_BUSY_THINKING = 'https://i.giphy.com/media/l44QzsOLXxcrigdgI/giphy.webp';
 
 
-export const avatarIconSx: SxProps = {
+const avatarIconSize = 28;
+
+export const avatarIconSx = {
   borderRadius: '10px',
-  height: 28,
-  width: 28,
+  height: avatarIconSize,
+  width: avatarIconSize,
   padding: '3px',
   '--Icon-color': '#a020f0',
   color: '#a020f0',
@@ -39,7 +41,7 @@ export const avatarIconSx: SxProps = {
   border: '1px solid rgba(160, 32, 240, 0.2)',
   boxShadow: 'none',
   transition: 'transform 0.2s cubic-bezier(.4,0,.2,1), box-shadow 0.2s ease',
-};
+} as const;
 
 // const largerAvatarIconsSx = {
 //   borderRadius: 'sm',
