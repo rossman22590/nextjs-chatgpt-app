@@ -519,34 +519,31 @@ export function prettyShortChatModelName(model: string | undefined): string {
 }
 
 function _prettyAnthropicModelName(modelId: string): string | null {
-  if (modelId.indexOf('claude-') === -1) return null; // not a Claude model
-
-  // must match any known prefix
-  let claudeIndex = -1;
-  const claudePrefixes = ['claude-opus-4', 'claude-sonnet-4', 'claude-haiku-4', 'claude-3', 'claude-2'];
-  for (const prefix of claudePrefixes) {
-    const index = modelId.indexOf(prefix);
-    if (index !== -1) {
-      claudeIndex = index;
-      break;
-    }
-  }
+  const claudeIndex = modelId.indexOf('claude-');
+  if (claudeIndex === -1) return null; // not a Claude model
 
   const subStr = modelId.slice(claudeIndex);
+  // Check dot-format versions first (OpenRouter style: claude-4.5-haiku, claude-haiku-4.5)
+  // then dash-format versions (Anthropic direct style: claude-haiku-4-5)
   const version =
-    subStr.includes('-4-6') ? '4.6'
-      : subStr.includes('-4-5') ? '4.5' // fixes the -5
-        : subStr.includes('-3-5') ? '3.5' // fixes the -5
-          : subStr.includes('-5') ? '5'
-            : subStr.includes('-4-1') ? '4.1'
-              : subStr.includes('-4') ? '4'
-                : subStr.includes('-3-7') ? '3.7'
-                  : subStr.includes('-3') ? '3'
-                    : '?';
+    subStr.includes('-4.6') ? '4.6'
+      : subStr.includes('-4.5') ? '4.5'
+        : subStr.includes('-4.1') ? '4.1'
+          : subStr.includes('-3.7') ? '3.7'
+            : subStr.includes('-3.5') ? '3.5'
+              : subStr.includes('-4-6') ? '4.6'
+                : subStr.includes('-4-5') ? '4.5'
+                  : subStr.includes('-3-5') ? '3.5'
+                    : subStr.includes('-5') ? '5'
+                      : subStr.includes('-4-1') ? '4.1'
+                        : subStr.includes('-4') ? '4'
+                          : subStr.includes('-3-7') ? '3.7'
+                            : subStr.includes('-3') ? '3'
+                              : '?';
 
-  if (subStr.includes(`-opus`)) return `Claude Opus ${version}`;
-  if (subStr.includes(`-sonnet`)) return `Claude Sonnet ${version}`;
-  if (subStr.includes(`-haiku`)) return `Claude Haiku ${version}`;
+  if (subStr.includes('-opus')) return `Claude Opus ${version}`;
+  if (subStr.includes('-sonnet')) return `Claude Sonnet ${version}`;
+  if (subStr.includes('-haiku')) return `Claude Haiku ${version}`;
 
   return `Claude ${version}`;
 }

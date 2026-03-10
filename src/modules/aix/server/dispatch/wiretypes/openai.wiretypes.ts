@@ -1688,7 +1688,7 @@ export namespace OpenAIWire_API_Responses {
 
 
   export type Response = z.infer<typeof Response_schema>;
-  /** @deprecated use Response_schema - kept for backward compatibility */
+  /** @deprecated use Response / Response_schema */
   export type ResponsesAPIResponse = Response;
   export const Response_schema = z.object({
     object: z.literal('response')
@@ -1743,6 +1743,9 @@ export namespace OpenAIWire_API_Responses {
     // user: ... // null
 
   });
+
+  /** @deprecated use Response_schema */
+  export const ResponsesAPIResponse_schema = Response_schema;
 
 
   // Response - Streaming Events

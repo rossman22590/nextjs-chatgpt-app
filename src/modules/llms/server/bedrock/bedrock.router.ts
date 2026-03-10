@@ -1,6 +1,6 @@
 import * as z from 'zod/v4';
 
-import { createTRPCRouter, edgeProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouterEdge, edgeProcedure } from '~/server/trpc/trpc.server-edge';
 
 import { ListModelsResponse_schema } from '../llm.server.types';
 import { listModelsRunDispatch } from '../listModels.dispatch';
@@ -17,7 +17,7 @@ const _listModelsInputSchema = z.object({
 
 // Router
 
-export const llmBedrockRouter = createTRPCRouter({
+export const llmBedrockRouter = createTRPCRouterEdge({
 
   /* [Bedrock] list models - fetches from ListFoundationModels + ListInferenceProfiles */
   listModels: edgeProcedure
