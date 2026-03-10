@@ -5,22 +5,34 @@ import { useSession } from 'next-auth/react';
 import {
   Avatar, Box, Button, Card, Chip, CircularProgress, Divider, IconButton,
   Input, LinearProgress, Modal, ModalClose, ModalDialog, Sheet, Stack,
-  Table, Tabs, Tab, TabList, TabPanel, Tooltip, Typography,
+  Table, Tooltip, Typography,
 } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
-import PersonIcon from '@mui/icons-material/Person';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import GroupIcon from '@mui/icons-material/Group';
-import BarChartIcon from '@mui/icons-material/BarChart';
 import SettingsIcon from '@mui/icons-material/Settings';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import TokenIcon from '@mui/icons-material/Token';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import SpeedIcon from '@mui/icons-material/Speed';
+import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
+import TuneIcon from '@mui/icons-material/Tune';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import BlockIcon from '@mui/icons-material/Block';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 import { apiAsyncNode } from '~/common/util/trpc.client';
 
 
-// --- Helpers ---
+// --- Tokens / Cost format ---
 
 function fmtNum(n: number | null | undefined): string {
   if (n == null) return '0';
@@ -36,20 +48,120 @@ function fmtCost(cents: number | null | undefined): string {
 }
 
 
-// --- Stat Card ---
+// --- Glassmorphic metric tile ---
 
-function StatCard(props: { title: string; value: string | number; subtitle?: string; color?: 'primary' | 'success' | 'warning' | 'danger' }) {
+const ACCENT = {
+  blue:    { bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', glow: 'rgba(102,126,234,0.25)' },
+  green:   { bg: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', glow: 'rgba(17,153,142,0.25)' },
+  orange:  { bg: 'linear-gradient(135deg, #f2994a 0%, #f2c94c 100%)', glow: 'rgba(242,153,74,0.20)' },
+  red:     { bg: 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)', glow: 'rgba(235,51,73,0.20)' },
+  purple:  { bg: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', glow: 'rgba(161,140,209,0.20)' },
+  cyan:    { bg: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', glow: 'rgba(56,249,215,0.20)' },
+} as const;
+type AccentKey = keyof typeof ACCENT;
+
+function MetricTile(props: { icon: React.ReactNode; label: string; value: string | number; sub?: string; accent: AccentKey }) {
+  const a = ACCENT[props.accent];
   return (
-    <Card variant='soft' color={props.color || 'primary'} sx={{ flex: '1 1 160px', minWidth: 160 }}>
-      <Typography level='body-xs' sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.5 }}>{props.title}</Typography>
-      <Typography level='h3' sx={{ my: 0.5 }}>{props.value}</Typography>
-      {props.subtitle && <Typography level='body-xs' sx={{ opacity: 0.8 }}>{props.subtitle}</Typography>}
-    </Card>
+    <Box sx={{
+      flex: '1 1 200px', minWidth: 170, position: 'relative', p: 2.5, borderRadius: 'xl',
+      background: 'var(--joy-palette-background-surface)',
+      boxShadow: `0 0 0 1px var(--joy-palette-neutral-outlinedBorder), 0 8px 24px -4px ${a.glow}`,
+      overflow: 'hidden', transition: 'transform 0.15s, box-shadow 0.15s',
+      '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 0 0 1px var(--joy-palette-neutral-outlinedBorder), 0 12px 32px -4px ${a.glow}` },
+    }}>
+      {/* gradient bar */}
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: a.bg }} />
+
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{
+          width: 40, height: 40, borderRadius: 'lg', display: 'grid', placeItems: 'center',
+          background: a.bg, color: '#fff', fontSize: 20, flexShrink: 0,
+        }}>
+          {props.icon}
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography level='body-xs' sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.8, opacity: 0.55 }}>
+            {props.label}
+          </Typography>
+          <Typography level='h3' sx={{ fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+            {props.value}
+          </Typography>
+          {props.sub && (
+            <Typography level='body-xs' sx={{ mt: 0.25, opacity: 0.6 }}>{props.sub}</Typography>
+          )}
+        </Box>
+      </Box>
+    </Box>
   );
 }
 
 
-// --- User Detail Modal ---
+// --- Nav pill ---
+
+function NavPill(props: { icon: React.ReactNode; label: string; active: boolean; badge?: number; onClick: () => void }) {
+  return (
+    <Button
+      variant={props.active ? 'solid' : 'plain'}
+      color={props.active ? 'primary' : 'neutral'}
+      size='sm'
+      onClick={props.onClick}
+      startDecorator={props.icon}
+      endDecorator={props.badge != null ? (
+        <Chip size='sm' variant='soft' color={props.active ? 'primary' : 'neutral'} sx={{ ml: 0.5, minWidth: 22, fontWeight: 700 }}>
+          {props.badge}
+        </Chip>
+      ) : undefined}
+      sx={{
+        borderRadius: 'xl', px: 2, py: 0.75, fontWeight: 600,
+        ...(props.active ? {
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          boxShadow: '0 4px 14px rgba(102,126,234,0.35)',
+        } : {
+          '&:hover': { background: 'var(--joy-palette-neutral-softBg)' },
+        }),
+      }}
+    >
+      {props.label}
+    </Button>
+  );
+}
+
+
+// --- Leaderboard row ---
+
+function LeaderboardRow(props: { rank: number; name: string; email: string; image?: string; tokens: string; cost: string; requests: number; onClick: () => void }) {
+  const medal = props.rank === 1 ? '🥇' : props.rank === 2 ? '🥈' : props.rank === 3 ? '🥉' : null;
+  return (
+    <Box
+      onClick={props.onClick}
+      sx={{
+        display: 'flex', alignItems: 'center', gap: 2, px: 2.5, py: 1.5, cursor: 'pointer',
+        borderRadius: 'lg', transition: 'background 0.1s',
+        '&:hover': { background: 'var(--joy-palette-neutral-softBg)' },
+      }}
+    >
+      <Typography level='body-sm' sx={{ width: 28, textAlign: 'center', fontWeight: 800, fontSize: medal ? 18 : 14 }}>
+        {medal || props.rank}
+      </Typography>
+      <Avatar size='sm' src={props.image} sx={{ width: 32, height: 32, fontSize: 13 }}>
+        {(props.name || '?')[0]}
+      </Avatar>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography level='body-sm' noWrap sx={{ fontWeight: 600 }}>{props.name || 'Unknown'}</Typography>
+        <Typography level='body-xs' noWrap sx={{ opacity: 0.5 }}>{props.email}</Typography>
+      </Box>
+      <Box sx={{ textAlign: 'right' }}>
+        <Typography level='body-sm' sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{props.tokens}</Typography>
+        <Typography level='body-xs' sx={{ opacity: 0.55 }}>{props.cost}</Typography>
+      </Box>
+      <Chip size='sm' variant='outlined' sx={{ minWidth: 46, fontVariantNumeric: 'tabular-nums' }}>{props.requests}</Chip>
+    </Box>
+  );
+}
+
+
+// --- User detail modal (premium) ---
 
 function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh: () => void }) {
   const [usage, setUsage] = React.useState<any>(null);
@@ -64,10 +176,9 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
     Promise.all([
       apiAsyncNode.admin.getUserUsage.query({ userId: props.userId }),
       apiAsyncNode.admin.getUserLogs.query({ userId: props.userId, limit: 50 }),
-    ]).then(([u, l]) => {
-      setUsage(u);
-      setLogs(l);
-    }).catch(() => {}).finally(() => setIsLoading(false));
+    ]).then(([u, l]) => { setUsage(u); setLogs(l); })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, [props.userId]);
 
   React.useEffect(() => { loadData(); }, [loadData]);
@@ -78,11 +189,9 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
     apiAsyncNode.admin.setTokenLimit.mutate({
       userId: props.userId,
       tokenLimit: val === '' || val === '0' ? null : parseInt(val, 10) || null,
-    }).then(() => {
-      setEditingLimit(false);
-      loadData();
-      props.onRefresh();
-    }).catch(() => {}).finally(() => setSaving(false));
+    }).then(() => { setEditingLimit(false); loadData(); props.onRefresh(); })
+      .catch(() => {})
+      .finally(() => setSaving(false));
   };
 
   const user = usage?.user;
@@ -90,99 +199,147 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
 
   return (
     <Modal open onClose={props.onClose}>
-      <ModalDialog sx={{ width: '90vw', maxWidth: 800, maxHeight: '90vh', overflow: 'auto', p: 3 }}>
-        <ModalClose />
+      <ModalDialog sx={{
+        width: '94vw', maxWidth: 880, maxHeight: '92vh', overflow: 'auto', p: 0,
+        borderRadius: 'xl', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.45)',
+        border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+      }}>
+        <ModalClose sx={{ zIndex: 2 }} />
 
         {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
         ) : !user ? (
-          <Typography color='danger'>User not found</Typography>
+          <Box sx={{ p: 4 }}><Typography color='danger'>User not found</Typography></Box>
         ) : (
-          <Stack spacing={2.5}>
-            {/* Header */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar src={user.image} sx={{ width: 56, height: 56 }}>{(user.name || '?')[0]}</Avatar>
-              <Box sx={{ flex: 1 }}>
-                <Typography level='h4'>{user.name || 'Unnamed'}</Typography>
-                <Typography level='body-sm' sx={{ color: 'text.secondary' }}>{user.email}</Typography>
+          <>
+            {/* Banner */}
+            <Box sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              px: 4, pt: 4, pb: 5, position: 'relative',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                <Avatar src={user.image} sx={{
+                  width: 64, height: 64, border: '3px solid rgba(255,255,255,0.3)',
+                  fontSize: 24, fontWeight: 700,
+                }}>{(user.name || '?')[0]}</Avatar>
+                <Box>
+                  <Typography level='h3' sx={{ color: '#fff', fontWeight: 800 }}>{user.name || 'Unnamed'}</Typography>
+                  <Typography level='body-sm' sx={{ color: 'rgba(255,255,255,0.7)' }}>{user.email}</Typography>
+                </Box>
               </Box>
-              <IconButton variant='outlined' size='sm' onClick={loadData}><RefreshIcon /></IconButton>
             </Box>
 
-            {/* Token Limit */}
-            <Card variant='outlined' sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Typography level='title-sm'>Token Limit</Typography>
-                {editingLimit ? (
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
-                    <Input size='sm' placeholder='Empty = Unlimited' value={limitValue}
-                      onChange={e => setLimitValue(e.target.value)} sx={{ width: 160 }} />
-                    <Button size='sm' onClick={handleSetLimit} loading={saving}>Save</Button>
-                    <Button size='sm' variant='plain' onClick={() => setEditingLimit(false)}>Cancel</Button>
-                  </Box>
-                ) : (
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
-                    <Chip size='sm' color={user.tokenLimit ? (pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary') : 'success'}>
-                      {user.tokenLimit ? fmtNum(user.tokenLimit) + ' /mo' : 'Unlimited'}
-                    </Chip>
-                    <IconButton size='sm' variant='plain' onClick={() => {
-                      setLimitValue(user.tokenLimit?.toString() || '');
-                      setEditingLimit(true);
-                    }}><EditIcon sx={{ fontSize: 16 }} /></IconButton>
+            {/* Content */}
+            <Box sx={{ px: 3.5, py: 3, mt: -2.5 }}>
+
+              {/* Token Limit Card */}
+              <Box sx={{
+                background: 'var(--joy-palette-background-surface)',
+                border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                borderRadius: 'xl', p: 2.5, mb: 3,
+                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <TuneIcon sx={{ fontSize: 18, opacity: 0.6 }} />
+                  <Typography level='title-sm' sx={{ fontWeight: 700 }}>Token Limit</Typography>
+                  {editingLimit ? (
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
+                      <Input size='sm' placeholder='Empty = Unlimited' value={limitValue}
+                        onChange={e => setLimitValue(e.target.value)} sx={{ width: 160 }} />
+                      <Button size='sm' onClick={handleSetLimit} loading={saving}
+                        sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>Save</Button>
+                      <Button size='sm' variant='plain' color='neutral' onClick={() => setEditingLimit(false)}>Cancel</Button>
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
+                      <Chip size='sm' variant='soft'
+                        color={user.tokenLimit ? (pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary') : 'success'}
+                        startDecorator={user.tokenLimit ? <TokenIcon sx={{ fontSize: 14 }} /> : <AllInclusiveIcon sx={{ fontSize: 14 }} />}
+                      >
+                        {user.tokenLimit ? fmtNum(user.tokenLimit) + ' /mo' : 'Unlimited'}
+                      </Chip>
+                      <IconButton size='sm' variant='plain' onClick={() => {
+                        setLimitValue(user.tokenLimit?.toString() || '');
+                        setEditingLimit(true);
+                      }}><EditIcon sx={{ fontSize: 16 }} /></IconButton>
+                    </Box>
+                  )}
+                </Box>
+                {user.tokenLimit && (
+                  <Box sx={{ mt: 1 }}>
+                    <LinearProgress determinate value={pct}
+                      color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary'}
+                      sx={{ height: 8, borderRadius: 99 }} />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                      <Typography level='body-xs' sx={{ opacity: 0.5 }}>{pct.toFixed(0)}% used</Typography>
+                      <Typography level='body-xs' sx={{ opacity: 0.5 }}>{fmtNum(usage?.thisMonth?._sum?.totalTokens)} of {fmtNum(user.tokenLimit)}</Typography>
+                    </Box>
                   </Box>
                 )}
               </Box>
-              {user.tokenLimit && (
-                <LinearProgress determinate value={pct} color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary'}
-                  sx={{ height: 8, borderRadius: 4 }} />
-              )}
-            </Card>
 
-            {/* Stats */}
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-              <StatCard title='Month Tokens' value={fmtNum(usage.thisMonth._sum.totalTokens)}
-                subtitle={`${fmtNum(usage.thisMonth._count)} requests`} />
-              <StatCard title='Month Cost' value={fmtCost(usage.thisMonth._sum.costCents)} color='warning' />
-              <StatCard title='All Time Tokens' value={fmtNum(usage.allTime._sum.totalTokens)}
-                subtitle={`${fmtNum(usage.allTime._count)} requests`} color='success' />
-              <StatCard title='All Time Cost' value={fmtCost(usage.allTime._sum.costCents)} color='danger' />
-            </Box>
+              {/* Stats Grid */}
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
+                <MetricTile accent='blue' icon={<TokenIcon sx={{ fontSize: 20 }} />}
+                  label='Month Tokens' value={fmtNum(usage.thisMonth._sum.totalTokens)}
+                  sub={`${fmtNum(usage.thisMonth._count)} requests`} />
+                <MetricTile accent='orange' icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
+                  label='Month Cost' value={fmtCost(usage.thisMonth._sum.costCents)} />
+                <MetricTile accent='green' icon={<SpeedIcon sx={{ fontSize: 20 }} />}
+                  label='All Time Tokens' value={fmtNum(usage.allTime._sum.totalTokens)}
+                  sub={`${fmtNum(usage.allTime._count)} total requests`} />
+                <MetricTile accent='red' icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
+                  label='All Time Cost' value={fmtCost(usage.allTime._sum.costCents)} />
+              </Box>
 
-            {/* Logs */}
-            <Typography level='title-sm'>Recent Usage ({logs.length} entries)</Typography>
-            {logs.length > 0 ? (
-              <Sheet variant='outlined' sx={{ borderRadius: 'sm', overflow: 'auto', maxHeight: 350 }}>
-                <Table size='sm' stickyHeader sx={{ '& th': { py: 1 }, '& td': { py: 0.75 } }}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: 150 }}>Time</th>
-                      <th>Model</th>
-                      <th style={{ textAlign: 'right' }}>In</th>
-                      <th style={{ textAlign: 'right' }}>Out</th>
-                      <th style={{ textAlign: 'right' }}>Total</th>
-                      <th style={{ textAlign: 'right' }}>Cost</th>
-                      <th style={{ width: 60 }}>Op</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs.map(log => (
-                      <tr key={log.id}>
-                        <td><Typography level='body-xs'>{new Date(log.createdAt).toLocaleString()}</Typography></td>
-                        <td><Typography level='body-xs' noWrap sx={{ maxWidth: 200 }}>{log.modelId}</Typography></td>
-                        <td style={{ textAlign: 'right' }}><Typography level='body-xs'>{fmtNum(log.inputTokens)}</Typography></td>
-                        <td style={{ textAlign: 'right' }}><Typography level='body-xs'>{fmtNum(log.outputTokens)}</Typography></td>
-                        <td style={{ textAlign: 'right' }}><Typography level='body-xs'>{fmtNum(log.totalTokens)}</Typography></td>
-                        <td style={{ textAlign: 'right' }}><Typography level='body-xs'>{fmtCost(log.costCents)}</Typography></td>
-                        <td><Chip size='sm' variant='soft' sx={{ fontSize: '0.65rem' }}>{log.operation}</Chip></td>
+              {/* Logs */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <AccessTimeIcon sx={{ fontSize: 18, opacity: 0.5 }} />
+                <Typography level='title-sm' sx={{ fontWeight: 700 }}>Recent Activity</Typography>
+                <Typography level='body-xs' sx={{ ml: 'auto', opacity: 0.5 }}>{logs.length} entries</Typography>
+                <IconButton size='sm' variant='plain' onClick={loadData}><RefreshIcon sx={{ fontSize: 16 }} /></IconButton>
+              </Box>
+
+              {logs.length > 0 ? (
+                <Sheet variant='outlined' sx={{ borderRadius: 'lg', overflow: 'auto', maxHeight: 320 }}>
+                  <Table size='sm' stickyHeader sx={{
+                    '--TableCell-headBackground': 'var(--joy-palette-background-level1)',
+                    '& th': { py: 1.25, fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5 },
+                    '& td': { py: 1, fontSize: '0.78rem' },
+                  }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: 140 }}>Time</th>
+                        <th>Model</th>
+                        <th style={{ textAlign: 'right' }}>In</th>
+                        <th style={{ textAlign: 'right' }}>Out</th>
+                        <th style={{ textAlign: 'right' }}>Total</th>
+                        <th style={{ textAlign: 'right' }}>Cost</th>
+                        <th style={{ width: 55 }}>Op</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Sheet>
-            ) : (
-              <Typography level='body-sm' sx={{ color: 'text.tertiary', fontStyle: 'italic' }}>No usage logs recorded yet</Typography>
-            )}
-          </Stack>
+                    </thead>
+                    <tbody>
+                      {logs.map(log => (
+                        <tr key={log.id}>
+                          <td><Typography level='body-xs'>{new Date(log.createdAt).toLocaleString()}</Typography></td>
+                          <td><Typography level='body-xs' noWrap sx={{ maxWidth: 180 }}>{log.modelId}</Typography></td>
+                          <td style={{ textAlign: 'right' }}>{fmtNum(log.inputTokens)}</td>
+                          <td style={{ textAlign: 'right' }}>{fmtNum(log.outputTokens)}</td>
+                          <td style={{ textAlign: 'right' }}><strong>{fmtNum(log.totalTokens)}</strong></td>
+                          <td style={{ textAlign: 'right' }}>{fmtCost(log.costCents)}</td>
+                          <td><Chip size='sm' variant='soft' sx={{ fontSize: '0.6rem', height: 20 }}>{log.operation}</Chip></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </Sheet>
+              ) : (
+                <Box sx={{ py: 3, textAlign: 'center', opacity: 0.4 }}>
+                  <Typography level='body-sm'>No usage logs recorded yet</Typography>
+                </Box>
+              )}
+            </Box>
+          </>
         )}
       </ModalDialog>
     </Modal>
@@ -206,11 +363,10 @@ export function AppAdmin() {
   const [selectedUserId, setSelectedUserId] = React.useState<string | null>(null);
   const [bulkLimit, setBulkLimit] = React.useState('');
   const [bulkSaving, setBulkSaving] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState(0);
+  const [activeView, setActiveView] = React.useState<'overview' | 'users' | 'settings'>('overview');
   const [sortField, setSortField] = React.useState<string>('name');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
 
-  // Load all admin data
   const loadAllData = React.useCallback(() => {
     if (!isAdmin) return;
     setLoading(true);
@@ -218,14 +374,11 @@ export function AppAdmin() {
       apiAsyncNode.admin.globalStats.query(),
       apiAsyncNode.admin.listUsers.query(),
       apiAsyncNode.admin.topUsers.query(),
-    ]).then(([stats, userList, top]) => {
-      setGlobalStats(stats);
-      setUsers(userList);
-      setTopUsers(top);
-    }).catch(() => {}).finally(() => setLoading(false));
+    ]).then(([stats, userList, top]) => { setGlobalStats(stats); setUsers(userList); setTopUsers(top); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [isAdmin]);
 
-  // Check admin on mount
   React.useEffect(() => {
     if (!session?.user) { setCheckingAdmin(false); return; }
     setCheckingAdmin(true);
@@ -240,39 +393,42 @@ export function AppAdmin() {
   const handleSetAllLimits = (tokenLimit: number | null) => {
     setBulkSaving(true);
     apiAsyncNode.admin.setAllTokenLimits.mutate({ tokenLimit })
-      .then(data => {
-        setBulkLimit('');
-        alert('Updated ' + data.updated + ' users');
-        loadAllData();
-      })
+      .then(data => { setBulkLimit(''); alert('Updated ' + data.updated + ' users'); loadAllData(); })
       .catch(() => alert('Failed to update limits'))
       .finally(() => setBulkSaving(false));
   };
 
   // Auth gates
   if (!session?.user)
-    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-      <Typography level='h4'>Please sign in to access admin panel</Typography>
-    </Box>;
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--joy-palette-background-body)' }}>
+        <Typography level='h4' sx={{ opacity: 0.6 }}>Sign in required</Typography>
+      </Box>
+    );
 
   if (checkingAdmin)
-    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-      <CircularProgress />
-    </Box>;
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--joy-palette-background-body)' }}>
+        <CircularProgress size='lg' />
+      </Box>
+    );
 
   if (!isAdmin)
-    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-      <Typography level='h4' color='danger'>Access denied. Admin privileges required.</Typography>
-    </Box>;
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', gap: 2, background: 'var(--joy-palette-background-body)' }}>
+        <BlockIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+        <Typography level='h4' sx={{ opacity: 0.6 }}>Access Denied</Typography>
+        <Typography level='body-sm' sx={{ opacity: 0.4 }}>Admin privileges required</Typography>
+      </Box>
+    );
 
-  // Filtering
+  // Filtering + sorting
   const filtered = users.filter((u: any) =>
     !searchQuery
     || u.name?.toLowerCase().includes(searchQuery.toLowerCase())
     || u.email?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // Sorting
   const sorted = [...filtered].sort((a: any, b: any) => {
     let av: any, bv: any;
     switch (sortField) {
@@ -295,134 +451,149 @@ export function AppAdmin() {
     else { setSortField(field); setSortDir('desc'); }
   };
 
-  const sortIcon = (field: string) => sortField === field ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+  const SortArrow = ({ field }: { field: string }) => {
+    if (sortField !== field) return null;
+    return sortDir === 'asc'
+      ? <ArrowUpwardIcon sx={{ fontSize: 14, ml: 0.3, verticalAlign: 'middle' }} />
+      : <ArrowDownwardIcon sx={{ fontSize: 14, ml: 0.3, verticalAlign: 'middle' }} />;
+  };
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--joy-palette-background-body)' }}>
 
-      {/* Header Bar */}
-      <Box sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-        <AdminPanelSettingsIcon sx={{ fontSize: 28 }} />
-        <Typography level='h4' sx={{ flex: 1 }}>Admin Panel</Typography>
-        <Typography level='body-xs' sx={{ color: 'text.tertiary' }}>{session.user?.email}</Typography>
-        <Tooltip title='Refresh data'>
-          <IconButton variant='outlined' size='sm' onClick={loadAllData} disabled={loading}>
-            <RefreshIcon />
+      {/* === Top Bar === */}
+      <Box sx={{
+        px: 3, py: 1.75, display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0,
+        borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+        background: 'var(--joy-palette-background-surface)',
+        backdropFilter: 'blur(12px)',
+      }}>
+        {/* Brand */}
+        <Box sx={{
+          width: 36, height: 36, borderRadius: 'lg', display: 'grid', placeItems: 'center',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: '#fff', flexShrink: 0,
+        }}>
+          <DashboardIcon sx={{ fontSize: 20 }} />
+        </Box>
+        <Box sx={{ mr: 2 }}>
+          <Typography level='title-md' sx={{ fontWeight: 800, lineHeight: 1.1 }}>Admin</Typography>
+          <Typography level='body-xs' sx={{ opacity: 0.45, lineHeight: 1 }}>Control Panel</Typography>
+        </Box>
+
+        {/* Nav pills */}
+        <Box sx={{ display: 'flex', gap: 0.75, flex: 1 }}>
+          <NavPill icon={<DashboardIcon sx={{ fontSize: 16 }} />} label='Overview'
+            active={activeView === 'overview'} onClick={() => setActiveView('overview')} />
+          <NavPill icon={<GroupIcon sx={{ fontSize: 16 }} />} label='Users'
+            active={activeView === 'users'} badge={users.length} onClick={() => setActiveView('users')} />
+          <NavPill icon={<SettingsIcon sx={{ fontSize: 16 }} />} label='Settings'
+            active={activeView === 'settings'} onClick={() => setActiveView('settings')} />
+        </Box>
+
+        {/* Right side */}
+        <Typography level='body-xs' sx={{ opacity: 0.4, display: { xs: 'none', md: 'block' } }}>{session.user?.email}</Typography>
+        <Tooltip title='Refresh all data'>
+          <IconButton variant='outlined' size='sm' onClick={loadAllData} disabled={loading}
+            sx={{ borderRadius: 'lg' }}>
+            <RefreshIcon sx={{ fontSize: 18, ...(loading ? { animation: 'spin 1s linear infinite', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } } } : {}) }} />
           </IconButton>
         </Tooltip>
       </Box>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v as number)}
-        sx={{ flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <TabList sx={{ px: 3 }}>
-          <Tab><BarChartIcon sx={{ mr: 0.5, fontSize: 18 }} /> Overview</Tab>
-          <Tab><GroupIcon sx={{ mr: 0.5, fontSize: 18 }} /> Users ({users.length})</Tab>
-          <Tab><SettingsIcon sx={{ mr: 0.5, fontSize: 18 }} /> Settings</Tab>
-        </TabList>
-      </Tabs>
-
-      {/* Scrollable Content */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+      {/* === Content === */}
+      <Box sx={{ flex: 1, overflow: 'auto', px: 3, py: 3 }}>
 
         {loading && !globalStats ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress size='lg' /></Box>
         ) : (
           <>
-            {/* Tab 0: Overview */}
-            {activeTab === 0 && (
-              <Stack spacing={3} sx={{ maxWidth: 1200, mx: 'auto' }}>
+            {/* ====== OVERVIEW ====== */}
+            {activeView === 'overview' && (
+              <Stack spacing={3.5} sx={{ maxWidth: 1200, mx: 'auto' }}>
 
-                {/* Global Stats */}
+                {/* Metric tiles */}
                 {globalStats && (
                   <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                    <StatCard title='Total Users' value={globalStats.userCount} color='primary' />
-                    <StatCard title='Today Tokens' value={fmtNum(globalStats.today._sum.totalTokens)}
-                      subtitle={`${fmtNum(globalStats.today._count)} requests`} />
-                    <StatCard title='This Month' value={fmtNum(globalStats.thisMonth._sum.totalTokens)}
-                      subtitle={fmtCost(globalStats.thisMonth._sum.costCents)} color='warning' />
-                    <StatCard title='All Time' value={fmtNum(globalStats.allTime._sum.totalTokens)}
-                      subtitle={fmtCost(globalStats.allTime._sum.costCents)} color='success' />
+                    <MetricTile accent='blue' icon={<PeopleAltIcon sx={{ fontSize: 20 }} />}
+                      label='Total Users' value={globalStats.userCount} />
+                    <MetricTile accent='cyan' icon={<SpeedIcon sx={{ fontSize: 20 }} />}
+                      label='Today' value={fmtNum(globalStats.today._sum.totalTokens)}
+                      sub={`${fmtNum(globalStats.today._count)} requests`} />
+                    <MetricTile accent='orange' icon={<TokenIcon sx={{ fontSize: 20 }} />}
+                      label='This Month' value={fmtNum(globalStats.thisMonth._sum.totalTokens)}
+                      sub={fmtCost(globalStats.thisMonth._sum.costCents)} />
+                    <MetricTile accent='green' icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
+                      label='All Time' value={fmtNum(globalStats.allTime._sum.totalTokens)}
+                      sub={fmtCost(globalStats.allTime._sum.costCents)} />
                   </Box>
                 )}
 
-                {/* Top Users */}
+                {/* Leaderboard */}
                 {topUsers.length > 0 && (
-                  <Card variant='outlined'>
-                    <Typography level='title-md' startDecorator={<TrendingUpIcon />} sx={{ p: 2, pb: 0 }}>
-                      Top Users This Month
-                    </Typography>
-                    <Box sx={{ overflow: 'auto' }}>
-                      <Table size='sm' sx={{ '& th': { py: 1.5 }, '& td': { py: 1 } }}>
-                        <thead>
-                          <tr>
-                            <th style={{ width: 40 }}>#</th>
-                            <th>User</th>
-                            <th style={{ textAlign: 'right' }}>Tokens</th>
-                            <th style={{ textAlign: 'right' }}>Cost</th>
-                            <th style={{ textAlign: 'right' }}>Requests</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {topUsers.map((entry, i) => (
-                            <tr key={entry.userId} style={{ cursor: 'pointer' }}
-                              onClick={() => { setSelectedUserId(entry.userId); }}>
-                              <td><Typography level='body-sm' sx={{ fontWeight: 700 }}>{i + 1}</Typography></td>
-                              <td>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Avatar size='sm' sx={{ width: 24, height: 24, fontSize: 12 }}>
-                                    {(entry.user?.name || '?')[0]}
-                                  </Avatar>
-                                  <Box>
-                                    <Typography level='body-sm'>{entry.user?.name || 'Unknown'}</Typography>
-                                    <Typography level='body-xs' sx={{ color: 'text.tertiary' }}>{entry.user?.email}</Typography>
-                                  </Box>
-                                </Box>
-                              </td>
-                              <td style={{ textAlign: 'right' }}><Typography level='body-sm'>{fmtNum(entry._sum.totalTokens)}</Typography></td>
-                              <td style={{ textAlign: 'right' }}><Typography level='body-sm'>{fmtCost(entry._sum.costCents)}</Typography></td>
-                              <td style={{ textAlign: 'right' }}><Typography level='body-sm'>{entry._count}</Typography></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </Table>
+                  <Box sx={{
+                    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                    borderRadius: 'xl', overflow: 'hidden',
+                    background: 'var(--joy-palette-background-surface)',
+                  }}>
+                    <Box sx={{ px: 2.5, py: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)' }}>
+                      <EmojiEventsIcon sx={{ fontSize: 20, color: '#f2994a' }} />
+                      <Typography level='title-md' sx={{ fontWeight: 700 }}>Top Users This Month</Typography>
+                      <Typography level='body-xs' sx={{ ml: 'auto', opacity: 0.4 }}>Click to view details</Typography>
                     </Box>
-                  </Card>
+                    <Box sx={{ py: 0.5 }}>
+                      {topUsers.map((entry, i) => (
+                        <LeaderboardRow key={entry.userId}
+                          rank={i + 1}
+                          name={entry.user?.name || 'Unknown'}
+                          email={entry.user?.email || ''}
+                          image={entry.user?.image}
+                          tokens={fmtNum(entry._sum.totalTokens)}
+                          cost={fmtCost(entry._sum.costCents)}
+                          requests={entry._count}
+                          onClick={() => setSelectedUserId(entry.userId)}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
                 )}
               </Stack>
             )}
 
-            {/* Tab 1: Users */}
-            {activeTab === 1 && (
+            {/* ====== USERS ====== */}
+            {activeView === 'users' && (
               <Stack spacing={2} sx={{ maxWidth: 1400, mx: 'auto' }}>
 
-                {/* Search */}
+                {/* Search bar */}
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <Input size='sm' placeholder='Search users...' startDecorator={<SearchIcon />}
+                  <Input size='sm' placeholder='Search by name or email...' startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
                     value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    sx={{ flex: 1, maxWidth: 350 }} />
-                  <Typography level='body-xs' sx={{ color: 'text.tertiary' }}>
-                    {sorted.length} of {users.length} users
-                  </Typography>
+                    sx={{ flex: 1, maxWidth: 380, borderRadius: 'xl', '--Input-focusedThickness': '2px' }} />
+                  <Chip variant='soft' color='neutral' size='sm' sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {sorted.length === users.length ? `${users.length} users` : `${sorted.length} of ${users.length}`}
+                  </Chip>
                 </Box>
 
-                {/* Users Table */}
-                <Sheet variant='outlined' sx={{ borderRadius: 'md', overflow: 'auto' }}>
-                  <Table size='sm' stickyHeader hoverRow
-                    sx={{
-                      '& th': { py: 1.5, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' },
-                      '& td': { py: 1, verticalAlign: 'middle' },
-                      '& tr': { cursor: 'pointer' },
-                    }}>
+                {/* Table */}
+                <Sheet variant='outlined' sx={{ borderRadius: 'xl', overflow: 'auto' }}>
+                  <Table size='sm' stickyHeader hoverRow sx={{
+                    '--TableCell-headBackground': 'var(--joy-palette-background-level1)',
+                    '& th': {
+                      py: 1.5, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
+                      fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5,
+                    },
+                    '& td': { py: 1.25, verticalAlign: 'middle' },
+                    '& tbody tr': { cursor: 'pointer', transition: 'background 0.08s' },
+                  }}>
                     <thead>
                       <tr>
-                        <th onClick={() => handleSort('name')}>User{sortIcon('name')}</th>
-                        <th onClick={() => handleSort('email')}>Email{sortIcon('email')}</th>
-                        <th onClick={() => handleSort('conversations')} style={{ textAlign: 'right' }}>Convos{sortIcon('conversations')}</th>
-                        <th onClick={() => handleSort('messages')} style={{ textAlign: 'right' }}>Msgs{sortIcon('messages')}</th>
-                        <th onClick={() => handleSort('monthTokens')} style={{ textAlign: 'right' }}>Month Tokens{sortIcon('monthTokens')}</th>
-                        <th onClick={() => handleSort('monthCost')} style={{ textAlign: 'right' }}>Month Cost{sortIcon('monthCost')}</th>
-                        <th onClick={() => handleSort('usageLogs')} style={{ textAlign: 'right' }}>Logs{sortIcon('usageLogs')}</th>
+                        <th onClick={() => handleSort('name')}>User <SortArrow field='name' /></th>
+                        <th onClick={() => handleSort('email')}>Email <SortArrow field='email' /></th>
+                        <th onClick={() => handleSort('conversations')} style={{ textAlign: 'right' }}>Convos <SortArrow field='conversations' /></th>
+                        <th onClick={() => handleSort('messages')} style={{ textAlign: 'right' }}>Messages <SortArrow field='messages' /></th>
+                        <th onClick={() => handleSort('monthTokens')} style={{ textAlign: 'right' }}>Month Tokens <SortArrow field='monthTokens' /></th>
+                        <th onClick={() => handleSort('monthCost')} style={{ textAlign: 'right' }}>Month Cost <SortArrow field='monthCost' /></th>
+                        <th onClick={() => handleSort('usageLogs')} style={{ textAlign: 'right' }}>Logs <SortArrow field='usageLogs' /></th>
                         <th>Limit</th>
                       </tr>
                     </thead>
@@ -431,80 +602,147 @@ export function AppAdmin() {
                         const mTokens = user.monthUsage?._sum?.totalTokens ?? 0;
                         const mCost = user.monthUsage?._sum?.costCents ?? 0;
                         const mReqs = user.monthUsage?._count ?? 0;
+                        const limitPct = user.tokenLimit ? Math.min(100, (mTokens / user.tokenLimit) * 100) : 0;
+                        const limitColor = limitPct > 90 ? 'danger' as const : limitPct > 70 ? 'warning' as const : 'success' as const;
                         return (
                           <tr key={user.id} onClick={() => setSelectedUserId(user.id)}>
                             <td>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Avatar size='sm' src={user.image} sx={{ width: 28, height: 28, fontSize: 12 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Avatar size='sm' src={user.image} sx={{ width: 30, height: 30, fontSize: 12, flexShrink: 0 }}>
                                   {(user.name || '?')[0]}
                                 </Avatar>
-                                <Typography level='body-sm' noWrap sx={{ maxWidth: 160 }}>
+                                <Typography level='body-sm' noWrap sx={{ maxWidth: 150, fontWeight: 600 }}>
                                   {user.name || 'Unnamed'}
                                 </Typography>
                               </Box>
                             </td>
-                            <td><Typography level='body-xs' noWrap sx={{ maxWidth: 200 }}>{user.email}</Typography></td>
-                            <td style={{ textAlign: 'right' }}>{user._count.conversations}</td>
-                            <td style={{ textAlign: 'right' }}>{user._count.messages}</td>
+                            <td><Typography level='body-xs' noWrap sx={{ maxWidth: 200, opacity: 0.7 }}>{user.email}</Typography></td>
+                            <td style={{ textAlign: 'right' }}>
+                              <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums' }}>{user._count.conversations}</Typography>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums' }}>{user._count.messages}</Typography>
+                            </td>
                             <td style={{ textAlign: 'right' }}>
                               <Tooltip title={`${mReqs} requests this month`}>
-                                <Typography level='body-sm'>{fmtNum(mTokens)}</Typography>
+                                <Typography level='body-sm' sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(mTokens)}</Typography>
                               </Tooltip>
                             </td>
                             <td style={{ textAlign: 'right' }}>
-                              <Typography level='body-sm'>{fmtCost(mCost)}</Typography>
+                              <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCost(mCost)}</Typography>
                             </td>
-                            <td style={{ textAlign: 'right' }}>{user._count.usageLogs}</td>
+                            <td style={{ textAlign: 'right' }}>
+                              <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums', opacity: 0.6 }}>{user._count.usageLogs}</Typography>
+                            </td>
                             <td>
-                              <Chip size='sm' variant='soft'
-                                color={user.tokenLimit ? 'warning' : 'success'}>
+                              <Chip size='sm' variant='soft' color={user.tokenLimit ? limitColor : 'neutral'}
+                                startDecorator={user.tokenLimit
+                                  ? (limitPct > 90 ? <WarningIcon sx={{ fontSize: 12 }} /> : <CheckCircleIcon sx={{ fontSize: 12 }} />)
+                                  : <AllInclusiveIcon sx={{ fontSize: 12 }} />
+                                }
+                                sx={{ fontVariantNumeric: 'tabular-nums' }}>
                                 {user.tokenLimit ? fmtNum(user.tokenLimit) : 'Unlimited'}
                               </Chip>
                             </td>
                           </tr>
                         );
                       })}
+                      {sorted.length === 0 && (
+                        <tr>
+                          <td colSpan={8}>
+                            <Box sx={{ py: 4, textAlign: 'center', opacity: 0.4 }}>
+                              <Typography level='body-sm'>No users match your search</Typography>
+                            </Box>
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </Table>
                 </Sheet>
               </Stack>
             )}
 
-            {/* Tab 2: Settings */}
-            {activeTab === 2 && (
-              <Stack spacing={3} sx={{ maxWidth: 600, mx: 'auto' }}>
-                <Card variant='outlined' sx={{ p: 3 }}>
-                  <Typography level='title-lg' sx={{ mb: 2 }}>Bulk Token Limits</Typography>
-                  <Typography level='body-sm' sx={{ mb: 2, color: 'text.secondary' }}>
-                    Set a monthly token limit for all users at once. Empty or 0 = unlimited.
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <Input size='sm' placeholder='e.g. 2000000' value={bulkLimit}
-                      onChange={e => setBulkLimit(e.target.value)} sx={{ width: 200 }} />
-                    <Button size='sm' color='warning' loading={bulkSaving}
-                      onClick={() => {
-                        const val = parseInt(bulkLimit, 10);
-                        if (!val || val <= 0) return alert('Enter a valid number');
-                        if (confirm('Set ' + val.toLocaleString() + ' tokens/month for ALL users?'))
-                          handleSetAllLimits(val);
-                      }}>
-                      Apply to All
-                    </Button>
-                    <Button size='sm' variant='soft' color='success' loading={bulkSaving}
-                      onClick={() => {
-                        if (confirm('Remove token limit for ALL users (unlimited)?'))
-                          handleSetAllLimits(null);
-                      }}>
-                      Set All Unlimited
-                    </Button>
-                  </Box>
-                </Card>
+            {/* ====== SETTINGS ====== */}
+            {activeView === 'settings' && (
+              <Stack spacing={3} sx={{ maxWidth: 640, mx: 'auto' }}>
 
-                <Card variant='outlined' sx={{ p: 3 }}>
-                  <Typography level='title-lg' sx={{ mb: 1 }}>Admin Info</Typography>
-                  <Typography level='body-sm'>Admin email: <strong>rcohen@mytsi.org</strong></Typography>
-                  <Typography level='body-sm'>Admin always has unlimited tokens regardless of settings.</Typography>
-                </Card>
+                {/* Bulk Limits */}
+                <Box sx={{
+                  border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                  borderRadius: 'xl', overflow: 'hidden',
+                  background: 'var(--joy-palette-background-surface)',
+                }}>
+                  <Box sx={{
+                    px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+                    borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                    background: 'var(--joy-palette-background-level1)',
+                  }}>
+                    <TuneIcon sx={{ fontSize: 18 }} />
+                    <Typography level='title-md' sx={{ fontWeight: 700 }}>Bulk Token Limits</Typography>
+                  </Box>
+                  <Box sx={{ p: 3 }}>
+                    <Typography level='body-sm' sx={{ mb: 2.5, opacity: 0.7 }}>
+                      Set a monthly token limit for every user at once. Leave empty or 0 for unlimited.
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Input size='sm' placeholder='e.g. 2000000' value={bulkLimit}
+                        onChange={e => setBulkLimit(e.target.value)}
+                        sx={{ width: 200, borderRadius: 'lg' }} />
+                      <Button size='sm' loading={bulkSaving}
+                        sx={{ borderRadius: 'lg', background: 'linear-gradient(135deg, #f2994a 0%, #f2c94c 100%)', color: '#000', fontWeight: 700 }}
+                        onClick={() => {
+                          const val = parseInt(bulkLimit, 10);
+                          if (!val || val <= 0) return alert('Enter a valid number');
+                          if (confirm('Set ' + val.toLocaleString() + ' tokens/month for ALL users?'))
+                            handleSetAllLimits(val);
+                        }}>
+                        Apply to All
+                      </Button>
+                      <Button size='sm' variant='outlined' color='neutral' loading={bulkSaving}
+                        sx={{ borderRadius: 'lg' }}
+                        onClick={() => {
+                          if (confirm('Remove token limit for ALL users (unlimited)?'))
+                            handleSetAllLimits(null);
+                        }}>
+                        Set All Unlimited
+                      </Button>
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Admin Info */}
+                <Box sx={{
+                  border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                  borderRadius: 'xl', overflow: 'hidden',
+                  background: 'var(--joy-palette-background-surface)',
+                }}>
+                  <Box sx={{
+                    px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+                    borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                    background: 'var(--joy-palette-background-level1)',
+                  }}>
+                    <SettingsIcon sx={{ fontSize: 18 }} />
+                    <Typography level='title-md' sx={{ fontWeight: 700 }}>System Info</Typography>
+                  </Box>
+                  <Box sx={{ p: 3 }}>
+                    <Stack spacing={1.5}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography level='body-sm' sx={{ opacity: 0.6 }}>Admin Email</Typography>
+                        <Typography level='body-sm' sx={{ fontWeight: 600 }}>rcohen@mytsi.org</Typography>
+                      </Box>
+                      <Divider />
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography level='body-sm' sx={{ opacity: 0.6 }}>Admin Token Limit</Typography>
+                        <Chip size='sm' variant='soft' color='success' startDecorator={<AllInclusiveIcon sx={{ fontSize: 12 }} />}>Always Unlimited</Chip>
+                      </Box>
+                      <Divider />
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography level='body-sm' sx={{ opacity: 0.6 }}>Monthly Reset</Typography>
+                        <Typography level='body-sm' sx={{ fontWeight: 600 }}>1st of each month</Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+                </Box>
               </Stack>
             )}
           </>
