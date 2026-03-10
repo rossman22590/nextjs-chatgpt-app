@@ -39,7 +39,7 @@ export function FormInputKey(props: {
   const handleChange = (e: React.ChangeEvent) => props.onChange((e.target as HTMLInputElement).value);
 
   const endDecorator = React.useMemo(() => !!props.value && !props.noKey && (
-    <IconButton onClick={() => setIsVisible(!isVisible)}>
+    <IconButton aria-label={isVisible ? 'Hide key' : 'Show key'} onClick={() => setIsVisible(!isVisible)}>
       {isVisible ? <VisibilityIcon sx={{ fontSize: 'lg' }} /> : <VisibilityOffIcon sx={{ fontSize: 'md' }} />}
     </IconButton>
   ), [props.value, props.noKey, isVisible]);

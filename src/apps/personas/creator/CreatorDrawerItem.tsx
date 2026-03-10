@@ -87,10 +87,10 @@ export function CreatorDrawerItem(props: {
 
       {/* Delete / Cancel buttons */}
       {!props.isSelection && deleteArmed && <>
-        <IconButton size='sm' variant='solid' color='danger' onClick={() => props.onDelete(item.id)}>
+        <IconButton aria-label="Delete persona" size='sm' variant='solid' color='danger' onClick={() => props.onDelete(item.id)}>
           <DeleteOutlineIcon />
         </IconButton>
-        <IconButton size='sm' variant='solid' color='neutral' onClick={() => setDeleteArmed(false)}>
+        <IconButton aria-label="Cancel delete" size='sm' variant='solid' color='neutral' onClick={() => setDeleteArmed(false)}>
           <CloseRoundedIcon />
         </IconButton>
       </>}

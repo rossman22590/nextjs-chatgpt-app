@@ -100,13 +100,11 @@ export function OptimaBar(props: { component: React.ElementType, currentApp?: Na
       {(props.isMobile || !navIsShown) && (
         <InvertedBarCornerItem>
           {(hasDrawerContent && navIsShown) ? (
-            // show the drawer button
-            <IconButton disabled={!hasDrawerContent} onPointerDown={optimaOpenDrawer}>
+            <IconButton aria-label="Open drawer" disabled={!hasDrawerContent} onPointerDown={optimaOpenDrawer}>
               <MenuIcon />
             </IconButton>
           ) : (
-            // back button
-            <IconButton onClick={() => navigateToIndex()}>
+            <IconButton aria-label="Back" onClick={() => navigateToIndex()}>
               <ArrowBackIcon />
             </IconButton>
           )}
@@ -126,10 +124,10 @@ export function OptimaBar(props: { component: React.ElementType, currentApp?: Na
         >
           {/*<Tooltip disableInteractive title={contentToPopup ? (panelIsOpen ? 'Close' : 'Open') + ' Menu' : (panelIsOpen ? 'Close' : 'Open')}>*/}
           <IconButton
+            aria-label={panelShownAsPanel || panelShownAsPopup ? 'Close menu' : 'Open app menu'}
             ref={appMenuAnchor}
-            // disabled={contentToPopup ? !appMenuAnchor : false}
-            onClick={optimaTogglePanel /* onPointerDown doesn't work well with a menu (the 'up' event would close it), so we're still with onClick */}
-            onContextMenu={optimaOpenPanel /* important to get the 'preventDefault' for the Right mouse click (to prevent the menu) */}
+            onClick={optimaTogglePanel}
+            onContextMenu={optimaOpenPanel}
           >
             {panelShownAsPanel ? <NavigateNextIcon />
               : panelAsPopup ? <MoreVertIcon />

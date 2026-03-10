@@ -17,6 +17,12 @@ Architecture and system documentation is available in the `/kb/` knowledge base,
 #### CSF - Client-Side Fetch
 - **[CSF.md](systems/client-side-fetch.md)** - Direct browser-to-API communication for LLM requests
 
+### Design
+
+#### Design Language
+- **[design-language.md](design-language.md)** - Theme, typography, color, radius, shadows, shell vars, chat/composer patterns, and usage guidelines
+- **[app-audit-ux-design.md](app-audit-ux-design.md)** - App-wide UX/design audit: aria-labels, theme alignment, auth pages, and remaining follow-ups
+
 ### Systems Documentation
 
 #### Core Platform Systems

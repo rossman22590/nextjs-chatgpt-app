@@ -108,7 +108,7 @@ export function ChatBarBeam(props: {
       {/* [desktop] maximize button, or a disabled spacer  */}
       {!props.isMobile && (
         <GoodTooltip variantOutlined title={<Box sx={{ p: 1 }}>Maximize Beam</Box>}>
-          <IconButton size='sm' onClick={handleMaximizeBeam}>
+          <IconButton aria-label="Maximize Beam" size='sm' onClick={handleMaximizeBeam}>
             {/*<OpenInFullIcon sx={{ fontSize: 'md' }} />*/}
           </IconButton>
         </GoodTooltip>

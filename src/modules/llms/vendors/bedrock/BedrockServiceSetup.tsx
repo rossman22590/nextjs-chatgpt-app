@@ -89,7 +89,7 @@ export function BedrockServiceSetup(props: { serviceId: DModelsServiceId }) {
             </Typography>
           )}
         </Box>
-        <IconButton size='sm' variant={showSetupInstructions ? 'solid' : 'soft'} color='neutral' onClick={() => setShowSetupInstructions(on => !on)}>
+        <IconButton aria-label={showSetupInstructions ? 'Hide setup instructions' : 'Show setup instructions'} size='sm' variant={showSetupInstructions ? 'solid' : 'soft'} color='neutral' onClick={() => setShowSetupInstructions(on => !on)}>
           <InfoOutlinedIcon />
         </IconButton>
       </Box>

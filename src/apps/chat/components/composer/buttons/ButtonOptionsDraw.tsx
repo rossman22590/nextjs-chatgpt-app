@@ -9,7 +9,7 @@ import { PhSlidersHorizontalIcon } from '~/common/components/icons/phosphor/PhSl
 
 export function ButtonOptionsDraw(props: { isMobile?: boolean, onClick: () => void, sx?: SxProps }) {
   return props.isMobile ? (
-    <IconButton variant='soft' color='warning' onClick={props.onClick} sx={props.sx}>
+    <IconButton aria-label="Image settings" variant='soft' color='warning' onClick={props.onClick} sx={props.sx}>
       <FormatPaintTwoToneIcon />
     </IconButton>
   ) : (

@@ -374,7 +374,7 @@ export function PersonaSelector(props: {
           placeholder='Search for purpose…'
           startDecorator={<SearchIcon />}
           endDecorator={searchQuery && (
-            <IconButton onClick={handleSearchClear}>
+            <IconButton aria-label="Clear search" onClick={handleSearchClear}>
               <ClearIcon />
             </IconButton>
           )}
@@ -401,7 +401,7 @@ export function PersonaSelector(props: {
             AI Persona
           </Typography>
           <Tooltip disableInteractive title={editMode ? 'Done Editing' : 'Edit Tiles'}>
-            <IconButton size='sm' onClick={toggleEditMode} sx={{ my: '-0.25rem' /* absorb the button padding */ }}>
+            <IconButton aria-label={editMode ? 'Done editing' : 'Edit tiles'} size='sm' onClick={toggleEditMode} sx={{ my: '-0.25rem' /* absorb the button padding */ }}>
               {editMode ? <DoneIcon /> : <EditRoundedIcon />}
             </IconButton>
           </Tooltip>

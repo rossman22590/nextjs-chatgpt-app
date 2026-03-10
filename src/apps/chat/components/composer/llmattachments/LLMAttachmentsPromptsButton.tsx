@@ -49,6 +49,7 @@ function LLMAttachmentsPromptsButton({ data }: { data: AgiAttachmentPromptsData 
 
   const button = (
     <IconButton
+      aria-label={data.hasData ? 'More attachment ideas' : 'Get attachment ideas'}
       variant={data.error ? 'soft' : data.hasData ? 'outlined' : 'soft'}
       color={data.error ? 'danger' : data.hasData ? AGI_SUGGESTIONS_COLOR : AGI_SUGGESTIONS_COLOR}
       size='sm'

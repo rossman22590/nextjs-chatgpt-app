@@ -102,7 +102,7 @@ function ModelInstallPanel(props: { access: OpenAIAccessSchema, modelName: strin
         <Typography level='title-sm'>
           Installing <strong>{props.modelName}</strong> from the <strong>{props.galleryName}</strong>
         </Typography>
-        <IconButton size='sm' onClick={() => setHideSelf(true)} sx={{ ml: 'auto' }}>
+        <IconButton aria-label="Close" size='sm' onClick={() => setHideSelf(true)} sx={{ ml: 'auto' }}>
           <CloseRoundedIcon />
         </IconButton>
       </Box>

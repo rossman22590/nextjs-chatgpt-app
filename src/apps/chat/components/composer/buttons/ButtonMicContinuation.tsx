@@ -15,7 +15,7 @@ export const ButtonMicContinuationMemo = React.memo(ButtonMicContinuation);
 
 function ButtonMicContinuation(props: { isActive: boolean, variant: VariantProp, color: ColorPaletteProp, onClick: () => void, sx?: SxProps }) {
   return <Tooltip placement='bottom' title={micContinuationLegend}>
-    <IconButton variant={props.variant} color={props.color} onClick={props.onClick} sx={props.sx}>
+    <IconButton aria-label="Voice continuation" variant={props.variant} color={props.color} onClick={props.onClick} sx={props.sx}>
       {props.isActive ? <RepeatOnIcon /> : <RepeatIcon />}
     </IconButton>
   </Tooltip>;

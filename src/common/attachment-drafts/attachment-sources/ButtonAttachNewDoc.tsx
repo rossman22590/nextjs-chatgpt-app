@@ -17,7 +17,7 @@ function ButtonAttachNew(props: {
   onAttachNew: () => void,
 }) {
   return props.isMobile ? (
-    <IconButton color={props.color} disabled={props.disabled} onClick={props.onAttachNew}>
+    <IconButton aria-label="Attach new document" color={props.color} disabled={props.disabled} onClick={props.onAttachNew}>
       <AddRoundedIcon />
     </IconButton>
   ) : (

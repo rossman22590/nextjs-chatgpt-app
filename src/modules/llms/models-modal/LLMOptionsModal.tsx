@@ -293,12 +293,12 @@ export function LLMOptionsModal(props: { id: DLLMId, context?: ModelOptionsConte
           {/* Star + Model Name */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0, md: 1 } }} onClick={event => event.shiftKey && console.log({ llm })}>
             {ENABLE_STARRING_ICON && <TooltipOutlined title={llm.userStarred ? 'Unstar this model' : 'Star this model for quick access'}>
-              <IconButton size='sm' onClick={handleLlmStarredToggle} sx={{ ml: -0.5 }}>
+              <IconButton aria-label={llm.userStarred ? 'Unstar model' : 'Star model'} size='sm' onClick={handleLlmStarredToggle} sx={{ ml: -0.5 }}>
                 {llm.userStarred ? <StarIcon sx={{ color: '#fad857', fontSize: 'xl2' }} /> : <StarBorderIcon />}
               </IconButton>
             </TooltipOutlined>}
             {ENABLE_HIDING_ICON && <TooltipOutlined title={visible ? 'Show this model in the app' : 'Hide this model from the app'}>
-              <IconButton size='sm' onClick={handleLlmVisibilityToggle} sx={{ ml: -0.5 }}>
+              <IconButton aria-label={visible ? 'Hide model in app' : 'Show model in app'} size='sm' onClick={handleLlmVisibilityToggle} sx={{ ml: -0.5 }}>
                 {visible ? <VisibilityIcon sx={{ fontSize: 'xl' }} /> : <VisibilityOffIcon />}
               </IconButton>
             </TooltipOutlined>}

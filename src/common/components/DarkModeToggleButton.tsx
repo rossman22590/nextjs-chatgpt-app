@@ -33,7 +33,7 @@ export function DarkModeToggleButton(props: { hasText?: boolean }) {
       {colorMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
     </Button>
   ) : (
-    <IconButton size='sm' variant='soft' onClick={handleToggleDarkMode} sx={{ ml: 'auto', /*mr: '2px',*/ my: '-0.25rem' /* absorb the menuItem padding */ }}>
+    <IconButton aria-label={colorMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} size='sm' variant='soft' onClick={handleToggleDarkMode} sx={{ ml: 'auto', my: '-0.25rem' }}>
       {colorMode !== 'dark' ? <DarkModeIcon /> : <LightModeIcon />}
     </IconButton>
   );

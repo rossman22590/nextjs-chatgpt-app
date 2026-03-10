@@ -723,6 +723,7 @@ export function ChatMessage(props: {
                   variant={opsMenuAnchor ? 'solid' : zenMode ? 'plain' : 'soft'}
                   color={(fromAssistant || fromSystem || zenMode) ? 'neutral' : userCommandApprox === 'draw' ? 'warning' : userCommandApprox === 'react' ? 'success' : 'primary'}
                   sx={avatarIconSx}
+                  aria-label='Message options'
                 >
                   <MoreVertIcon />
                 </IconButton>
@@ -745,7 +746,7 @@ export function ChatMessage(props: {
         {isEditingText && (
           <Box sx={messageAsideColumnSx} className='msg-edit-button'>
             <Tooltip arrow disableInteractive title='Apply Edits'>
-              <IconButton size='sm' variant='solid' color='warning' onClick={handleEditsApplyClicked}>
+              <IconButton aria-label="Apply edits" size='sm' variant='solid' color='warning' onClick={handleEditsApplyClicked}>
                 <CheckRoundedIcon />
               </IconButton>
             </Tooltip>
@@ -902,7 +903,7 @@ export function ChatMessage(props: {
         {isEditingText && (
           <Box sx={messageAsideColumnSx} className='msg-edit-button'>
             <Tooltip arrow disableInteractive title='Discard Edits'>
-              <IconButton size='sm' variant='solid' onClick={handleEditsCancel}>
+              <IconButton aria-label="Discard edits" size='sm' variant='solid' onClick={handleEditsCancel}>
                 <CloseRoundedIcon />
               </IconButton>
             </Tooltip>
@@ -1119,7 +1120,7 @@ export function ChatMessage(props: {
             >
               {/* Bubble Add Reference */}
               {!!onAddInReferenceTo && <Tooltip disableInteractive arrow placement='top' title={props.hasInReferenceTo ? 'Reply to this too' : fromAssistant ? 'Reply' : 'Refer To'}>
-                <IconButton color='primary' onClick={handleOpsAddInReferenceTo}>
+                <IconButton aria-label={props.hasInReferenceTo ? 'Reply to this too' : fromAssistant ? 'Reply' : 'Refer to'} color='primary' onClick={handleOpsAddInReferenceTo}>
                   {props.hasInReferenceTo ? <ReplyAllRoundedIcon sx={{ fontSize: 'xl' }} /> : <ReplyRoundedIcon sx={{ fontSize: 'xl' }} />}
                 </IconButton>
               </Tooltip>}
@@ -1132,7 +1133,7 @@ export function ChatMessage(props: {
 
               {/* Text Tools (edits fragment, only for assistant messages) */}
               {fromAssistant && <Tooltip disableInteractive arrow placement='top' title='Highlight Text'>
-                <IconButton disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
+                <IconButton aria-label="Highlight text" disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
                   handleHighlightSelText('highlight');
                   closeBubble();
                 }}>
@@ -1140,7 +1141,7 @@ export function ChatMessage(props: {
                 </IconButton>
               </Tooltip>}
               {fromAssistant && <Tooltip disableInteractive arrow placement='top' title='Strike Through'>
-                <IconButton disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
+                <IconButton aria-label="Strike through" disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
                   handleHighlightSelText('strike');
                   closeBubble();
                 }}>
@@ -1148,7 +1149,7 @@ export function ChatMessage(props: {
                 </IconButton>
               </Tooltip>}
               {fromAssistant && <Tooltip disableInteractive arrow placement='top' title='Toggle Bold'>
-                <IconButton disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
+                <IconButton aria-label="Toggle bold" disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
                   handleHighlightSelText('strong');
                   closeBubble();
                 }}>
@@ -1156,7 +1157,7 @@ export function ChatMessage(props: {
                 </IconButton>
               </Tooltip>}
               {fromAssistant && <Tooltip disableInteractive arrow placement='top' title='Cut Text'>
-                <IconButton disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
+                <IconButton aria-label="Cut text" disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
                   handleHighlightSelText('cut');
                   closeBubble();
                 }}>
@@ -1167,17 +1168,17 @@ export function ChatMessage(props: {
 
               {/* Intelligent functions */}
               {!!props.onTextDiagram && <Tooltip disableInteractive arrow placement='top' title={couldDiagram ? 'Auto-Diagram...' : 'Too short to Auto-Diagram'}>
-                <IconButton color='success' onClick={couldDiagram ? handleOpsDiagram : undefined}>
+                <IconButton aria-label={couldDiagram ? 'Auto-diagram' : 'Auto-diagram (selection too short)'} color='success' onClick={couldDiagram ? handleOpsDiagram : undefined}>
                   <AccountTreeOutlinedIcon sx={{ color: couldDiagram ? 'primary' : 'neutral.plainDisabledColor' }} />
                 </IconButton>
               </Tooltip>}
               {!!props.onTextImagine && <Tooltip disableInteractive arrow placement='top' title='Auto-Draw'>
-                <IconButton color='success' onClick={handleOpsImagine} disabled={!couldImagine || props.isImagining}>
+                <IconButton aria-label="Auto-draw" color='success' onClick={handleOpsImagine} disabled={!couldImagine || props.isImagining}>
                   {!props.isImagining ? <FormatPaintOutlinedIcon /> : <CircularProgress sx={{ '--CircularProgress-size': '16px' }} />}
                 </IconButton>
               </Tooltip>}
               {!!props.onTextSpeak && <Tooltip disableInteractive arrow placement='top' title='Speak'>
-                <IconButton color='success' onClick={handleOpsSpeak} disabled={!couldSpeak || props.isSpeaking}>
+                <IconButton aria-label="Speak" color='success' onClick={handleOpsSpeak} disabled={!couldSpeak || props.isSpeaking}>
                   {!props.isSpeaking ? <PhVoice /> : <CircularProgress sx={{ '--CircularProgress-size': '16px' }} />}
                 </IconButton>
               </Tooltip>}
@@ -1185,7 +1186,7 @@ export function ChatMessage(props: {
 
               {/* Bubble Copy */}
               <Tooltip disableInteractive arrow placement='top' title='Copy Selection'>
-                <IconButton onClick={handleBubbleCopyDOM}>
+                <IconButton aria-label="Copy selection" onClick={handleBubbleCopyDOM}>
                   <ContentCopyIcon />
                 </IconButton>
               </Tooltip>

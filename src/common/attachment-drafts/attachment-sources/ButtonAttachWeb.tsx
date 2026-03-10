@@ -19,7 +19,7 @@ function ButtonAttachWeb(props: {
 }) {
 
   const button = props.isMobile ? (
-    <IconButton color={props.color} disabled={props.disabled} onClick={props.onOpenWebInput}>
+    <IconButton aria-label="Attach from web" color={props.color} disabled={props.disabled} onClick={props.onOpenWebInput}>
       <LanguageRoundedIcon />
     </IconButton>
   ) : (

@@ -92,7 +92,7 @@ export function CreatorDrawer(props: {
     >
       {hasPersonas && !selectMode && (
         <Tooltip title={selectMode ? 'Done' : 'Select'}>
-          <IconButton onClick={selectMode ? handleSelectionClose : () => setSelectMode(true)}>
+          <IconButton aria-label={selectMode ? 'Done selecting' : 'Select personas'} onClick={selectMode ? handleSelectionClose : () => setSelectMode(true)}>
             {selectMode ? <DoneIcon /> : <CheckBoxOutlineBlankIcon />}
           </IconButton>
         </Tooltip>

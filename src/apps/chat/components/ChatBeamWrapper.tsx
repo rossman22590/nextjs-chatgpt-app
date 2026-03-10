@@ -71,7 +71,7 @@ export function ChatBeamWrapper(props: {
         {/* Modal-Close-alike */}
         <Box sx={beamWrapperStyles.closeContainer}>
           <GoodTooltip title='Exit maximized mode'>
-            <IconButton variant='solid' onClick={handleUnMaximize} sx={beamWrapperStyles.closeButton}>
+            <IconButton aria-label="Exit maximized mode" variant='solid' onClick={handleUnMaximize} sx={beamWrapperStyles.closeButton}>
               <CloseFullscreenIcon />
               {/*<CloseRoundedIcon />*/}
             </IconButton>

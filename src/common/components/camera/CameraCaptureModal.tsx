@@ -325,7 +325,7 @@ export function CameraCaptureModal(props: {
     if (allowMultiCapture)
       btns.push(
         <Tooltip key='add' disableInteractive arrow placement='top' title='Add to message'>
-          <IconButton size='sm' disabled={isAddButtonDisabled} onClick={handleVideoAddClicked} sx={_styles.addButton}>
+          <IconButton aria-label="Add capture to message" size='sm' disabled={isAddButtonDisabled} onClick={handleVideoAddClicked} sx={_styles.addButton}>
             <AddRoundedIcon />
           </IconButton>
         </Tooltip>,
@@ -394,7 +394,7 @@ export function CameraCaptureModal(props: {
             </Select>
 
             {canSwitchCameras && (
-              <IconButton size='sm' onClick={handleCameraSwitch}>
+              <IconButton aria-label="Switch camera" size='sm' onClick={handleCameraSwitch}>
                 {isFrontCamera ? <CameraRearIcon /> : isBackCamera ? <CameraFrontIcon /> : <FlipCameraAndroidOutlinedIcon />}
               </IconButton>
             )}
@@ -446,7 +446,7 @@ export function CameraCaptureModal(props: {
           <Box paddingBottom={zoomControl ? 1 : undefined} sx={_styles.captureButtonContainer}>
 
             {/* Info */}
-            <IconButton disabled={!info} onClick={() => setShowInfo((prev) => !prev)}>
+            <IconButton aria-label={showInfo ? 'Hide info' : 'Show info'} disabled={!info} onClick={() => setShowInfo((prev) => !prev)}>
               <InfoOutlinedIcon />
             </IconButton>
 
@@ -460,7 +460,7 @@ export function CameraCaptureModal(props: {
             </ButtonGroup>
 
             {/* Download */}
-            <IconButton onClick={handleVideoDownloadClicked}>
+            <IconButton aria-label="Download capture" onClick={handleVideoDownloadClicked}>
               <DownloadIcon />
             </IconButton>
 

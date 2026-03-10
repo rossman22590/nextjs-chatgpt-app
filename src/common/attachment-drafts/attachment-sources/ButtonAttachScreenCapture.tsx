@@ -42,7 +42,7 @@ function ButtonAttachScreenCapture(props: {
 
 
   return props.isMobile ? (
-    <IconButton color={props.color} disabled={props.disabled} onClick={handleTakeScreenCapture}>
+    <IconButton aria-label="Attach screen capture" color={props.color} disabled={props.disabled} onClick={handleTakeScreenCapture}>
       <ScreenshotMonitorIcon />
     </IconButton>
   ) : (

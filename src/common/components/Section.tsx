@@ -22,7 +22,11 @@ export function Section(props: { title?: string; collapsible?: boolean, collapse
         </FormLabel>
       )}
       {!!props.collapsible && !props.asLink && (
-        <IconButton onClick={() => setCollapsed(!collapsed)} sx={{ ml: 1 }}>
+        <IconButton
+          aria-label={collapsed ? 'Expand section' : 'Collapse section'}
+          onClick={() => setCollapsed(!collapsed)}
+          sx={{ ml: 1 }}
+        >
           {!collapsed ? <KeyboardArrowDownIcon sx={{ transform: 'rotate(180deg)' }} /> : <KeyboardArrowDownIcon />}
         </IconButton>
       )}

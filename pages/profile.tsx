@@ -174,7 +174,7 @@ export default function Profile() {
                   <Typography level="body-sm" color="neutral" noWrap>
                     {session?.user?.email}
                   </Typography>
-                  <Chip variant="solid" color="primary" size="sm" sx={{ mt: 1, color: '#fff' }}>
+                  <Chip variant="solid" color="primary" size="sm" sx={{ mt: 1 }}>
                     Active
                   </Chip>
                 </Box>

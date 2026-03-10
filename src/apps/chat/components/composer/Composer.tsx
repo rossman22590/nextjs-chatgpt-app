@@ -991,7 +991,7 @@ export function Composer(props: {
 
           {/* [Mobile: bottom, Desktop: right] */}
           <Grid xs={12} md={3}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, height: '100%' } as const}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1, md: 1.5 }, height: '100%', minWidth: 0, justifyContent: 'flex-start' } as const}>
 
               {/* [mobile] This row is here only for the [mobile] bottom-start corner item */}
               {/* [desktop] This column arrangement will have the [desktop] beam button right under call */}
@@ -1013,6 +1013,7 @@ export function Composer(props: {
                   color={sendButtonColor}
                   sx={{
                     flexGrow: 1,
+                    gap: { xs: 1, md: 1.5 },
                     backgroundColor: (isMobile && sendButtonVariant === 'outlined') ? 'background.popup' : undefined,
                     boxShadow: (isMobile && sendButtonVariant !== 'outlined') ? 'none' : `0 8px 24px -4px rgb(var(--joy-palette-${sendButtonColor}-mainChannel) / 20%)`,
                   }}
@@ -1026,7 +1027,7 @@ export function Composer(props: {
                       loadingPosition='end'
                       onClick={handleSendClicked}
                       endDecorator={sendButtonIcon}
-                      sx={{ '--Button-gap': '1rem' }}
+                      sx={{ '--Button-gap': '1rem', minHeight: 40, px: 1.5 }}
                     >
                       {micContinuation && 'Voice '}{sendButtonLabel}
                     </Button>
@@ -1038,7 +1039,7 @@ export function Composer(props: {
                       disabled={noConversation}
                       onClick={handleStopClicked}
                       endDecorator={<StopOutlinedIcon sx={{ fontSize: 18 }} />}
-                      sx={{ animation: `${animationEnterBelow} 0.1s ease-out` }}
+                      sx={{ animation: `${animationEnterBelow} 0.1s ease-out`, minHeight: 40 }}
                     >
                       Stop
                     </Button>
@@ -1059,11 +1060,14 @@ export function Composer(props: {
                   {/*  </IconButton>*/}
                   {/*</Tooltip>}*/}
 
-                  {/* Mode expander */}
+                  {/* Mode expander: soft variant so it reads as secondary, not a second primary */}
                   <IconButton
-                    variant={chatExecuteMenuShown ? 'outlined' : assistantAbortible ? 'soft' : isDraw ? undefined : undefined}
+                    aria-label="Choose send mode (Chat, Beam, or Call)"
+                    variant={chatExecuteMenuShown ? 'outlined' : 'soft'}
+                    color={sendButtonColor}
                     disabled={noConversation /*|| chatExecuteMenuShown*/}
                     onClick={showChatExecuteMenu}
+                    sx={{ ml: { xs: 1, md: 1.5 }, flexShrink: 0, minWidth: 40, minHeight: 40 }}
                   >
                     <ExpandLessIcon />
                   </IconButton>

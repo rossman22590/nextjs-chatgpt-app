@@ -18,7 +18,7 @@ function ButtonAttachCamera(props: {
   onOpenCamera: () => void,
 }) {
   return props.isMobile ? (
-    <IconButton color={props.color} disabled={props.disabled} onClick={props.onOpenCamera}>
+    <IconButton aria-label="Attach from camera" color={props.color} disabled={props.disabled} onClick={props.onOpenCamera}>
       <AddAPhotoIcon />
     </IconButton>
   ) : (

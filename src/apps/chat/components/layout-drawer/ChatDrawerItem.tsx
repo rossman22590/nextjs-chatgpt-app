@@ -356,7 +356,7 @@ function ChatDrawerItem(props: {
               {(folder !== undefined) && <>
                 <Tooltip arrow disableInteractive title={folder ? `Change Folder (${folder.title})` : 'Add to Folder'}>
                   {folder ? (
-                    <IconButton size='sm' onClick={handleFolderChangeBegin}>
+                    <IconButton aria-label={folder ? `Change folder (${folder.title})` : 'Add to folder'} size='sm' onClick={handleFolderChangeBegin}>
                       <FolderIcon style={{ color: folder.color || 'inherit' }} />
                     </IconButton>
                   ) : (

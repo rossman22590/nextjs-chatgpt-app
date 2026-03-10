@@ -69,18 +69,19 @@ export const PasswordProtection: React.FC<PasswordProtectionProps> = ({ onUnlock
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #1e1e2f 0%, #2d2d44 100%)',
+        bgcolor: 'background.body',
         zIndex: 9999,
         p: 2,
       }}
     >
       <Card
+        variant="outlined"
         sx={{
           width: '90%',
           maxWidth: '400px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-          backdropFilter: 'blur(16px)',
-          background: 'rgba(255, 255, 255, 0.95)',
+          boxShadow: 'lg',
+          borderRadius: 'lg',
+          borderColor: 'divider',
         }}
       >
         <CardContent sx={{ p: 4, textAlign: 'center' }}>
@@ -92,12 +93,13 @@ export const PasswordProtection: React.FC<PasswordProtectionProps> = ({ onUnlock
               width: 64,
               height: 64,
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              bgcolor: 'primary.solidBg',
+              color: 'primary.solidColor',
               mx: 'auto',
               mb: 3,
             }}
           >
-            <LockIcon sx={{ fontSize: 32, color: 'white' }} />
+            <LockIcon sx={{ fontSize: 32 }} />
           </Box>
 
           <Typography level="h2" component="h1" fontWeight="bold" sx={{ mb: 1 }}>
@@ -126,6 +128,7 @@ export const PasswordProtection: React.FC<PasswordProtectionProps> = ({ onUnlock
                 sx={{ borderRadius: 'md' }}
                 endDecorator={
                   <IconButton
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     variant="plain"
                     color="neutral"
                     onClick={() => setShowPassword(!showPassword)}
@@ -142,12 +145,9 @@ export const PasswordProtection: React.FC<PasswordProtectionProps> = ({ onUnlock
               loading={isLoading}
               size="lg"
               variant="solid"
+              color="primary"
               fullWidth
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: 'md',
-                py: 1.5,
-              }}
+              sx={{ borderRadius: 'md', py: 1.5 }}
             >
               {isLoading ? 'Verifying...' : 'Unlock App'}
             </Button>

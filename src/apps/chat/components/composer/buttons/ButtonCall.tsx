@@ -23,12 +23,12 @@ export const ButtonCallMemo = React.memo(ButtonCall);
 
 function ButtonCall(props: { isMobile?: boolean, disabled?: boolean, onClick: () => void }) {
   return props.isMobile ? (
-    <IconButton variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} sx={mobileSx}>
+    <IconButton aria-label="Call" variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} sx={{ ...mobileSx, minWidth: 40, minHeight: 40 }}>
       <CallIcon />
     </IconButton>
   ) : (
     <Tooltip disableInteractive variant='solid' arrow placement='right' title={callConversationLegend}>
-      <Button variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} endDecorator={<CallIcon />} sx={desktopSx}>
+      <Button aria-label="Call" variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} endDecorator={<CallIcon />} sx={{ ...desktopSx, minHeight: 40 }}>
         Call
       </Button>
     </Tooltip>

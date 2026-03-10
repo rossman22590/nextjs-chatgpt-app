@@ -43,12 +43,12 @@ function ButtonBeam(props: {
   onClick: () => void,
 }) {
   return props.isMobile ? (
-    <IconButton variant='outlined' color={props.color ?? 'primary'} disabled={props.disabled} onClick={props.onClick} sx={mobileSx}>
+    <IconButton aria-label="Beam (multiple models)" variant='outlined' color={props.color ?? 'primary'} disabled={props.disabled} onClick={props.onClick} sx={{ ...mobileSx, minWidth: 40, minHeight: 40 }}>
       <ChatBeamIcon />
     </IconButton>
   ) : (
     <Tooltip disableInteractive variant='solid' arrow placement='right' title={props.hasContent ? desktopLegend : desktopLegendNoContent}>
-      <Button variant='soft' color={props.color ?? 'primary'} disabled={props.disabled} onClick={props.onClick} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
+      <Button aria-label="Beam (combine multiple models)" variant='soft' color={props.color ?? 'primary'} disabled={props.disabled} onClick={props.onClick} endDecorator={<ChatBeamIcon />} sx={{ ...desktopSx, minHeight: 40 }}>
         Beam
       </Button>
     </Tooltip>

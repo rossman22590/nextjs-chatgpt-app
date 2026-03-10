@@ -299,7 +299,7 @@ function ChatDrawer(props: {
     {/* Drawer Header */}
     <OptimaDrawerHeader title='Chats' onClose={optimaCloseDrawer}>
       <Tooltip title={enableFolders ? 'Hide Folders' : 'Use Folders'}>
-        <IconButton size='sm' onClick={toggleEnableFolders}>
+        <IconButton aria-label={enableFolders ? 'Hide folders' : 'Show folders'} size='sm' onClick={toggleEnableFolders}>
           {enableFolders ? <FoldersToggleOn /> : <FoldersToggleOff />}
         </IconButton>
       </Tooltip>
@@ -426,7 +426,7 @@ function ChatDrawer(props: {
               </Typography>
               {(filterHasStars || filterHasImageAssets || filterHasDocFragments || filterIsArchived) && (
                 <Tooltip title='Clear Filters'>
-                  <IconButton size='sm' color='primary' onClick={clearFilters}>
+                  <IconButton aria-label="Clear filters" size='sm' color='primary' onClick={clearFilters}>
                     <ClearIcon />
                   </IconButton>
                 </Tooltip>

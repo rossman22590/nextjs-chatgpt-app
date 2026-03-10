@@ -30,7 +30,7 @@ export default function AuthError() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(to bottom, #1e1e2f, #2d2d44)',
+        bgcolor: 'background.body',
         p: 2,
       }}
     >
