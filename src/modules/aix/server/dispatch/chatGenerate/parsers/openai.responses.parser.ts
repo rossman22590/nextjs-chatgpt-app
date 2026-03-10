@@ -6,6 +6,7 @@ import type { AixWire_Particles } from '../../../api/aix.wiretypes';
 import type { ChatGenerateParseFunction } from '../chatGenerate.dispatch';
 import type { IParticleTransmitter } from './IParticleTransmitter';
 import { IssueSymbols } from '../ChatGenerateTransmitter';
+import { aixResilientUnknownValue } from '../../../api/aix.resilience';
 
 import { OpenAIWire_API_Responses } from '../../wiretypes/openai.wiretypes';
 
@@ -55,6 +56,7 @@ class ResponseParserStateMachine {
 
   // low-level verifications
   #sequenceNumber: number = 0;
+  #sequenceNumberActive: boolean = false; // tracks if sequence_number validation is active
   #expectedEvents: TEventType[] | undefined;
 
   // most recently updated response object
@@ -76,11 +78,27 @@ class ResponseParserStateMachine {
 
   // Validations
 
-  validateSequenceNumber(sequenceNumber: number) {
+  validateSequenceNumber(sequenceNumber: number | undefined) {
     // time-to-first-event
     if (this.timeToFirstEvent === undefined)
       this.timeToFirstEvent = Date.now() - this.parserCreationTimestamp;
 
+    // [LiteLLM, 2026-01-29] Handle optional sequence_number for proxy compatibility
+    // Once we see a valid sequence_number, we activate validation and require monotonicity
+    if (sequenceNumber === undefined) {
+      // If validation was previously active, warn about missing sequence number
+      if (this.#sequenceNumberActive)
+        console.warn(`[DEV] AIX: OpenAI Responses: sequence_number missing after previously seeing valid numbers`);
+      return;
+    }
+
+    // First valid sequence_number activates validation
+    if (!this.#sequenceNumberActive) {
+      this.#sequenceNumberActive = true;
+      this.#sequenceNumber = sequenceNumber;
+    }
+
+    // Validate monotonicity
     if (sequenceNumber !== this.#sequenceNumber)
       console.warn(`[DEV] AIX: OpenAI Responses: sequence mismatch: got ${sequenceNumber}, expected ${this.#sequenceNumber}`);
     this.#sequenceNumber = sequenceNumber + 1;
@@ -244,11 +262,16 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
     R.validateExpectedEventType(eventType);
 
     // Debugging: show the sequence of events
-    OPENAI_RESPONSES_DEBUG_EVENT_SEQUENCE && console.log(`response ${R.responseId}: ${eventType}`);
+    OPENAI_RESPONSES_DEBUG_EVENT_SEQUENCE && console.log(`response ${R.responseId}: ${eventType}\n`);
 
     switch (eventType) {
 
       // level 1. Lifecycle events
+
+      // 1.0. Request queued (background/async or under load) - response.created will follow
+      case 'response.queued':
+        R.setResponse(eventType, event.response);
+        break;
 
       // 1.1. First event, with the response substrate
       case 'response.created':
@@ -308,6 +331,9 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
           if (metrics)
             pt.updateMetrics(metrics);
         }
+
+        // -> End of the response
+        pt.setDialectEnded('done-dialect'); // OpenAI Responses: 'response.completed'
         break;
 
       case 'response.failed':
@@ -370,6 +396,8 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
             R.markHasFunctionCalls();
             break;
 
+          // --- Hosted Tools Outputs ---
+
           case 'web_search_call':
             // -> WSC: process completed web search - NO TEXT MESSAGES, use fragments instead
             _forwardWebSearchCallItem(pt, doneItem);
@@ -381,25 +409,33 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
             // Create inline image with base64 data
             if (igResult)
               pt.appendImageInline(
-                'image/png', // default mime type
+                _imageGenerationMimeType(doneItem), // infer from output_format echoed in the item
                 igResult,
                 igRevisedPrompt || 'Generated image',
                 'gpt-image-1', // generator
-                igRevisedPrompt || '' // prompt used
+                igRevisedPrompt || '', // prompt used
               );
             else
               console.warn('[DEV] AIX: OpenAI Responses: image_generation_call done without result:', doneItem);
             break;
 
+          case 'code_interpreter_call':
+            // -> CIC: process completed code interpreter call (xAI/OpenAI)
+            _forwardCodeInterpreterCallItem(pt, doneItem);
+            break;
+
+          case 'custom_tool_call':
+            // -> CTC: notify about the custom tool call completion and its input
+            _forwardCustomToolCallItem(pt, doneItem);
+            break;
+
           default:
             const _exhaustiveCheck: never = doneItemType;
             // noinspection FallThroughInSwitchStatementJS
-            // case 'custom_tool_call':
-            // case 'code_interpreter_call':
             // case 'file_search_call': // OpenAI vector store - not implemented
             // case 'mcp_call':
             // TODO: Implement these when types are properly integrated
-            console.log(`[DEV] Output item type: ${doneItemType} (TODO: implement)`, doneItem);
+            aixResilientUnknownValue('OpenAI-Responses', `outputItemType:${doneItemType}`, doneItem);
             break;
         }
 
@@ -507,7 +543,9 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
         // .done: we parse this at the end
         break;
 
-      // 4.4 - Web Search Call Events
+      // --- Hosted Tool Call Events ---
+
+      // 4.x - Web Search Call Events
       // Flow: in_progress (unique start) -> searching (can be multiple) -> completed
       // NOTE: We use placeholder signals instead of text to avoid cluttering the response
 
@@ -528,7 +566,7 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
         // -> Actual web_search_call results are handled in response.output_item.done
         break;
 
-      // Image Generation Call Events
+      // 4.x Image Generation Call Events
       // Flow: in_progress -> generating -> [partial_image]* -> completed
       // NOTE: We use placeholder signals for progress, final image handled in output_item.done
 
@@ -556,6 +594,48 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
         // -> Final image result is handled in response.output_item.done
         break;
 
+      // 4.x Code Interpreter Call Events (xAI/OpenAI)
+      // Flow: in_progress -> interpreting -> completed
+      // NOTE: We use placeholder signals for progress, final result handled in output_item.done
+
+      case 'response.code_interpreter_call.in_progress':
+        R.outputItemVisit(eventType, event.output_index, 'code_interpreter_call');
+        pt.sendVoidPlaceholder('code-exec', 'Starting code interpreter...');
+        break;
+
+      case 'response.code_interpreter_call.interpreting':
+        R.outputItemVisit(eventType, event.output_index, 'code_interpreter_call');
+        pt.sendVoidPlaceholder('code-exec', 'Running code...');
+        break;
+
+      case 'response.code_interpreter_call.completed':
+        R.outputItemVisit(eventType, event.output_index, 'code_interpreter_call');
+        pt.sendVoidPlaceholder('code-exec', 'Code execution completed');
+        // -> Final result is handled in response.output_item.done
+        break;
+
+      case 'response.code_interpreter_call_code.delta':
+        R.outputItemVisit(eventType, event.output_index, 'code_interpreter_call');
+        // Incremental code updates - could show live code being written
+        // For now, just acknowledge - final code handled in output_item.done
+        break;
+
+      case 'response.code_interpreter_call_code.done':
+        R.outputItemVisit(eventType, event.output_index, 'code_interpreter_call');
+        // Code complete - final handling in output_item.done
+        break;
+
+      // 4.x - Custom Tool Call Events
+
+      case 'response.custom_tool_call_input.delta':
+        R.outputItemVisit(eventType, event.output_index, 'custom_tool_call');
+        // Incremental input - just acknowledge, final input handled in output_item.done
+        break;
+
+      case 'response.custom_tool_call_input.done':
+        R.outputItemVisit(eventType, event.output_index, 'custom_tool_call');
+        // Input complete - final handling in output_item.done
+        break;
 
       // 1.5 - Error
 
@@ -570,6 +650,11 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
         // Transmit the error as text - note: throw if you want to transmit as 'error'
         // FIXME: potential point for throwing RequestRetryError (using 'srv-warn' for now)
         pt.setDialectTerminatingIssue(`${errorCode || 'Error'}: ${errorMessage || 'unknown.'}${errorParam ? ` (param: ${errorParam})` : ''}`, IssueSymbols.Generic, 'srv-warn');
+        break;
+
+      case 'keepalive':
+        // [OpenAI, 2025-01-13] Keepalive events are sent periodically to keep the connection alive
+        // Nothing to do here - just acknowledge the event by not erroring
         break;
 
       default:
@@ -593,9 +678,8 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
         // case 'response.mcp_list_tools.failed':
         // case 'response.custom_tool_call_input.delta':
         // case 'response.custom_tool_call_input.done':
-        // case 'response.queued':
         // FIXME: if we're here, we prob needed to implement the part
-        console.warn('[DEV] AIX: OpenAI Responses: unexpected event type:', eventType);
+        aixResilientUnknownValue('OpenAI-Responses', 'eventType', eventType);
         break;
 
     }
@@ -686,7 +770,7 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
 
       default:
         const _exhaustiveCheck: never = response.status;
-        console.warn('[DEV] AIX: OpenAI-Response-NS unexpected response status:', { status: response.status });
+        aixResilientUnknownValue('OpenAI-Responses-NS', 'responseStatus', { status: response.status });
         break;
     }
 
@@ -774,7 +858,7 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
 
               default:
                 const _exhaustiveCheck: never = contentType;
-                console.warn('[DEV] AIX: OpenAI-Response-NS unexpected message content type:', contentType);
+                aixResilientUnknownValue('OpenAI-Responses-NS', 'contentType', contentType);
                 break;
             }
           }
@@ -793,6 +877,8 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
           pt.endMessagePart();
           break;
 
+        // -- Hosted Tools Outputs --
+
         case 'web_search_call':
           // -> WSC: process completed web search - NO TEXT MESSAGES, use fragments instead
           _forwardWebSearchCallItem(pt, oItem);
@@ -805,7 +891,7 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
           // Create inline image with base64 data
           if (igResult)
             pt.appendImageInline(
-              'image/png', // default mime type
+              _imageGenerationMimeType(oItem), // infer from output_format echoed in the item
               igResult,
               igRevisedPrompt || 'Generated image',
               'gpt-image-1', // generator
@@ -816,9 +902,20 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
           pt.endMessagePart();
           break;
 
+        case 'code_interpreter_call':
+          // -> CIC: process completed code interpreter call (xAI/OpenAI)
+          _forwardCodeInterpreterCallItem(pt, oItem);
+          pt.endMessagePart();
+          break;
+
+        case 'custom_tool_call':
+          // -> CTC: notify about the custom tool call completion and its input          _forwardCustomToolCallItem(pt, oItem);
+          pt.endMessagePart();
+          break;
+
         default:
           const _exhaustiveCheck: never = oItemType;
-          console.log(`[DEV] Final Response output item type: ${oItemType} (TODO: implement)`);
+          aixResilientUnknownValue('OpenAI-Responses-NS', 'outputItemType', oItemType);
           break;
       }
 
@@ -937,6 +1034,22 @@ function _forwardTextAnnotation(pt: IParticleTransmitter, annotation: Exclude<Ex
 }
 
 /**
+ * Infers the mime type from the image_generation_call output item's output_format field.
+ * The API echoes the output_format in the done item (e.g. 'png', 'webp', 'jpeg').
+ */
+function _imageGenerationMimeType(item: { output_format?: string }): string {
+  switch ((item as any).output_format) {
+    case 'webp':
+      return 'image/webp';
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+    default:
+      return 'image/png';
+  }
+}
+
+/**
  * Processes web search call actions and sends appropriate placeholders.
  * Handles search, open_page, and find_in_page action types.
  *
@@ -944,8 +1057,17 @@ function _forwardTextAnnotation(pt: IParticleTransmitter, annotation: Exclude<Ex
  * - sources: ALL search results (e.g., 20 URLs) - bulk data for special web search fragments
  * - citations: High-quality links (2-3) via annotations in message content
  */
-function _forwardWebSearchCallItem(pt: IParticleTransmitter, webSearchCall: Extract<OpenAIWire_API_Responses.ResponsesAPIResponse['output'][number], { type: 'web_search_call' }>): void {
-  const { action } = webSearchCall;
+function _forwardWebSearchCallItem(pt: IParticleTransmitter, webSearchCall: Extract<OpenAIWire_API_Responses.Response['output'][number], { type: 'web_search_call' }>): void {
+  const { action, status } = webSearchCall;
+
+  // Handle failed web search (e.g., xAI returns status: 'failed' when web search fails)
+  if (status === 'failed') {
+    const failedUrl = action?.type === 'open_page' ? action.url : undefined;
+    pt.sendVoidPlaceholder('search-web', failedUrl ? `Failed to access ${sanitizeUrlForDisplay(failedUrl)}` : 'Web search failed');
+    return;
+  }
+
+
   switch (action?.type) {
     case 'search':
       if (action.query && action.sources && Array.isArray(action.sources)) {
@@ -975,6 +1097,72 @@ function _forwardWebSearchCallItem(pt: IParticleTransmitter, webSearchCall: Extr
       console.log(`[DEV] AIX: Unknown web_search_call action type: ${action?.type}`, { action });
       break;
   }
+}
+
+/**
+ * Processes code interpreter call and emits appropriate particles.
+ * Handles code execution results from xAI/OpenAI code_interpreter tool.
+ *
+ * Pattern follows Gemini's code execution handling:
+ * - addCodeExecutionInvocation for the code being executed
+ * - addCodeExecutionResponse for each output result
+ */
+function _forwardCodeInterpreterCallItem(pt: IParticleTransmitter, codeInterpreterCall: Extract<OpenAIWire_API_Responses.Response['output'][number], { type: 'code_interpreter_call' }>): void {
+  const { id, code, outputs, status /*,container_id*/ } = codeInterpreterCall;
+
+  // <- Emit code (like Gemini's executableCode)
+  if (code)
+    pt.addCodeExecutionInvocation(id, '', code, 'code_interpreter');
+
+  // <- Emit outputs (like Gemini's codeExecutionResult)
+  let outputSent = 0;
+  if (outputs && Array.isArray(outputs))
+    for (const output of outputs) {
+      const outputType = output.type;
+      switch (outputType) {
+        case 'logs':
+          // Emit logs as code execution response
+          const isError = status === 'failed';
+          pt.addCodeExecutionResponse(id, isError, output.logs, 'code_interpreter', 'upstream');
+          outputSent++;
+          break;
+
+        case 'image':
+          // Image output has a URL
+          // TODO: could fetch and inline the image
+          console.log('[DEV] AIX: TODO: Analyze code Interpreter output URL and decide what to do:', output.url.slice(0, 200)); // log first 200 chars
+          pt.addCodeExecutionResponse(id, false, `[Generated image: ${output.url}]`, 'code_interpreter', 'upstream');
+          outputSent++;
+          break;
+
+        default:
+          const _exhaustiveCheck: never = outputType;
+          console.log(`[DEV] AIX: Unknown code_interpreter_call output type: ${(output as any)?.type}`, { output });
+          break;
+      }
+    }
+
+  // <- Error message if status is failed and no outputs were provided
+  if (status === 'failed' && !outputSent)
+    pt.addCodeExecutionResponse(id, true, 'Code execution failed', 'code_interpreter', 'upstream');
+
+}
+
+/**
+ * Processes custom tool call and emits appropriate particles.
+ *
+ * For now, we just show a placeholder indicating the search was performed.
+ * The actual search results are typically reflected in the model's text response.
+ */
+function _forwardCustomToolCallItem(pt: IParticleTransmitter, customToolCall: Extract<OpenAIWire_API_Responses.Response['output'][number], { type: 'custom_tool_call' }>): void {
+  const { name, input } = customToolCall;
+
+  // Show a placeholder for the custom tool call
+  // xAI x_search tools include: x_user_search, x_keyword_search, x_semantic_search, x_thread_fetch, ...
+  if (name.startsWith('x_'))
+    pt.sendVoidPlaceholder('search-web', `X search: ${name}${input ? ` (${input.slice(0, 50)}${input.length > 50 ? '...' : ''})` : ''}`);
+  else
+    pt.sendVoidPlaceholder('search-web', `Custom tool: ${name}`);
 }
 
 

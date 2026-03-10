@@ -40,8 +40,9 @@ export function InlineTextarea(props: {
 
   const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter') {
-      const shiftOrAlt = e.shiftKey || e.altKey;
-      if (enterIsNewline ? shiftOrAlt : !shiftOrAlt) {
+      if (e.nativeEvent.isComposing)
+        return;
+      if (enterIsNewline ? e.shiftKey : !e.shiftKey) {
         e.preventDefault();
         props.onEdit(text);
       }

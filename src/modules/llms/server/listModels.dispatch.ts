@@ -4,19 +4,25 @@ import type { AixAPI_Access } from '~/modules/aix/server/api/aix.wiretypes';
 
 import { LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
 
+import { createDebugWireLogger } from '~/server/wire';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import type { ModelDescriptionSchema } from './llm.server.types';
+import { llmDevValidateParameterSpecs_DEV, llmsAutoImplyInterfaces } from './models.mappings';
 
 
 // protocol: Anthropic
-import { AnthropicWire_API_Models_List, hardcodedAnthropicModels, hardcodedAnthropicVariants, llmsAntCreatePlaceholderModel, llmsAntDevCheckForObsoletedModels_DEV, llmsAntInjectWebSearchInterface } from './anthropic/anthropic.models';
-import { anthropicAccess } from './anthropic/anthropic.access';
+import { anthropicInjectVariants, anthropicValidateModelDefs_DEV, AnthropicWire_API_Models_List, hardcodedAnthropicModels, llmsAntCreatePlaceholderModel } from './anthropic/anthropic.models';
+import { ANTHROPIC_API_PATHS, anthropicAccess } from './anthropic/anthropic.access';
+
+// protocol: Bedrock
+import { bedrockAccessAsync, bedrockResolveRegion, bedrockURLControlPlane, bedrockURLMantle } from './bedrock/bedrock.access';
+import { bedrockModelsToDescriptions, BedrockWire_API_Models_List } from './bedrock/bedrock.models';
 
 // protocol: Gemini
 import { GeminiWire_API_Models_List } from '~/modules/aix/server/dispatch/wiretypes/gemini.wiretypes';
 import { geminiAccess } from './gemini/gemini.access';
-import { geminiDevCheckForParserMisses_DEV, geminiDevCheckForSuperfluousModels_DEV, geminiFilterModels, geminiModelsAddVariants, geminiModelToModelDescription, geminiSortModels } from './gemini/gemini.models';
+import { geminiFilterModels, geminiModelsAddVariants, geminiModelToModelDescription, geminiSortModels, geminiValidateModelDefs_DEV, geminiValidateParserOutput_DEV } from './gemini/gemini.models';
 
 // protocol: Ollama
 import { OLLAMA_BASE_MODELS } from './ollama/ollama.models';
@@ -25,24 +31,28 @@ import { wireOllamaListModelsSchema, wireOllamaModelInfoSchema } from './ollama/
 
 // protocol: OpenAI-compatible
 import type { OpenAIWire_API_Models_List } from '~/modules/aix/server/dispatch/wiretypes/openai.wiretypes';
-import { openAIAccess } from './openai/openai.access';
+import { llmsHostnameMatches, OPENAI_API_PATHS, openAIAccess } from './openai/openai.access';
 import { alibabaModelFilter, alibabaModelSort, alibabaModelToModelDescription } from './openai/models/alibaba.models';
 import { azureDeploymentFilter, azureDeploymentToModelDescription, azureParseFromDeploymentsAPI } from './openai/models/azure.models';
 import { chutesAIHeuristic, chutesAIModelsToModelDescriptions } from './openai/models/chutesai.models';
-import { deepseekInjectVariants, deepseekModelFilter, deepseekModelSort, deepseekModelToModelDescription } from './openai/models/deepseek.models';
+import { deepseekModelFilter, deepseekModelSort, deepseekModelToModelDescription } from './openai/models/deepseek.models';
 import { fastAPIHeuristic, fastAPIModels } from './openai/models/fastapi.models';
 import { fireworksAIHeuristic, fireworksAIModelsToModelDescriptions } from './openai/models/fireworksai.models';
-import { groqModelFilter, groqModelSortFn, groqModelToModelDescription } from './openai/models/groq.models';
-import { lmStudioModelToModelDescription } from './openai/models/lmstudio.models';
+import { groqModelFilter, groqModelSortFn, groqModelToModelDescription, groqValidateModelDefs_DEV } from './openai/models/groq.models';
+import { llmapiHeuristic, llmapiModelsToModelDescriptions } from './openai/models/llmapi.models';
+import { novitaHeuristic, novitaModelsToModelDescriptions } from './openai/models/novita.models';
+import { lmStudioFetchModels, lmStudioModelsToModelDescriptions } from './openai/models/lmstudio.models';
 import { localAIModelSortFn, localAIModelToModelDescription } from './openai/models/localai.models';
 import { mistralModels } from './openai/models/mistral.models';
 import { moonshotModelFilter, moonshotModelSortFn, moonshotModelToModelDescription } from './openai/models/moonshot.models';
 import { openPipeModelDescriptions, openPipeModelSort, openPipeModelToModelDescriptions } from './openai/models/openpipe.models';
 import { openRouterInjectVariants, openRouterModelFamilySortFn, openRouterModelToModelDescription } from './openai/models/openrouter.models';
-import { openaiDevCheckForModelsOverlap_DEV, openAIInjectVariants, openAIModelFilter, openAIModelToModelDescription, openAISortModels } from './openai/models/openai.models';
+import { openAIInjectVariants, openAIModelFilter, openAIModelToModelDescription, openAISortModels, openaiValidateModelDefs_DEV } from './openai/models/openai.models';
 import { perplexityHardcodedModelDescriptions, perplexityInjectVariants } from './openai/models/perplexity.models';
+import { tlusApiHeuristic, tlusApiTryParse } from './openai/models/tlusapi.models';
 import { togetherAIModelsToModelDescriptions } from './openai/models/together.models';
 import { xaiFetchModelDescriptions, xaiModelSort } from './openai/models/xai.models';
+import { zaiCuratedModelDescriptions, zaiDiscoverModels, zaiModelSort } from './openai/models/zai.models';
 
 
 // -- Dispatch types --
@@ -56,7 +66,7 @@ export type ListModelsDispatch<TWireModels = any> = {
  * Helper to create a dispatch with proper type inference.
  * TypeScript will infer TWireModels from fetchModels return type and enforce it in convertToDescriptions.
  */
-function createDispatch<T>(dispatch: ListModelsDispatch<T>): ListModelsDispatch<T> {
+function createListModelsDispatch<T>(dispatch: ListModelsDispatch<T>): ListModelsDispatch<T> {
   return dispatch;
 }
 
@@ -66,7 +76,14 @@ function createDispatch<T>(dispatch: ListModelsDispatch<T>): ListModelsDispatch<
 export async function listModelsRunDispatch(access: AixAPI_Access, signal?: AbortSignal): Promise<ModelDescriptionSchema[]> {
   const dispatch = _listModelsCreateDispatch(access, signal);
   const wireModels = await dispatch.fetchModels();
-  return dispatch.convertToDescriptions(wireModels);
+  const models = dispatch.convertToDescriptions(wireModels)
+    .map(llmsAutoImplyInterfaces); // auto-inject implied IFs from parameterSpecs
+
+  // DEV: validate parameterSpecs (enumValues ⊆ registry values, paramId existence)
+  if (process.env.NODE_ENV === 'development')
+    models.forEach(llmDevValidateParameterSpecs_DEV);
+
+  return models;
 }
 
 
@@ -82,30 +99,38 @@ function _capitalize(s: string): string {
  */
 function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal): ListModelsDispatch {
 
+  // create the debug logger (if enabled)
+  const _wire = createDebugWireLogger('LLMs');
+
   // dialect is the only common property
   const { dialect } = access;
 
   switch (dialect) {
 
     case 'anthropic': {
-      return createDispatch({
+      return createListModelsDispatch({
         fetchModels: async () => {
-          const { headers, url } = anthropicAccess(access, '/v1/models?limit=1000', {/* ... no options for list ... */ });
+          const { headers, url } = anthropicAccess(access, `${ANTHROPIC_API_PATHS.models}?limit=1000`, {/* ... no options for list ... */ });
+          _wire?.logRequest('GET', url, headers);
           const wireModels = await fetchJsonOrTRPCThrow({ url, headers, name: 'Anthropic', signal });
+          _wire?.logResponse(wireModels);
           return AnthropicWire_API_Models_List.Response_schema.parse(wireModels);
         },
         convertToDescriptions: (wireModelsResponse) => {
           const { data: availableModels } = wireModelsResponse;
 
+          // [DEV] check for stale/unknown model definitions
+          anthropicValidateModelDefs_DEV(availableModels);
+
           // sort by: family (desc) > class (desc) > date (desc) -- Future NOTE: -5- will match -4-5- and -3-5-.. figure something else out
-          const familyPrecedence = ['-4-7-', '-4-5-', '-4-1-', '-4-', '-3-7-', '-3-5-', '-3-'];
+          const familyPrecedence = ['-4-7-', '-4-6', '-4-5-', '-4-1-', '-4-', '-3-7-', '-3-5-', '-3-'];
           const classPrecedence = ['-opus-', '-sonnet-', '-haiku-'];
 
           const getFamilyIdx = (id: string) => familyPrecedence.findIndex(f => id.includes(f));
           const getClassIdx = (id: string) => classPrecedence.findIndex(c => id.includes(c));
 
           // cast the models to the common schema
-          const models = availableModels
+          return availableModels
             .sort((a, b) => {
               const familyA = getFamilyIdx(a.id);
               const familyB = getFamilyIdx(b.id);
@@ -119,57 +144,86 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
               // date desc (newer first) - string comparison works since format is YYYYMMDD
               return b.id.localeCompare(a.id);
             })
-            .reduce((acc: ModelDescriptionSchema[], model) => {
-              // find the model description
-              const hardcodedModel = hardcodedAnthropicModels.find(m => m.id === model.id);
-              if (hardcodedModel) {
+            .map((model): ModelDescriptionSchema => {
+              // match model definition
+              const knownModel = hardcodedAnthropicModels.find(m => m.id === model.id);
+              if (knownModel) {
 
-                // update creation date
-                function roundTime(date: string) {
-                  return Math.round(new Date(date).getTime() / 1000);
-                }
+                // update model creation time, if provided
+                if (!knownModel.created && model.created_at)
+                  knownModel.created = Math.round(new Date(model.created_at).getTime() / 1000);
 
-                if (!hardcodedModel.created && model.created_at)
-                  hardcodedModel.created = roundTime(model.created_at);
-
-                // add FIRST a thinking variant, if defined
-                if (hardcodedAnthropicVariants[model.id])
-                  acc.push({
-                    ...hardcodedModel,
-                    ...hardcodedAnthropicVariants[model.id],
-                  });
-
-                // add the base model
-                acc.push(hardcodedModel);
-              } else {
-                // for day-0 support of new models, create a placeholder model using sensible defaults
-                const novelModel = llmsAntCreatePlaceholderModel(model);
-                // if (DEV_DEBUG_ANTHROPIC_MODELS) // kind of important...
-                console.log('[DEV] anthropic.router: new model found, please configure it:', novelModel.id);
-                acc.push(novelModel);
+                return knownModel;
               }
-              return acc;
-            }, [] as ModelDescriptionSchema[])
-            .map(llmsAntInjectWebSearchInterface);
 
-          // [DEV] check for obsoleted models (defined but no longer in API response)
-          llmsAntDevCheckForObsoletedModels_DEV(availableModels);
-
-          return models;
+              // 0-day, new model: create an approximate model definition (placeholder) with sensible defaultss
+              return llmsAntCreatePlaceholderModel(model);
+            })
+            // inject thinking variants using the centralized variant system
+            .reduce(anthropicInjectVariants, []);
         },
       });
     }
 
+    case 'bedrock': {
+      return createListModelsDispatch({
+        fetchModels: async () => {
+
+          // construct URLs by region
+          const region = bedrockResolveRegion(access);
+          const fmUrl = bedrockURLControlPlane(region, '/foundation-models?byInferenceType=ON_DEMAND');
+          const ipUrl = bedrockURLControlPlane(region, '/inference-profiles?typeEquals=SYSTEM_DEFINED&maxResults=1000');
+          const mantleUrl = bedrockURLMantle(region, '/v1/models');
+
+          // sign and fetch all lists in parallel - each fails independently
+          const [fmResult, ipResult, mantleIdsResult] = await Promise.allSettled([
+            // Foundation Models
+            bedrockAccessAsync(access, 'GET', fmUrl, undefined)
+              .then(fmAccess => fetchJsonOrTRPCThrow({ ...fmAccess, signal, name: 'Bedrock/FM' })),
+            // Inference Profiles
+            bedrockAccessAsync(access, 'GET', ipUrl, undefined)
+              .then(ipAccess => fetchJsonOrTRPCThrow({ ...ipAccess, signal, name: 'Bedrock/IP' })),
+            // Mantle Models
+            bedrockAccessAsync(access, 'GET', mantleUrl, undefined)
+              .then(mantleAccess => fetchJsonOrTRPCThrow({ ...mantleAccess, signal, name: 'Bedrock/Mantle' })),
+          ]);
+
+          // if both FM and IP failed, throw the first error so the user sees it
+          if (fmResult.status === 'rejected' && ipResult.status === 'rejected')
+            throw fmResult.reason;
+
+          // degrade gracefully if any failed
+          const fmResponse = fmResult.status === 'fulfilled' ? fmResult.value : { modelSummaries: [] };
+          const ipResponse = ipResult.status === 'fulfilled' ? ipResult.value : { inferenceProfileSummaries: [] };
+          const mantleResponse = mantleIdsResult.status === 'fulfilled' ? mantleIdsResult.value : { data: [] };
+
+          _wire?.logResponse(fmResponse);
+          _wire?.logResponse(ipResponse);
+          _wire?.logResponse(mantleResponse);
+
+          return {
+            foundationModels: BedrockWire_API_Models_List.FoundationModelsResponse_schema.parse(fmResponse),
+            inferenceProfiles: BedrockWire_API_Models_List.InferenceProfilesResponse_schema.parse(ipResponse),
+            mantleModelIds: BedrockWire_API_Models_List.MantleModelsResponse_schema.parse(mantleResponse),
+          };
+        },
+        convertToDescriptions: ({ foundationModels, inferenceProfiles, mantleModelIds }) =>
+          bedrockModelsToDescriptions(foundationModels, inferenceProfiles, mantleModelIds),
+      });
+    }
+
     case 'gemini': {
-      return createDispatch({
+      return createListModelsDispatch({
         fetchModels: async () => {
           const { headers, url } = geminiAccess(access, null, GeminiWire_API_Models_List.getPath, false);
+          _wire?.logRequest('GET', url, headers);
           const wireModels = await fetchJsonOrTRPCThrow({ url, headers, name: 'Gemini', signal });
+          _wire?.logResponse(wireModels);
           const detailedModels = GeminiWire_API_Models_List.Response_schema.parse(wireModels).models;
 
-          // [DEV] check for missing or superfluous models
-          geminiDevCheckForParserMisses_DEV(wireModels, detailedModels);
-          geminiDevCheckForSuperfluousModels_DEV(detailedModels.map((model: any) => model.name));
+          // [DEV] check for stale/unknown model definitions
+          geminiValidateParserOutput_DEV(wireModels, detailedModels);
+          geminiValidateModelDefs_DEV(detailedModels);
 
           return detailedModels;
         },
@@ -191,10 +245,12 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
     }
 
     case 'ollama': {
-      return createDispatch({
+      return createListModelsDispatch({
         fetchModels: async () => {
           const { headers, url } = ollamaAccess(access, '/api/tags');
+          _wire?.logRequest('GET', url, headers);
           const wireModels = await fetchJsonOrTRPCThrow({ url, headers, name: 'Ollama', signal });
+          _wire?.logResponse(wireModels);
           const models = wireOllamaListModelsSchema.parse(wireModels).models;
 
           // retrieve info for each of the models
@@ -277,23 +333,53 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
 
     case 'perplexity':
       // [Perplexity]: there's no API for models listing (upstream: https://docs.perplexity.ai/getting-started/pricing#sonar-models-chat-completions)
-      return createDispatch({
+      return createListModelsDispatch({
         fetchModels: async () => null,
         convertToDescriptions: () => perplexityHardcodedModelDescriptions().reduce(perplexityInjectVariants, []),
       });
 
     case 'xai':
       // [xAI]: custom models listing
-      return createDispatch({
+      return createListModelsDispatch({
         fetchModels: async () => xaiFetchModelDescriptions(access),
         convertToDescriptions: models => models.sort(xaiModelSort),
+      });
+
+    case 'lmstudio':
+      // [LM Studio]: custom models listing with native API
+      return createListModelsDispatch({
+        fetchModels: async () => lmStudioFetchModels(access),
+        convertToDescriptions: (response) => lmStudioModelsToModelDescriptions(response.models),
+      });
+
+    case 'zai':
+      // [Z.ai]: curated models as primary source; list API is unreliable/abandoned.
+      // Optimistically try the API for 0-day model discovery, but never fail on it.
+      return createListModelsDispatch({
+        fetchModels: async (): Promise<string[]> => {
+          try {
+            const { headers, url } = openAIAccess(access, null, OPENAI_API_PATHS.models);
+            _wire?.logRequest('GET', url, headers);
+            const wireModels = await fetchJsonOrTRPCThrow<OpenAIWire_API_Models_List.Response>({ url, headers, name: 'OpenAI/Zai', signal });
+            _wire?.logResponse(wireModels);
+            return (wireModels?.data || []).map((m: { id: string }) => m.id);
+          } catch (error) {
+            // API is unreliable - log and continue with curated list only
+            console.warn('[Z.ai] Models list API failed, using curated models only:', (error as Error)?.message || error);
+            return [];
+          }
+        },
+        convertToDescriptions: (apiModelIds) => {
+          const curated = zaiCuratedModelDescriptions();
+          const discovered = zaiDiscoverModels(apiModelIds);
+          return [...curated, ...discovered].sort(zaiModelSort);
+        },
       });
 
     case 'alibaba':
     case 'azure':
     case 'deepseek':
     case 'groq':
-    case 'lmstudio':
     case 'localai':
     case 'mistral':
     case 'moonshot':
@@ -301,12 +387,15 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
     case 'openpipe':
     case 'openrouter':
     case 'togetherai':
-      return createDispatch({
+      return createListModelsDispatch({
 
-        // [OpenAI-compatible dialects]: fetch openAI-style /v1/models API
+        // [OpenAI-compatible dialects]: openAI-style fetch models list
         fetchModels: async () => {
-          const { headers, url } = openAIAccess(access, null, '/v1/models');
-          return fetchJsonOrTRPCThrow<OpenAIWire_API_Models_List.Response>({ url, headers, name: `OpenAI/${_capitalize(dialect)}`, signal });
+          const { headers, url } = openAIAccess(access, null, OPENAI_API_PATHS.models);
+          _wire?.logRequest('GET', url, headers);
+          const wireModels = await fetchJsonOrTRPCThrow<OpenAIWire_API_Models_List.Response>({ url, headers, name: `OpenAI/${_capitalize(dialect)}`, signal });
+          _wire?.logResponse(wireModels);
+          return wireModels;
         },
 
         // OpenAI models conversions: dependent on the dialect
@@ -315,6 +404,13 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
           // [Together] missing the .data property - so we have to do this early
           if (dialect === 'togetherai')
             return togetherAIModelsToModelDescriptions(openAIWireModelsResponse);
+
+          // [TLUS-style API] detect by structure: { data: [{ id, tier, capabilities, ... }] }
+          if (tlusApiHeuristic(openAIWireModelsResponse)) {
+            const tlusModels = tlusApiTryParse(openAIWireModelsResponse);
+            if (tlusModels) return tlusModels;
+            // fall through if failed
+          }
 
           // NOTE: we don't zod here as it would strip unknown properties needed for some dialects - so we proceed optimistically
           // let maybeModels = OpenAIWire_API_Models_List.Response_schema.parse(openAIWireModelsResponse).data || [];
@@ -345,22 +441,19 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
                 .sort(openAISortModels);
 
             case 'deepseek':
-              // [DeepSeek, 2025-12-01] Inject V3.2-Speciale variant via reduce
               return maybeModels
                 .filter(({ id }) => deepseekModelFilter(id))
                 .map(({ id }) => deepseekModelToModelDescription(id))
-                .reduce(deepseekInjectVariants, [] as ModelDescriptionSchema[])
+                // .reduce(deepseekInjectVariants, [] as ModelDescriptionSchema[]) // was used to inject V3.2-Speciale
                 .sort(deepseekModelSort);
 
             case 'groq':
+              // [DEV] check for stale/unknown model definitions
+              groqValidateModelDefs_DEV(maybeModels.map(m => m.id));
               return maybeModels
                 .filter(groqModelFilter)
                 .map(groqModelToModelDescription)
                 .sort(groqModelSortFn);
-
-            case 'lmstudio':
-              return maybeModels
-                .map(({ id }) => lmStudioModelToModelDescription(id));
 
             case 'localai':
               return maybeModels
@@ -386,23 +479,32 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
               if (fireworksAIHeuristic(oaiHost))
                 return fireworksAIModelsToModelDescriptions(maybeModels);
 
+              // [Novita] special case for model enumeration
+              if (novitaHeuristic(oaiHost))
+                return novitaModelsToModelDescriptions(openAIWireModelsResponse);
+
+              // [LLM API] OpenAI-compatible gateway with rich model metadata
+              if (llmapiHeuristic(oaiHost))
+                return llmapiModelsToModelDescriptions(openAIWireModelsResponse);
+
               // [FastChat] make the best of the little info
               if (fastAPIHeuristic(maybeModels))
                 return fastAPIModels(maybeModels);
 
               // [OpenAI or OpenAI-compatible]: chat-only models, custom sort, manual mapping
+              const isNotOpenai = !!(oaiHost && !llmsHostnameMatches(oaiHost, 'api.openai.com')); // empty host (uses default) or explicitly api.openai.com
               const models = maybeModels
                 // limit to only 'gpt' and 'non instruct' models
                 .filter(openAIModelFilter)
                 // to model description
-                .map((model: any): ModelDescriptionSchema => openAIModelToModelDescription(model.id, model.created))
+                .map((model: any): ModelDescriptionSchema => openAIModelToModelDescription(model.id, { isNotOpenai, modelCreated: model.created }))
                 // inject variants
-                .reduce(openAIInjectVariants, [] as ModelDescriptionSchema[])
+                .reduce(openAIInjectVariants, [])
                 // custom OpenAI sort
                 .sort(openAISortModels);
 
-              // [DEV] check for superfluous and missing models
-              openaiDevCheckForModelsOverlap_DEV(maybeModels, models);
+              // [DEV] check for stale/unknown model definitions
+              openaiValidateModelDefs_DEV(maybeModels, models);
               return models;
 
             case 'openpipe':
@@ -417,7 +519,7 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
                 .sort(openRouterModelFamilySortFn)
                 .map(openRouterModelToModelDescription)
                 .filter(desc => !!desc)
-                .reduce(openRouterInjectVariants, [] as ModelDescriptionSchema[]);
+                .reduce(openRouterInjectVariants, []);
 
             default:
               const _exhaustiveCheck: never = dialect;

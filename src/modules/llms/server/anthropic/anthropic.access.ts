@@ -10,49 +10,62 @@ import { TRPCError } from '@trpc/server';
 
 import { env } from '~/server/env.server';
 
-import { llmsFixupHost } from '../openai/openai.access';
+import { llmsFixupHost, llmsHostnameMatches } from '../openai/openai.access';
 
 
 // configuration
 const DEFAULT_ANTHROPIC_HOST = 'api.anthropic.com';
 const DEFAULT_HELICONE_ANTHROPIC_HOST = 'anthropic.hconeai.com';
 
-const DEFAULT_ANTHROPIC_HEADERS = {
+/**
+ * Centralized Anthropic API paths.
+ */
+export const ANTHROPIC_API_PATHS = {
+  // Messages
+  messages: '/v1/messages', // POST: create a message (chat completion)
+  // /v1/messages/count_tokens, // POST: count tokens in a message
+
+  // Models
+  models: '/v1/models', // GET: List Models
+
+  // Skills
+  skills: '/v1/skills', // POST: create, GET: list
+  // /v1/skills/{skill_id} // GET: get skill, DELETE: delete skill
+
+  // Files
+  files: '/v1/files', // POST: upload file, GET: list files,
+  // /v1/files/{file_id} // GET: get file metadata, DELETE: delete file
+  // /v1/files/{file_id}/content // GET: download file
+} as const;
+
+
+const ANTHROPIC_HEADERS_VERSION = {
   // Latest version hasn't changed (as of Feb 2025)
   'anthropic-version': '2023-06-01',
 
-  // Enable CORS for browsers - we don't use this on server
-  // 'anthropic-dangerous-direct-browser-access': 'true',
-
-  // Used for instance by Claude Code - shall we set it
+  // Used for instance by Claude Code - shall we set it?
   // 'x-app': 'big-agi',
+} as const;
+
+const ANTHROPIC_HEADERS_CORS = {
+  // CORS header to allow browser access to Anthropic API servers
+  'anthropic-dangerous-direct-browser-access': 'true',
 } as const;
 
 const DEFAULT_ANTHROPIC_BETA_FEATURES: string[] = [
 
-  // NOTE: undocumented: I wonder what this is for
-  // 'claude-code-20250219',
+  // See this for a full index:
+  //   https://github.com/anthropics/anthropic-sdk-typescript/blob/main/src/resources/beta/beta.ts#L256
 
-  // NOTE: disabled for now, as we don't have tested side-effects for this feature yet
-  // 'token-efficient-tools-2025-02-19', // https://docs.anthropic.com/en/docs/build-with-claude/tool-use/token-efficient-tool-use
+  // Known SDK beta headers (for reference, not all used):
+  //   prompt-caching-2024-07-31        -- GA: no longer needed
+  //   pdfs-2024-09-25                  -- GA: no longer needed
+  //   token-efficient-tools-2025-02-19 -- not used; disabled for now as side-effects are untested
+  //   extended-cache-ttl-2025-04-11    -- for 1h cache TTL; we support ttl:'1h' in wiretypes already
+  //   interleaved-thinking-2025-05-14  -- for Claude 4/4.5 interleaved thinking (auto on Opus 4.6 adaptive)
+  //   context-management-2025-06-27    -- for context_management edits (e.g. clear_tool_uses)
+  //   model-context-window-exceeded-2025-08-26 -- Sonnet 4.5+ have this by default
 
-  /**
-   * to use the prompt caching feature; adds to any API invocation:
-   *  - message_start.message.usage.cache_creation_input_tokens: number
-   *  - message_start.message.usage.cache_read_input_tokens: number
-   */
-  'prompt-caching-2024-07-31',
-
-  /**
-   * Enables model_context_window_exceeded stop reason for models earlier than Sonnet 4.5
-   * (Sonnet 4.5+ have this by default). This allows requesting max tokens without calculating
-   * input size, and the API will return as much as possible within the context window.
-   * https://docs.claude.com/en/api/handling-stop-reasons#model-context-window-exceeded
-   */
-  // 'model-context-window-exceeded-2025-08-26',
-
-  // now default
-  // 'messages-2023-12-15'
 ] as const;
 
 const PER_MODEL_BETA_FEATURES: { [modelId: string]: string[] } = {
@@ -74,9 +87,9 @@ export type AnthropicHeaderOptions = {
   modelIdForBetaFeatures?: string;
   vndAntWebFetch?: boolean;
   vndAnt1MContext?: boolean;
-  vndAntEffort?: boolean; // [Anthropic, effort-2025-11-24]
   enableSkills?: boolean;
   enableCodeExecution?: boolean;
+  enableFastMode?: boolean; // [Anthropic, fast-mode-2026-02-01]
   enableStrictOutputs?: boolean; // [Anthropic, 2025-11-13] Structured Outputs (JSON outputs & strict tool use)
   enableToolSearch?: boolean; // [Anthropic, 2025-11-24] Tool Search Tool
   enableProgrammaticToolCalling?: boolean; // [Anthropic, 2025-11-24] Programmatic Tool Calling (allowed_callers, input_examples)
@@ -90,6 +103,7 @@ export const anthropicAccessSchema = z.object({
   anthropicKey: z.string().trim(),
   anthropicHost: z.string().trim().nullable(),
   heliconeKey: z.string().trim().nullable(),
+  anthropicInferenceGeo: z.string().trim().nullable().optional(), // [Anthropic, 2026-02-01] e.g. "us" for US-only inference, optional: for server backward-comp, and can be removed
 });
 
 export function anthropicAccess(access: AnthropicAccessSchema, apiPath: string, options?: AnthropicHeaderOptions): { headers: HeadersInit, url: string } {
@@ -107,20 +121,24 @@ export function anthropicAccess(access: AnthropicAccessSchema, apiPath: string, 
   // https://docs.helicone.ai/getting-started/integration-method/anthropic
   const heliKey = access.heliconeKey || env.HELICONE_API_KEY || false;
   if (heliKey) {
-    if (!anthropicHost.includes(DEFAULT_ANTHROPIC_HOST) && !anthropicHost.includes(DEFAULT_HELICONE_ANTHROPIC_HOST))
+    if (!llmsHostnameMatches(anthropicHost, DEFAULT_ANTHROPIC_HOST) && !llmsHostnameMatches(anthropicHost, DEFAULT_HELICONE_ANTHROPIC_HOST))
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'The Helicone Anthropic Key has been provided, but the host is set to custom. Please fix it in the Models Setup page.' });
     anthropicHost = `https://${DEFAULT_HELICONE_ANTHROPIC_HOST}`;
   }
 
-  // [CSF] add CORS-allow header if client-side fetch
-  if (access.clientSideFetch)
-    options = { ...options, clientSideFetch: true };
+  // Beta features
+  const betaFeatures = anthropicBetaFeatures(options);
 
   return {
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
-      ..._anthropicHeaders(options),
+      // anthropic-version
+      ...ANTHROPIC_HEADERS_VERSION,
+      // [CSF] add CORS-allow header to allow browser access to Anthropic API servers
+      ...(access.clientSideFetch && ANTHROPIC_HEADERS_CORS),
+      // Beta features
+      ...(betaFeatures.length && { 'anthropic-beta': betaFeatures.join(',') }),
       'X-API-Key': anthropicKey,
       ...(heliKey && { 'Helicone-Auth': `Bearer ${heliKey}` }),
     },
@@ -129,9 +147,11 @@ export function anthropicAccess(access: AnthropicAccessSchema, apiPath: string, 
 }
 
 
-function _anthropicHeaders(options?: AnthropicHeaderOptions): Record<string, string> {
-
-  // accumulate the beta features
+/**
+ * Build the list of Anthropic beta feature strings from options.
+ * Used by both the direct Anthropic path (as header) and Bedrock path (as body field).
+ */
+export function anthropicBetaFeatures(options?: AnthropicHeaderOptions): string[] {
   const betaFeatures = [...DEFAULT_ANTHROPIC_BETA_FEATURES];
   if (options?.modelIdForBetaFeatures) {
     // string search (.includes) within the keys, to be more resilient to modelId changes/prefixing
@@ -149,35 +169,28 @@ function _anthropicHeaders(options?: AnthropicHeaderOptions): Record<string, str
   if (options?.vndAnt1MContext)
     betaFeatures.push('context-1m-2025-08-07');
 
+  // Add beta feature for code execution (required for Skills)
+  if (options?.enableCodeExecution || options?.enableSkills)
+    betaFeatures.push('code-execution-2025-08-25');
+
   // Add beta features for Skills API
   if (options?.enableSkills) {
     betaFeatures.push('skills-2025-10-02');
     betaFeatures.push('files-api-2025-04-14'); // For file downloads
   }
 
-  // Add beta feature for code execution (required for Skills)
-  if (options?.enableCodeExecution || options?.enableSkills) {
-    betaFeatures.push('code-execution-2025-08-25');
-  }
-
-  // [Anthropic, 2025-11-24] Add beta feature for effort parameter (Claude Opus 4.5+)
-  if (options?.vndAntEffort)
-    betaFeatures.push('effort-2025-11-24');
+  // [Anthropic, 2025-11-13] Add beta feature for Structured Outputs (JSON outputs & strict tool use)
+  if (options?.enableStrictOutputs)
+    betaFeatures.push('structured-outputs-2025-11-13');
 
   // [Anthropic, 2025-11-24] Add beta feature for Advanced Tool Use (Tool Search Tool, Programmatic Tool Calling)
   // Same beta header covers both features: tool discovery and programmatic calling from code execution
   if (options?.enableToolSearch || options?.enableProgrammaticToolCalling)
     betaFeatures.push('advanced-tool-use-2025-11-20');
 
-  // [Anthropic, 2025-11-13] Add beta feature for Structured Outputs (JSON outputs & strict tool use)
-  if (options?.enableStrictOutputs)
-    betaFeatures.push('structured-outputs-2025-11-13');
+  // [Anthropic, fast-mode-2026-02-01] Fast inference mode
+  if (options?.enableFastMode)
+    betaFeatures.push('fast-mode-2026-02-01');
 
-  return {
-    ...DEFAULT_ANTHROPIC_HEADERS,
-    // CORS: allow browser access to Anthropic API servers
-    ...(options?.clientSideFetch ? { 'anthropic-dangerous-direct-browser-access': 'true' } : {}),
-    // Beta features
-    ...(betaFeatures.length ? { 'anthropic-beta': betaFeatures.join(',') } : {}),
-  };
+  return betaFeatures;
 }

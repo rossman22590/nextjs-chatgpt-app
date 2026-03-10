@@ -59,7 +59,6 @@ export function ContentFragments(props: {
   messageGeneratorLlmId?: string | null,
   optiAllowSubBlocksMemo?: boolean,
   disableMarkdownText: boolean,
-  enhanceCodeBlocks: boolean,
   showUnsafeHtmlCode?: boolean,
 
   textEditsState: ChatMessageTextPartEditState | null,
@@ -96,7 +95,17 @@ export function ContentFragments(props: {
   // Content Fragments Edit Zero-State: button to create a new TextContentFragment
   if (isEditingText && !props.contentFragments.some(isTextContentFragment))
     return !props.onFragmentAddBlank ? null : (
-      <Button aria-label='message body empty' variant='plain' color='neutral' onClick={props.onFragmentAddBlank} sx={{ justifyContent: 'flex-start' }}>
+      <Button
+        aria-label='message body empty'
+        color={fromAssistant ? 'neutral' : 'primary'}
+        variant='outlined'
+        onClick={props.onFragmentAddBlank}
+        sx={{
+          justifyContent: 'flex-start',
+          backgroundColor: fromAssistant ? 'neutral.softBg' : 'primary.softBg',
+          '&:hover': { backgroundColor: fromAssistant ? 'neutral.softHoverBg' : 'primary.softHoverBg' },
+        }}
+      >
         add text ...
       </Button>
     );
@@ -323,7 +332,6 @@ export function ContentFragments(props: {
               fitScreen={props.fitScreen}
               isMobile={props.isMobile}
               disableMarkdownText={props.disableMarkdownText}
-              enhanceCodeBlocks={props.enhanceCodeBlocks}
               // renderWordsDiff={wordsDiff || undefined}
               showUnsafeHtmlCode={props.showUnsafeHtmlCode}
               optiAllowSubBlocksMemo={!!props.optiAllowSubBlocksMemo}

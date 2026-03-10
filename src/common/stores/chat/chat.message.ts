@@ -141,6 +141,7 @@ export type DMessageGenerator = ({
   },
 }) & {
   metrics?: DMetricsChatGenerate_Md;   // medium-sized metrics stored in the message
+  providerInfraLabel?: string;         // upstream provider that served the request (e.g., OpenRouter provider routing)
   upstreamHandle?: {
     uht: 'vnd.oai.responses',
     responseId: string,
@@ -244,6 +245,7 @@ export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator
         name: generator.name,
         // ...(generator.xeOpCode ? { xeOpCode: generator.xeOpCode } : {}),
         ...(generator.metrics ? { metrics: { ...generator.metrics } } : {}),
+        ...(generator.providerInfraLabel ? { providerInfraLabel: generator.providerInfraLabel } : {}),
         ...(generator.upstreamHandle ? { upstreamHandle: { ...generator.upstreamHandle } } : {}),
         ...(generator.tokenStopReason ? { tokenStopReason: generator.tokenStopReason } : {}),
       };
@@ -253,6 +255,7 @@ export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator
         name: generator.name,
         aix: { ...generator.aix },
         ...(generator.metrics ? { metrics: { ...generator.metrics } } : {}),
+        ...(generator.providerInfraLabel ? { providerInfraLabel: generator.providerInfraLabel } : {}),
         ...(generator.upstreamHandle ? { upstreamHandle: { ...generator.upstreamHandle } } : {}),
         ...(generator.tokenStopReason ? { tokenStopReason: generator.tokenStopReason } : {}),
       };
@@ -263,6 +266,7 @@ export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator
 // helpers - status checks
 
 export function messageWasInterruptedAtStart(message: Pick<DMessage, 'generator' | 'fragments'>): boolean {
+  // FIXME: placeholder-check (see below) too here?
   return message.generator?.tokenStopReason === 'client-abort' && !message.fragments?.length;
 }
 
@@ -300,8 +304,8 @@ function _messageSetGeneratorAIX(message: Pick<DMessage, 'generator'>, modelLabe
 
 export function messageSetGeneratorAIX_AutoLabel(message: Pick<DMessage, 'generator'>, modelVendorId: ModelVendorId, modelId: DLLMId): void {
 
-  // Simply strip the first part of the modelId, which is the serviceId, before the dash.
-  const heuristicLabel = modelId.includes('-') ? modelId.replace(/^[^-]+-/, '') : modelId;
+  // Strip the serviceId prefix: 'vendor-' or 'vendor-N-' (when multiple providers of same vendor)
+  const heuristicLabel = modelId.includes('-') ? modelId.replace(/^[^-]+-(\d-)?/, '') : modelId;
 
   _messageSetGeneratorAIX(message, heuristicLabel, modelVendorId, modelId);
 }

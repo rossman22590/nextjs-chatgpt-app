@@ -10,11 +10,13 @@ import { OPTIMA_OPEN_DEBOUNCE, OPTIMA_PEEK_HOVER_ENTER_DELAY, OPTIMA_PEEK_HOVER_
 
 export type PreferencesTabId = 'chat' | 'voice' | 'draw' | 'tools' | undefined;
 
+export type ModelOptionsContext = 'full' | 'parameters';
+
 
 interface OptimaState {
 
   // modes
-  // isFocusedMode: boolean; // when active, the Mobile App menu is not displayed
+  isChromeless: boolean; // when active, the top bar and composer are hidden, with floating buttons
 
   // panes
   drawerIsOpen: boolean;
@@ -27,6 +29,7 @@ interface OptimaState {
   showKeyboardShortcuts: boolean;
   showLogger: boolean;
   showModelOptions: DLLMId | false;
+  showModelOptionsContext: ModelOptionsContext;
   showModels: boolean;
   showPreferences: boolean;
   preferencesTab: PreferencesTabId;
@@ -51,6 +54,7 @@ const modalsClosedState = {
   showKeyboardShortcuts: false,
   showLogger: false,
   showModelOptions: false,
+  showModelOptionsContext: 'full' as ModelOptionsContext,
   showModels: false,
   showPreferences: false,
 } as const;
@@ -58,7 +62,7 @@ const modalsClosedState = {
 const initialState: OptimaState = {
 
   // modes
-  // isFocusedMode: false,
+  isChromeless: false,
 
   // panes
   drawerIsOpen: initialDrawerOpen(),
@@ -77,7 +81,7 @@ const initialState: OptimaState = {
 
 export interface OptimaActions {
 
-  // setIsFocusedMode: (isFocusedMode: boolean) => void;
+  setChromeless: (isChromeless: boolean) => void;
 
   closeDrawer: () => void;
   openDrawer: () => void;
@@ -102,7 +106,7 @@ export interface OptimaActions {
   openLogger: () => void;
 
   closeModelOptions: () => void;
-  openModelOptions: (id: DLLMId) => void;
+  openModelOptions: (id: DLLMId, context?: ModelOptionsContext) => void;
 
   closeModels: () => void;
   openModels: () => void;
@@ -164,7 +168,7 @@ export const useLayoutOptimaStore = create<OptimaState & OptimaActions>((_set, _
 
   ...initialState,
 
-  // setIsFocusedMode: (isFocusedMode) => _set({ isFocusedMode }),
+  setChromeless: (isChromeless) => _set({ isChromeless }),
 
   closeDrawer: () => {
     // prevent accidental immediate close (e.g. double-click, animation protection)
@@ -209,7 +213,7 @@ export const useLayoutOptimaStore = create<OptimaState & OptimaActions>((_set, _
   openLogger: () => _set({ ...modalsClosedState, showLogger: true }),
 
   closeModelOptions: () => _set({ showModelOptions: false }),
-  openModelOptions: (id: DLLMId) => _set({ showModelOptions: id }),
+  openModelOptions: (id: DLLMId, context?: ModelOptionsContext) => _set({ showModelOptions: id, showModelOptionsContext: context ?? 'full' }),
 
   closeModels: () => _set({ showModels: false }),
   openModels: () => _set({ showModels: true }),

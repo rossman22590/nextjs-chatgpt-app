@@ -3,15 +3,20 @@ import type { AixWire_Particles } from '~/modules/aix/server/api/aix.wiretypes';
 
 export type ParticleServerLogLevel = false | 'srv-log' | 'srv-warn';
 
+export type ParticleCGDialectEndReason = Extract<AixWire_Particles.CGEndReason, 'done-dialect' | 'issue-dialect'>;
+
 export interface IParticleTransmitter {
 
   // Parser-initiated Control //
 
   /** Set the end reason - only use for 'done-dialect' to signal a dialect-close */
-  setEnded(reason: Extract<AixWire_Particles.CGEndReason, 'done-dialect' | 'issue-dialect'>): void;
+  setDialectEnded(reason: ParticleCGDialectEndReason): void;
 
-  /** End the current part and flush it */
+  /** End the current part and flush it, which also calls `setDialectEnded('issue-dialct')` */
   setDialectTerminatingIssue(dialectText: string, symbol: string | null, serverLog: ParticleServerLogLevel): void;
+
+  /** Communicates the finish reason to the client - Data only, this does not do Control, like the above */
+  setTokenStopReason(reason: AixWire_Particles.GCTokenStopReason): void;
 
 
   // Parts data //
@@ -53,10 +58,10 @@ export interface IParticleTransmitter {
   appendFunctionCallInvocationArgs(id: string | null, argsJsonChunk: string): void;
 
   /** Creates a CE request part, flushing the previous one if needed, and completes it */
-  addCodeExecutionInvocation(id: string | null, language: string, code: string, author: 'gemini_auto_inline'): void;
+  addCodeExecutionInvocation(id: string | null, language: string, code: string, author: 'gemini_auto_inline' | 'code_interpreter'): void;
 
   /** Creates a CE result part, flushing the previous one if needed, and completes it */
-  addCodeExecutionResponse(id: string | null, error: boolean | string, result: string, executor: 'gemini_auto_inline', environment: 'upstream'): void;
+  addCodeExecutionResponse(id: string | null, error: boolean | string, result: string, executor: 'gemini_auto_inline' | 'code_interpreter', environment: 'upstream'): void;
 
   /** Adds a URL citation part */
   appendUrlCitation(title: string, url: string, citationNumber?: number, startIndex?: number, endIndex?: number, textSnippet?: string, pubTs?: number): void;
@@ -80,11 +85,11 @@ export interface IParticleTransmitter {
   /** Communicates the model name to the client */
   setModelName(modelName: string): void;
 
+  /** Communicates the provider name to the client (e.g., OpenRouter provider routing) */
+  setProviderInfraLabel(label: string): void;
+
   /** Communicates the upstream response handle, for remote control/resumability */
   setUpstreamHandle(handle: string, type: 'oai-responses'): void;
-
-  /** Communicates the finish reason to the client */
-  setTokenStopReason(reason: AixWire_Particles.GCTokenStopReason): void;
 
   /** Update the metrics, sent twice (after the first call, and then at the end of the transmission) */
   updateMetrics(update: Partial<AixWire_Particles.CGSelectMetrics>): void;

@@ -3,21 +3,19 @@ import * as React from 'react';
 import { FormControl, ListDivider, Switch } from '@mui/joy';
 import CodeIcon from '@mui/icons-material/Code';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
-import EngineeringIcon from '@mui/icons-material/Engineering';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 
 import type { DModelDomainId } from '~/common/stores/llms/model.domains.types';
 import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
 import { FormSelectControl, FormSelectOption } from '~/common/components/forms/FormSelectControl';
 import { useLLMSelect } from '~/common/components/forms/useLLMSelect';
-import { useLabsDevMode } from '~/common/stores/store-ux-labs';
 import { useModelDomain } from '~/common/stores/llms/hooks/useModelDomain';
 
-import type { TokenCountingMethod } from '../chat/store-app-chat';
+import type { ChatThinkingPolicy, TokenCountingMethod } from '../chat/store-app-chat';
 import { useChatAutoAI } from '../chat/store-app-chat';
 
 
-const _keepThinkingBlocksOptions: FormSelectOption<'all' | 'last-only'>[] = [
+const _keepThinkingBlocksOptions: FormSelectOption<ChatThinkingPolicy>[] = [
   {
     value: 'last-only',
     label: 'Most Recent',
@@ -27,6 +25,11 @@ const _keepThinkingBlocksOptions: FormSelectOption<'all' | 'last-only'>[] = [
     value: 'all',
     label: 'Preserve All',
     description: 'Keep all traces',
+  },
+  {
+    value: 'discard-all',
+    label: 'Discard All',
+    description: 'May reduce quality',
   },
 ] as const;
 
@@ -76,11 +79,9 @@ export function AppChatSettingsAI() {
     autoSuggestHTMLUI, setAutoSuggestHTMLUI,
     // autoSuggestQuestions, setAutoSuggestQuestions,
     autoTitleChat, setAutoTitleChat,
-    chatKeepLastThinkingOnly, setChatKeepLastThinkingOnly,
+    chatThinkingPolicy, setChatThinkingPolicy,
     tokenCountingMethod, setTokenCountingMethod,
   } = useChatAutoAI();
-
-  const labsDevMode = useLabsDevMode();
 
   const showModelIcons = false; // useUIComplexityMode() === 'extra';
 
@@ -136,15 +137,6 @@ export function AppChatSettingsAI() {
       tooltip='Vision model used to generate text descriptions of images when the Caption (Text) attachment option is selected.'
     />
 
-    {labsDevMode && (
-      <FormControlDomainModel
-        domainId='primaryChat'
-        title={<><EngineeringIcon color='warning' sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Last used model</>}
-        description='Chat fallback model'
-        tooltip='The last used chat model, used as default for new conversations. This is a development setting used to test out auto-detection of the most fitting initial chat model.'
-      />
-    )}
-
     <FormSelectControl
       title='Token Counting'
       tooltip='Controls how tokens are counted for context limits and pricing estimates.'
@@ -155,10 +147,10 @@ export function AppChatSettingsAI() {
 
     <FormSelectControl
       title='Reasoning traces'
-      tooltip='Controls how AI thinking/reasoning blocks are kept in your chat history. Keeping only in the last message (default) reduces clutter.'
+      tooltip='Controls how AI thinking/reasoning blocks are kept in your chat history. "Most Recent" keeps only the last message traces (default). "Discard All" removes all traces after each response, which may reduce multi-turn quality with some providers.'
       options={_keepThinkingBlocksOptions}
-      value={chatKeepLastThinkingOnly ? 'last-only' : 'all'}
-      onChange={(value) => setChatKeepLastThinkingOnly(value === 'last-only')}
+      value={chatThinkingPolicy}
+      onChange={setChatThinkingPolicy}
     />
 
     <ListDivider inset='gutter'>Automatic AI Functions</ListDivider>

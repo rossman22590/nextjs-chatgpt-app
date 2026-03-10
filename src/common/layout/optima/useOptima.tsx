@@ -6,6 +6,22 @@ import { NavItemApp } from '~/common/app.nav';
 import { useOptimaPortalHasInputs } from '~/common/layout/optima/portals/useOptimaPortalHasInputs';
 
 
+// Chromeless Mode
+
+export function optimaToggleChromeless() {
+  const state = useLayoutOptimaStore.getState();
+  state.setChromeless(!state.isChromeless);
+}
+
+export function optimaExitChromeless() {
+  useLayoutOptimaStore.getState().setChromeless(false);
+}
+
+export function useOptimaChromeless() {
+  return useLayoutOptimaStore(({ isChromeless }) => isChromeless);
+}
+
+
 // Drawer
 
 export function optimaCloseDrawer() {
@@ -91,6 +107,7 @@ export function useOptimaModals() {
     showKeyboardShortcuts: state.showKeyboardShortcuts,
     showLogger: state.showLogger,
     showModelOptions: state.showModelOptions,
+    showModelOptionsContext: state.showModelOptionsContext,
     showModels: state.showModels,
     showPreferences: state.showPreferences,
     preferencesTab: state.preferencesTab,

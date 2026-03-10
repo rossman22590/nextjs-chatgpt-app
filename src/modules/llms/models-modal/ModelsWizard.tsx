@@ -9,7 +9,7 @@ import { llmsStoreActions, llmsStoreState, useModelsStore } from '~/common/store
 import { useShallowStabilizer } from '~/common/util/hooks/useShallowObject';
 
 import type { IModelVendor } from '../vendors/IModelVendor';
-import { LLMVendorIcon } from '../components/LLMVendorIcon';
+import { LLMVendorIconSprite } from '../components/LLMVendorIconSprite';
 import { ModelVendorAnthropic } from '../vendors/anthropic/anthropic.vendor';
 import { ModelVendorGemini } from '../vendors/gemini/gemini.vendor';
 import { ModelVendorLMStudio } from '../vendors/lmstudio/lmstudio.vendor';
@@ -44,8 +44,11 @@ interface WizardProvider {
 const _styles = {
 
   container: {
-    margin: 'calc(-1 * var(--Card-padding, 1rem))',
+    mx: 'calc(-1 * var(--Card-padding, 1rem))',
     padding: 'var(--Card-padding)',
+    borderTop: '1px solid',
+    borderBottom: '1px solid',
+    borderColor: 'divider',
     // paddingRight: 'calc(1.5 * var(--Card-padding))',
     // background: 'linear-gradient(135deg, var(--joy-palette-primary-500), var(--joy-palette-primary-700))',
     // background: 'linear-gradient(135deg, var(--joy-palette-background-level1), var(--joy-palette-background-level1))',
@@ -173,7 +176,7 @@ function WizardProviderSetup(props: {
     // if the key is empty, remove the models
     if (!newKey) {
       setUpdateError(null);
-      setServiceLLMs(vendorServiceId, [], false, false);
+      setServiceLLMs(vendorServiceId, [], true, false);
       return;
     }
 
@@ -187,7 +190,7 @@ function WizardProviderSetup(props: {
       if (errorText.includes('Incorrect API key'))
         errorText = '[OpenAI issue] Unauthorized: Incorrect API key.';
       setUpdateError(errorText);
-      setServiceLLMs(vendorServiceId, [], false, false);
+      setServiceLLMs(vendorServiceId, [], true, false);
     }
     setIsLoading(false);
 
@@ -239,7 +242,7 @@ function WizardProviderSetup(props: {
             slotProps={{ badge: { sx: { boxShadow: 'xs', border: 'none' } } }}
           >
             <Avatar sx={{ height: '100%', aspectRatio: 1, backgroundColor: 'transparent' }}>
-              {isLoading ? <CircularProgress color='primary' variant='solid' size='sm' /> : <LLMVendorIcon vendorId={providerVendor.id} />}
+              {isLoading ? <CircularProgress color='primary' variant='solid' size='sm' /> : <LLMVendorIconSprite vendorId={providerVendor.id} />}
             </Avatar>
           </Badge>
         </TooltipOutlined>

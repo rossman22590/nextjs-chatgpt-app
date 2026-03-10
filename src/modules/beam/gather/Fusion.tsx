@@ -6,7 +6,7 @@ import TelegramIcon from '@mui/icons-material/Telegram';
 
 import { ChatMessageMemo } from '../../../apps/chat/components/message/ChatMessage';
 
-import type { DLLMId } from '~/common/stores/llms/llms.types';
+import { DLLMId, getLLMLabel } from '~/common/stores/llms/llms.types';
 import type { DMessageFragment, DMessageFragmentId } from '~/common/stores/chat/chat.fragments';
 import type { DMessageId } from '~/common/stores/chat/chat.message';
 import { messageFragmentsReduceText } from '~/common/stores/chat/chat.message';
@@ -14,7 +14,7 @@ import { messageFragmentsReduceText } from '~/common/stores/chat/chat.message';
 import { GoodTooltip } from '~/common/components/GoodTooltip';
 import { InlineError } from '~/common/components/InlineError';
 import { animationEnterBelow } from '~/common/util/animUtils';
-import { copyToClipboard } from '~/common/util/clipboardUtils';
+import { clipboardInterceptCtrlCForCleanup, copyToClipboard } from '~/common/util/clipboardUtils';
 import { useLLMSelect } from '~/common/components/forms/useLLMSelect';
 
 import { BeamCard, beamCardClasses, beamCardMessageScrollingSx, beamCardMessageSx, beamCardMessageWrapperSx } from '../BeamCard';
@@ -58,7 +58,7 @@ export function Fusion(props: {
   // get LLM Label and Vendor Icon
   const llmId = fusion?.llmId ?? null;
   const setLlmId = React.useCallback((llmId: DLLMId | null) => fusionSetLlmId(props.fusionId, llmId), [props.fusionId, fusionSetLlmId]);
-  const [llmOrNull, llmComponent, llmVendorIcon] = useLLMSelect(llmId, setLlmId, {
+  const [llmOrNull, llmComponent] = useLLMSelect(llmId, setLlmId, {
     label: '',
     disabled: isFusing,
     showStarFilter: true,
@@ -70,7 +70,7 @@ export function Fusion(props: {
   }, [isFusing]);
 
   // more derived
-  const llmLabel = llmOrNull?.label || 'Model unknown';
+  const llmLabel = llmOrNull ? getLLMLabel(llmOrNull) : 'Model unknown';
 
   // handlers
   const handleFusionCopyToClipboard = React.useCallback(() => {
@@ -145,9 +145,9 @@ export function Fusion(props: {
         isInterrupted={isStopped}
         isMobile={props.isMobile}
         isUsable={isUsable}
-        llmComponent={(isFusing || !showLlmSelector) ? undefined : llmComponent}
+        llmComponent={(isFusing || (!isEditable && !showLlmSelector)) ? undefined : llmComponent}
         llmLabel={llmLabel}
-        llmVendorIcon={llmVendorIcon}
+        llmVendorId={llmOrNull?.vId}
         fusionAvatarTooltip={fusionAvatarTooltip}
         onIconClick={isFusing ? undefined : handleIconClick}
         onRemove={handleFusionRemove}
@@ -175,7 +175,7 @@ export function Fusion(props: {
 
       {/* Output Message */}
       {(!!fusion?.outputDMessage?.fragments.length || fusion?.stage === 'fusing') && (
-        <Box sx={beamCardMessageWrapperSx}>
+        <Box onCopy={clipboardInterceptCtrlCForCleanup} sx={beamCardMessageWrapperSx}>
           {!!fusion.outputDMessage && (
             <ChatMessageMemo
               message={fusion.outputDMessage}

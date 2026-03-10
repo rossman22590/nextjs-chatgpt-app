@@ -15,6 +15,7 @@ import { optimaCloseDrawer, optimaOpenModels, optimaOpenPreferences } from '../u
 
 // configuration
 const INVERT_PANE = true; // if true, the pane will be darker
+const MAX_LINKS = 1; // max number of links to show in mobile mode - the 1st is discord - stop there
 const COLOR_PANE: ColorPaletteProp = 'neutral';
 
 
@@ -147,12 +148,23 @@ export function MobileNavItems(props: { currentApp?: NavItemApp }) {
           </Box>
         </Button>
 
-        {/* Enhanced Sign in/out button */}
+        {/* Auth: Sign in/out button */}
         <AuthButton
           variant="text"
           size="sm"
           sx={_styles.button}
         />
+
+        {/* External links (e.g. Discord) */}
+        {navItems.links.slice(0, MAX_LINKS).map((link) => (
+          <BringTheLove
+            key={link.name}
+            text={link.name}
+            icon={link.icon}
+            link={link.href}
+            sx={_styles.button}
+          />
+        ))}
       </Box>
 
     </Sheet>

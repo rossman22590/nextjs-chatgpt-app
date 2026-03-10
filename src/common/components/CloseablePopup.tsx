@@ -12,6 +12,19 @@ const Popup = styled(Popper)({
 
 
 /**
+ * Use this for submenus on any Menu/Popup, to prevent the parent popup from closing when clicking on this item. e.g.
+ * <MenuItem onClick={joyKeepPopup(() => setShowModelsHidden(!showModelsHidden))}> ...
+ */
+export function joyKeepPopup<TEvent extends React.MouseEvent>(fn: (event: TEvent) => void) {
+  return (event: TEvent) => {
+    // the key to not close the popup when activating this menu item - REV ENG
+    (event as any).defaultMuiPrevented = true;
+    fn(event);
+  };
+}
+
+
+/**
  * Workaround to the Menu in Joy 5-beta.0.
  *
  * This component addresses major changes in the Menu component in Joy 5-beta.0:
@@ -93,6 +106,8 @@ export function CloseablePopup(props: {
     },
   }], [props.placementOffset]);
 
+  const popperMemoSx: undefined | SxProps = React.useMemo(() => !props.zIndex ? undefined : ({ zIndex: props.zIndex }), [props.zIndex]);
+
   const styleMemoSx: SxProps = React.useMemo(() => ({
 
     // style
@@ -120,7 +135,6 @@ export function CloseablePopup(props: {
 
   }), [props.boxShadow, props.maxHeightGapPx, props.maxWidth, props.minWidth, props.size, props.dense, props.bigIcons, props.noBottomPadding, props.noTopPadding, props.sx]);
 
-
   return (
     <Popup
       role={undefined}
@@ -129,7 +143,7 @@ export function CloseablePopup(props: {
       placement={props.placement}
       disablePortal={false}
       modifiers={modifiersMemo}
-      sx={props.zIndex ? { zIndex: props.zIndex } : undefined}
+      sx={popperMemoSx}
     >
       <ClickAwayListener onClickAway={handleClose}>
         {props.menu ? (

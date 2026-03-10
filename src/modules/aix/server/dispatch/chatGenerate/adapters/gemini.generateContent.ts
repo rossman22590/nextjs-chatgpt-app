@@ -1,3 +1,5 @@
+import * as z from 'zod/v4';
+
 import type { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_ChatMessage, AixParts_DocPart, AixTools_ToolDefinition, AixTools_ToolsPolicy } from '../../../api/aix.wiretypes';
 import { GeminiWire_API_Generate_Content, GeminiWire_ContentParts, GeminiWire_Messages, GeminiWire_Safety, GeminiWire_ToolDeclarations } from '../../wiretypes/gemini.wiretypes';
 
@@ -11,12 +13,19 @@ const hotFixReplaceEmptyMessagesWithEmptyTextPart = true;
 // [Gemini 3, 2025-11-20] Bypass dummy thoughtSignature for Gemini 3+ validation
 // https://ai.google.dev/gemini-api/docs/thought-signatures
 const GEMINI_BYPASS_THOUGHT_SIGNATURE = 'context_engineering_is_the_way_to_go';
+const MODELS_REQUIRING_THOUGHT_SIGNATURE = [
+  'nano-banana-pro',
+  // preview, e.g.:
+  // 'gemini-3.1-flash-image-preview',
+  // 'gemini-3-pro-image-preview',
+  '-image-preview', // catch-all for image (nano banana) preview models
+] as const;
 
 
 export function aixToGeminiGenerateContent(model: AixAPI_Model, _chatGenerate: AixAPIChatGenerate_Request, geminiSafetyThreshold: GeminiWire_Safety.HarmBlockThreshold, jsonOutput: boolean, _streaming: boolean): TRequest {
 
   // Hotfixes - reduce these to the minimum, as they shall be higher-level resolved
-  const isFamilyNanoBanana = model.id.includes('nano-banana') || model.id.includes('gemini-3-pro-image-preview');
+  const isFamilyNanoBanana = MODELS_REQUIRING_THOUGHT_SIGNATURE.some(m => model.id.includes(m));
   const api3RequiresSignatures = isFamilyNanoBanana;
 
   // Note: the streaming setting is ignored here as it only belongs in the path
@@ -90,19 +99,25 @@ export function aixToGeminiGenerateContent(model: AixAPI_Model, _chatGenerate: A
   }
 
   // Thinking models: thinking budget and show thoughts
-  if (model.vndGeminiShowThoughts === true || model.vndGeminiThinkingBudget !== undefined || model.vndGeminiThinkingLevel) {
+  const thinkingLevel = model.reasoningEffort; // ?? model.vndGeminiThinkingLevel;
+  if (thinkingLevel === 'none' || thinkingLevel === 'xhigh' || thinkingLevel === 'max') // domain validation
+    throw new Error(`Gemini API does not support '${thinkingLevel}' thinking level`);
+
+  if (thinkingLevel || model.vndGeminiThinkingBudget !== undefined /*|| model.vndGeminiShowThoughts === true*/) {
     const thinkingConfig: Exclude<TRequest['generationConfig'], undefined>['thinkingConfig'] = {};
 
     // This shows mainly 'summaries' of thoughts, and we enable it for most cases where thinking is requested
-    if (model.vndGeminiShowThoughts || (model.vndGeminiThinkingBudget ?? 0) > 1 || model.vndGeminiThinkingLevel === 'high' || model.vndGeminiThinkingLevel === 'medium')
+    if (thinkingLevel || (model.vndGeminiThinkingBudget ?? 0) > 1 /*|| model.vndGeminiShowThoughts === true*/)
       thinkingConfig.includeThoughts = true;
 
     // [Gemini 3, 2025-11-18] Thinking Level (replaces thinkingBudget for Gemini 3)
     // CRITICAL: Cannot use both thinkingLevel and thinkingBudget (400 error)
-    if (model.vndGeminiThinkingLevel) {
-      thinkingConfig.thinkingLevel = model.vndGeminiThinkingLevel;
+    if (thinkingLevel) {
+      // - Gemini 3 Flash: supports 'high', 'medium', 'low', 'minimal'
+      // - Gemini 3 Pro: supports 'high', 'low'
+      thinkingConfig.thinkingLevel = thinkingLevel;
     }
-    // [Gemini 2.x] Thinking Budget (0 disables thinking explicitly)
+    // [Gemini 2.x] Thinking Budget (0 disables thinking explicitly) - mutually exclusive with thinkingLevel
     else if (model.vndGeminiThinkingBudget !== undefined) {
       if (model.vndGeminiThinkingBudget > 0)
         thinkingConfig.includeThoughts = true;
@@ -217,7 +232,8 @@ export function aixToGeminiGenerateContent(model: AixAPI_Model, _chatGenerate: A
   }
 
   // [Gemini, 2025-08-18] URL Context: add tool when enabled
-  if (model.vndGeminiUrlContext === 'auto' && !isFamilyNanoBanana && !skipHostedToolsDueToCustomTools) {
+  const disableUrlContext = isFamilyNanoBanana /* Nano Bananas don't fetch */ || skipHostedToolsDueToCustomTools;
+  if (model.vndGeminiUrlContext === 'auto' && !disableUrlContext) {
     if (!payload.tools) payload.tools = [];
 
     // Build the URL Context tool configuration (empty object)
@@ -232,8 +248,8 @@ export function aixToGeminiGenerateContent(model: AixAPI_Model, _chatGenerate: A
   // Preemptive error detection with server-side payload validation before sending it upstream
   const validated = GeminiWire_API_Generate_Content.Request_schema.safeParse(payload);
   if (!validated.success) {
-    console.warn('Gemini: invalid generateContent payload. Error:', validated.error.message);
-    throw new Error(`Invalid sequence for Gemini models: ${validated.error.issues?.[0]?.message || validated.error.message || validated.error}.`);
+    console.warn('[DEV] Gemini: invalid generateContent payload. Error:', { valError: validated.error });
+    throw new Error(`Invalid request for Gemini models: ${z.prettifyError(validated.error)}`);
   }
 
   return validated.data;
@@ -388,6 +404,8 @@ function _toGeminiContents(chatSequence: AixMessages_ChatMessage[], apiRequiresS
         }
         // if not applied yet, and required for this part type, apply bypass dummy and warn
         else if (partRequiresSignature) {
+          // Without this, images that are generated by other (non-signed) models/tools will cause errors:
+          // << [Service Issue] Gemini: Upstream responded with HTTP 400 Bad Request - Image part is missing a thought_signature in content position 12, part position 1. Please refer to https://ai.google.dev/gemini-api/docs/thought-signatures#model-behavior for more details. >>
           tsTarget.thoughtSignature = GEMINI_BYPASS_THOUGHT_SIGNATURE;
           // [Gemini 3, 2025-11-20] Cross-provider or edited content warning
           console.log(`[Gemini 3] ${part.pt} missing thoughtSignature - bypass applied`);
@@ -442,8 +460,9 @@ function _toGeminiTools(itds: AixTools_ToolDefinition[]): NonNullable<TRequest['
         break;
 
       case 'code_execution':
-        if (itd.variant !== 'gemini_auto_inline')
-          throw new Error('Gemini only supports inline code execution');
+        // NOTE: commented because now we have 'code_interpreter' too
+        // if (itd.variant !== 'gemini_auto_inline')
+        //   throw new Error('Gemini only supports inline code execution');
 
         // throw if code execution is present more than once
         if (tools.some(tool => tool.codeExecution))

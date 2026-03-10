@@ -1,7 +1,7 @@
 import { findServiceAccessOrThrow } from '~/modules/llms/vendors/vendor.helpers';
 
 import type { MaybePromise } from '~/common/types/useful.types';
-import { DLLM, DLLMId, getLLMPricing, LLM_IF_HOTFIX_NoTemperature, LLM_IF_OAI_Responses, LLM_IF_Outputs_Audio, LLM_IF_Outputs_Image, LLM_IF_Outputs_NoText } from '~/common/stores/llms/llms.types';
+import { DLLM, DLLMId, LLM_IF_HOTFIX_NoTemperature, LLM_IF_OAI_Responses, LLM_IF_Outputs_Audio, LLM_IF_Outputs_Image, LLM_IF_Outputs_NoText } from '~/common/stores/llms/llms.types';
 import { DMessage, DMessageGenerator, messageSetGeneratorAIX_AutoLabel } from '~/common/stores/chat/chat.message';
 import { DMetricsChatGenerate_Lg, metricsChatGenerateLgToMd, metricsComputeChatGenerateCostsMd } from '~/common/stores/metrics/metrics.chatgenerate';
 import { DModelParameterValues, getAllModelParameterValues } from '~/common/stores/llms/llms.parameters';
@@ -9,8 +9,9 @@ import { apiStream } from '~/common/util/trpc.client';
 import { createErrorContentFragment, DMessageContentFragment, DMessageErrorPart, DMessageVoidFragment, isContentFragment, isErrorPart } from '~/common/stores/chat/chat.fragments';
 import { findLLMOrThrow } from '~/common/stores/llms/store-llms';
 import { getAixInspectorEnabled } from '~/common/stores/store-ui';
-import { getLabsDevNoStreaming } from '~/common/stores/store-ux-labs';
+import { llmChatPricing_adjusted } from '~/common/stores/llms/llms.pricing';
 import { metricsStoreAddChatGenerate } from '~/common/stores/metrics/store-metrics';
+import { stripUndefined } from '~/common/util/objectUtils';
 import { webGeolocationCached } from '~/common/util/webGeolocationUtils';
 
 // NOTE: pay particular attention to the "import type", as this is importing from the server-side Zod definitions
@@ -20,6 +21,7 @@ import { AixStreamRetry } from './aix.client.retry';
 import { ContentReassembler } from './ContentReassembler';
 import { aixCGR_ChatSequence_FromDMessagesOrThrow, aixCGR_FromSimpleText, aixCGR_SystemMessage_FromDMessageOrThrow, AixChatGenerate_TextMessages, clientHotFixGenerateRequest_ApplyAll } from './aix.client.chatGenerateRequest';
 import { aixClassifyStreamingError } from './aix.client.errors';
+import { aixClientDebuggerGetRBO, getAixDebuggerNoStreaming } from './debugger/memstore-aix-client-debugger';
 import { withDecimator } from './withDecimator';
 
 
@@ -46,14 +48,16 @@ export function aixCreateModelFromLLMOptions(
 
   // destructure input with the overrides
   const {
-    llmRef, llmTemperature, llmResponseTokens, llmTopP,
-    llmVndAnt1MContext, llmVndAntSkills, llmVndAntThinkingBudget, llmVndAntWebFetch, llmVndAntWebSearch, llmVndAntEffort,
-    llmVndGeminiAspectRatio, llmVndGeminiImageSize, llmVndGeminiCodeExecution, llmVndGeminiComputerUse, llmVndGeminiGoogleSearch, llmVndGeminiMediaResolution, llmVndGeminiShowThoughts, llmVndGeminiThinkingBudget, llmVndGeminiThinkingLevel,
+    llmRef, llmTemperature, llmResponseTokens, llmTopP, llmForceNoStream,
+    llmVndAntEffort, llmVndGemEffort, llmVndOaiEffort, llmVndMiscEffort,
+    llmVndAnt1MContext, llmVndAntInfSpeed, llmVndAntSkills, llmVndAntThinkingBudget, llmVndAntWebFetch, llmVndAntWebFetchMaxUses, llmVndAntWebSearch, llmVndAntWebSearchMaxUses,
+    llmVndBedrockAPI,
+    llmVndGeminiAspectRatio, llmVndGeminiImageSize, llmVndGeminiCodeExecution, llmVndGeminiComputerUse, llmVndGeminiGoogleSearch, llmVndGeminiMediaResolution, llmVndGeminiThinkingBudget,
     // llmVndMoonshotWebSearch,
-    llmVndOaiReasoningEffort, llmVndOaiReasoningEffort4, llmVndOaiReasoningEffort52, llmVndOaiReasoningEffort52Pro, llmVndOaiRestoreMarkdown, llmVndOaiVerbosity, llmVndOaiWebSearchContext, llmVndOaiWebSearchGeolocation, llmVndOaiImageGeneration,
+    llmVndOaiRestoreMarkdown, llmVndOaiVerbosity, llmVndOaiWebSearchContext, llmVndOaiWebSearchGeolocation, llmVndOaiImageGeneration, llmVndOaiCodeInterpreter,
     llmVndOrtWebSearch,
     llmVndPerplexityDateFilter, llmVndPerplexitySearchMode,
-    llmVndXaiSearchMode, llmVndXaiSearchSources, llmVndXaiSearchDateFilter,
+    llmVndXaiCodeExecution, llmVndXaiSearchInterval, llmVndXaiWebSearch, llmVndXaiXSearch, llmVndXaiXSearchHandles,
   } = {
     ...llmOptions,
     ...llmOptionOverrides,
@@ -94,18 +98,30 @@ export function aixCreateModelFromLLMOptions(
       console.log(`[DEV] AIX: Geolocation is requested for model ${debugLlmId}, but it's not available.`);
   }
 
-  return {
+  return stripUndefined({
     id: llmRef,
     acceptsOutputs: acceptsOutputs,
-    ...(hotfixOmitTemperature ? { temperature: null } : llmTemperature !== undefined ? { temperature: llmTemperature } : {}),
-    ...(llmResponseTokens /* null: similar to undefined, will omit the value */ ? { maxTokens: llmResponseTokens } : {}),
-    ...(llmTopP !== undefined ? { topP: llmTopP } : {}),
-    ...(llmVndAntThinkingBudget !== undefined ? { vndAntThinkingBudget: llmVndAntThinkingBudget } : {}),
+    temperature: (hotfixOmitTemperature || llmTemperature === null) ? null : llmTemperature, // strippable
+    maxTokens: llmResponseTokens ?? undefined, // strippable - null: like undefined -> strip -> omit the value
+    topP: llmTopP, // strippable (likely)
+    forceNoStream: llmForceNoStream ? true : undefined, // strippable
+    userGeolocation: userGeolocation, // strippable (likely)
+
+    // Cross-provider unified options
+    reasoningEffort: llmVndAntEffort ?? llmVndGemEffort ?? llmVndOaiEffort ?? llmVndMiscEffort, // strippable
+
+    // Anthropic
+    ...(llmVndAntThinkingBudget !== undefined ? { vndAntThinkingBudget: llmVndAntThinkingBudget === -1 ? 'adaptive' as const : llmVndAntThinkingBudget } : {}),
     ...(llmVndAnt1MContext ? { vndAnt1MContext: llmVndAnt1MContext } : {}),
+    ...(llmVndAntInfSpeed === 'fast' ? { vndAntInfSpeed: 'fast' } : {}),
     ...(llmVndAntSkills ? { vndAntSkills: llmVndAntSkills } : {}),
-    ...(llmVndAntWebFetch === 'auto' ? { vndAntWebFetch: llmVndAntWebFetch } : {}),
-    ...(llmVndAntWebSearch === 'auto' ? { vndAntWebSearch: llmVndAntWebSearch } : {}),
-    ...(llmVndAntEffort ? { vndAntEffort: llmVndAntEffort } : {}),
+    ...(llmVndAntWebFetch === 'auto' ? { vndAntWebFetch: llmVndAntWebFetch, ...(llmVndAntWebFetchMaxUses ? { vndAntWebFetchMaxUses: llmVndAntWebFetchMaxUses } : {}) } : {}),
+    ...(llmVndAntWebSearch === 'auto' ? { vndAntWebSearch: llmVndAntWebSearch, ...(llmVndAntWebSearchMaxUses ? { vndAntWebSearchMaxUses: llmVndAntWebSearchMaxUses } : {}) } : {}),
+
+    // Bedrock
+    ...(llmVndBedrockAPI ? { vndBedrockAPI: llmVndBedrockAPI } : {}),
+
+    // Gemini
     ...(llmVndGeminiAspectRatio ? { vndGeminiAspectRatio: llmVndGeminiAspectRatio } : {}),
     ...(llmVndGeminiCodeExecution === 'auto' ? { vndGeminiCodeExecution: llmVndGeminiCodeExecution } : {}),
     ...(llmVndGeminiComputerUse ? { vndGeminiComputerUse: llmVndGeminiComputerUse } : {}),
@@ -115,25 +131,34 @@ export function aixCreateModelFromLLMOptions(
     } : {}),
     ...(llmVndGeminiImageSize ? { vndGeminiImageSize: llmVndGeminiImageSize } : {}),
     ...(llmVndGeminiMediaResolution ? { vndGeminiMediaResolution: llmVndGeminiMediaResolution } : {}),
-    ...(llmVndGeminiShowThoughts ? { vndGeminiShowThoughts: llmVndGeminiShowThoughts } : {}),
     ...(llmVndGeminiThinkingBudget !== undefined ? { vndGeminiThinkingBudget: llmVndGeminiThinkingBudget } : {}),
-    ...(llmVndGeminiThinkingLevel ? { vndGeminiThinkingLevel: llmVndGeminiThinkingLevel } : {}),
     // ...(llmVndGeminiUrlContext === 'auto' ? { vndGeminiUrlContext: llmVndGeminiUrlContext } : {}),
+
+    // Moonshot
     // ...(llmVndMoonshotWebSearch === 'auto' ? { vndMoonshotWebSearch: 'auto' } : {}),
+
+    // OpenAI
     ...(llmVndOaiResponsesAPI ? { vndOaiResponsesAPI: true } : {}),
-    ...((llmVndOaiReasoningEffort52Pro || llmVndOaiReasoningEffort52 || llmVndOaiReasoningEffort4 || llmVndOaiReasoningEffort) ? { vndOaiReasoningEffort: llmVndOaiReasoningEffort52Pro || llmVndOaiReasoningEffort52 || llmVndOaiReasoningEffort4 || llmVndOaiReasoningEffort } : {}),
     ...(llmVndOaiRestoreMarkdown ? { vndOaiRestoreMarkdown: llmVndOaiRestoreMarkdown } : {}),
     ...(llmVndOaiVerbosity ? { vndOaiVerbosity: llmVndOaiVerbosity } : {}),
     ...(llmVndOaiWebSearchContext ? { vndOaiWebSearchContext: llmVndOaiWebSearchContext } : {}),
     ...(llmVndOaiImageGeneration ? { vndOaiImageGeneration: (llmVndOaiImageGeneration as any /* backward comp */) === true ? 'mq' : llmVndOaiImageGeneration } : {}),
+    ...(llmVndOaiCodeInterpreter === 'auto' ? { vndOaiCodeInterpreter: llmVndOaiCodeInterpreter } : {}),
+
+    // OpenRouter
     ...(llmVndOrtWebSearch === 'auto' ? { vndOrtWebSearch: 'auto' } : {}),
+
+    // Perplexity
     ...(llmVndPerplexityDateFilter ? { vndPerplexityDateFilter: llmVndPerplexityDateFilter } : {}),
     ...(llmVndPerplexitySearchMode ? { vndPerplexitySearchMode: llmVndPerplexitySearchMode } : {}),
-    ...(userGeolocation ? { userGeolocation } : {}),
-    ...(llmVndXaiSearchMode ? { vndXaiSearchMode: llmVndXaiSearchMode } : {}),
-    ...(llmVndXaiSearchSources ? { vndXaiSearchSources: llmVndXaiSearchSources } : {}),
-    ...(llmVndXaiSearchDateFilter ? { vndXaiSearchDateFilter: llmVndXaiSearchDateFilter } : {}),
-  };
+
+    // xAI
+    ...(llmVndXaiCodeExecution === 'auto' ? { vndXaiCodeExecution: llmVndXaiCodeExecution } : {}),
+    ...(llmVndXaiSearchInterval ? { vndXaiSearchInterval: llmVndXaiSearchInterval } : {}),
+    ...(llmVndXaiWebSearch === 'auto' ? { vndXaiWebSearch: llmVndXaiWebSearch } : {}),
+    ...(llmVndXaiXSearch === 'auto' ? { vndXaiXSearch: llmVndXaiXSearch } : {}),
+    ...(llmVndXaiXSearchHandles ? { vndXaiXSearchHandles: llmVndXaiXSearchHandles } : {}),
+  });
 }
 
 
@@ -225,11 +250,15 @@ export async function aixChatGenerateContent_DMessage_FromConversation(
 
   }
 
-  // TODO: check something beyond this return status (as exceptions almost never happen here)
-  // - e.g. the generator.aix may have error/token stop codes
+  // Derive outcome: client-abort wins (user intent), then errors/issues, then success
+  const tokenStopReason = lastDMessage.generator?.tokenStopReason;
+  const outcome: StreamMessageStatus['outcome'] =
+    tokenStopReason === 'client-abort' ? 'aborted'
+      : (errorMessage || tokenStopReason === 'issue') ? 'errored'
+        : 'success';
 
   return {
-    outcome: errorMessage ? 'errored' : lastDMessage.generator?.tokenStopReason === 'client-abort' ? 'aborted' : 'success',
+    outcome,
     lastDMessage: lastDMessage,
     errorMessage: errorMessage || undefined,
   };
@@ -296,7 +325,7 @@ export async function aixChatGenerateText_Simple(
 
 
   // Client-side late stage model HotFixes
-  const { shallDisableStreaming } = clientHotFixGenerateRequest_ApplyAll(llm.interfaces, aixChatGenerate, llmParameters.llmRef || llm.id);
+  const { shallDisableStreaming } = await clientHotFixGenerateRequest_ApplyAll(llm.interfaces, aixChatGenerate, llmParameters.llmRef || llm.id);
   if (shallDisableStreaming || aixModel.forceNoStream)
     aixStreaming = false;
 
@@ -424,7 +453,6 @@ function _llToText(src: AixChatGenerateContent_LL, dest: AixChatGenerateText_Sim
  * - vendor-specific rate limit
  * - 'pendingIncomplete' logic
  * - 'o1-preview' hotfix for OpenAI models
- * - [NOT PORTED YET: checks for harmful content with the free 'moderation' API (OpenAI-only)]
  *
  * @param llmId - ID of the Language Model to use
  * @param aixChatGenerate - Multi-modal chat generation request specifics, including Tools and high-level metadata
@@ -456,17 +484,11 @@ export async function aixChatGenerateContent_DMessage_orThrow<TServiceSettings e
   const aixModel = aixCreateModelFromLLMOptions(llm.interfaces, llmParameters, clientOptions?.llmOptionsOverride, llmId);
 
   // Client-side late stage model HotFixes
-  const { shallDisableStreaming } = clientHotFixGenerateRequest_ApplyAll(llm.interfaces, aixChatGenerate, llmParameters.llmRef || llm.id);
+  const { shallDisableStreaming } = await clientHotFixGenerateRequest_ApplyAll(llm.interfaces, aixChatGenerate, llmParameters.llmRef || llm.id);
   if (shallDisableStreaming || aixModel.forceNoStream)
     aixStreaming = false;
 
-
-  // [OpenAI-only] check for harmful content with the free 'moderation' API, if the user requests so
-  // if (aixAccess.dialect === 'openai' && aixAccess.moderationCheck) {
-  //   const moderationUpdate = await _openAIModerationCheck(aixAccess, messages.at(-1) ?? null);
-  //   if (moderationUpdate)
-  //     return onUpdate({ textSoFar: moderationUpdate, typing: false }, true);
-  // }
+  // Legacy Note: awaited OpenAI moderation check was removed (was only on this codepath)
 
   // Aix Low-Level Chat Generation
   const dMessage: AixChatGenerateContent_DMessageGuts = {
@@ -525,16 +547,19 @@ function _llToDMessageGuts(src: AixChatGenerateContent_LL, dest: AixChatGenerate
     dest.generator.metrics = metricsChatGenerateLgToMd(src.genMetricsLg); // reduce the size to store in DMessage
   if (src.genModelName)
     dest.generator.name = src.genModelName;
+  if (src.genProviderInfraLabel)
+    dest.generator.providerInfraLabel = src.genProviderInfraLabel;
   if (src.genUpstreamHandle)
     dest.generator.upstreamHandle = src.genUpstreamHandle;
-  if (src.genTokenStopReason)
-    dest.generator.tokenStopReason = src.genTokenStopReason;
+  if (src.legacyGenTokenStopReason)
+    dest.generator.tokenStopReason = src.legacyGenTokenStopReason;
 }
 
 function _updateGeneratorCostsInPlace(generator: DMessageGenerator, llm: DLLM, debugCostSource: string) {
   // Compute costs
   const logLlmRefId = getAllModelParameterValues(llm.initialParameters, llm.userParameters).llmRef || llm.id;
-  const costs = metricsComputeChatGenerateCostsMd(generator.metrics, getLLMPricing(llm)?.chat, logLlmRefId);
+  const adjChatPricing = llmChatPricing_adjusted(llm);
+  const costs = metricsComputeChatGenerateCostsMd(generator.metrics, adjChatPricing, logLlmRefId);
   if (!costs) {
     // FIXME: we shall warn that the costs are missing, as the only way to get pricing is through surfacing missing prices
     return;
@@ -564,8 +589,9 @@ export interface AixChatGenerateContent_LL {
   // pieces of generator
   genMetricsLg?: DMetricsChatGenerate_Lg;
   genModelName?: string;
+  genProviderInfraLabel?: string;
   genUpstreamHandle?: DMessageGenerator['upstreamHandle'];
-  genTokenStopReason?: DMessageGenerator['tokenStopReason'];
+  legacyGenTokenStopReason?: DMessageGenerator['tokenStopReason'];
 }
 
 /**
@@ -620,7 +646,12 @@ async function _aixChatGenerateContent_LL(
 
   // Inspector support - can be requested by the client, but granted on the server side
   const inspectorEnabled = getAixInspectorEnabled();
+  const inspectorTransport = inspectorEnabled ? aixAccess.clientSideFetch ? 'csf' as const : 'trpc' as const : undefined;
   const inspectorContext = inspectorEnabled ? { contextName: aixContext.name, contextRef: aixContext.ref } : undefined;
+
+  // [DEV] Inspector - request body override
+  const requestBodyOverrideJson = inspectorEnabled && aixClientDebuggerGetRBO();
+  const debugRequestBodyOverride = !requestBodyOverrideJson ? false : JSON.parse(requestBodyOverrideJson);
 
   /**
    * FIXME: implement client selection of resumability - aixAccess option?
@@ -631,6 +662,7 @@ async function _aixChatGenerateContent_LL(
 
   const aixConnectionOptions: AixAPI_ConnectionOptions_ChatGenerate = {
     ...inspectorEnabled && { debugDispatchRequest: true, debugProfilePerformance: true },
+    ...debugRequestBodyOverride && { debugRequestBodyOverride },
     // FIXME: disabled until clearly working
     // ...requestResumability && { enableResumability: true },
   } as const;
@@ -682,6 +714,7 @@ async function _aixChatGenerateContent_LL(
     const reassembler = new ContentReassembler(
       accumulator_LL, // FIXME: TEMP: moved the accumulator outside to keep appending to it (recreating new ContentReassembler each retry)
       sendContentUpdate,
+      inspectorTransport,
       inspectorContext,
       abortSignal,
     );
@@ -696,9 +729,10 @@ async function _aixChatGenerateContent_LL(
           aixAccess,
           aixModel,
           aixChatGenerate,
-          getLabsDevNoStreaming() ? false : aixStreaming,
+          aixContext,
+          getAixDebuggerNoStreaming() ? false : aixStreaming,
+          aixConnectionOptions,
           abortSignal,
-          !!aixConnectionOptions?.enableResumability,
         );
 
       // AIX tRPC Streaming Generation from Chat input
@@ -708,7 +742,7 @@ async function _aixChatGenerateContent_LL(
           model: aixModel,
           chatGenerate: aixChatGenerate,
           context: aixContext,
-          streaming: getLabsDevNoStreaming() ? false : aixStreaming, // [DEV] disable streaming if set in the UX (testing)
+          streaming: getAixDebuggerNoStreaming() ? false : aixStreaming, // [DEV] disable streaming if set in the UX (testing)
           connectionOptions: aixConnectionOptions,
         }, { signal: abortSignal });
 
@@ -737,6 +771,9 @@ async function _aixChatGenerateContent_LL(
       for await (const particle of particleStream)
         reassembler.enqueueWireParticle(particle);
 
+      // [CSF] generators end cleanly on abort (unlike tRPC which throws) - route to catch
+      abortSignal.throwIfAborted();
+
       // stop the deadline decimator before the await, as we're done basically
       sendContentUpdate?.stop?.();
 
@@ -761,10 +798,10 @@ async function _aixChatGenerateContent_LL(
 
         // NOT retryable: e.g. client-abort, or missing handle
         if (errorType === 'client-aborted')
-          await reassembler.setClientAborted().catch(console.error /* never */);
+          reassembler.setClientAborted();
         else {
           const errorHint: DMessageErrorPart['hint'] = `aix-${errorType}`; // MUST MATCH our `aixClassifyStreamingError` hints with 'aix-<type>' in DMessageErrorPart
-          await reassembler.setClientExcepted(errorMessage, errorHint).catch(console.error);
+          reassembler.setClientExcepted(errorMessage, errorHint);
         }
         // ... fall through (traditional single path)
 
@@ -784,7 +821,7 @@ async function _aixChatGenerateContent_LL(
           continue; // -> Loop
 
         // user-aborted during retry-backoff
-        await reassembler.setClientAborted().catch(console.error);
+        reassembler.setClientAborted();
         // ... fall through (aborted during backoff)
 
       }

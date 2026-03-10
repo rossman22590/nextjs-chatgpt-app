@@ -54,3 +54,6 @@ next-env.d.ts
 /.run/dev (ENV).run.xml
 /src/modules/3rdparty/aider/scratch*
 temp-reset-tokens.json 
+
+# Ignore temporary CC files
+/tmpclaude*

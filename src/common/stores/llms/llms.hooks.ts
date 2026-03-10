@@ -1,12 +1,17 @@
 import { useShallow } from 'zustand/react/shallow';
 
-import { DLLM, DLLMId, isLLMVisible } from './llms.types';
 import type { DModelsServiceId } from './llms.service.types';
+import { DLLM, DLLMId, isLLMVisible } from './llms.types';
+import { isLLMChatFree_cached } from './llms.pricing';
 import { useModelsStore } from './store-llms';
 
 
 export function useLLM(llmId: undefined | DLLMId | null): DLLM | undefined {
   return useModelsStore(state => !llmId ? undefined : state.llms.find(llm => llm.id === llmId));
+}
+
+export function useLLMExists(llmId: undefined | DLLMId | null): boolean {
+  return useModelsStore(state => !llmId ? false : state.llms.some(llm => llm.id === llmId));
 }
 
 export function useLLMs(llmIds: ReadonlyArray<DLLMId>): ReadonlyArray<DLLM | undefined> {
@@ -53,6 +58,14 @@ export function useVisibleLLMs(includeLlmId: undefined | DLLMId | null, starredO
 
 export function useHasLLMs(): boolean {
   return useModelsStore(state => !!state.llms.length);
+}
+
+export function useHasFreeLLMs(serviceId: false | DModelsServiceId | null): boolean {
+  return useModelsStore(state => {
+    if (serviceId === null) return false; // explicitly no service, so no free llms
+    const llms = !serviceId ? state.llms : state.llms.filter(llm => llm.sId === serviceId);
+    return llms.some(isLLMChatFree_cached);
+  });
 }
 
 export function useModelsServices() {
