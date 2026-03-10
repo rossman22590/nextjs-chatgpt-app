@@ -33,12 +33,12 @@ const ANIM_BUSY_THINKING = 'https://i.giphy.com/media/l44QzsOLXxcrigdgI/giphy.we
 export const avatarIconSize = 28;
 
 export const avatarIconSx: SxProps = {
-  borderRadius: '10px',
-  height: { xs: 24, sm: avatarIconSize },
-  width: { xs: 24, sm: avatarIconSize },
-  minWidth: { xs: 24, sm: avatarIconSize },
-  minHeight: { xs: 24, sm: avatarIconSize },
-  padding: '2px',
+  borderRadius: '12px',
+  height: { xs: 28, sm: 32 },
+  width: { xs: 28, sm: 32 },
+  minWidth: { xs: 28, sm: 32 },
+  minHeight: { xs: 28, sm: 32 },
+  padding: '3px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -47,9 +47,13 @@ export const avatarIconSx: SxProps = {
   color: 'primary.plainColor',
   backgroundColor: 'primary.softBg',
   border: '1px solid',
-  borderColor: 'primary.outlinedBorder',
-  boxShadow: 'none',
-  transition: 'transform 0.2s cubic-bezier(.4,0,.2,1), box-shadow 0.2s ease',
+  borderColor: 'rgba(160, 32, 240, 0.18)',
+  boxShadow: '0 2px 8px rgba(160, 32, 240, 0.12)',
+  transition: 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease',
+  '&:hover': {
+    transform: 'scale(1.08)',
+    boxShadow: '0 4px 16px rgba(160, 32, 240, 0.22)',
+  },
 };
 
 // const largerAvatarIconsSx = {
@@ -139,12 +143,15 @@ export function makeMessageAvatarIcon(
   if (messageFlaxNotifyComplete)
     return <Box sx={aixSkipBoxSx}><NotificationsActiveIcon sx={aixSkipIconSx} /></Box>;
 
+  // Cast for MUI SvgIcon: Joy SxProps has slight incompatibility (e.g. cursor) with @mui/icons-material sx
+  const iconSx = avatarIconSx as React.ComponentProps<typeof SettingsSuggestIcon>['sx'];
+
   switch (messageRole) {
     case 'system':
-      return <SettingsSuggestIcon sx={avatarIconSx} />;  // https://em-content.zobj.net/thumbs/120/apple/325/robot_1f916.png
+      return <SettingsSuggestIcon sx={iconSx} />;  // https://em-content.zobj.net/thumbs/120/apple/325/robot_1f916.png
 
     case 'user':
-      return <Face6Icon sx={avatarIconSx} />;            // https://www.svgrepo.com/show/306500/openai.svg
+      return <Face6Icon sx={iconSx} />;            // https://www.svgrepo.com/show/306500/openai.svg
 
     case 'assistant':
       const isDownload = messageGeneratorName === 'web';
@@ -219,7 +226,7 @@ export function makeMessageAvatarIcon(
         </Box>;
 
       // default assistant avatar
-      return <SmartToyOutlinedIcon sx={avatarIconSx} />;
+      return <SmartToyOutlinedIcon sx={iconSx} />;
   }
   return <Avatar alt={nameOfRole} />;
 }

@@ -436,6 +436,7 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
       } finally {
         setLoading(false);
       }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- userId is used inside fetchAnalytics
   }, [userId]);
 
   React.useEffect(() => {
@@ -446,6 +447,8 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
     setError(null);
     fetchAnalytics();
   }, [fetchAnalytics]);
+
+  const theme = useTheme();
 
   const formatCost = (cost: number) => {
     if (cost === 0) return '$0.00';
@@ -487,7 +490,6 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
     );
   }
 
-  const theme = useTheme();
   const p = theme.palette as { primary?: { [k: string]: string }; success?: { [k: string]: string }; danger?: { [k: string]: string } };
   const chartPrimary = p.primary?.[500] ?? p.primary?.solidBg ?? '#a020f0';
   const chartSuccess = p.success?.[500] ?? (p.success as { solidBg?: string })?.solidBg ?? '#22c55e';

@@ -362,8 +362,8 @@ function ChatDrawer(props: {
 
         {/* + New chat - prominent rounded primary button (reference layout) */}
         <Button
-          color="primary"
-          variant="solid"
+          color='primary'
+          variant={disableNewButton ? 'soft' : 'solid'}
           disabled={disableNewButton}
           onClick={handleButtonNew}
           startDecorator={<AddIcon />}
@@ -372,11 +372,12 @@ function ChatDrawer(props: {
             py: 0.75,
             borderRadius: 'md',
             '--Button-gap': '0.5rem',
-            background: 'primary.solidBg',
-            color: 'primary.solidColor',
             boxShadow: 'none',
-            '&:hover': { background: 'primary.solidHoverBg', boxShadow: 'none' },
-            '&:active': { background: 'primary.solidActiveBg' },
+            '&:hover': { boxShadow: 'none' },
+            ...(disableNewButton && {
+              '--variant-softDisabledBg': 'rgba(235, 220, 255, 0.85)',
+              '--variant-softDisabledColor': 'rgba(139, 56, 234, 0.45)',
+            }),
           }}
         >
           New chat

@@ -23,9 +23,12 @@
         radial-gradient(circle at 20% 0%, rgba(160, 32, 240, 0.08), transparent 40%),
         radial-gradient(circle at 80% 0%, rgba(224, 64, 160, 0.06), transparent 36%);
     --agi-page-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(252, 248, 255, 0.82) 30%, rgba(248, 242, 255, 0.9));
-    --agi-message-user: linear-gradient(135deg, rgba(143, 60, 232, 0.17) 0%, rgba(170, 64, 226, 0.14) 40%, rgba(208, 70, 200, 0.11) 75%, rgba(232, 78, 172, 0.09) 100%);
+    --agi-thread-fade: #f8f4ff;
+    --agi-thread-bg: radial-gradient(ellipse 90% 50% at 50% 20%, rgba(160, 32, 240, 0.05) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 30% at 80% 80%, rgba(224, 64, 160, 0.03) 0%, transparent 60%);
+    --agi-message-user: linear-gradient(135deg, rgba(139, 56, 234, 0.26) 0%, rgba(164, 60, 228, 0.22) 42%, rgba(200, 66, 206, 0.17) 74%, rgba(228, 74, 178, 0.14) 100%);
     --agi-message-assistant: rgba(255, 255, 255, 1);
-    --agi-message-system: rgba(248, 242, 255, 0.92);
+    --agi-message-system: rgba(248, 242, 255, 0.94);
 }
 
 [data-joy-color-scheme="dark"] {
@@ -46,6 +49,9 @@
         radial-gradient(circle at 20% 0%, rgba(160, 32, 240, 0.12), transparent 38%),
         radial-gradient(circle at 80% 0%, rgba(224, 64, 160, 0.08), transparent 34%);
     --agi-page-gradient: linear-gradient(180deg, rgba(14, 8, 28, 0.88), rgba(10, 6, 22, 0.95) 36%, rgba(6, 3, 18, 0.99));
+    --agi-thread-fade: #06031a;
+    --agi-thread-bg: radial-gradient(ellipse 90% 50% at 50% 20%, rgba(160, 32, 240, 0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 30% at 80% 80%, rgba(224, 64, 160, 0.05) 0%, transparent 60%);
     --agi-message-user: linear-gradient(135deg, rgba(104, 34, 192, 0.96) 0%, rgba(118, 30, 158, 0.94) 50%, rgba(132, 28, 126, 0.92) 100%);
     --agi-message-assistant: rgba(18, 12, 38, 0.98);
     --agi-message-system: rgba(32, 20, 58, 0.94);

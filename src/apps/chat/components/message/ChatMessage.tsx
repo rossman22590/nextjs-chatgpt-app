@@ -608,9 +608,9 @@ export function ChatMessage(props: {
 
     // multi-layer background: top-shine gloss + CSS variable base
     background: fromUser
-      ? `linear-gradient(180deg, rgba(255,255,255,0.22) 0%, transparent 42%), ${backgroundColor}`
+      ? `linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 36%, transparent 52%), ${backgroundColor}`
       : fromAssistant
-        ? `linear-gradient(180deg, rgba(255,255,255,0.65) 0%, transparent 44%), ${backgroundColor}`
+        ? `linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.15) 30%, transparent 50%), ${backgroundColor}`
         : backgroundColor,
 
     // generous padding - content needs room

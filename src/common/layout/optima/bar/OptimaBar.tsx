@@ -88,8 +88,8 @@ export function OptimaBar(props: { component: React.ElementType, currentApp?: Na
     return null;
 
   const barSx: SxProps = toolbarContentKind === 'beam'
-    ? { ...props.sx, bgcolor: 'background.surface', borderColor: 'divider', boxShadow: 'sm', '&::before': { opacity: 0 } }
-    : props.sx;
+    ? { ...(props.sx ?? {}), bgcolor: 'background.surface', borderColor: 'divider', boxShadow: 'sm', '&::before': { opacity: 0 } }
+    : (props.sx ?? {});
 
   return <>
 

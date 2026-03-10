@@ -462,11 +462,14 @@ export const useChatCloudSync = () => {
   }, [conversations, isAuthenticated, userId, scheduleConversationSync]);
 
   useEffect(() => {
+    const debounceTimers = syncDebounceTimersRef.current;
+    const pending = syncPendingRef.current;
+    const inFlight = syncInFlightRef.current;
     return () => {
-      syncDebounceTimersRef.current.forEach(timer => clearTimeout(timer));
-      syncDebounceTimersRef.current.clear();
-      syncPendingRef.current.clear();
-      syncInFlightRef.current.clear();
+      debounceTimers.forEach(timer => clearTimeout(timer));
+      debounceTimers.clear();
+      pending.clear();
+      inFlight.clear();
     };
   }, []);
 

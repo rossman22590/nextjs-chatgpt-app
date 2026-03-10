@@ -69,10 +69,13 @@ export interface AppChatIntent {
 const scrollToBottomSx = {
   display: 'flex',
   flexDirection: 'column',
+  backgroundImage: 'var(--agi-thread-bg)',
 };
 
 const chatMessageListSx: SxProps = {
   flexGrow: 1,
+  // extra bottom space so the last message clears the composer fade gradient
+  pb: { xs: 6, md: 8 },
 };
 
 /*const chatMessageListBrandedSx: SxProps = {
