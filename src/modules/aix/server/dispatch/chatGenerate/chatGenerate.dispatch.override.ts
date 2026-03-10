@@ -5,13 +5,13 @@ import { createOpenAIResponsesAPIParserNS } from './parsers/openai.responsesAPI.
 import { openAIAccess } from '~/modules/llms/server/openai/openai.access';
 
 // Override the createChatGenerateDispatch function
-export function createChatGenerateDispatch(
+export async function createChatGenerateDispatch(
   access: AixAPI_Access, 
   model: AixAPI_Model, 
   chatGenerate: AixAPIChatGenerate_Request, 
   streaming: boolean,
   enableResumability: boolean
-): ChatGenerateDispatch {
+): Promise<ChatGenerateDispatch> {
   // Check if we should use the Responses API
   if (access.dialect === 'openai' && usesResponsesAPI(model)) {
     console.log(`Using Responses API dispatch for model: ${model.id}, forcing streaming=false (was: ${streaming})`);
