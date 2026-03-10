@@ -15,10 +15,6 @@ import {
   ListItem,
   ListItemDecorator,
   Chip,
-  Tabs,
-  TabList,
-  Tab,
-  TabPanel,
   Sheet,
   Table,
   LinearProgress,
@@ -119,7 +115,7 @@ export default function Profile() {
         px: 2,
       }}
     >
-      <Box sx={{ maxWidth: 720, margin: '0 auto' }}>
+      <Box sx={{ maxWidth: { xs: '100%', sm: 720, md: 880, lg: 1040 }, margin: '0 auto', width: '100%' }}>
         {/* Page header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
           <Button
@@ -185,28 +181,39 @@ export default function Profile() {
               </Box>
             </Box>
 
-            <Tabs value={activeTab} onChange={(event, newValue) => setActiveTab(newValue as number)}>
-              <TabList
-                sx={{
-                  px: 2,
-                  pt: 1,
-                  gap: 0.5,
-                  '--List-padding': 0,
-                  '--ListItem-minHeight': '2.5rem',
-                }}
-              >
-                <Tab sx={{ borderRadius: 'md', fontWeight: activeTab === 0 ? 600 : 400 }}>
-                  <AccountCircleIcon sx={{ mr: 1, fontSize: '1.1rem' }} />
+            <Box sx={{ px: 2, pt: 1 }}>
+              <Stack direction="row" spacing={0.5} sx={{ '--List-padding': 0, '--ListItem-minHeight': '2.5rem' }}>
+                <Button
+                  variant={activeTab === 0 ? 'soft' : 'plain'}
+                  color="neutral"
+                  size="sm"
+                  onClick={() => setActiveTab(0)}
+                  startDecorator={<AccountCircleIcon sx={{ fontSize: '1.1rem' }} />}
+                  sx={{
+                    borderRadius: 'md',
+                    fontWeight: activeTab === 0 ? 600 : 400,
+                  }}
+                >
                   Account
-                </Tab>
-                <Tab sx={{ borderRadius: 'md', fontWeight: activeTab === 1 ? 600 : 400 }}>
-                  <AnalyticsIcon sx={{ mr: 1, fontSize: '1.1rem' }} />
+                </Button>
+                <Button
+                  variant={activeTab === 1 ? 'soft' : 'plain'}
+                  color="neutral"
+                  size="sm"
+                  onClick={() => setActiveTab(1)}
+                  startDecorator={<AnalyticsIcon sx={{ fontSize: '1.1rem' }} />}
+                  sx={{
+                    borderRadius: 'md',
+                    fontWeight: activeTab === 1 ? 600 : 400,
+                  }}
+                >
                   Analytics
-                </Tab>
-              </TabList>
+                </Button>
+              </Stack>
+            </Box>
 
-              {/* Account tab */}
-              <TabPanel value={0} sx={{ p: 3 }}>
+            {activeTab === 0 && (
+              <Box sx={{ p: 3 }}>
                 <Typography level="title-md" fontWeight="lg" sx={{ mb: 2 }}>
                   Profile
                 </Typography>
@@ -357,7 +364,7 @@ export default function Profile() {
                 <Typography level="title-sm" fontWeight="lg" sx={{ mb: 2 }}>
                   Actions
                 </Typography>
-                <Stack spacing={1.5}>
+                <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
                   <Button
                     variant="outlined"
                     color="neutral"
@@ -368,21 +375,33 @@ export default function Profile() {
                   >
                     Reset password
                   </Button>
-                  <Box sx={{ pt: 1 }}>
-                    <AuthButton variant="text" size="sm" />
-                  </Box>
+                  <AuthButton
+                    variant="text"
+                    size="sm"
+                    sx={{
+                      justifyContent: 'flex-start',
+                      flexDirection: 'row',
+                      gap: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 'md',
+                      bgcolor: 'background.body',
+                      '&:hover': { bgcolor: 'background.level1' },
+                    }}
+                  />
                 </Stack>
 
                 <Typography level="body-xs" color="neutral" sx={{ mt: 4, textAlign: 'center' }}>
                   {Brand.Title.Base}
                 </Typography>
-              </TabPanel>
+              </Box>
+            )}
 
-              {/* Analytics tab */}
-              <TabPanel value={1} sx={{ p: 3 }}>
+            {activeTab === 1 && (
+              <Box sx={{ p: 3 }}>
                 <UserAnalytics userId={session?.user?.id} />
-              </TabPanel>
-            </Tabs>
+              </Box>
+            )}
           </CardContent>
         </Card>
       </Box>
