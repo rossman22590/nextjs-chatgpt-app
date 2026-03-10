@@ -75,7 +75,7 @@ export const BUBBLE_MIN_TEXT_LENGTH = 3;
 const messageBodySx: SxProps = {
   display: 'flex',
   alignItems: 'flex-start',
-  gap: { xs: 0, md: 0.75 },
+  gap: { xs: 0.5, md: 0.75 },
 };
 
 const messageBodyReverseSx: SxProps = {

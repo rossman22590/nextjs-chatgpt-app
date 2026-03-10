@@ -11,6 +11,8 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 
 import { SystemPurposeId, SystemPurposes } from '../../data';
 
+import { CUSTOM_PERSONA_PREFIX } from '~/common/stores/chat/chat.conversation';
+import { usePersonaCacheStore } from '~/common/stores/chat/store-persona-cache';
 import { llmsGetVendorIcon } from '~/modules/llms/components/LLMVendorIcon';
 
 import type { MetricsChatGenerateCost_Md } from '~/common/stores/metrics/metrics.chatgenerate';
@@ -28,20 +30,27 @@ const ANIM_BUSY_PAINTING = 'https://i.giphy.com/media/5t9ujj9cMisyVjUZ0m/giphy.w
 const ANIM_BUSY_THINKING = 'https://i.giphy.com/media/l44QzsOLXxcrigdgI/giphy.webp';
 
 
-const avatarIconSize = 28;
+export const avatarIconSize = 28;
 
-export const avatarIconSx = {
+export const avatarIconSx: SxProps = {
   borderRadius: '10px',
-  height: avatarIconSize,
-  width: avatarIconSize,
-  padding: '3px',
-  '--Icon-color': '#a020f0',
-  color: '#a020f0',
-  backgroundColor: 'rgba(160, 32, 240, 0.1)',
-  border: '1px solid rgba(160, 32, 240, 0.2)',
+  height: { xs: 24, sm: avatarIconSize },
+  width: { xs: 24, sm: avatarIconSize },
+  minWidth: { xs: 24, sm: avatarIconSize },
+  minHeight: { xs: 24, sm: avatarIconSize },
+  padding: '2px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+  '--Icon-color': 'primary.plainColor',
+  color: 'primary.plainColor',
+  backgroundColor: 'primary.softBg',
+  border: '1px solid',
+  borderColor: 'primary.outlinedBorder',
   boxShadow: 'none',
   transition: 'transform 0.2s cubic-bezier(.4,0,.2,1), box-shadow 0.2s ease',
-} as const;
+};
 
 // const largerAvatarIconsSx = {
 //   borderRadius: 'sm',
@@ -145,32 +154,45 @@ export function makeMessageAvatarIcon(
         || messageGeneratorName === 'Prodia';
       const isReact = messageGeneratorName?.startsWith('react-');
 
-      // Extra appearance
-      if (uiComplexityMode === 'extra') {
+      // Pending animations (extra mode)
+      if (uiComplexityMode === 'extra' && messageIncomplete)
+        return <Avatar
+          variant='plain'
+          alt={nameOfRole}
+          src={isDownload ? ANIM_BUSY_DOWNLOADING
+            : isTextToImage ? ANIM_BUSY_PAINTING
+              : isReact ? ANIM_BUSY_THINKING
+                : ANIM_BUSY_TYPING}
+          sx={avatarIconSx}
+        />;
 
-        // Pending animations (larger too)
-        if (messageIncomplete)
-          return <Avatar
-            variant='plain'
-            alt={nameOfRole}
-            src={isDownload ? ANIM_BUSY_DOWNLOADING
-              : isTextToImage ? ANIM_BUSY_PAINTING
-                : isReact ? ANIM_BUSY_THINKING
-                  : ANIM_BUSY_TYPING}
-            sx={avatarIconSx}
-            // sx={larger ? largerAvatarIconsSx : avatarIconSx}
-          />;
+      // Persona/purpose image (always use when present; built-in only)
+      const purposeImage = SystemPurposes[messagePurposeId as SystemPurposeId]?.imageUri ?? undefined;
+      if (purposeImage)
+        return <Avatar
+          variant='plain'
+          alt={nameOfRole}
+          src={purposeImage}
+          sx={avatarIconSx}
+        />;
 
-        // Purpose image (if present)
-        const purposeImage = SystemPurposes[messagePurposeId as SystemPurposeId]?.imageUri ?? undefined;
-        if (purposeImage)
-          return <Avatar
-            variant='plain'
-            alt={nameOfRole}
-            src={purposeImage}
-            sx={avatarIconSx}
-          />;
-
+      // Custom persona: show chosen emoji from cache
+      if (messagePurposeId?.startsWith(CUSTOM_PERSONA_PREFIX)) {
+        const personaId = messagePurposeId.slice(CUSTOM_PERSONA_PREFIX.length);
+        const persona = usePersonaCacheStore.getState().getPersona(personaId);
+        if (persona?.symbol)
+          return (
+            <Box sx={{
+              fontSize: '24px',
+              textAlign: 'center',
+              width: '100%',
+              minWidth: `${avatarIconSize}px`,
+              lineHeight: `${avatarIconSize}px`,
+              ...avatarIconSx,
+            }}>
+              {persona.symbol}
+            </Box>
+          );
       }
 
       // mode: text-to-image
@@ -190,14 +212,14 @@ export function makeMessageAvatarIcon(
           fontSize: '24px',
           textAlign: 'center',
           width: '100%',
-          minWidth: `${avatarIconSx.width}px`,
-          lineHeight: `${avatarIconSx.height}px`,
+          minWidth: `${avatarIconSize}px`,
+          lineHeight: `${avatarIconSize}px`,
         }}>
           {symbol}
         </Box>;
 
       // default assistant avatar
-      return <SmartToyOutlinedIcon sx={avatarIconSx} />; // https://mui.com/static/images/avatar/2.jpg
+      return <SmartToyOutlinedIcon sx={avatarIconSx} />;
   }
   return <Avatar alt={nameOfRole} />;
 }

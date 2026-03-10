@@ -28,9 +28,14 @@ export const messageZenAsideColumnSx: SxProps = {
 };
 
 export const messageAvatarLabelSx: SxProps = {
-  overflowWrap: 'anywhere',
+  overflowWrap: 'break-word',
+  wordBreak: 'break-word',
+  maxWidth: '100%',
+  fontSize: '0.75rem',
+  lineHeight: 1.25,
   color: 'text.tertiary',
   fontWeight: 'md',
+  textAlign: 'center',
 };
 
 export const messageAvatarLabelAnimatedSx: SxProps = {
