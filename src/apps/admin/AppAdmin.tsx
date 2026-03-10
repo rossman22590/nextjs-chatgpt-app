@@ -3,12 +3,11 @@ import * as React from 'react';
 import { useSession } from 'next-auth/react';
 
 import {
-  Avatar, Box, Button, Card, Chip, CircularProgress, Divider, IconButton,
+  Avatar, Box, Button, Chip, CircularProgress, Divider, IconButton,
   Input, LinearProgress, Modal, ModalClose, ModalDialog, Sheet, Stack,
   Table, Tooltip, Typography,
 } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import GroupIcon from '@mui/icons-material/Group';
@@ -24,146 +23,296 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
 import BlockIcon from '@mui/icons-material/Block';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import BoltIcon from '@mui/icons-material/Bolt';
+import ShieldIcon from '@mui/icons-material/Shield';
 
 import { apiAsyncNode } from '~/common/util/trpc.client';
 
 
 // --- Tokens / Cost format ---
 
-function fmtNum(n: number | null | undefined): string {
+const fmtNum = (n: number | null | undefined): string => {
   if (n == null) return '0';
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
   return n.toLocaleString();
-}
+};
 
-function fmtCost(cents: number | null | undefined): string {
+const fmtCost = (cents: number | null | undefined): string => {
   if (!cents) return '$0.00';
   const d = cents / 100;
   return d < 0.01 ? '$' + d.toFixed(4) : '$' + d.toFixed(2);
-}
+};
 
 
-// --- Glassmorphic metric tile ---
+// --- Design tokens ---
+
+const SIDEBAR_WIDTH = 240;
+
+const GRADIENT = {
+  brand: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
+  brandSubtle: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%)',
+  brandGlow: 'rgba(99,102,241,0.15)',
+  surface: 'var(--joy-palette-background-surface)',
+} as const;
 
 const ACCENT = {
-  blue:    { bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', glow: 'rgba(102,126,234,0.25)' },
-  green:   { bg: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', glow: 'rgba(17,153,142,0.25)' },
-  orange:  { bg: 'linear-gradient(135deg, #f2994a 0%, #f2c94c 100%)', glow: 'rgba(242,153,74,0.20)' },
-  red:     { bg: 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)', glow: 'rgba(235,51,73,0.20)' },
-  purple:  { bg: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', glow: 'rgba(161,140,209,0.20)' },
-  cyan:    { bg: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', glow: 'rgba(56,249,215,0.20)' },
+  indigo: { bg: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', glow: 'rgba(99,102,241,0.18)', text: '#6366f1' },
+  emerald: { bg: 'linear-gradient(135deg, #059669 0%, #34d399 100%)', glow: 'rgba(5,150,105,0.18)', text: '#059669' },
+  amber: { bg: 'linear-gradient(135deg, #d97706 0%, #fbbf24 100%)', glow: 'rgba(217,119,6,0.18)', text: '#d97706' },
+  rose: { bg: 'linear-gradient(135deg, #e11d48 0%, #fb7185 100%)', glow: 'rgba(225,29,72,0.18)', text: '#e11d48' },
+  sky: { bg: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)', glow: 'rgba(2,132,199,0.18)', text: '#0284c7' },
+  violet: { bg: 'linear-gradient(135deg, #7c3aed 0%, #c084fc 100%)', glow: 'rgba(124,58,237,0.18)', text: '#7c3aed' },
 } as const;
 type AccentKey = keyof typeof ACCENT;
 
-function MetricTile(props: { icon: React.ReactNode; label: string; value: string | number; sub?: string; accent: AccentKey }) {
+
+// --- Shared animation keyframes ---
+
+const pulseKeyframes = {
+  '@keyframes pulse-ring': {
+    '0%': { transform: 'scale(0.95)', opacity: 1 },
+    '100%': { transform: 'scale(1.05)', opacity: 0 },
+  },
+  '@keyframes spin': {
+    '100%': { transform: 'rotate(360deg)' },
+  },
+  '@keyframes fadeInUp': {
+    '0%': { opacity: 0, transform: 'translateY(8px)' },
+    '100%': { opacity: 1, transform: 'translateY(0)' },
+  },
+};
+
+
+// --- Glassmorphic Metric Card ---
+
+const MetricCard = (props: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent: AccentKey;
+  trend?: 'up' | 'down';
+}) => {
   const a = ACCENT[props.accent];
   return (
     <Box sx={{
-      flex: '1 1 200px', minWidth: 170, position: 'relative', p: 2.5, borderRadius: 'xl',
+      flex: '1 1 220px', minWidth: 200, position: 'relative', p: 2.5, borderRadius: '16px',
       background: 'var(--joy-palette-background-surface)',
-      boxShadow: `0 0 0 1px var(--joy-palette-neutral-outlinedBorder), 0 8px 24px -4px ${a.glow}`,
-      overflow: 'hidden', transition: 'transform 0.15s, box-shadow 0.15s',
-      '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 0 0 1px var(--joy-palette-neutral-outlinedBorder), 0 12px 32px -4px ${a.glow}` },
+      border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+      boxShadow: `0 1px 3px rgba(0,0,0,0.04), 0 8px 24px -8px ${a.glow}`,
+      overflow: 'hidden',
+      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+      '&:hover': {
+        transform: 'translateY(-2px)',
+        boxShadow: `0 1px 3px rgba(0,0,0,0.04), 0 16px 40px -8px ${a.glow}`,
+        borderColor: a.text,
+      },
+      ...pulseKeyframes,
+      animation: 'fadeInUp 0.4s ease-out both',
     }}>
-      {/* gradient bar */}
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: a.bg }} />
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: a.bg, opacity: 0.8 }} />
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Box sx={{
-          width: 40, height: 40, borderRadius: 'lg', display: 'grid', placeItems: 'center',
-          background: a.bg, color: '#fff', fontSize: 20, flexShrink: 0,
-        }}>
-          {props.icon}
-        </Box>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography level='body-xs' sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.8, opacity: 0.55 }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
+          <Typography level='body-xs' sx={{
+            textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.08em',
+            opacity: 0.5, fontSize: '0.65rem',
+          }}>
             {props.label}
           </Typography>
-          <Typography level='h3' sx={{ fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
-            {props.value}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+            <Typography level='h3' sx={{
+              fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+              fontSize: '1.75rem', letterSpacing: '-0.02em',
+            }}>
+              {props.value}
+            </Typography>
+            {props.trend && (
+              <Chip size='sm' variant='soft' color={props.trend === 'up' ? 'success' : 'danger'} sx={{ fontSize: '0.6rem', height: 18 }}>
+                {props.trend === 'up' ? '↑' : '↓'}
+              </Chip>
+            )}
+          </Box>
           {props.sub && (
-            <Typography level='body-xs' sx={{ mt: 0.25, opacity: 0.6 }}>{props.sub}</Typography>
+            <Typography level='body-xs' sx={{ opacity: 0.45, mt: -0.5, fontSize: '0.7rem' }}>{props.sub}</Typography>
           )}
+        </Box>
+        <Box sx={{
+          width: 42, height: 42, borderRadius: '12px', display: 'grid', placeItems: 'center',
+          background: a.bg, color: '#fff', fontSize: 20, flexShrink: 0,
+          boxShadow: `0 4px 12px -2px ${a.glow}`,
+        }}>
+          {props.icon}
         </Box>
       </Box>
     </Box>
   );
-}
+};
 
 
-// --- Nav pill ---
+// --- Sidebar Navigation Item ---
 
-function NavPill(props: { icon: React.ReactNode; label: string; active: boolean; badge?: number; onClick: () => void }) {
-  return (
-    <Button
-      variant={props.active ? 'solid' : 'plain'}
-      color={props.active ? 'primary' : 'neutral'}
-      size='sm'
-      onClick={props.onClick}
-      startDecorator={props.icon}
-      endDecorator={props.badge != null ? (
-        <Chip size='sm' variant='soft' color={props.active ? 'primary' : 'neutral'} sx={{ ml: 0.5, minWidth: 22, fontWeight: 700 }}>
-          {props.badge}
-        </Chip>
-      ) : undefined}
-      sx={{
-        borderRadius: 'xl', px: 2, py: 0.75, fontWeight: 600,
-        ...(props.active ? {
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          boxShadow: '0 4px 14px rgba(102,126,234,0.35)',
-        } : {
-          '&:hover': { background: 'var(--joy-palette-neutral-softBg)' },
-        }),
-      }}
-    >
-      {props.label}
-    </Button>
-  );
-}
+type ViewId = 'overview' | 'users' | 'settings';
+
+const SidebarItem = (props: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  badge?: number;
+  onClick: () => void;
+}) => (
+  <Button
+    variant='plain'
+    color='neutral'
+    size='sm'
+    onClick={props.onClick}
+    startDecorator={props.icon}
+    endDecorator={props.badge != null ? (
+      <Chip size='sm' variant='soft' color={props.active ? 'primary' : 'neutral'}
+        sx={{ ml: 'auto', minWidth: 24, fontWeight: 700, fontSize: '0.65rem', height: 20 }}>
+        {props.badge}
+      </Chip>
+    ) : undefined}
+    aria-label={props.label}
+    tabIndex={0}
+    sx={{
+      justifyContent: 'flex-start', width: '100%', borderRadius: '10px',
+      px: 1.75, py: 1, fontWeight: 600, fontSize: '0.82rem',
+      transition: 'all 0.15s ease',
+      ...(props.active ? {
+        background: GRADIENT.brandSubtle,
+        color: 'var(--joy-palette-primary-600)',
+        '&::before': {
+          content: '""', position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+          width: 3, height: 20, borderRadius: 99, background: GRADIENT.brand,
+        },
+      } : {
+        color: 'var(--joy-palette-text-secondary)',
+        '&:hover': {
+          background: 'var(--joy-palette-neutral-softBg)',
+        },
+      }),
+    }}
+  >
+    {props.label}
+  </Button>
+);
 
 
-// --- Leaderboard row ---
+// --- Leaderboard Row ---
 
-function LeaderboardRow(props: { rank: number; name: string; email: string; image?: string; tokens: string; cost: string; requests: number; onClick: () => void }) {
+const LeaderboardRow = (props: {
+  rank: number;
+  name: string;
+  email: string;
+  image?: string;
+  tokens: string;
+  cost: string;
+  requests: number;
+  onClick: () => void;
+}) => {
   const medal = props.rank === 1 ? '🥇' : props.rank === 2 ? '🥈' : props.rank === 3 ? '🥉' : null;
   return (
     <Box
       onClick={props.onClick}
+      tabIndex={0}
+      role='button'
+      aria-label={`View details for ${props.name}`}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') props.onClick(); }}
       sx={{
         display: 'flex', alignItems: 'center', gap: 2, px: 2.5, py: 1.5, cursor: 'pointer',
-        borderRadius: 'lg', transition: 'background 0.1s',
-        '&:hover': { background: 'var(--joy-palette-neutral-softBg)' },
+        borderRadius: '12px', transition: 'all 0.15s ease', position: 'relative',
+        '&:hover': {
+          background: GRADIENT.brandSubtle,
+          transform: 'translateX(4px)',
+        },
+        ...(props.rank <= 3 && {
+          '&::after': {
+            content: '""', position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+            width: 2, height: '60%', borderRadius: 99,
+            background: props.rank === 1 ? '#fbbf24' : props.rank === 2 ? '#94a3b8' : '#d97706',
+            opacity: 0.6,
+          },
+        }),
       }}
     >
-      <Typography level='body-sm' sx={{ width: 28, textAlign: 'center', fontWeight: 800, fontSize: medal ? 18 : 14 }}>
-        {medal || props.rank}
+      <Typography level='body-sm' sx={{
+        width: 32, textAlign: 'center', fontWeight: 800,
+        fontSize: medal ? 20 : 13, opacity: medal ? 1 : 0.4,
+      }}>
+        {medal || `#${props.rank}`}
       </Typography>
-      <Avatar size='sm' src={props.image} sx={{ width: 32, height: 32, fontSize: 13 }}>
+      <Avatar size='sm' src={props.image} sx={{
+        width: 36, height: 36, fontSize: 13, fontWeight: 700,
+        border: props.rank <= 3 ? '2px solid var(--joy-palette-neutral-outlinedBorder)' : undefined,
+      }}>
         {(props.name || '?')[0]}
       </Avatar>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography level='body-sm' noWrap sx={{ fontWeight: 600 }}>{props.name || 'Unknown'}</Typography>
-        <Typography level='body-xs' noWrap sx={{ opacity: 0.5 }}>{props.email}</Typography>
+        <Typography level='body-sm' noWrap sx={{ fontWeight: 600, lineHeight: 1.3 }}>{props.name || 'Unknown'}</Typography>
+        <Typography level='body-xs' noWrap sx={{ opacity: 0.4, fontSize: '0.68rem' }}>{props.email}</Typography>
       </Box>
-      <Box sx={{ textAlign: 'right' }}>
-        <Typography level='body-sm' sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{props.tokens}</Typography>
-        <Typography level='body-xs' sx={{ opacity: 0.55 }}>{props.cost}</Typography>
+      <Box sx={{ textAlign: 'right', minWidth: 80 }}>
+        <Typography level='body-sm' sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', lineHeight: 1.3 }}>{props.tokens}</Typography>
+        <Typography level='body-xs' sx={{ opacity: 0.4, fontSize: '0.68rem' }}>{props.cost}</Typography>
       </Box>
-      <Chip size='sm' variant='outlined' sx={{ minWidth: 46, fontVariantNumeric: 'tabular-nums' }}>{props.requests}</Chip>
+      <Chip size='sm' variant='outlined' sx={{
+        minWidth: 50, fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: '0.68rem',
+        borderColor: 'var(--joy-palette-neutral-outlinedBorder)',
+      }}>
+        {props.requests} req
+      </Chip>
     </Box>
   );
-}
+};
 
 
-// --- User detail modal (premium) ---
+// --- Section Header ---
 
-function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh: () => void }) {
+const SectionHeader = (props: { icon: React.ReactNode; title: string; subtitle?: string; action?: React.ReactNode }) => (
+  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+    <Box sx={{
+      width: 32, height: 32, borderRadius: '8px', display: 'grid', placeItems: 'center',
+      background: GRADIENT.brandSubtle, color: 'var(--joy-palette-primary-600)', fontSize: 16,
+    }}>
+      {props.icon}
+    </Box>
+    <Box sx={{ flex: 1 }}>
+      <Typography level='title-md' sx={{ fontWeight: 700, lineHeight: 1.2 }}>{props.title}</Typography>
+      {props.subtitle && (
+        <Typography level='body-xs' sx={{ opacity: 0.45, mt: 0.25 }}>{props.subtitle}</Typography>
+      )}
+    </Box>
+    {props.action}
+  </Box>
+);
+
+
+// --- Premium Card Wrapper ---
+
+const PanelCard = (props: { children: React.ReactNode; sx?: object }) => (
+  <Box sx={{
+    background: 'var(--joy-palette-background-surface)',
+    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+    borderRadius: '16px', overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    transition: 'box-shadow 0.2s ease',
+    '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.06)' },
+    ...props.sx,
+  }}>
+    {props.children}
+  </Box>
+);
+
+
+// --- User Detail Modal ---
+
+const UserDetailModal = (props: { userId: string; onClose: () => void; onRefresh: () => void }) => {
   const [usage, setUsage] = React.useState<any>(null);
   const [logs, setLogs] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -200,112 +349,130 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
   return (
     <Modal open onClose={props.onClose}>
       <ModalDialog sx={{
-        width: '94vw', maxWidth: 880, maxHeight: '92vh', overflow: 'auto', p: 0,
-        borderRadius: 'xl', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.45)',
-        border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+        width: '94vw', maxWidth: 920, maxHeight: '92vh', overflow: 'auto', p: 0,
+        borderRadius: '20px',
+        boxShadow: '0 0 0 1px var(--joy-palette-neutral-outlinedBorder), 0 24px 80px -12px rgba(0,0,0,0.35)',
+        border: 'none',
       }}>
-        <ModalClose sx={{ zIndex: 2 }} />
+        <ModalClose sx={{ zIndex: 2, color: '#fff', '&:hover': { background: 'rgba(255,255,255,0.15)' } }} />
 
         {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress /></Box>
         ) : !user ? (
           <Box sx={{ p: 4 }}><Typography color='danger'>User not found</Typography></Box>
         ) : (
           <>
-            {/* Banner */}
+            {/* Gradient Banner */}
             <Box sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              px: 4, pt: 4, pb: 5, position: 'relative',
+              background: GRADIENT.brand, px: 4, pt: 4.5, pb: 6, position: 'relative',
+              '&::after': {
+                content: '""', position: 'absolute', bottom: 0, left: 0, right: 0, height: 40,
+                background: 'linear-gradient(to top, var(--joy-palette-background-surface), transparent)',
+              },
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, position: 'relative', zIndex: 1 }}>
                 <Avatar src={user.image} sx={{
-                  width: 64, height: 64, border: '3px solid rgba(255,255,255,0.3)',
-                  fontSize: 24, fontWeight: 700,
+                  width: 72, height: 72,
+                  border: '3px solid rgba(255,255,255,0.25)',
+                  fontSize: 26, fontWeight: 800,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
                 }}>{(user.name || '?')[0]}</Avatar>
                 <Box>
-                  <Typography level='h3' sx={{ color: '#fff', fontWeight: 800 }}>{user.name || 'Unnamed'}</Typography>
-                  <Typography level='body-sm' sx={{ color: 'rgba(255,255,255,0.7)' }}>{user.email}</Typography>
+                  <Typography level='h3' sx={{ color: '#fff', fontWeight: 800, letterSpacing: '-0.01em' }}>
+                    {user.name || 'Unnamed'}
+                  </Typography>
+                  <Typography level='body-sm' sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.25 }}>{user.email}</Typography>
                 </Box>
               </Box>
             </Box>
 
             {/* Content */}
-            <Box sx={{ px: 3.5, py: 3, mt: -2.5 }}>
+            <Box sx={{ px: 3.5, py: 3, mt: -3 }}>
 
-              {/* Token Limit Card */}
-              <Box sx={{
-                background: 'var(--joy-palette-background-surface)',
-                border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                borderRadius: 'xl', p: 2.5, mb: 3,
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <TuneIcon sx={{ fontSize: 18, opacity: 0.6 }} />
-                  <Typography level='title-sm' sx={{ fontWeight: 700 }}>Token Limit</Typography>
-                  {editingLimit ? (
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
-                      <Input size='sm' placeholder='Empty = Unlimited' value={limitValue}
-                        onChange={e => setLimitValue(e.target.value)} sx={{ width: 160 }} />
-                      <Button size='sm' onClick={handleSetLimit} loading={saving}
-                        sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>Save</Button>
-                      <Button size='sm' variant='plain' color='neutral' onClick={() => setEditingLimit(false)}>Cancel</Button>
-                    </Box>
-                  ) : (
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
-                      <Chip size='sm' variant='soft'
-                        color={user.tokenLimit ? (pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary') : 'success'}
-                        startDecorator={user.tokenLimit ? <TokenIcon sx={{ fontSize: 14 }} /> : <AllInclusiveIcon sx={{ fontSize: 14 }} />}
-                      >
-                        {user.tokenLimit ? fmtNum(user.tokenLimit) + ' /mo' : 'Unlimited'}
-                      </Chip>
-                      <IconButton size='sm' variant='plain' onClick={() => {
-                        setLimitValue(user.tokenLimit?.toString() || '');
-                        setEditingLimit(true);
-                      }}><EditIcon sx={{ fontSize: 16 }} /></IconButton>
+              {/* Token Limit */}
+              <PanelCard sx={{ mb: 3 }}>
+                <Box sx={{ p: 2.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <TuneIcon sx={{ fontSize: 16, opacity: 0.5 }} />
+                    <Typography level='title-sm' sx={{ fontWeight: 700, fontSize: '0.8rem' }}>Token Limit</Typography>
+                    {editingLimit ? (
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
+                        <Input size='sm' placeholder='Empty = Unlimited' value={limitValue}
+                          onChange={e => setLimitValue(e.target.value)}
+                          sx={{ width: 160, borderRadius: '10px' }} />
+                        <Button size='sm' onClick={handleSetLimit} loading={saving}
+                          sx={{ borderRadius: '10px', background: GRADIENT.brand, fontWeight: 700 }}>Save</Button>
+                        <Button size='sm' variant='plain' color='neutral' onClick={() => setEditingLimit(false)}>Cancel</Button>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
+                        <Chip size='sm' variant='soft'
+                          color={user.tokenLimit ? (pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary') : 'success'}
+                          startDecorator={user.tokenLimit ? <TokenIcon sx={{ fontSize: 13 }} /> : <AllInclusiveIcon sx={{ fontSize: 13 }} />}
+                          sx={{ fontWeight: 700, fontSize: '0.7rem' }}
+                        >
+                          {user.tokenLimit ? fmtNum(user.tokenLimit) + ' /mo' : 'Unlimited'}
+                        </Chip>
+                        <IconButton size='sm' variant='plain' onClick={() => {
+                          setLimitValue(user.tokenLimit?.toString() || '');
+                          setEditingLimit(true);
+                        }}><EditIcon sx={{ fontSize: 15 }} /></IconButton>
+                      </Box>
+                    )}
+                  </Box>
+                  {user.tokenLimit && (
+                    <Box sx={{ mt: 1 }}>
+                      <LinearProgress determinate value={pct}
+                        color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary'}
+                        sx={{ height: 6, borderRadius: 99, '--LinearProgress-radius': '99px' }} />
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75 }}>
+                        <Typography level='body-xs' sx={{ opacity: 0.4, fontSize: '0.65rem' }}>{pct.toFixed(0)}% used</Typography>
+                        <Typography level='body-xs' sx={{ opacity: 0.4, fontSize: '0.65rem' }}>
+                          {fmtNum(usage?.thisMonth?._sum?.totalTokens)} of {fmtNum(user.tokenLimit)}
+                        </Typography>
+                      </Box>
                     </Box>
                   )}
                 </Box>
-                {user.tokenLimit && (
-                  <Box sx={{ mt: 1 }}>
-                    <LinearProgress determinate value={pct}
-                      color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary'}
-                      sx={{ height: 8, borderRadius: 99 }} />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                      <Typography level='body-xs' sx={{ opacity: 0.5 }}>{pct.toFixed(0)}% used</Typography>
-                      <Typography level='body-xs' sx={{ opacity: 0.5 }}>{fmtNum(usage?.thisMonth?._sum?.totalTokens)} of {fmtNum(user.tokenLimit)}</Typography>
-                    </Box>
-                  </Box>
-                )}
-              </Box>
+              </PanelCard>
 
               {/* Stats Grid */}
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
-                <MetricTile accent='blue' icon={<TokenIcon sx={{ fontSize: 20 }} />}
+                <MetricCard accent='indigo' icon={<TokenIcon sx={{ fontSize: 20 }} />}
                   label='Month Tokens' value={fmtNum(usage.thisMonth._sum.totalTokens)}
                   sub={`${fmtNum(usage.thisMonth._count)} requests`} />
-                <MetricTile accent='orange' icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
+                <MetricCard accent='amber' icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
                   label='Month Cost' value={fmtCost(usage.thisMonth._sum.costCents)} />
-                <MetricTile accent='green' icon={<SpeedIcon sx={{ fontSize: 20 }} />}
+                <MetricCard accent='emerald' icon={<SpeedIcon sx={{ fontSize: 20 }} />}
                   label='All Time Tokens' value={fmtNum(usage.allTime._sum.totalTokens)}
                   sub={`${fmtNum(usage.allTime._count)} total requests`} />
-                <MetricTile accent='red' icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
+                <MetricCard accent='rose' icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
                   label='All Time Cost' value={fmtCost(usage.allTime._sum.costCents)} />
               </Box>
 
-              {/* Logs */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <AccessTimeIcon sx={{ fontSize: 18, opacity: 0.5 }} />
-                <Typography level='title-sm' sx={{ fontWeight: 700 }}>Recent Activity</Typography>
-                <Typography level='body-xs' sx={{ ml: 'auto', opacity: 0.5 }}>{logs.length} entries</Typography>
-                <IconButton size='sm' variant='plain' onClick={loadData}><RefreshIcon sx={{ fontSize: 16 }} /></IconButton>
-              </Box>
+              {/* Activity Logs */}
+              <SectionHeader
+                icon={<AccessTimeIcon sx={{ fontSize: 16 }} />}
+                title='Recent Activity'
+                subtitle={`${logs.length} entries`}
+                action={
+                  <IconButton size='sm' variant='plain' onClick={loadData} aria-label='Refresh logs'>
+                    <RefreshIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                }
+              />
 
               {logs.length > 0 ? (
-                <Sheet variant='outlined' sx={{ borderRadius: 'lg', overflow: 'auto', maxHeight: 320 }}>
+                <Sheet variant='outlined' sx={{ borderRadius: '14px', overflow: 'auto', maxHeight: 320 }}>
                   <Table size='sm' stickyHeader sx={{
                     '--TableCell-headBackground': 'var(--joy-palette-background-level1)',
-                    '& th': { py: 1.25, fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5 },
-                    '& td': { py: 1, fontSize: '0.78rem' },
+                    '& th': {
+                      py: 1.25, fontWeight: 700, fontSize: '0.65rem',
+                      textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6,
+                    },
+                    '& td': { py: 1, fontSize: '0.76rem' },
+                    '& tbody tr': { transition: 'background 0.1s' },
+                    '& tbody tr:hover': { background: 'var(--joy-palette-neutral-softBg)' },
                   }}>
                     <thead>
                       <tr>
@@ -327,15 +494,23 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
                           <td style={{ textAlign: 'right' }}>{fmtNum(log.outputTokens)}</td>
                           <td style={{ textAlign: 'right' }}><strong>{fmtNum(log.totalTokens)}</strong></td>
                           <td style={{ textAlign: 'right' }}>{fmtCost(log.costCents)}</td>
-                          <td><Chip size='sm' variant='soft' sx={{ fontSize: '0.6rem', height: 20 }}>{log.operation}</Chip></td>
+                          <td>
+                            <Chip size='sm' variant='soft' sx={{ fontSize: '0.58rem', height: 18, fontWeight: 600 }}>
+                              {log.operation}
+                            </Chip>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </Table>
                 </Sheet>
               ) : (
-                <Box sx={{ py: 3, textAlign: 'center', opacity: 0.4 }}>
-                  <Typography level='body-sm'>No usage logs recorded yet</Typography>
+                <Box sx={{
+                  py: 5, textAlign: 'center', borderRadius: '14px',
+                  border: '1px dashed var(--joy-palette-neutral-outlinedBorder)',
+                }}>
+                  <AccessTimeIcon sx={{ fontSize: 32, opacity: 0.15, mb: 1 }} />
+                  <Typography level='body-sm' sx={{ opacity: 0.35 }}>No usage logs recorded yet</Typography>
                 </Box>
               )}
             </Box>
@@ -344,12 +519,12 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
       </ModalDialog>
     </Modal>
   );
-}
+};
 
 
 // --- Main Admin Panel ---
 
-export function AppAdmin() {
+export const AppAdmin = () => {
   const { data: session } = useSession();
 
   const [checkingAdmin, setCheckingAdmin] = React.useState(true);
@@ -363,7 +538,7 @@ export function AppAdmin() {
   const [selectedUserId, setSelectedUserId] = React.useState<string | null>(null);
   const [bulkLimit, setBulkLimit] = React.useState('');
   const [bulkSaving, setBulkSaving] = React.useState(false);
-  const [activeView, setActiveView] = React.useState<'overview' | 'users' | 'settings'>('overview');
+  const [activeView, setActiveView] = React.useState<ViewId>('overview');
   const [sortField, setSortField] = React.useState<string>('name');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
 
@@ -401,24 +576,36 @@ export function AppAdmin() {
   // Auth gates
   if (!session?.user)
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--joy-palette-background-body)' }}>
-        <Typography level='h4' sx={{ opacity: 0.6 }}>Sign in required</Typography>
+      <Box sx={{
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+        minHeight: '100vh', gap: 2, background: 'var(--joy-palette-background-body)',
+      }}>
+        <ShieldIcon sx={{ fontSize: 48, opacity: 0.15 }} />
+        <Typography level='h4' sx={{ fontWeight: 700, opacity: 0.5 }}>Sign in required</Typography>
+        <Typography level='body-sm' sx={{ opacity: 0.3 }}>Authenticate to access the admin panel</Typography>
       </Box>
     );
 
   if (checkingAdmin)
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--joy-palette-background-body)' }}>
-        <CircularProgress size='lg' />
+      <Box sx={{
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+        minHeight: '100vh', gap: 2, background: 'var(--joy-palette-background-body)',
+      }}>
+        <CircularProgress size='lg' sx={{ '--CircularProgress-trackColor': 'transparent' }} />
+        <Typography level='body-sm' sx={{ opacity: 0.4, mt: 1 }}>Verifying access...</Typography>
       </Box>
     );
 
   if (!isAdmin)
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', gap: 2, background: 'var(--joy-palette-background-body)' }}>
-        <BlockIcon sx={{ fontSize: 48, opacity: 0.3 }} />
-        <Typography level='h4' sx={{ opacity: 0.6 }}>Access Denied</Typography>
-        <Typography level='body-sm' sx={{ opacity: 0.4 }}>Admin privileges required</Typography>
+      <Box sx={{
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+        minHeight: '100vh', gap: 2, background: 'var(--joy-palette-background-body)',
+      }}>
+        <BlockIcon sx={{ fontSize: 48, opacity: 0.15 }} />
+        <Typography level='h4' sx={{ fontWeight: 700, opacity: 0.5 }}>Access Denied</Typography>
+        <Typography level='body-sm' sx={{ opacity: 0.3 }}>Admin privileges required</Typography>
       </Box>
     );
 
@@ -454,299 +641,439 @@ export function AppAdmin() {
   const SortArrow = ({ field }: { field: string }) => {
     if (sortField !== field) return null;
     return sortDir === 'asc'
-      ? <ArrowUpwardIcon sx={{ fontSize: 14, ml: 0.3, verticalAlign: 'middle' }} />
-      : <ArrowDownwardIcon sx={{ fontSize: 14, ml: 0.3, verticalAlign: 'middle' }} />;
+      ? <ArrowUpwardIcon sx={{ fontSize: 12, ml: 0.3, verticalAlign: 'middle', opacity: 0.6 }} />
+      : <ArrowDownwardIcon sx={{ fontSize: 12, ml: 0.3, verticalAlign: 'middle', opacity: 0.6 }} />;
   };
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--joy-palette-background-body)' }}>
+    <Box sx={{
+      height: '100%', display: 'flex', overflow: 'hidden',
+      background: 'var(--joy-palette-background-body)',
+      ...pulseKeyframes,
+    }}>
 
-      {/* === Top Bar === */}
+      {/* === Sidebar === */}
       <Box sx={{
-        px: 3, py: 1.75, display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0,
-        borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+        width: SIDEBAR_WIDTH, flexShrink: 0, display: { xs: 'none', md: 'flex' },
+        flexDirection: 'column', borderRight: '1px solid var(--joy-palette-neutral-outlinedBorder)',
         background: 'var(--joy-palette-background-surface)',
-        backdropFilter: 'blur(12px)',
       }}>
         {/* Brand */}
-        <Box sx={{
-          width: 36, height: 36, borderRadius: 'lg', display: 'grid', placeItems: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: '#fff', flexShrink: 0,
-        }}>
-          <DashboardIcon sx={{ fontSize: 20 }} />
-        </Box>
-        <Box sx={{ mr: 2 }}>
-          <Typography level='title-md' sx={{ fontWeight: 800, lineHeight: 1.1 }}>Admin</Typography>
-          <Typography level='body-xs' sx={{ opacity: 0.45, lineHeight: 1 }}>Control Panel</Typography>
+        <Box sx={{ px: 2.5, py: 2.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{
+            width: 36, height: 36, borderRadius: '10px', display: 'grid', placeItems: 'center',
+            background: GRADIENT.brand, color: '#fff', flexShrink: 0,
+            boxShadow: `0 4px 12px ${GRADIENT.brandGlow}`,
+          }}>
+            <BoltIcon sx={{ fontSize: 20 }} />
+          </Box>
+          <Box>
+            <Typography level='title-sm' sx={{ fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.01em' }}>
+              Admin
+            </Typography>
+            <Typography level='body-xs' sx={{ opacity: 0.35, fontSize: '0.65rem', lineHeight: 1 }}>
+              Control Panel
+            </Typography>
+          </Box>
         </Box>
 
-        {/* Nav pills */}
-        <Box sx={{ display: 'flex', gap: 0.75, flex: 1 }}>
-          <NavPill icon={<DashboardIcon sx={{ fontSize: 16 }} />} label='Overview'
+        <Divider sx={{ mx: 2, opacity: 0.5 }} />
+
+        {/* Nav Items */}
+        <Box sx={{ px: 1.5, py: 2, display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
+          <Typography level='body-xs' sx={{
+            px: 1, mb: 0.5, textTransform: 'uppercase', fontWeight: 700,
+            letterSpacing: '0.08em', fontSize: '0.6rem', opacity: 0.35,
+          }}>
+            Navigation
+          </Typography>
+          <SidebarItem icon={<DashboardIcon sx={{ fontSize: 18 }} />} label='Overview'
             active={activeView === 'overview'} onClick={() => setActiveView('overview')} />
-          <NavPill icon={<GroupIcon sx={{ fontSize: 16 }} />} label='Users'
+          <SidebarItem icon={<GroupIcon sx={{ fontSize: 18 }} />} label='Users'
             active={activeView === 'users'} badge={users.length} onClick={() => setActiveView('users')} />
-          <NavPill icon={<SettingsIcon sx={{ fontSize: 16 }} />} label='Settings'
+          <SidebarItem icon={<SettingsIcon sx={{ fontSize: 18 }} />} label='Settings'
             active={activeView === 'settings'} onClick={() => setActiveView('settings')} />
         </Box>
 
-        {/* Right side */}
-        <Typography level='body-xs' sx={{ opacity: 0.4, display: { xs: 'none', md: 'block' } }}>{session.user?.email}</Typography>
-        <Tooltip title='Refresh all data'>
-          <IconButton variant='outlined' size='sm' onClick={loadAllData} disabled={loading}
-            sx={{ borderRadius: 'lg' }}>
-            <RefreshIcon sx={{ fontSize: 18, ...(loading ? { animation: 'spin 1s linear infinite', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } } } : {}) }} />
-          </IconButton>
-        </Tooltip>
+        {/* Sidebar Footer */}
+        <Box sx={{ px: 2.5, py: 2, borderTop: '1px solid var(--joy-palette-neutral-outlinedBorder)' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar size='sm' src={session.user?.image ?? undefined} sx={{ width: 30, height: 30, fontSize: 11 }}>
+              {(session.user?.name || '?')[0]}
+            </Avatar>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography level='body-xs' noWrap sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+                {session.user?.name || 'Admin'}
+              </Typography>
+              <Typography level='body-xs' noWrap sx={{ opacity: 0.35, fontSize: '0.6rem' }}>
+                {session.user?.email}
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
       </Box>
 
-      {/* === Content === */}
-      <Box sx={{ flex: 1, overflow: 'auto', px: 3, py: 3 }}>
+      {/* === Main Content === */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {loading && !globalStats ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress size='lg' /></Box>
-        ) : (
-          <>
-            {/* ====== OVERVIEW ====== */}
-            {activeView === 'overview' && (
-              <Stack spacing={3.5} sx={{ maxWidth: 1200, mx: 'auto' }}>
+        {/* Top Bar */}
+        <Box sx={{
+          px: 3, py: 1.5, display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0,
+          borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+          background: 'var(--joy-palette-background-surface)',
+        }}>
+          {/* Mobile brand */}
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
+            <Box sx={{
+              width: 28, height: 28, borderRadius: '8px', display: 'grid', placeItems: 'center',
+              background: GRADIENT.brand, color: '#fff',
+            }}>
+              <BoltIcon sx={{ fontSize: 16 }} />
+            </Box>
+          </Box>
 
-                {/* Metric tiles */}
-                {globalStats && (
-                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                    <MetricTile accent='blue' icon={<PeopleAltIcon sx={{ fontSize: 20 }} />}
-                      label='Total Users' value={globalStats.userCount} />
-                    <MetricTile accent='cyan' icon={<SpeedIcon sx={{ fontSize: 20 }} />}
-                      label='Today' value={fmtNum(globalStats.today._sum.totalTokens)}
-                      sub={`${fmtNum(globalStats.today._count)} requests`} />
-                    <MetricTile accent='orange' icon={<TokenIcon sx={{ fontSize: 20 }} />}
-                      label='This Month' value={fmtNum(globalStats.thisMonth._sum.totalTokens)}
-                      sub={fmtCost(globalStats.thisMonth._sum.costCents)} />
-                    <MetricTile accent='green' icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
-                      label='All Time' value={fmtNum(globalStats.allTime._sum.totalTokens)}
-                      sub={fmtCost(globalStats.allTime._sum.costCents)} />
-                  </Box>
-                )}
+          {/* Mobile nav pills */}
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, gap: 0.5 }}>
+            {(['overview', 'users', 'settings'] as ViewId[]).map(v => (
+              <Button key={v} size='sm' variant={activeView === v ? 'soft' : 'plain'} color={activeView === v ? 'primary' : 'neutral'}
+                onClick={() => setActiveView(v)} sx={{ borderRadius: '10px', px: 1.5, fontSize: '0.78rem', fontWeight: 600, textTransform: 'capitalize' }}>
+                {v}
+              </Button>
+            ))}
+          </Box>
 
-                {/* Leaderboard */}
-                {topUsers.length > 0 && (
-                  <Box sx={{
-                    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                    borderRadius: 'xl', overflow: 'hidden',
-                    background: 'var(--joy-palette-background-surface)',
-                  }}>
-                    <Box sx={{ px: 2.5, py: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)' }}>
-                      <EmojiEventsIcon sx={{ fontSize: 20, color: '#f2994a' }} />
-                      <Typography level='title-md' sx={{ fontWeight: 700 }}>Top Users This Month</Typography>
-                      <Typography level='body-xs' sx={{ ml: 'auto', opacity: 0.4 }}>Click to view details</Typography>
+          {/* Page title (desktop) */}
+          <Typography level='title-md' sx={{ fontWeight: 700, display: { xs: 'none', md: 'block' }, textTransform: 'capitalize' }}>
+            {activeView}
+          </Typography>
+
+          <Box sx={{ flex: 1 }} />
+
+          {/* Refresh */}
+          <Tooltip title='Refresh all data' arrow>
+            <IconButton variant='outlined' size='sm' onClick={loadAllData} disabled={loading}
+              aria-label='Refresh all data'
+              sx={{
+                borderRadius: '10px', borderColor: 'var(--joy-palette-neutral-outlinedBorder)',
+                '&:hover': { borderColor: 'var(--joy-palette-primary-400)' },
+              }}>
+              <RefreshIcon sx={{
+                fontSize: 16,
+                ...(loading ? { animation: 'spin 1s linear infinite' } : {}),
+              }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* Content Area */}
+        <Box sx={{ flex: 1, overflow: 'auto', px: { xs: 2, md: 3.5 }, py: 3 }}>
+
+          {loading && !globalStats ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', py: 16, gap: 2 }}>
+              <CircularProgress size='lg' sx={{ '--CircularProgress-trackColor': 'transparent' }} />
+              <Typography level='body-sm' sx={{ opacity: 0.35 }}>Loading dashboard...</Typography>
+            </Box>
+          ) : (
+            <>
+              {/* ====== OVERVIEW ====== */}
+              {activeView === 'overview' && (
+                <Stack spacing={4} sx={{ maxWidth: 1200, mx: 'auto' }}>
+
+                  {/* Metric Cards */}
+                  {globalStats && (
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
+                      <MetricCard accent='indigo' icon={<PeopleAltIcon sx={{ fontSize: 20 }} />}
+                        label='Total Users' value={globalStats.userCount} />
+                      <MetricCard accent='sky' icon={<BoltIcon sx={{ fontSize: 20 }} />}
+                        label='Today' value={fmtNum(globalStats.today._sum.totalTokens)}
+                        sub={`${fmtNum(globalStats.today._count)} requests`} />
+                      <MetricCard accent='amber' icon={<CalendarTodayIcon sx={{ fontSize: 18 }} />}
+                        label='This Month' value={fmtNum(globalStats.thisMonth._sum.totalTokens)}
+                        sub={fmtCost(globalStats.thisMonth._sum.costCents)} />
+                      <MetricCard accent='emerald' icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
+                        label='All Time' value={fmtNum(globalStats.allTime._sum.totalTokens)}
+                        sub={fmtCost(globalStats.allTime._sum.costCents)} />
                     </Box>
-                    <Box sx={{ py: 0.5 }}>
-                      {topUsers.map((entry, i) => (
-                        <LeaderboardRow key={entry.userId}
-                          rank={i + 1}
-                          name={entry.user?.name || 'Unknown'}
-                          email={entry.user?.email || ''}
-                          image={entry.user?.image}
-                          tokens={fmtNum(entry._sum.totalTokens)}
-                          cost={fmtCost(entry._sum.costCents)}
-                          requests={entry._count}
-                          onClick={() => setSelectedUserId(entry.userId)}
-                        />
-                      ))}
-                    </Box>
+                  )}
+
+                  {/* Leaderboard */}
+                  {topUsers.length > 0 && (
+                    <PanelCard>
+                      <Box sx={{
+                        px: 2.5, py: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+                        borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                      }}>
+                        <Box sx={{
+                          width: 28, height: 28, borderRadius: '8px', display: 'grid', placeItems: 'center',
+                          background: ACCENT.amber.bg, color: '#fff',
+                        }}>
+                          <EmojiEventsIcon sx={{ fontSize: 16 }} />
+                        </Box>
+                        <Typography level='title-sm' sx={{ fontWeight: 700 }}>Top Users This Month</Typography>
+                        <Typography level='body-xs' sx={{ ml: 'auto', opacity: 0.35, fontSize: '0.65rem' }}>
+                          Click to view details
+                        </Typography>
+                      </Box>
+                      <Box sx={{ py: 0.75 }}>
+                        {topUsers.map((entry, i) => (
+                          <LeaderboardRow key={entry.userId}
+                            rank={i + 1}
+                            name={entry.user?.name || 'Unknown'}
+                            email={entry.user?.email || ''}
+                            image={entry.user?.image}
+                            tokens={fmtNum(entry._sum.totalTokens)}
+                            cost={fmtCost(entry._sum.costCents)}
+                            requests={entry._count}
+                            onClick={() => setSelectedUserId(entry.userId)}
+                          />
+                        ))}
+                      </Box>
+                    </PanelCard>
+                  )}
+                </Stack>
+              )}
+
+              {/* ====== USERS ====== */}
+              {activeView === 'users' && (
+                <Stack spacing={2.5} sx={{ maxWidth: 1400, mx: 'auto' }}>
+
+                  {/* Search + Count */}
+                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <Input size='sm' placeholder='Search users...'
+                      startDecorator={<SearchIcon sx={{ fontSize: 16, opacity: 0.4 }} />}
+                      value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                      aria-label='Search users'
+                      sx={{
+                        flex: 1, maxWidth: 360, borderRadius: '12px',
+                        '--Input-focusedThickness': '2px',
+                        '--Input-focusedHighlight': 'var(--joy-palette-primary-400)',
+                      }} />
+                    <Chip variant='soft' color='neutral' size='sm' sx={{
+                      fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: '0.7rem',
+                    }}>
+                      {sorted.length === users.length ? `${users.length} users` : `${sorted.length} of ${users.length}`}
+                    </Chip>
                   </Box>
-                )}
-              </Stack>
-            )}
 
-            {/* ====== USERS ====== */}
-            {activeView === 'users' && (
-              <Stack spacing={2} sx={{ maxWidth: 1400, mx: 'auto' }}>
-
-                {/* Search bar */}
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <Input size='sm' placeholder='Search by name or email...' startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
-                    value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    sx={{ flex: 1, maxWidth: 380, borderRadius: 'xl', '--Input-focusedThickness': '2px' }} />
-                  <Chip variant='soft' color='neutral' size='sm' sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {sorted.length === users.length ? `${users.length} users` : `${sorted.length} of ${users.length}`}
-                  </Chip>
-                </Box>
-
-                {/* Table */}
-                <Sheet variant='outlined' sx={{ borderRadius: 'xl', overflow: 'auto' }}>
-                  <Table size='sm' stickyHeader hoverRow sx={{
-                    '--TableCell-headBackground': 'var(--joy-palette-background-level1)',
-                    '& th': {
-                      py: 1.5, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
-                      fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5,
-                    },
-                    '& td': { py: 1.25, verticalAlign: 'middle' },
-                    '& tbody tr': { cursor: 'pointer', transition: 'background 0.08s' },
-                  }}>
-                    <thead>
-                      <tr>
-                        <th onClick={() => handleSort('name')}>User <SortArrow field='name' /></th>
-                        <th onClick={() => handleSort('email')}>Email <SortArrow field='email' /></th>
-                        <th onClick={() => handleSort('conversations')} style={{ textAlign: 'right' }}>Convos <SortArrow field='conversations' /></th>
-                        <th onClick={() => handleSort('messages')} style={{ textAlign: 'right' }}>Messages <SortArrow field='messages' /></th>
-                        <th onClick={() => handleSort('monthTokens')} style={{ textAlign: 'right' }}>Month Tokens <SortArrow field='monthTokens' /></th>
-                        <th onClick={() => handleSort('monthCost')} style={{ textAlign: 'right' }}>Month Cost <SortArrow field='monthCost' /></th>
-                        <th onClick={() => handleSort('usageLogs')} style={{ textAlign: 'right' }}>Logs <SortArrow field='usageLogs' /></th>
-                        <th>Limit</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sorted.map((user: any) => {
-                        const mTokens = user.monthUsage?._sum?.totalTokens ?? 0;
-                        const mCost = user.monthUsage?._sum?.costCents ?? 0;
-                        const mReqs = user.monthUsage?._count ?? 0;
-                        const limitPct = user.tokenLimit ? Math.min(100, (mTokens / user.tokenLimit) * 100) : 0;
-                        const limitColor = limitPct > 90 ? 'danger' as const : limitPct > 70 ? 'warning' as const : 'success' as const;
-                        return (
-                          <tr key={user.id} onClick={() => setSelectedUserId(user.id)}>
-                            <td>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <Avatar size='sm' src={user.image} sx={{ width: 30, height: 30, fontSize: 12, flexShrink: 0 }}>
-                                  {(user.name || '?')[0]}
-                                </Avatar>
-                                <Typography level='body-sm' noWrap sx={{ maxWidth: 150, fontWeight: 600 }}>
-                                  {user.name || 'Unnamed'}
-                                </Typography>
-                              </Box>
-                            </td>
-                            <td><Typography level='body-xs' noWrap sx={{ maxWidth: 200, opacity: 0.7 }}>{user.email}</Typography></td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums' }}>{user._count.conversations}</Typography>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums' }}>{user._count.messages}</Typography>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Tooltip title={`${mReqs} requests this month`}>
-                                <Typography level='body-sm' sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(mTokens)}</Typography>
-                              </Tooltip>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCost(mCost)}</Typography>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums', opacity: 0.6 }}>{user._count.usageLogs}</Typography>
-                            </td>
-                            <td>
-                              <Chip size='sm' variant='soft' color={user.tokenLimit ? limitColor : 'neutral'}
-                                startDecorator={user.tokenLimit
-                                  ? (limitPct > 90 ? <WarningIcon sx={{ fontSize: 12 }} /> : <CheckCircleIcon sx={{ fontSize: 12 }} />)
-                                  : <AllInclusiveIcon sx={{ fontSize: 12 }} />
-                                }
-                                sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                {user.tokenLimit ? fmtNum(user.tokenLimit) : 'Unlimited'}
-                              </Chip>
-                            </td>
+                  {/* Users Table */}
+                  <PanelCard>
+                    <Sheet sx={{ borderRadius: '16px', overflow: 'auto' }}>
+                      <Table size='sm' stickyHeader hoverRow sx={{
+                        '--TableCell-headBackground': 'var(--joy-palette-background-level1)',
+                        '& th': {
+                          py: 1.5, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
+                          fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase',
+                          letterSpacing: '0.06em', opacity: 0.55,
+                          transition: 'opacity 0.1s',
+                          '&:hover': { opacity: 0.8 },
+                        },
+                        '& td': { py: 1.25, verticalAlign: 'middle' },
+                        '& tbody tr': {
+                          cursor: 'pointer', transition: 'background 0.1s',
+                          '&:hover': { background: GRADIENT.brandSubtle },
+                        },
+                      }}>
+                        <thead>
+                          <tr>
+                            <th onClick={() => handleSort('name')}>User <SortArrow field='name' /></th>
+                            <th onClick={() => handleSort('email')}>Email <SortArrow field='email' /></th>
+                            <th onClick={() => handleSort('conversations')} style={{ textAlign: 'right' }}>Convos <SortArrow field='conversations' /></th>
+                            <th onClick={() => handleSort('messages')} style={{ textAlign: 'right' }}>Messages <SortArrow field='messages' /></th>
+                            <th onClick={() => handleSort('monthTokens')} style={{ textAlign: 'right' }}>Month Tokens <SortArrow field='monthTokens' /></th>
+                            <th onClick={() => handleSort('monthCost')} style={{ textAlign: 'right' }}>Month Cost <SortArrow field='monthCost' /></th>
+                            <th onClick={() => handleSort('usageLogs')} style={{ textAlign: 'right' }}>Logs <SortArrow field='usageLogs' /></th>
+                            <th>Limit</th>
                           </tr>
-                        );
-                      })}
-                      {sorted.length === 0 && (
-                        <tr>
-                          <td colSpan={8}>
-                            <Box sx={{ py: 4, textAlign: 'center', opacity: 0.4 }}>
-                              <Typography level='body-sm'>No users match your search</Typography>
-                            </Box>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </Table>
-                </Sheet>
-              </Stack>
-            )}
+                        </thead>
+                        <tbody>
+                          {sorted.map((user: any) => {
+                            const mTokens = user.monthUsage?._sum?.totalTokens ?? 0;
+                            const mCost = user.monthUsage?._sum?.costCents ?? 0;
+                            const mReqs = user.monthUsage?._count ?? 0;
+                            const limitPct = user.tokenLimit ? Math.min(100, (mTokens / user.tokenLimit) * 100) : 0;
+                            const limitColor = limitPct > 90 ? 'danger' as const : limitPct > 70 ? 'warning' as const : 'success' as const;
+                            return (
+                              <tr key={user.id} onClick={() => setSelectedUserId(user.id)}>
+                                <td>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <Avatar size='sm' src={user.image} sx={{
+                                      width: 30, height: 30, fontSize: 11, flexShrink: 0, fontWeight: 700,
+                                    }}>
+                                      {(user.name || '?')[0]}
+                                    </Avatar>
+                                    <Typography level='body-sm' noWrap sx={{ maxWidth: 150, fontWeight: 600 }}>
+                                      {user.name || 'Unnamed'}
+                                    </Typography>
+                                  </Box>
+                                </td>
+                                <td>
+                                  <Typography level='body-xs' noWrap sx={{ maxWidth: 200, opacity: 0.55 }}>
+                                    {user.email}
+                                  </Typography>
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums', opacity: 0.7 }}>
+                                    {user._count.conversations}
+                                  </Typography>
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums', opacity: 0.7 }}>
+                                    {user._count.messages}
+                                  </Typography>
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <Tooltip title={`${mReqs} requests this month`}>
+                                    <Typography level='body-sm' sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                                      {fmtNum(mTokens)}
+                                    </Typography>
+                                  </Tooltip>
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums', opacity: 0.7 }}>
+                                    {fmtCost(mCost)}
+                                  </Typography>
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <Typography level='body-sm' sx={{ fontVariantNumeric: 'tabular-nums', opacity: 0.45 }}>
+                                    {user._count.usageLogs}
+                                  </Typography>
+                                </td>
+                                <td>
+                                  <Chip size='sm' variant='soft' color={user.tokenLimit ? limitColor : 'neutral'}
+                                    startDecorator={user.tokenLimit
+                                      ? (limitPct > 90 ? <WarningIcon sx={{ fontSize: 11 }} /> : <CheckCircleIcon sx={{ fontSize: 11 }} />)
+                                      : <AllInclusiveIcon sx={{ fontSize: 11 }} />
+                                    }
+                                    sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: '0.65rem', height: 22 }}>
+                                    {user.tokenLimit ? fmtNum(user.tokenLimit) : 'Unlimited'}
+                                  </Chip>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {sorted.length === 0 && (
+                            <tr>
+                              <td colSpan={8}>
+                                <Box sx={{
+                                  py: 6, textAlign: 'center',
+                                }}>
+                                  <SearchIcon sx={{ fontSize: 32, opacity: 0.12, mb: 1 }} />
+                                  <Typography level='body-sm' sx={{ opacity: 0.35 }}>No users match your search</Typography>
+                                </Box>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </Table>
+                    </Sheet>
+                  </PanelCard>
+                </Stack>
+              )}
 
-            {/* ====== SETTINGS ====== */}
-            {activeView === 'settings' && (
-              <Stack spacing={3} sx={{ maxWidth: 640, mx: 'auto' }}>
+              {/* ====== SETTINGS ====== */}
+              {activeView === 'settings' && (
+                <Stack spacing={3} sx={{ maxWidth: 680, mx: 'auto' }}>
 
-                {/* Bulk Limits */}
-                <Box sx={{
-                  border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                  borderRadius: 'xl', overflow: 'hidden',
-                  background: 'var(--joy-palette-background-surface)',
-                }}>
-                  <Box sx={{
-                    px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5,
-                    borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                    background: 'var(--joy-palette-background-level1)',
-                  }}>
-                    <TuneIcon sx={{ fontSize: 18 }} />
-                    <Typography level='title-md' sx={{ fontWeight: 700 }}>Bulk Token Limits</Typography>
-                  </Box>
-                  <Box sx={{ p: 3 }}>
-                    <Typography level='body-sm' sx={{ mb: 2.5, opacity: 0.7 }}>
-                      Set a monthly token limit for every user at once. Leave empty or 0 for unlimited.
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Input size='sm' placeholder='e.g. 2000000' value={bulkLimit}
-                        onChange={e => setBulkLimit(e.target.value)}
-                        sx={{ width: 200, borderRadius: 'lg' }} />
-                      <Button size='sm' loading={bulkSaving}
-                        sx={{ borderRadius: 'lg', background: 'linear-gradient(135deg, #f2994a 0%, #f2c94c 100%)', color: '#000', fontWeight: 700 }}
-                        onClick={() => {
-                          const val = parseInt(bulkLimit, 10);
-                          if (!val || val <= 0) return alert('Enter a valid number');
-                          if (confirm('Set ' + val.toLocaleString() + ' tokens/month for ALL users?'))
-                            handleSetAllLimits(val);
-                        }}>
-                        Apply to All
-                      </Button>
-                      <Button size='sm' variant='outlined' color='neutral' loading={bulkSaving}
-                        sx={{ borderRadius: 'lg' }}
-                        onClick={() => {
-                          if (confirm('Remove token limit for ALL users (unlimited)?'))
-                            handleSetAllLimits(null);
-                        }}>
-                        Set All Unlimited
-                      </Button>
+                  {/* Bulk Token Limits */}
+                  <PanelCard>
+                    <Box sx={{
+                      px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+                      borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                      background: 'var(--joy-palette-background-level1)',
+                    }}>
+                      <Box sx={{
+                        width: 28, height: 28, borderRadius: '8px', display: 'grid', placeItems: 'center',
+                        background: ACCENT.amber.bg, color: '#fff',
+                      }}>
+                        <TuneIcon sx={{ fontSize: 15 }} />
+                      </Box>
+                      <Typography level='title-sm' sx={{ fontWeight: 700 }}>Bulk Token Limits</Typography>
                     </Box>
-                  </Box>
-                </Box>
+                    <Box sx={{ p: 3 }}>
+                      <Typography level='body-sm' sx={{ mb: 2.5, opacity: 0.55, lineHeight: 1.6 }}>
+                        Set a monthly token limit for every user at once. Leave empty or 0 for unlimited.
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Input size='sm' placeholder='e.g. 2000000' value={bulkLimit}
+                          onChange={e => setBulkLimit(e.target.value)}
+                          aria-label='Bulk token limit value'
+                          sx={{ width: 200, borderRadius: '10px' }} />
+                        <Button size='sm' loading={bulkSaving}
+                          sx={{
+                            borderRadius: '10px', fontWeight: 700,
+                            background: GRADIENT.brand,
+                            '&:hover': { background: GRADIENT.brand, filter: 'brightness(1.1)' },
+                          }}
+                          onClick={() => {
+                            const val = parseInt(bulkLimit, 10);
+                            if (!val || val <= 0) return alert('Enter a valid number');
+                            if (confirm('Set ' + val.toLocaleString() + ' tokens/month for ALL users?'))
+                              handleSetAllLimits(val);
+                          }}>
+                          Apply to All
+                        </Button>
+                        <Button size='sm' variant='outlined' color='neutral' loading={bulkSaving}
+                          sx={{ borderRadius: '10px', fontWeight: 600 }}
+                          onClick={() => {
+                            if (confirm('Remove token limit for ALL users (unlimited)?'))
+                              handleSetAllLimits(null);
+                          }}>
+                          Set All Unlimited
+                        </Button>
+                      </Box>
+                    </Box>
+                  </PanelCard>
 
-                {/* Admin Info */}
-                <Box sx={{
-                  border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                  borderRadius: 'xl', overflow: 'hidden',
-                  background: 'var(--joy-palette-background-surface)',
-                }}>
-                  <Box sx={{
-                    px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5,
-                    borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                    background: 'var(--joy-palette-background-level1)',
-                  }}>
-                    <SettingsIcon sx={{ fontSize: 18 }} />
-                    <Typography level='title-md' sx={{ fontWeight: 700 }}>System Info</Typography>
-                  </Box>
-                  <Box sx={{ p: 3 }}>
-                    <Stack spacing={1.5}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography level='body-sm' sx={{ opacity: 0.6 }}>Admin Email</Typography>
-                        <Typography level='body-sm' sx={{ fontWeight: 600 }}>rcohen@mytsi.org</Typography>
+                  {/* System Info */}
+                  <PanelCard>
+                    <Box sx={{
+                      px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+                      borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                      background: 'var(--joy-palette-background-level1)',
+                    }}>
+                      <Box sx={{
+                        width: 28, height: 28, borderRadius: '8px', display: 'grid', placeItems: 'center',
+                        background: ACCENT.indigo.bg, color: '#fff',
+                      }}>
+                        <ShieldIcon sx={{ fontSize: 15 }} />
                       </Box>
-                      <Divider />
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography level='body-sm' sx={{ opacity: 0.6 }}>Admin Token Limit</Typography>
-                        <Chip size='sm' variant='soft' color='success' startDecorator={<AllInclusiveIcon sx={{ fontSize: 12 }} />}>Always Unlimited</Chip>
-                      </Box>
-                      <Divider />
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography level='body-sm' sx={{ opacity: 0.6 }}>Monthly Reset</Typography>
-                        <Typography level='body-sm' sx={{ fontWeight: 600 }}>1st of each month</Typography>
-                      </Box>
-                    </Stack>
-                  </Box>
-                </Box>
-              </Stack>
-            )}
-          </>
-        )}
+                      <Typography level='title-sm' sx={{ fontWeight: 700 }}>System Info</Typography>
+                    </Box>
+                    <Box sx={{ p: 3 }}>
+                      <Stack spacing={2}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography level='body-sm' sx={{ opacity: 0.5 }}>Admin Email</Typography>
+                          <Typography level='body-sm' sx={{ fontWeight: 700, fontFamily: 'code' }}>rcohen@mytsi.org</Typography>
+                        </Box>
+                        <Divider />
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography level='body-sm' sx={{ opacity: 0.5 }}>Admin Token Limit</Typography>
+                          <Chip size='sm' variant='soft' color='success'
+                            startDecorator={<AllInclusiveIcon sx={{ fontSize: 12 }} />}
+                            sx={{ fontWeight: 700, fontSize: '0.7rem' }}>
+                            Always Unlimited
+                          </Chip>
+                        </Box>
+                        <Divider />
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography level='body-sm' sx={{ opacity: 0.5 }}>Monthly Reset</Typography>
+                          <Typography level='body-sm' sx={{ fontWeight: 700 }}>1st of each month</Typography>
+                        </Box>
+                        <Divider />
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography level='body-sm' sx={{ opacity: 0.5 }}>Total Users</Typography>
+                          <Typography level='body-sm' sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                            {globalStats?.userCount ?? '-'}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Box>
+                  </PanelCard>
+                </Stack>
+              )}
+            </>
+          )}
+        </Box>
       </Box>
 
       {/* User Detail Modal */}
@@ -755,4 +1082,4 @@ export function AppAdmin() {
       )}
     </Box>
   );
-}
+};
