@@ -33,10 +33,14 @@ import { AuthButton } from '~/common/components/auth/AuthButton';
 import { UserAnalytics } from '~/common/components/analytics/UserAnalytics';
 import { apiAsyncNode } from '~/common/util/trpc.client';
 import DataUsageIcon from '@mui/icons-material/DataUsage';
+import HistoryIcon from '@mui/icons-material/History';
 import LinearProgress from '@mui/joy/LinearProgress';
+import { Sheet, Table } from '@mui/joy';
 
 type MyUsageData = Awaited<ReturnType<typeof apiAsyncNode.usage.myUsage.query>>;
 type CheckLimitData = Awaited<ReturnType<typeof apiAsyncNode.usage.checkLimit.query>>;
+type MonthlyHistoryData = Awaited<ReturnType<typeof apiAsyncNode.usage.myMonthlyHistory.query>>;
+type MyLogsData = Awaited<ReturnType<typeof apiAsyncNode.usage.myLogs.query>>;
 
 export default function Profile() {
   const { data: session, status } = useSession();
@@ -44,11 +48,15 @@ export default function Profile() {
   const [activeTab, setActiveTab] = React.useState(0);
   const [myUsage, setMyUsage] = React.useState<MyUsageData | null>(null);
   const [limitInfo, setLimitInfo] = React.useState<CheckLimitData | null>(null);
+  const [monthlyHistory, setMonthlyHistory] = React.useState<MonthlyHistoryData | null>(null);
+  const [myLogs, setMyLogs] = React.useState<MyLogsData | null>(null);
 
   React.useEffect(() => {
     if (status === 'authenticated') {
       apiAsyncNode.usage.myUsage.query().then(setMyUsage).catch(() => {});
       apiAsyncNode.usage.checkLimit.query().then(setLimitInfo).catch(() => {});
+      apiAsyncNode.usage.myMonthlyHistory.query({ months: 6 }).then(setMonthlyHistory).catch(() => {});
+      apiAsyncNode.usage.myLogs.query({ limit: 10 }).then(setMyLogs).catch(() => {});
     }
   }, [status]);
 
@@ -267,13 +275,83 @@ export default function Profile() {
                           <Typography level='body-sm'>No monthly token limit set on your account.</Typography>
                         )}
                         <Typography level='body-xs' sx={{ mt: 1 }}>
-                          {myUsage.thisMonth._count} requests this month
+                          {myUsage.thisMonth._count} requests this month - resets on the 1st of each month
                         </Typography>
                       </CardContent>
                     </Card>
                   );
                 })() : (
                   <CircularProgress size='sm' />
+                )}
+
+                {/* Monthly History */}
+                {monthlyHistory && monthlyHistory.length > 0 && (
+                  <>
+                    <Typography level='h4' sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <HistoryIcon /> Monthly Usage History
+                    </Typography>
+                    <Sheet variant='outlined' sx={{ borderRadius: 'sm', overflow: 'auto', mb: 2 }}>
+                      <Table size='sm' stickyHeader>
+                        <thead>
+                          <tr>
+                            <th>Month</th>
+                            <th style={{ textAlign: 'right' }}>Tokens Used</th>
+                            <th style={{ textAlign: 'right' }}>Input</th>
+                            <th style={{ textAlign: 'right' }}>Output</th>
+                            <th style={{ textAlign: 'right' }}>Cost</th>
+                            <th style={{ textAlign: 'right' }}>Requests</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {monthlyHistory.map((m, i) => (
+                            <tr key={m.month} style={i === 0 ? { fontWeight: 'bold' } : undefined}>
+                              <td>{m.month}{i === 0 ? ' (current)' : ''}</td>
+                              <td style={{ textAlign: 'right' }}>{m.totalTokens.toLocaleString()}</td>
+                              <td style={{ textAlign: 'right' }}>{m.inputTokens.toLocaleString()}</td>
+                              <td style={{ textAlign: 'right' }}>{m.outputTokens.toLocaleString()}</td>
+                              <td style={{ textAlign: 'right' }}>{'$' + (m.costCents / 100 < 0.01 && m.costCents > 0 ? (m.costCents / 100).toFixed(4) : (m.costCents / 100).toFixed(2))}</td>
+                              <td style={{ textAlign: 'right' }}>{m.requests}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </Sheet>
+                  </>
+                )}
+
+                {/* Recent Deductions */}
+                {myLogs && myLogs.length > 0 && (
+                  <>
+                    <Typography level='h4' sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <DataUsageIcon /> Recent Token Deductions
+                    </Typography>
+                    <Sheet variant='outlined' sx={{ borderRadius: 'sm', overflow: 'auto', maxHeight: 350, mb: 2 }}>
+                      <Table size='sm' stickyHeader>
+                        <thead>
+                          <tr>
+                            <th>Time</th>
+                            <th>Model</th>
+                            <th style={{ textAlign: 'right' }}>Input</th>
+                            <th style={{ textAlign: 'right' }}>Output</th>
+                            <th style={{ textAlign: 'right' }}>Total</th>
+                            <th style={{ textAlign: 'right' }}>Cost</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {myLogs.map(log => (
+                            <tr key={log.id}>
+                              <td>{new Date(log.createdAt).toLocaleString()}</td>
+                              <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.modelId}</td>
+                              <td style={{ textAlign: 'right' }}>{log.inputTokens.toLocaleString()}</td>
+                              <td style={{ textAlign: 'right' }}>{log.outputTokens.toLocaleString()}</td>
+                              <td style={{ textAlign: 'right' }}>{log.totalTokens.toLocaleString()}</td>
+                              <td style={{ textAlign: 'right' }}>{'$' + (log.costCents / 100).toFixed(4)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </Sheet>
+                  </>
                 )}
 
                 <Divider sx={{ my: 3 }} />

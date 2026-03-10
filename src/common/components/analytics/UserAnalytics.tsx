@@ -229,18 +229,22 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
           
           conv.messages.forEach((msg: any) => {
             if (msg.role === 'ASSISTANT' && msg.generator) {
-              // Extract real cost data from database
-              const cost = msg.generator.metrics?.$c ? msg.generator.metrics.$c / 100 : 0;
+              // Extract real cost data - include both computed ($c) and provider-reported ($cReported) costs
+              const m = msg.generator.metrics;
+              const computedCostCents = m?.$c || 0;
+              const reportedCostCents = m?.$cReported || 0;
+              // Use the higher of computed vs reported, don't double-count
+              const cost = Math.max(computedCostCents, reportedCostCents) / 100;
               totalCost += cost;
               convCost += cost;
               
               // Extract detailed token data
-              const inputTokens = (msg.generator.metrics?.TIn || 0) + 
-                                (msg.generator.metrics?.TCacheRead || 0) + 
-                                (msg.generator.metrics?.TCacheWrite || 0);
-              const outputTokens = msg.generator.metrics?.TOut || 0;
-              const cacheRead = msg.generator.metrics?.TCacheRead || 0;
-              const cacheSavings = msg.generator.metrics?.$cdCache ? msg.generator.metrics.$cdCache / 100 : 0;
+              const inputTokens = (m?.TIn || 0) + 
+                                (m?.TCacheRead || 0) + 
+                                (m?.TCacheWrite || 0);
+              const outputTokens = m?.TOut || 0;
+              const cacheRead = m?.TCacheRead || 0;
+              const cacheSavings = m?.$cdCache ? m.$cdCache / 100 : 0;
               
               totalInputTokens += inputTokens;
               totalOutputTokens += outputTokens;
@@ -434,7 +438,9 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
   }, [userId]);
 
   const formatCost = (cost: number) => {
-    return cost < 0.01 ? '$0.00' : `$${cost.toFixed(2)}`;
+    if (cost === 0) return '$0.00';
+    if (cost < 0.01) return `$${cost.toFixed(4)}`;
+    return `$${cost.toFixed(2)}`;
   };
 
   const formatNumber = (num: number) => {

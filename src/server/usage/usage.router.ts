@@ -108,4 +108,38 @@ export const usageRouter = createTRPCRouter({
         take: input?.limit ?? 30,
       });
     }),
+
+  // Get monthly usage history (last N months) for profile analytics
+  myMonthlyHistory: protectedProcedure
+    .input(z.object({ months: z.number().min(1).max(24).default(6) }).optional())
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const monthCount = input?.months ?? 6;
+      const now = new Date();
+
+      const months = [];
+      for (let i = 0; i < monthCount; i++) {
+        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+
+        const agg = await prisma.usageLog.aggregate({
+          where: { userId, createdAt: { gte: monthStart, lt: monthEnd } },
+          _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
+          _count: true,
+        });
+
+        months.push({
+          month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          year: monthStart.getFullYear(),
+          monthIndex: monthStart.getMonth(),
+          inputTokens: agg._sum.inputTokens ?? 0,
+          outputTokens: agg._sum.outputTokens ?? 0,
+          totalTokens: agg._sum.totalTokens ?? 0,
+          costCents: agg._sum.costCents ?? 0,
+          requests: agg._count,
+        });
+      }
+
+      return months;
+    }),
 });
