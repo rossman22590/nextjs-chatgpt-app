@@ -69,7 +69,7 @@ export interface ChatNavigationItemData {
   hasBeamOpen: boolean;
   messageCount: number;
   beingGenerated: boolean;
-  systemPurposeId: SystemPurposeId;
+  systemPurposeId: import('~/common/stores/chat/chat.conversation').ConversationPurposeId;
   searchFrequency: number;
 }
 
@@ -203,8 +203,8 @@ function ChatDrawerItem(props: {
   }, [conversationId, deleteArmed, onConversationDeleteNoConfirmation]);
 
 
-  const personaSymbol = userSymbol || SystemPurposes[systemPurposeId]?.symbol || '❓';
-  const personaImageURI = SystemPurposes[systemPurposeId]?.imageUri ?? undefined;
+  const personaSymbol = userSymbol || (systemPurposeId.startsWith('persona:') ? undefined : SystemPurposes[systemPurposeId as SystemPurposeId]?.symbol) || '?';
+  const personaImageURI = systemPurposeId.startsWith('persona:') ? undefined : (SystemPurposes[systemPurposeId as SystemPurposeId]?.imageUri ?? undefined);
 
 
   const progress = props.bottomBarBasis ? 100 * (searchFrequency || messageCount) / props.bottomBarBasis : 0;
@@ -244,7 +244,7 @@ function ChatDrawerItem(props: {
             }}
           />
         ) : (
-          <Typography sx={isNew ? { opacity: 0.4, filter: 'grayscale(0.75)' } : undefined}>
+          <Typography sx={isNew && !isActive ? { opacity: 0.4, filter: 'grayscale(0.75)' } : undefined}>
             {personaSymbol}
           </Typography>
         )}
@@ -253,11 +253,11 @@ function ChatDrawerItem(props: {
 
     {/* Title */}
     {!isEditingTitle ? (
-      // using Box to not reset the parent font scaling
+      // using Box to not reset the parent font scaling (active = white on gradient, inactive = secondary)
       <Box
         onDoubleClick={handleTitleEditBegin}
         sx={{
-          color: isActive ? 'text.primary' : 'text.secondary',
+          color: isActive ? 'common.white' : 'text.secondary',
           overflowWrap: 'anywhere',
           flex: 1,
         }}
@@ -290,7 +290,7 @@ function ChatDrawerItem(props: {
         whiteSpace: 'nowrap',
         pointerEvents: 'none',
       }}>
-        {userFlagsSummary}{containsDocAttachments && '📄'}{containsImageAssets && '🖍️'}
+        {userFlagsSummary}{containsDocAttachments && '[doc]'}{containsImageAssets && '[img]'}
       </Box>
     ) : null}
 
@@ -299,8 +299,8 @@ function ChatDrawerItem(props: {
   const progressBarFixedComponent = React.useMemo(() =>
     progress > 0 && (
       <Box sx={{
-        backgroundColor: 'neutral.softHoverBg',
-        position: 'absolute', left: 0, bottom: 0, width: progress + '%', height: 4,
+        background: 'linear-gradient(90deg, #a020f0, #e040a0)',
+        position: 'absolute', left: 0, bottom: 0, width: progress + '%', height: 4, borderRadius: 999,
       }} />
     ), [progress]);
 
@@ -312,46 +312,29 @@ function ChatDrawerItem(props: {
       invertedColors={isActive}
       onClick={!isActive ? handleConversationActivate : undefined}
       sx={{
-        // common
-        // position: 'relative', // for the progress bar (now disabled)
-        '--ListItem-minHeight': '2.75rem',
-
-        // differences between primary and secondary variants
+        '--ListItem-minHeight': '2.5rem',
         ...(isActive ? {
-          border: 'none', // there's a default border of 1px and invisible.. hmm
+          border: '1px solid rgba(255 255 255 / 0.16)',
         } : {
-          // '--variant-borderWidth': '0.125rem',
           cursor: 'pointer',
+          border: '1px solid var(--agi-shell-border)',
         }),
-
-        // style
         fontSize: 'inherit',
-        backgroundColor: isActive ? 'neutral.solidActiveBg' : 'neutral.softBg',
-        borderRadius: 'md',
+        background: isActive ? 'linear-gradient(135deg, #a020f0 0%, #d040a0 100%)' : 'transparent',
+        color: isActive ? 'common.white' : undefined,
+        boxShadow: isActive ? '0 2px 10px rgba(160 32 240 / 0.2)' : 'none',
+        borderRadius: '10px',
         mx: '0.25rem',
         '&:hover > button': {
-          opacity: 1, // fade in buttons when hovering, but by default wash them out a bit
+          opacity: 1,
         },
-        // NOTE: we experimented with this code to have the actions fade in on hover, but idk about mobile..
-        //       Buttons Row had the "className='chat-actions'"
-        // '& .chat-actions': {
-        //   opacity: 0,
-        //   transition: 'opacity 0.2s ease-in-out',
-        // },
-        // '&:hover .chat-actions': {
-        //   opacity: 1,
-        // },
         ...(isIncognito && {
           backgroundColor: 'background.level2',
-          backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(0,0,0,0.03) 10px, transparent 10px, transparent 20px)',
-          // border: 'none',
-          // border: '1px dashed',
-          borderColor: 'background.level3',
-          // purple icon to further indicate incognito mode
+          backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.04), rgba(255,255,255,0.04) 10px, transparent 10px, transparent 20px)',
+          borderColor: 'var(--agi-shell-border-strong)',
           '& .MuiListItemDecorator-root': {
-            color: '#9C27B0',
+            color: '#f0b6ff',
           },
-          // filter: 'brightness(0.5) contrast(0.5)',
         }),
       }}
     >
@@ -461,12 +444,19 @@ function ChatDrawerItem(props: {
       <ListItemButton
         onClick={handleConversationActivate}
         sx={{
-          border: 'none', // there's a default border of 1px and invisible.. hmm
-          position: 'relative', // for the progress bar
-          borderRadius: 'sm', // OPTIMA_NAV_RADIUS, // sync with the optima radius, because they need to match
-          ...isIncognito && {
-            filter: 'contrast(0)',
+          border: '1px solid transparent',
+          position: 'relative',
+          borderRadius: '10px',
+          background: 'transparent',
+          boxShadow: 'none',
+          transition: 'background-color 0.15s ease, border-color 0.15s ease',
+          '&:hover': {
+            background: 'var(--agi-shell-soft)',
+            borderColor: 'var(--agi-shell-border)',
           },
+          ...(isIncognito && {
+            filter: 'contrast(0)',
+          }),
         }}
       >
 

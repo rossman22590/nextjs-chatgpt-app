@@ -30,7 +30,8 @@ import { createDMessageFromFragments, createDMessagePlaceholderIncomplete, DMess
 import { createErrorContentFragment, createTextContentFragment, DMessageAttachmentFragment, DMessageContentFragment, duplicateDMessageFragments } from '~/common/stores/chat/chat.fragments';
 import { gcChatImageAssets } from '~/common/stores/chat/chat.gc';
 import { getChatLLMId } from '~/common/stores/llms/store-llms';
-import { getConversation, getConversationSystemPurposeId, useConversation } from '~/common/stores/chat/store-chats';
+import { usePersonaCacheStore } from '~/common/stores/chat/store-persona-cache';
+import { getConversation, getConversationSystemPurposeId, useChatStore, useConversation } from '~/common/stores/chat/store-chats';
 import { optimaActions, optimaOpenModels, optimaOpenPreferences, useOptimaChromeless } from '~/common/layout/optima/useOptima';
 import { useFolderStore } from '~/common/stores/folders/store-chat-folders';
 import { useIsMobile, useIsTallScreen } from '~/common/components/useMatchMedia';
@@ -97,8 +98,8 @@ const composerOpenSx: SxProps = {
   minWidth: { md: 480 }, // don't get compresses too much on desktop
   // backgroundColor: themeBgAppChatComposer, // inlined in the Composer
   transition: 'background-color 0.5s ease-out',
-  borderTop: `1px solid`,
-  borderTopColor: 'rgba(var(--joy-palette-neutral-mainChannel, 99 107 116) / 0.4)',
+  borderTop: '1px solid',
+  borderTopColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.1)',
   // hack: eats the bottom of the last message (as it has a 1px divider)
   // NOTE: commented on 2024-05-13, as other content was stepping on the border due to it and missing zIndex
   // mt: '-1px',
@@ -346,12 +347,21 @@ export function AppChat() {
 
   // Chat actions
 
-  const handleConversationNewInFocusedPane = React.useCallback((forceNoRecycle: boolean, isIncognito: boolean) => {
+  const handleConversationNewInFocusedPane = React.useCallback((forceNoRecycle: boolean, isIncognito: boolean, initialPurposeId?: import('~/common/stores/chat/chat.conversation').ConversationPurposeId) => {
 
     // create conversation (or recycle the existing top-of-stack empty conversation)
+    const personaId = initialPurposeId ?? getConversationSystemPurposeId(focusedPaneConversationId) ?? undefined;
     const conversationId = (recycleNewConversationId && !forceNoRecycle && !isIncognito)
       ? recycleNewConversationId
-      : prependNewConversation(getConversationSystemPurposeId(focusedPaneConversationId) ?? undefined, isIncognito);
+      : prependNewConversation(personaId, isIncognito);
+
+    // when starting with a custom persona, set userSymbol so the drawer shows the correct icon
+    if (conversationId && initialPurposeId?.startsWith('persona:')) {
+      const personaIdOnly = initialPurposeId.slice(7);
+      const cached = usePersonaCacheStore.getState().getPersona(personaIdOnly);
+      if (cached?.symbol)
+        useChatStore.getState().setUserSymbol(conversationId, cached.symbol);
+    }
 
     // switch the focused pane to the new conversation
     handleOpenConversationInFocusedPane(conversationId);

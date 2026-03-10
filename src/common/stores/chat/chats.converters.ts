@@ -8,7 +8,7 @@ import { liveFileGetAllValidIDs } from '~/common/livefile/store-live-file';
 
 import type { DModelsService } from '~/common/stores/llms/llms.service.types';
 
-import { createDConversation, DConversation, type DConversationId } from './chat.conversation';
+import { createDConversation, type ConversationPurposeId, DConversation, type DConversationId } from './chat.conversation';
 import { createDMessageTextContent, DMessage, MESSAGE_FLAG_NOTIFY_COMPLETE, messageSetUserFlag } from './chat.message';
 import { createDMessageZyncAssetReferencePart, createErrorContentFragment, isAttachmentFragment, isContentOrAttachmentFragment, isDocPart, isImageRefPart, isPlaceholderPart, isTextContentFragment, isVoidFragment } from './chat.fragments';
 
@@ -168,7 +168,7 @@ export namespace V3StoreDataToHead {
       created,
     } = ic;
 
-    const cc = createDConversation(systemPurposeId as SystemPurposeId);
+    const cc = createDConversation(systemPurposeId as ConversationPurposeId);
     if (id) cc.id = id;
     cc.messages = messages.map(_recreateMessage);
     if (userTitle) cc.userTitle = userTitle;

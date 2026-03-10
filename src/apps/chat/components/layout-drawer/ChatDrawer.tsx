@@ -70,7 +70,7 @@ function ChatDrawer(props: {
   focusedChatBeamOpen: boolean,
   onConversationActivate: (conversationId: DConversationId) => void,
   onConversationBranch: (conversationId: DConversationId, messageId: string | null, addSplitPane: boolean) => void,
-  onConversationNew: (forceNoRecycle: boolean, isIncognito: boolean) => void,
+  onConversationNew: (forceNoRecycle: boolean, isIncognito: boolean, initialPurposeId?: import('~/common/stores/chat/chat.conversation').ConversationPurposeId) => void,
   onConversationsDelete: (conversationIds: DConversationId[], bypassConfirmation: boolean) => void,
   onConversationsExportDialog: (conversationId: DConversationId | null, exportAll: boolean) => void,
   onConversationsImportDialog: () => void,
@@ -342,7 +342,7 @@ function ChatDrawer(props: {
       {/* Search / New Chat */}
       <Box sx={{ display: 'flex', flexDirection: 'column', m: 2, gap: 2 }}>
 
-        {/* Search Input Field */}
+        {/* Search Input Field - use primary color so placeholder/icons are not grey */}
         <DebouncedInputMemo
           minChars={2}
           onDebounce={setDebouncedSearchQuery}
@@ -350,10 +350,19 @@ function ChatDrawer(props: {
           placeholder='Search...'
           aria-label='Search'
           endDecorator={groupingComponent}
+          sx={{
+            color: 'primary.softColor',
+            '& .MuiInput-startDecorator': { color: 'primary.softColor' },
+            '& .MuiInput-endDecorator': { color: 'primary.softColor' },
+            '& .MuiInput-endDecorator button': { color: 'primary.softColor' },
+            '& input::placeholder': { color: 'primary.softColor', opacity: 0.85 },
+            '& input': { color: 'primary.softColor' },
+          }}
         />
 
         {/* New Chat Button */}
         <Button
+          color="primary"
           // variant='outlined'
           variant={disableNewButton ? undefined : 'soft'}
           disabled={disableNewButton}
@@ -368,9 +377,11 @@ function ChatDrawer(props: {
             borderColor: 'neutral.outlinedBorder',
             borderRadius: 'sm',
             '--ListItemDecorator-size': 'calc(2.5rem - 1px)', // compensate for the border
-            // backgroundColor: 'background.popup',
-            // boxShadow: (disableNewButton || props.isMobile) ? 'none' : 'xs',
-            // transition: 'box-shadow 0.2s',
+            // keep text/icon from going grey when disabled
+            ...(disableNewButton && {
+              color: 'primary.softColor',
+              '& .MuiListItemDecorator-root': { color: 'primary.softColor' },
+            }),
           }}
         >
           <ListItemDecorator><AddIcon sx={{ fontSize: '' }} /></ListItemDecorator>

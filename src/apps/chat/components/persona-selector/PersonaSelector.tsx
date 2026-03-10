@@ -16,7 +16,9 @@ import { SystemPurposeData, SystemPurposeExample, SystemPurposeId, SystemPurpose
 import { YouTubeURLInput } from '~/modules/youtube/YouTubeURLInput';
 import { bareBonesPromptMixer } from '~/modules/persona/pmix/pmix';
 
+import { CUSTOM_PERSONA_PREFIX, getPersonaIdFromPurposeId, isCustomPersonaPurposeId } from '~/common/stores/chat/chat.conversation';
 import type { DConversationId } from '~/common/stores/chat/chat.conversation';
+import { usePersonaCacheStore } from '~/common/stores/chat/store-persona-cache';
 import { ExpanderControlledBox } from '~/common/components/ExpanderControlledBox';
 import { createDMessageTextContent } from '~/common/stores/chat/chat.message';
 import { lineHeightTextareaMd } from '~/common/app.theme';
@@ -171,6 +173,10 @@ export function PersonaSelector(props: {
     hiddenPurposeIDs: state.hiddenPurposeIDs,
     toggleHiddenPurposeId: state.toggleHiddenPurposeId,
   })));
+  const getPersonaFromCache = usePersonaCacheStore(state => state.getPersona);
+  const cachedCustomPersona = systemPurposeId && isCustomPersonaPurposeId(systemPurposeId)
+    ? getPersonaFromCache(getPersonaIdFromPurposeId(systemPurposeId)!)
+    : null;
   const { domainModelId: chatLLMId } = useModelDomain('primaryChat');
   const chatLLM = { id: chatLLMId ?? undefined }; // adapter for porting
 
@@ -181,7 +187,9 @@ export function PersonaSelector(props: {
   const isYouTubeTranscriber = systemPurposeId === 'YouTubeTranscriber';
 
   const { selectedPurpose, fourExamples } = React.useMemo(() => {
-    const selectedPurpose: SystemPurposeData | null = systemPurposeId ? (SystemPurposes[systemPurposeId] ?? null) : null;
+    const selectedPurpose: SystemPurposeData | null = systemPurposeId && !isCustomPersonaPurposeId(systemPurposeId)
+      ? (SystemPurposes[systemPurposeId as SystemPurposeId] ?? null)
+      : null;
     // const selectedExample = selectedPurpose?.examples?.length
     //   ? selectedPurpose.examples[Math.floor(Math.random() * selectedPurpose.examples.length)]
     //   : null;
@@ -229,25 +237,30 @@ export function PersonaSelector(props: {
 
   const toggleEditMode = React.useCallback(() => setEditMode(on => !on), []);
 
-  const handleApplyPersona = React.useCallback((systemPrompt: string, symbol?: string | null) => {
+  const handleApplyPersona = React.useCallback((personaId: string, _systemPrompt: string, symbol?: string | null) => {
     if (setSystemPurposeId) {
-      SystemPurposes['Custom'].systemMessage = systemPrompt;
-      setSystemPurposeId(props.conversationId, 'Custom');
-      if (symbol)
-        useChatStore.getState().setUserSymbol(props.conversationId, symbol);
+      const purposeId = `${CUSTOM_PERSONA_PREFIX}${personaId}` as const;
+      setSystemPurposeId(props.conversationId, purposeId);
+      useChatStore.getState().setUserSymbol(props.conversationId, symbol ?? null);
     }
   }, [props.conversationId, setSystemPurposeId]);
 
+  const setPersonasCache = usePersonaCacheStore(state => state.setPersonas);
   React.useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
     setLoadingPersonas(true);
     apiAsyncNode.persona.list.query()
-      .then((items) => { if (!cancelled) setUserPersonas(items); })
+      .then((items) => {
+        if (!cancelled) {
+          setUserPersonas(items);
+          setPersonasCache(items.map(p => ({ id: p.id, name: p.name, systemPrompt: p.systemPrompt, symbol: p.symbol })));
+        }
+      })
       .catch(() => { if (!cancelled) setUserPersonas([]); })
       .finally(() => { if (!cancelled) setLoadingPersonas(false); });
     return () => { cancelled = true; };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, setPersonasCache]);
 
 
   // Search (filtering)
@@ -357,10 +370,10 @@ export function PersonaSelector(props: {
                 text={p.name || p.llmLabel || 'Persona'}
                 imageUrl={p.pictureUrl || undefined}
                 symbol={p.symbol || (p.pictureUrl ? undefined : '🎭')}
-                isActive={false}
+                isActive={systemPurposeId === `${CUSTOM_PERSONA_PREFIX}${p.id}`}
                 isEditMode={false}
                 isHidden={false}
-                onClick={() => handleApplyPersona(p.systemPrompt, p.symbol)}
+                onClick={() => handleApplyPersona(p.id, p.systemPrompt, p.symbol)}
               />
             ))}
           </>
@@ -406,23 +419,27 @@ export function PersonaSelector(props: {
         {/* [row -3] Description */}
         <Box sx={{ gridColumn: '1 / -1', mt: 3, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
 
-          {/* Description*/}
+          {/* Description: built-in purpose or custom persona from cache */}
           <Typography level='body-sm' sx={{ color: 'text.primary' }}>
-            {!selectedPurpose
-              ? 'Cannot find the former persona' + (systemPurposeId ? ` "${systemPurposeId}"` : '')
-              : selectedPurpose?.description || 'No description available'}
+            {selectedPurpose
+              ? (selectedPurpose.description || 'No description available')
+              : cachedCustomPersona
+                ? (cachedCustomPersona.name || 'Custom persona')
+                : systemPurposeId
+                  ? 'Cannot find the former persona' + ` "${systemPurposeId}"`
+                  : 'Select a persona above'}
           </Typography>
 
-          {/* Examples/Prompt Toggles */}
+          {/* Examples/Prompt Toggles: only for built-in (not Custom, not custom persona) */}
           <Box sx={{ display: 'flex', gap: 1 }}>
             {fourExamples && showExamplescomponent}
-            {!isCustomPurpose && showPromptComponent}
+            {!isCustomPurpose && !cachedCustomPersona && showPromptComponent}
           </Box>
 
         </Box>
 
-        {/* [row -3] Example incipits */}
-        {systemPurposeId !== 'Custom' && (
+        {/* [row -3] Example incipits (built-in only; custom personas have no examples) */}
+        {systemPurposeId !== 'Custom' && !cachedCustomPersona && (
           <ExpanderControlledBox expanded={showExamples || (!isCustomPurpose && showPrompt)} sx={{ gridColumn: '1 / -1', pt: 1 }}>
             {showExamples && (
               <List

@@ -5,13 +5,14 @@
 
 /* Make clicks pass-through */
 #nprogress {
-    --barColor: #32383E;
-    --barHeight: 4px;
+    --barHeight: 3px;
     pointer-events: none;
 }
 
 #nprogress .bar {
-    background: var(--barColor);
+    background: linear-gradient(90deg, #a020f0, #e040a0, #a020f0);
+    background-size: 200% 100%;
+    animation: nprogress-shimmer 2s linear infinite;
 
     position: fixed;
     z-index: 1031;
@@ -22,6 +23,11 @@
     height: var(--barHeight);
 }
 
+@keyframes nprogress-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
 /* Fancy blur effect */
 #nprogress .peg {
     display: block;
@@ -29,7 +35,7 @@
     right: 0;
     width: 100px;
     height: 100%;
-    box-shadow: 0 0 10px var(--barColor), 0 0 5px var(--barColor);
+    box-shadow: 0 0 14px rgba(160, 32, 240, 0.6), 0 0 6px rgba(224, 64, 160, 0.4);
     opacity: 1.0;
 
     -ms-transform: rotate(3deg) translate(0px, -4px);

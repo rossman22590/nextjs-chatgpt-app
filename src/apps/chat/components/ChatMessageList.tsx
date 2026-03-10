@@ -48,7 +48,7 @@ export function ChatMessageList(props: {
   isMessageSelectionMode: boolean,
   onConversationBranch: (conversationId: DConversationId, messageId: string, addSplitPane: boolean) => void,
   onConversationExecuteHistory: (conversationId: DConversationId) => Promise<void>,
-  onConversationNew: (forceNoRecycle: boolean, isIncognito: boolean) => void,
+  onConversationNew: (forceNoRecycle: boolean, isIncognito: boolean, initialPurposeId?: import('~/common/stores/chat/chat.conversation').ConversationPurposeId) => void,
   onTextDiagram: (diagramConfig: DiagramConfig | null) => void,
   onTextImagine: (conversationId: DConversationId, selectedText: string) => Promise<void>,
   setIsMessageSelectionMode: (isMessageSelectionMode: boolean) => void,
@@ -290,7 +290,8 @@ export function ChatMessageList(props: {
 
   // style memo
   const listSx: SxProps = React.useMemo(() => ({
-    p: 0,
+    px: { xs: 0.5, md: 1 },
+    py: { xs: 0.5, md: 1 },
     ...props.sx,
 
     // we added these after removing the minSize={20} (%) from the containing panel.
@@ -318,7 +319,7 @@ export function ChatMessageList(props: {
 
   if (!filteredMessages.length)
     return (
-      <Box sx={{ ...props.sx }}>
+      <Box sx={{ px: { xs: 0.5, md: 1 }, py: { xs: 1, md: 1.5 }, ...props.sx }}>
         <PersonaSelector conversationId={conversationId} isMobile={props.isMobile} runExample={handleRunExample} />
       </Box>
     );

@@ -74,8 +74,8 @@ export const BUBBLE_MIN_TEXT_LENGTH = 3;
 
 const messageBodySx: SxProps = {
   display: 'flex',
-  alignItems: 'flex-start', // avatars at the top, and honor 'static' position
-  gap: { xs: 0, md: 1 },
+  alignItems: 'flex-start',
+  gap: { xs: 0, md: 0.75 },
 };
 
 const messageBodyReverseSx: SxProps = {
@@ -605,35 +605,43 @@ export function ChatMessage(props: {
   const backgroundColor = messageBackground(messageRole, userCommandApprox, messageHasBeenEdited, false /*isAssistantError && !errorMessage*/);
 
   const listItemSx: SxProps = React.useMemo(() => ({
-    // vars
-    // '--AGI-overlay-start-opacity': uiComplexityMode === 'extra' ? 0.1 : 0, // disabled - looks worse
+    background: backgroundColor,
+    px: { xs: 1, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.25 },
+    py: { xs: 0.75, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.25 },
+    my: { xs: 0.25, md: 0.375 },
+    width: '100%',
+    maxWidth: {
+      xs: '100%',
+      md: fromAssistant ? 'min(100%, 100%)' : fromUser ? 'min(100%, 80%)' : 'min(100%, 100%)',
+    },
+    border: '1px solid',
+    borderColor: fromUser ? 'rgba(160 32 240 / 0.14)' : 'rgba(160 32 240 / 0.06)',
+    borderRadius: { xs: '14px', md: '16px' },
+    boxShadow: fromUser
+      ? '0 2px 8px rgba(160 32 240 / 0.06)'
+      : '0 1px 4px rgba(120 40 180 / 0.03)',
+    backdropFilter: 'blur(16px) saturate(130%)',
+    overflow: 'hidden',
+    transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+    '&:hover': {
+      boxShadow: fromUser
+        ? '0 4px 16px rgba(160 32 240 / 0.1)'
+        : '0 2px 10px rgba(120 40 180 / 0.06)',
+      borderColor: fromUser ? 'rgba(160 32 240 / 0.2)' : 'rgba(160 32 240 / 0.1)',
+    },
+    ...(fromAssistant && { mr: 0, ml: 0 }),
+    ...(fromUser && { ml: { xs: 0, md: 'auto' }, mr: 0 }),
+    ...(fromSystem && { ml: 0, mr: 0 }),
 
-    // style
-    backgroundColor: backgroundColor,
-    px: { xs: 1, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 2 },
-    py: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 2,
-    // filter: 'url(#agi-futuristic-glow)',
-
-    // style: omit border if set externally
-    ...(!('borderBottom' in (props.sx || {})) && !props.isBottom && {
-      borderBottom: '1px solid',
-      borderBottomColor: 'divider',
-    }),
-
-    // style: when starred
     ...(isUserStarred && {
-      outline: '3px solid',
-      outlineColor: 'primary.solidBg',
-      boxShadow: 'lg',
-      borderRadius: 'lg',
+      outline: '2px solid',
+      outlineColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.42)',
+      boxShadow: 'var(--agi-shell-shadow-strong)',
       zIndex: 1,
     }),
 
-    // style: when has a user/automatic breakpoint
     ...(isVndAndCacheUser && {
       borderInlineStart: `0.125rem solid ${ModelVendorAnthropic.brandColor}`,
-      // borderTopLeftRadius: '0.375rem',
-      // borderBottomLeftRadius: '0.375rem',
     }),
     ...(uiComplexityMode === 'extra' && isVndAndCacheAuto && !isVndAndCacheUser && {
       position: 'relative',
@@ -644,27 +652,18 @@ export function ChatMessage(props: {
         top: 0,
         bottom: 0,
         width: '0.125rem',
-        background: `repeating-linear-gradient( -45deg, transparent, transparent 2px, ${ModelVendorAnthropic.brandColor} 2px, ${ModelVendorAnthropic.brandColor} 12px ) repeat`,
+        background: `repeating-linear-gradient(-45deg, transparent, transparent 2px, ${ModelVendorAnthropic.brandColor} 2px, ${ModelVendorAnthropic.brandColor} 12px) repeat`,
       },
     }),
-    // style: when the user skips the message
     ...(isUserMessageSkipped && messageSkippedSx),
-
-    // style: when the message is being edited
     ...(isEditingText && {
-      zIndex: 1, // this is to make the whole message appear on top of Beam Scatter > RayControlsMemo
+      zIndex: 1,
     }),
 
-    // for: ENABLE_COPY_MESSAGE_OVERLAY
-    // '&:hover > button': { opacity: 1 },
-
-    // layout
-    display: 'block', // this is Needed, otherwise there will be a horizontal overflow
+    display: 'block',
 
     ...props.sx,
-  }), [adjContentScaling, backgroundColor, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.isBottom, props.sx, uiComplexityMode]);
-
-
+  }), [adjContentScaling, backgroundColor, fromAssistant, fromSystem, fromUser, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.sx, uiComplexityMode]);
   // avatar icon & label & tooltip
 
   const zenMode = uiComplexityMode === 'minimal';
@@ -1228,3 +1227,6 @@ export function ChatMessage(props: {
     </Box>
   );
 }
+
+
+

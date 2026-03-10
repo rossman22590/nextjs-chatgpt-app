@@ -1,7 +1,7 @@
 import * as React from 'react';
 
 import type { SxProps } from '@mui/joy/styles/types';
-import { Box, Sheet, styled, useTheme } from '@mui/joy';
+import { Box, Sheet, styled } from '@mui/joy';
 
 
 export const InvertedBarCornerItem = styled(Box)({
@@ -10,21 +10,37 @@ export const InvertedBarCornerItem = styled(Box)({
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
+  flexShrink: 0,
 });
 
 
 const StyledSheet = styled(Sheet)({
-  // customization
   '--Bar': 'var(--AGI-Nav-width)',
-
-  // layout
+  position: 'relative',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
+  background: 'var(--agi-shell-bg)',
+  border: '1px solid var(--agi-shell-border)',
+  boxShadow: 'var(--agi-shell-shadow)',
+  backdropFilter: 'blur(32px) saturate(170%)',
+  overflow: 'hidden',
+  isolation: 'isolate',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    inset: 0,
+    background: 'var(--agi-shell-glow)',
+    opacity: 0.6,
+    pointerEvents: 'none',
+  },
+  '& > *': {
+    position: 'relative',
+    zIndex: 1,
+  },
 }) as typeof Sheet;
 
 
-// This is the PageBar and the MobileAppNav and DesktopNav
 export const InvertedBar = (props: {
   id?: string,
   component: React.ElementType,
@@ -35,22 +51,21 @@ export const InvertedBar = (props: {
   onMouseLeave?: () => void,
 }) => {
 
-  // check for dark mode
-  const theme = useTheme();
-  const isDark = theme?.palette.mode === 'dark';
-
-
-  // memoize the Sx for stability, based on direction
   const sx: SxProps = React.useMemo(() => (
     props.direction === 'horizontal'
       ? {
-        // minHeight: 'var(--Bar)',
         flexDirection: 'row',
-        // overflow: 'hidden',
+        minHeight: 'calc(var(--Bar) + 4px)',
+        margin: { xs: '0.375rem', md: '0.75rem 0.75rem 0.5rem' },
+        paddingInline: '0.25rem',
+        borderRadius: '16px',
         ...props.sx,
       } : {
-        // minWidth: 'var(--Bar)',
         flexDirection: 'column',
+        minWidth: 'calc(var(--Bar) + 4px)',
+        margin: '0.75rem 0.5rem 0.75rem 0.75rem',
+        paddingBlock: '0.25rem',
+        borderRadius: '16px',
         ...props.sx,
       }
   ), [props.direction, props.sx]);
@@ -60,8 +75,7 @@ export const InvertedBar = (props: {
     <StyledSheet
       id={props.id}
       component={props.component}
-      variant={isDark ? 'soft' : 'solid'}
-      invertedColors={!isDark ? true : undefined}
+      variant='plain'
       onMouseEnter={props.onMouseEnter}
       onMouseLeave={props.onMouseLeave}
       sx={sx}

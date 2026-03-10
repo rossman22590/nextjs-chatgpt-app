@@ -633,12 +633,12 @@ export function Composer(props: {
       //   composerShortcuts.push({ key: 's', ctrl: true, shift: true, action: openScreenCaptureDialog, description: 'Attach Screen Capture' });
     }
     if (recognitionState.isActive) {
-      composerShortcuts.push({ key: 'm', ctrl: true, action: handleFinishMicAndSend, description: 'Mic · Send', disabled: !recognitionState.hasSpeech || sendStarted, endDecoratorIcon: TelegramIcon as any, level: 4 });
+      composerShortcuts.push({ key: 'm', ctrl: true, action: handleFinishMicAndSend, description: 'Mic - Send', disabled: !recognitionState.hasSpeech || sendStarted, endDecoratorIcon: TelegramIcon as any, level: 4 });
       composerShortcuts.push({
         key: ShortcutKey.Esc, action: () => {
           setMicContinuation(false);
           toggleRecognition(false);
-        }, description: 'Mic · Stop', level: 4,
+        }, description: 'Mic - Stop', level: 4,
       });
     } else if (browserSpeechRecognitionCapability().mayWork)
       composerShortcuts.push({
@@ -699,26 +699,48 @@ export function Composer(props: {
         : isTextBeam ? 'Combine insights from multiple AI models...'
           : showChatInReferenceTo ? 'Chat about this...'
             : 'Type'
-            + (props.isDeveloperMode ? ' · attach code' : '')
-            + (isDesktop ? ` · drop ${props.isDeveloperMode ? 'source' : 'files'}` : '')
-            + ` · ${placeholderAction}`
-            + (recognitionState.isAvailable ? ' · ramble' : '')
+            + (props.isDeveloperMode ? ' - attach code' : '')
+            + (isDesktop ? ` - drop ${props.isDeveloperMode ? 'source' : 'files'}` : '')
+            + ` - ${placeholderAction}`
+            + (recognitionState.isAvailable ? ' - ramble' : '')
             + '...';
 
   if (isDesktop && timeToShowTips && !isDraw) {
     if (explainShiftEnter)
-      textPlaceholder += !enterIsNewline ? '\n\n⏎ Shift + Enter to add a new line' : '\n\n➤ Shift + Enter to send';
+      textPlaceholder += !enterIsNewline ? '\n\nTip: Shift + Enter adds a new line' : '\n\nTip: Shift + Enter sends';
       // else if (explainAltEnter)
-    //   textPlaceholder += platformAwareKeystrokes('\n\n⭳ Tip: Alt + Enter to just append the message');
+    //   textPlaceholder += platformAwareKeystrokes('\n\nTip: Alt + Enter appends the message');
     else if (explainCtrlEnter)
-      textPlaceholder += platformAwareKeystrokes('\n\n⫷ Tip: Ctrl + Enter to beam');
+      textPlaceholder += platformAwareKeystrokes('\n\nTip: Ctrl + Enter beams');
   }
 
   const stableGridSx: SxProps = React.useMemo(() => ({
-    // basically a position:relative to enable the inner drop area
     ...dragContainerSx,
-    // This used to be in the outer box, but we put it here instead
-    // p: { xs: 1, md: 2 },
+    position: 'relative',
+    p: { xs: 0.875, md: 1 },
+    borderRadius: { xs: '14px', md: '16px' },
+    background: 'var(--agi-shell-elevated)',
+    border: '1px solid var(--agi-shell-border)',
+    boxShadow: '0 12px 40px rgba(160 32 240 / 0.1), 0 4px 12px rgba(224 64 160 / 0.04)',
+    backdropFilter: 'blur(28px) saturate(160%)',
+    overflow: 'hidden',
+    transition: 'box-shadow 0.3s ease, border-color 0.3s ease',
+    '&:focus-within': {
+      borderColor: 'var(--agi-shell-border-strong)',
+      boxShadow: '0 16px 52px rgba(160 32 240 / 0.16), 0 4px 16px rgba(224 64 160 / 0.08)',
+    },
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      inset: 0,
+      background: 'var(--agi-shell-glow)',
+      opacity: 0.5,
+      pointerEvents: 'none',
+    },
+    '& > *': {
+      position: 'relative',
+      zIndex: 1,
+    },
   }), [dragContainerSx]);
 
   return (
@@ -858,8 +880,13 @@ export function Composer(props: {
                     }}
                     sx={{
                       height: '100%',
-                      backgroundColor: showTint ? undefined : 'background.level1',
-                      '&:focus-within': { backgroundColor: 'background.popup', '.within-composer-focus': { backgroundColor: 'background.popup' } },
+                      borderRadius: '22px',
+                      backgroundColor: showTint ? 'rgba(var(--joy-palette-warning-mainChannel) / 0.08)' : 'transparent',
+                      boxShadow: 'inset 0 1px 0 rgba(255 255 255 / 0.04)',
+                      '&:focus-within': {
+                        backgroundColor: showTint ? 'rgba(var(--joy-palette-warning-mainChannel) / 0.12)' : 'rgba(var(--joy-palette-primary-mainChannel) / 0.04)',
+                        '.within-composer-focus': { backgroundColor: 'transparent' },
+                      },
                       lineHeight: lineHeightTextareaMd,
                     }} />
 
@@ -904,7 +931,7 @@ export function Composer(props: {
                       // alignItems: 'center', justifyContent: 'center',
                       border: '1px solid',
                       borderColor: 'primary.solidBg',
-                      borderRadius: 'sm',
+                      borderRadius: '22px',
                       boxShadow: 'inset 1px 1px 4px -3px var(--joy-palette-primary-solidHoverBg)',
                       zIndex: zIndexComposerOverlayMic,
                       pl: 1.5,
@@ -977,7 +1004,7 @@ export function Composer(props: {
                       : <ButtonBeamMemo isMobile disabled={noConversation /*|| noLLM*/} color={beamButtonColor} hasContent={!!composeText} onClick={handleSendTextBeamClicked} />)
                     : isDraw
                       ? <ButtonOptionsDraw isMobile onClick={handleDrawOptionsClicked} sx={{ mr: { xs: 1, md: 2 } }} />
-                      : <IconButton disabled sx={{ mr: { xs: 1, md: 2 } }} />
+                      : <Box sx={{ mr: { xs: 1, md: 2 }, width: 40, flexShrink: 0 }} />
                 )}
 
                 {/* Responsive Send/Stop buttons */}

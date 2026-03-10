@@ -28,11 +28,18 @@ const ANIM_BUSY_PAINTING = 'https://i.giphy.com/media/5t9ujj9cMisyVjUZ0m/giphy.w
 const ANIM_BUSY_THINKING = 'https://i.giphy.com/media/l44QzsOLXxcrigdgI/giphy.webp';
 
 
-export const avatarIconSx = {
-  borderRadius: 'sm',
-  height: 36,
-  width: 36,
-} as const;
+export const avatarIconSx: SxProps = {
+  borderRadius: '10px',
+  height: 28,
+  width: 28,
+  padding: '3px',
+  '--Icon-color': '#a020f0',
+  color: '#a020f0',
+  backgroundColor: 'rgba(160, 32, 240, 0.1)',
+  border: '1px solid rgba(160, 32, 240, 0.2)',
+  boxShadow: 'none',
+  transition: 'transform 0.2s cubic-bezier(.4,0,.2,1), box-shadow 0.2s ease',
+};
 
 // const largerAvatarIconsSx = {
 //   borderRadius: 'sm',
@@ -83,15 +90,15 @@ const tooltipMetricsGridSx: SxProps = {
 export function messageBackground(messageRole: DMessageRole | string, userCommand: 'draw' | 'react' | false, wasEdited: boolean, isAssistantIssue: boolean): string {
   switch (messageRole) {
     case 'user':
-      return userCommand === 'draw' ? 'warning.softActiveBg'
-        : userCommand === 'react' ? 'success.softHoverBg'
-          : 'primary.plainHoverBg'; // was .background.level1
+      return userCommand === 'draw' ? 'rgba(255 247 237 / 0.88)'
+        : userCommand === 'react' ? 'rgba(236 253 245 / 0.88)'
+          : 'var(--agi-message-user)';
     case 'assistant':
-      return isAssistantIssue ? 'danger.softBg' : 'background.surface';
+      return isAssistantIssue ? 'rgba(255 241 242 / 0.88)' : 'var(--agi-message-assistant)';
     case 'system':
-      return wasEdited ? 'warning.softHoverBg' : 'neutral.softBg';
+      return wasEdited ? 'rgba(255 251 235 / 0.88)' : 'var(--agi-message-system)';
     default:
-      return '#ff0000';
+      return 'var(--agi-message-assistant)';
   }
 }
 
@@ -132,7 +139,7 @@ export function makeMessageAvatarIcon(
       const isDownload = messageGeneratorName === 'web';
       const isTextToImage =
         messageGeneratorName?.startsWith('GPT Image') // sync this with t2i.client.ts
-        || messageGeneratorName?.startsWith('DALL·E')
+        || messageGeneratorName?.startsWith('DALL-E')
         || messageGeneratorName === 'Prodia';
       const isReact = messageGeneratorName?.startsWith('react-');
 
@@ -284,8 +291,8 @@ function _prettyMetrics(metrics: DMessageGenerator['metrics'], uiComplexityMode:
     {metrics?.TIn !== undefined && <div>Tokens:</div>}
     {metrics?.TIn !== undefined && <div>
       {' '}<b>{metrics.TIn?.toLocaleString() || ''}</b> in
-      {metrics.TCacheRead !== undefined && <>{' · '}<b>{metrics.TCacheRead?.toLocaleString() || ''}</b> read</>}
-      {metrics.TCacheWrite !== undefined && <>{' · '}<b>{metrics.TCacheWrite?.toLocaleString() || ''}</b> wrote</>}
+      {metrics.TCacheRead !== undefined && <>{' - '}<b>{metrics.TCacheRead?.toLocaleString() || ''}</b> read</>}
+      {metrics.TCacheWrite !== undefined && <>{' - '}<b>{metrics.TCacheWrite?.toLocaleString() || ''}</b> wrote</>}
       {', '}<b>{metrics.TOut?.toLocaleString() || ''}</b> out
       {metrics.TOutR !== undefined && <> (<b>{metrics.TOutR?.toLocaleString() || ''}</b> for reasoning)</>}
       {/*{metrics.TOutA !== undefined && <> (<b>{metrics.TOutA?.toLocaleString() || ''}</b> for audio)</>}*/}
@@ -296,7 +303,7 @@ function _prettyMetrics(metrics: DMessageGenerator['metrics'], uiComplexityMode:
     {showSpeedSection && <div>
       {!!metrics.vTOutInner && <>~<b>{(Math.round(metrics.vTOutInner * 10) / 10).toLocaleString() || ''}</b> tok/s</>}
       {showWaitingTime && (<span style={{ opacity: 0.5 }}>
-        {metrics.vTOutInner !== undefined && ' · '}
+        {metrics.vTOutInner !== undefined && ' - '}
         <span>{(Math.round(metrics.dtStart! / 100) / 10).toLocaleString() || ''}</span>s wait
       </span>)}
     </div>}
@@ -500,7 +507,7 @@ export function prettyShortChatModelName(model: string | undefined): string {
     return model
       .replace('glm-', 'GLM-')
       .replace('ocr', 'OCR')
-      .replace(/(\d)v/, '$1 V')   // vision suffix: 4.6v → 4.6 V
+      .replace(/(\d)v/, '$1 V')   // vision suffix: 4.6v -> 4.6 V
       .replace('-flashx', ' FlashX')
       .replace('-flash', ' Flash')
       .replace('-airx', ' AirX')
@@ -513,7 +520,7 @@ export function prettyShortChatModelName(model: string | undefined): string {
   if (model.includes('accounts/')) {
     const index = model.indexOf('accounts/');
     const subStr = model.slice(index + 9);
-    return subStr.replaceAll('/models/', ' · ').replaceAll(/[_-]/g, ' ');
+    return subStr.replaceAll('/models/', ' - ').replaceAll(/[_-]/g, ' ');
   }
   return model;
 }
@@ -552,3 +559,4 @@ function _prettyLMStudioFileModelName(filePath: string): string {
   const normalizedPath = filePath.replace(/\\/g, '/');
   return normalizedPath.split('/').pop() || '';
 }
+

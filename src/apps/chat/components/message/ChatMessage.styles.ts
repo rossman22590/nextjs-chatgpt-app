@@ -4,24 +4,17 @@ import { animationColorRainbow } from '~/common/util/animUtils';
 
 
 export const messageAsideColumnSx: SxProps = {
-  // make this stick to the top of the screen
   position: 'sticky',
-  top: '0.25rem',
-
-  // style
-  // filter: 'url(#agi-holographic)',
-
-  // flexBasis: 0, // this won't let the item grow
-  minWidth: { xs: 50, md: 64 },
-  maxWidth: 80,
+  top: '0.5rem',
+  minWidth: { xs: 36, md: 40 },
+  maxWidth: 48,
   textAlign: 'center',
-  // layout
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  gap: 0.25, // 2024-08-24: added, space the avatar icon from the label
-
-  // when with the 'edit-button' class
+  gap: 0.25,
+  pt: 0.125,
+  alignSelf: 'flex-start',
   '&.msg-edit-button': {
     gap: 0.25,
   },
@@ -36,10 +29,10 @@ export const messageZenAsideColumnSx: SxProps = {
 
 export const messageAvatarLabelSx: SxProps = {
   overflowWrap: 'anywhere',
+  color: 'text.tertiary',
+  fontWeight: 'md',
 };
 
 export const messageAvatarLabelAnimatedSx: SxProps = {
   animation: `${animationColorRainbow} 5s linear infinite`,
-  // Extra hinting... but looks weird
-  // fontStyle: 'italic',
 };

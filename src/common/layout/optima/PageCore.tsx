@@ -7,7 +7,6 @@ import { themeBgApp, themeZIndexPageBar } from '~/common/app.theme';
 import type { NavItemApp } from '~/common/app.nav';
 import { ExpanderControlledBox } from '~/common/components/ExpanderControlledBox';
 
-// import { MobileNav } from './MobileNav';
 import { OptimaBar } from '~/common/layout/optima/bar/OptimaBar';
 import { optimaHasMOTD, OptimaMOTD } from '~/common/layout/optima/OptimaMOTD';
 import { ChromelessFloatingButtons } from './ChromelessFloatingButtons';
@@ -15,29 +14,51 @@ import { useOptimaChromeless } from './useOptima';
 
 
 const pageCoreSx: SxProps = {
-  // background: 'url(/images/big-agi-background-3.png) no-repeat center bottom fixed',
+  position: 'relative',
+  isolation: 'isolate',
   backgroundColor: themeBgApp,
+  backgroundImage: 'var(--agi-page-gradient)',
+  minHeight: '100dvh',
   height: '100dvh',
-  display: 'flex', flexDirection: 'column',
-  transition: 'background-color 0.5s cubic-bezier(.17,.84,.44,1)',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  transition: 'background-color 0.5s cubic-bezier(.17,.84,.44,1), box-shadow 0.4s ease',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    inset: 0,
+    background: 'linear-gradient(140deg, rgba(160 32 240 / 0.04), transparent 28%), var(--agi-shell-glow)',
+    opacity: 1,
+    pointerEvents: 'none',
+  },
+  '& > *': {
+    position: 'relative',
+    zIndex: 1,
+  },
 };
 
 const pageCoreFullSx: SxProps = {
   ...pageCoreSx,
-  backgroundColor: 'transparent',
-} as const;
+  borderRadius: 0,
+  border: 'none',
+  boxShadow: 'none',
+};
+
+const pageCoreContainedSx: SxProps = {
+  ...pageCoreSx,
+  borderRadius: { xs: 0, md: '20px' },
+  border: { xs: 'none', md: '1px solid var(--agi-shell-border)' },
+  boxShadow: { xs: 'none', md: 'var(--agi-shell-shadow)' },
+};
 
 const pageCoreBrighterSx: SxProps = {
-  ...pageCoreSx,
+  ...pageCoreContainedSx,
   backgroundColor: 'background.surface',
 };
 
 const pageCoreBarSx: SxProps = {
   zIndex: themeZIndexPageBar,
-};
-
-const pageCoreMobileNavSx: SxProps = {
-  flex: 0,
 };
 
 
@@ -49,18 +70,15 @@ export const PageCore = (props: {
   children: React.ReactNode,
 }) => {
 
-  // external state
   const isChromeless = useOptimaChromeless();
 
   return <Box
     component={props.component}
-    sx={props.currentApp?.pageBrighter ? pageCoreBrighterSx : props.isFull ? pageCoreFullSx : pageCoreSx}
+    sx={props.currentApp?.pageBrighter ? pageCoreBrighterSx : props.isFull ? pageCoreFullSx : pageCoreContainedSx}
   >
 
-    {/* Optional deployment MOTD */}
     {optimaHasMOTD && <OptimaMOTD />}
 
-    {/* Responsive page bar (pluggable App Center Items and App Menu) - collapsible for chromeless mode */}
     <ExpanderControlledBox expanded={!isChromeless}>
       <OptimaBar
         component='header'
@@ -69,21 +87,9 @@ export const PageCore = (props: {
         sx={pageCoreBarSx}
       />
     </ExpanderControlledBox>
-    {/* Chromeless alternative to the OptimaBar */}
     {isChromeless && <ChromelessFloatingButtons />}
 
-    {/* Page (NextJS) must make the assumption they're in a flex-col layout */}
     {props.children}
-
-    {/* [Mobile] Nav bar at the bottom */}
-    {/*{!!props.isMobile && (*/}
-    {/*  <MobileNav*/}
-    {/*    component='nav'*/}
-    {/*    currentApp={props.currentApp}*/}
-    {/*    hideOnFocusMode*/}
-    {/*    sx={pageCoreMobileNavSx}*/}
-    {/*  />*/}
-    {/*)}*/}
 
   </Box>;
 };
