@@ -75,7 +75,7 @@ export const BUBBLE_MIN_TEXT_LENGTH = 3;
 const messageBodySx: SxProps = {
   display: 'flex',
   alignItems: 'flex-start',
-  gap: { xs: 0.5, md: 0.75 },
+  gap: { xs: 0.75, md: 1 },
 };
 
 const messageBodyReverseSx: SxProps = {
@@ -109,7 +109,7 @@ const fragmentsListSx: SxProps = {
   // layout
   display: 'flex',
   flexDirection: 'column',
-  gap: 1.5,     // we give a bit more space between the 'classes' of fragments (in-reply-to, images, content, attachments, etc.)
+  gap: 1.75,    // slightly more space between fragment groups for better readability
 };
 
 const antCachePromptOffSx: SxProps = {
@@ -605,32 +605,76 @@ export function ChatMessage(props: {
   const backgroundColor = messageBackground(messageRole, userCommandApprox, messageHasBeenEdited, false /*isAssistantError && !errorMessage*/);
 
   const listItemSx: SxProps = React.useMemo(() => ({
+    // background - CSS var holds gradient for user, frosted white for assistant
     background: backgroundColor,
-    px: { xs: 1, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.25 },
-    py: { xs: 0.75, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.25 },
-    my: { xs: 0.25, md: 0.375 },
+
+    // spacing - generous padding gives content room to breathe
+    px: { xs: 1.5, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.75 },
+    py: { xs: 1, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.25 },
+    my: { xs: 0.5, md: 0.75 },
+
+    // sizing - user bubbles are narrower and float right; assistant fills more width
     width: '100%',
     maxWidth: {
-      xs: '100%',
-      md: fromAssistant ? 'min(100%, 100%)' : fromUser ? 'min(100%, 80%)' : 'min(100%, 100%)',
+      xs: fromUser ? '92%' : '100%',
+      md: fromAssistant ? 'min(100%, 88%)' : fromUser ? 'min(100%, 72%)' : 'min(100%, 100%)',
     },
+
+    // border - user gets a vivid purple accent, assistant is almost invisible
     border: '1px solid',
-    borderColor: fromUser ? 'rgba(160 32 240 / 0.14)' : 'rgba(160 32 240 / 0.06)',
-    borderRadius: { xs: '14px', md: '16px' },
+    borderColor: fromUser
+      ? 'rgba(160 32 240 / 0.32)'
+      : fromAssistant
+        ? 'rgba(160 32 240 / 0.07)'
+        : 'rgba(160 32 240 / 0.1)',
+
+    // corner radius - speech bubble style: tail corner is tight, others are rounded
+    borderRadius: fromUser
+      ? { xs: '18px 18px 6px 18px', md: '20px 20px 6px 20px' }
+      : fromAssistant
+        ? { xs: '6px 18px 18px 18px', md: '6px 20px 20px 20px' }
+        : { xs: '14px', md: '16px' },
+
+    // left accent stripe on assistant messages - brand identity line
+    ...(fromAssistant && {
+      borderInlineStart: '3px solid rgba(160, 32, 240, 0.3)',
+    }),
+
+    // shadow - user has a warm purple lift, assistant has a clean neutral depth
     boxShadow: fromUser
-      ? '0 2px 8px rgba(160 32 240 / 0.06)'
-      : '0 1px 4px rgba(120 40 180 / 0.03)',
-    backdropFilter: 'blur(16px) saturate(130%)',
+      ? '0 4px 24px rgba(160 32 240 / 0.16), 0 1px 8px rgba(160 32 240 / 0.08)'
+      : fromAssistant
+        ? '0 4px 24px rgba(120 40 180 / 0.07), 0 1px 6px rgba(0 0 0 / 0.04)'
+        : '0 1px 6px rgba(120 40 180 / 0.05)',
+
+    backdropFilter: 'blur(20px) saturate(160%)',
     overflow: 'hidden',
-    transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+
+    // entrance animation
+    animation: fromUser
+      ? 'agi-message-in-user 0.28s cubic-bezier(0.22, 1, 0.36, 1) both'
+      : 'agi-message-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both',
+
+    transition: 'box-shadow 0.22s ease, border-color 0.22s ease, transform 0.22s ease',
+
+    // hover - subtle lift effect
     '&:hover': {
       boxShadow: fromUser
-        ? '0 4px 16px rgba(160 32 240 / 0.1)'
-        : '0 2px 10px rgba(120 40 180 / 0.06)',
-      borderColor: fromUser ? 'rgba(160 32 240 / 0.2)' : 'rgba(160 32 240 / 0.1)',
+        ? '0 8px 36px rgba(160 32 240 / 0.22), 0 2px 12px rgba(160 32 240 / 0.1)'
+        : fromAssistant
+          ? '0 8px 32px rgba(120 40 180 / 0.11), 0 2px 8px rgba(0 0 0 / 0.06)'
+          : '0 4px 16px rgba(120 40 180 / 0.07)',
+      borderColor: fromUser
+        ? 'rgba(160 32 240 / 0.42)'
+        : fromAssistant
+          ? 'rgba(160 32 240 / 0.14)'
+          : 'rgba(160 32 240 / 0.14)',
+      transform: 'translateY(-1px)',
     },
+
+    // alignment
     ...(fromAssistant && { mr: 0, ml: 0 }),
-    ...(fromUser && { ml: { xs: 0, md: 'auto' }, mr: 0 }),
+    ...(fromUser && { ml: { xs: 'auto', md: 'auto' }, mr: 0 }),
     ...(fromSystem && { ml: 0, mr: 0 }),
 
     ...(isUserStarred && {

@@ -23,7 +23,6 @@ import { OptimaDrawerIn, OptimaPanelIn, OptimaToolbarIn } from '~/common/layout/
 import { PanelResizeInset } from '~/common/components/PanelResizeInset';
 import { Release } from '~/common/app.release';
 import { ScrollToBottom } from '~/common/scroll-to-bottom/ScrollToBottom';
-import { ScrollToBottomButton } from '~/common/scroll-to-bottom/ScrollToBottomButton';
 import { ShortcutKey, useGlobalShortcuts } from '~/common/components/shortcuts/useGlobalShortcuts';
 import { WorkspaceIdProvider } from '~/common/stores/workspace/WorkspaceIdProvider';
 import { addSnackbar, removeSnackbar } from '~/common/components/snackbar/useSnackbarsStore';
@@ -94,16 +93,15 @@ const chatBeamWrapperSx: SxProps = {
 };
 
 const composerOpenSx: SxProps = {
-  // NOTE: disabled on 2025-03-05: conflicts with the GlobalDragOverlay's
-  // zIndex: 21, // just to allocate a surface, and potentially have a shadow
-  minWidth: { md: 480 }, // don't get compresses too much on desktop
-  // backgroundColor: themeBgAppChatComposer, // inlined in the Composer
-  transition: 'background-color 0.5s ease-out',
+  minWidth: { md: 480 },
+  pt: { xs: 1, md: 1.5 },
+  pb: { xs: 0.5, md: 1 },
+  px: { xs: 0, md: 1 },
+  transition: 'background-color 0.4s ease-out',
   borderTop: '1px solid',
-  borderTopColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.1)',
-  // hack: eats the bottom of the last message (as it has a 1px divider)
-  // NOTE: commented on 2024-05-13, as other content was stepping on the border due to it and missing zIndex
-  // mt: '-1px',
+  borderTopColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.08)',
+  backdropFilter: 'blur(20px) saturate(150%)',
+  background: 'var(--agi-shell-bg)',
 } as const;
 
 const composerOpenMobileSx: SxProps = {
@@ -747,9 +745,6 @@ export function AppChat() {
                   inlineSx={chatBeamWrapperSx}
                 />
               )}
-
-              {/* Visibility and actions are handled via Context */}
-              <ScrollToBottomButton />
 
             </ScrollToBottom>
 

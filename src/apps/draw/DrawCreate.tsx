@@ -5,7 +5,6 @@ import { Box } from '@mui/joy';
 
 import type { TextToImageProvider } from '~/common/components/useCapabilities';
 import { ScrollToBottom } from '~/common/scroll-to-bottom/ScrollToBottom';
-import { ScrollToBottomButton } from '~/common/scroll-to-bottom/ScrollToBottomButton';
 
 import { DesignerPrompt, PromptComposer } from './create/PromptComposer';
 import { DrawCreateQueue } from './queue-draw-create';
@@ -208,10 +207,6 @@ export function DrawCreate(props: {
 
           {/* End with this Unconfigured message */}
           {!props.mayWork && <ZeroDrawConfig />}
-
-
-          {/* Visibility and actions are handled via Context */}
-          <ScrollToBottomButton />
 
         </ScrollToBottom>
 

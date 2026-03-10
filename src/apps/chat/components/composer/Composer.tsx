@@ -698,12 +698,9 @@ export function Composer(props: {
       : isReAct ? 'Ask a multi-step reasoning question...'
         : isTextBeam ? 'Combine insights from multiple AI models...'
           : showChatInReferenceTo ? 'Chat about this...'
-            : 'Type'
-            + (props.isDeveloperMode ? ' - attach code' : '')
-            + (isDesktop ? ` - drop ${props.isDeveloperMode ? 'source' : 'files'}` : '')
-            + ` - ${placeholderAction}`
-            + (recognitionState.isAvailable ? ' - ramble' : '')
-            + '...';
+            : (props.isDeveloperMode || (isDesktop && timeToShowTips))
+              ? 'Type' + (props.isDeveloperMode ? ' - attach code' : '') + (isDesktop ? ` - drop ${props.isDeveloperMode ? 'source' : 'files'}` : '') + ` - ${placeholderAction}` + (recognitionState.isAvailable ? ' - ramble' : '') + '...'
+              : 'Type your message here...';
 
   if (isDesktop && timeToShowTips && !isDraw) {
     if (explainShiftEnter)
@@ -718,23 +715,23 @@ export function Composer(props: {
     ...dragContainerSx,
     position: 'relative',
     p: { xs: 0.875, md: 1 },
-    borderRadius: { xs: '14px', md: '16px' },
+    borderRadius: { xs: '16px', md: '18px' },
     background: 'var(--agi-shell-elevated)',
     border: '1px solid var(--agi-shell-border)',
-    boxShadow: '0 12px 40px rgba(160 32 240 / 0.1), 0 4px 12px rgba(224 64 160 / 0.04)',
-    backdropFilter: 'blur(28px) saturate(160%)',
+    boxShadow: '0 4px 20px rgba(160 32 240 / 0.06), 0 2px 8px rgba(224 64 160 / 0.03)',
+    backdropFilter: 'blur(20px) saturate(140%)',
     overflow: 'hidden',
-    transition: 'box-shadow 0.3s ease, border-color 0.3s ease',
+    transition: 'box-shadow 0.25s ease, border-color 0.25s ease',
     '&:focus-within': {
       borderColor: 'var(--agi-shell-border-strong)',
-      boxShadow: '0 16px 52px rgba(160 32 240 / 0.16), 0 4px 16px rgba(224 64 160 / 0.08)',
+      boxShadow: '0 6px 24px rgba(160 32 240 / 0.1), 0 2px 10px rgba(224 64 160 / 0.05)',
     },
     '&::before': {
       content: '""',
       position: 'absolute',
       inset: 0,
       background: 'var(--agi-shell-glow)',
-      opacity: 0.5,
+      opacity: 0.25,
       pointerEvents: 'none',
     },
     '& > *': {

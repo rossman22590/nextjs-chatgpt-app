@@ -360,32 +360,25 @@ function ChatDrawer(props: {
           }}
         />
 
-        {/* New Chat Button - flat solid color, white text */}
+        {/* + New chat - prominent rounded primary button (reference layout) */}
         <Button
           color="primary"
           variant="solid"
           disabled={disableNewButton}
           onClick={handleButtonNew}
+          startDecorator={<AddIcon />}
           sx={{
-            justifyContent: 'flex-start',
-            padding: '0px 0.75rem',
-            borderRadius: 'sm',
-            '--ListItemDecorator-size': 'calc(2.5rem - 1px)',
-            // override the theme gradient with a flat color
-            background: '#a020f0',
-            color: '#fff',
+            justifyContent: 'center',
+            py: 0.75,
+            borderRadius: 'md',
+            '--Button-gap': '0.5rem',
+            background: 'primary.solidBg',
+            color: 'primary.solidColor',
             boxShadow: 'none',
-            '&:hover': {
-              background: '#8916d6',
-              boxShadow: 'none',
-            },
-            '&:active': {
-              background: '#7112b5',
-            },
-            '& .MuiListItemDecorator-root': { color: '#fff' },
+            '&:hover': { background: 'primary.solidHoverBg', boxShadow: 'none' },
+            '&:active': { background: 'primary.solidActiveBg' },
           }}
         >
-          <ListItemDecorator><AddIcon sx={{ fontSize: '' }} /></ListItemDecorator>
           New chat
         </Button>
 
@@ -460,30 +453,23 @@ function ChatDrawer(props: {
 
       <ListDivider sx={{ my: 0 }} />
 
-      {/* Bottom commands */}
-      <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-        <ListItemButton onClick={props.onConversationsImportDialog} sx={{ flex: 1 }}>
-          <ListItemDecorator>
-            <FileDownloadOutlinedIcon />
-          </ListItemDecorator>
-          Import
-          {/*<OpenAIIcon sx={{  ml: 'auto' }} />*/}
-        </ListItemButton>
-
-        <ListItemButton disabled={filteredChatsAreEmpty || props.focusedChatBeamOpen} onClick={handleConversationsExport} sx={{ flex: 1 }}>
-          <ListItemDecorator>
-            <FileUploadOutlinedIcon />
-          </ListItemDecorator>
-          Export
+      {/* Bottom: Import | Export, then Delete all (reference layout) */}
+      <Box sx={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0, px: 1, pb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+          <ListItemButton onClick={props.onConversationsImportDialog} sx={{ flex: 1, borderRadius: 'sm' }}>
+            <ListItemDecorator><FileDownloadOutlinedIcon /></ListItemDecorator>
+            Import
+          </ListItemButton>
+          <ListItemButton disabled={filteredChatsAreEmpty || props.focusedChatBeamOpen} onClick={handleConversationsExport} sx={{ flex: 1, borderRadius: 'sm' }}>
+            <ListItemDecorator><FileUploadOutlinedIcon /></ListItemDecorator>
+            Export
+          </ListItemButton>
+        </Box>
+        <ListItemButton disabled={filteredChatsAreEmpty} onClick={handleConversationsDeleteFiltered} sx={{ borderRadius: 'sm' }}>
+          <ListItemDecorator><DeleteOutlineIcon /></ListItemDecorator>
+          Delete {filteredChatsCount >= 2 ? `all ${filteredChatsCount} chats` : 'chat'}
         </ListItemButton>
       </Box>
-
-      <ListItemButton disabled={filteredChatsAreEmpty} onClick={handleConversationsDeleteFiltered}>
-        <ListItemDecorator>
-          <DeleteOutlineIcon />
-        </ListItemDecorator>
-        Delete {filteredChatsCount >= 2 ? `all ${filteredChatsCount} chats` : 'chat'}
-      </ListItemButton>
 
     </OptimaDrawerList>
 

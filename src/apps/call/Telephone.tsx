@@ -9,7 +9,6 @@ import MicIcon from '@mui/icons-material/Mic';
 import MicNoneIcon from '@mui/icons-material/MicNone';
 
 import { ScrollToBottom } from '~/common/scroll-to-bottom/ScrollToBottom';
-import { ScrollToBottomButton } from '~/common/scroll-to-bottom/ScrollToBottomButton';
 import { useChatLLMDropdown } from '../chat/components/layout-bar/useLLMDropdown';
 
 import { SystemPurposeId, SystemPurposes } from '../../data';
@@ -395,9 +394,6 @@ export function Telephone(props: {
             )}
 
           </Box>
-
-          {/* Visibility and actions are handled via Context */}
-          <ScrollToBottomButton />
 
         </ScrollToBottom>
       </Card>
