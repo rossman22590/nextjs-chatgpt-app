@@ -135,11 +135,11 @@ export function aixToOpenAIChatCompletions(
     const inputMessages = convertToResponsesAPIFormat(systemMessage, chatSequence);
 
     const reasoningEffort: ResponsesAPIPayload['reasoning']['effort'] = (() => {
-      switch (model.vndOaiReasoningEffort) {
+      switch (model.reasoningEffort) {
         case 'low':
         case 'medium':
         case 'high':
-          return model.vndOaiReasoningEffort;
+          return model.reasoningEffort;
         case 'minimal':
         case 'none':
           return 'low';
