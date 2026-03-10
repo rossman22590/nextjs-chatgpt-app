@@ -4,6 +4,7 @@
 
 import { OPENAI_API_PATHS } from '~/modules/llms/server/openai/openai.access'; // server-side import
 import { fetchJsonOrTRPCThrow, fetchResponseOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
+import { env } from '~/server/env.server';
 
 import type { SpeexWire_Access_OpenAI, SpeexWire_ListVoices_Output } from './rpc.wiretypes';
 import type { SynthesizeBackendFn } from './synthesize.core';
@@ -197,7 +198,7 @@ function _resolveAccess(access: Readonly<SpeexWire_Access_OpenAI>): { host: stri
   // determine host
   const isOpenAI = access.dialect === 'openai';
   let host = isOpenAI
-    ? (access.apiHost || 'https://api.openai.com').trim()
+    ? (access.apiHost || env.OPENAI_API_HOST || 'https://api.openai.com').trim()
     : (access.apiHost || '').trim();
   if (!host) throw new Error('LocalAI requires a host URL');
   if (!host.startsWith('http')) {
@@ -207,5 +208,5 @@ function _resolveAccess(access: Readonly<SpeexWire_Access_OpenAI>): { host: stri
   if (host.endsWith('/'))
     host = host.slice(0, -1);
 
-  return { host, apiKey: access.apiKey || '' };
+  return { host, apiKey: access.apiKey || env.OPENAI_API_KEY || '' };
 }

@@ -69,11 +69,11 @@ export function UxLabsSettings() {
       <FormLabelStart title='Graduated' description='Ex-labs' />
       <Typography level='body-xs'>
         Screen Capture · Webcam · Cost Estimation · Enhanced Code Blocks
-        {' · '}<Link href='https://big-agi.com/blog/beam-multi-model-ai-reasoning' target='_blank'>Beam</Link>
-        {' · '}<Link href='https://github.com/enricoros/big-AGI/issues/208' target='_blank'>Split Chats</Link>
-        {' · '}<Link href='https://github.com/enricoros/big-AGI/issues/354' target='_blank'>Call AGI</Link>
-        {' · '}<Link href='https://github.com/enricoros/big-AGI/issues/282' target='_blank'>Persona Creator</Link>
-        {' · '}<Link href='https://github.com/enricoros/big-agi/issues/192' target='_blank'>Auto Diagrams</Link>
+        {' · '}<Link href='https://support.myapps.ai' target='_blank'>Beam</Link>
+        {' · '}<Link href='https://support.myapps.ai' target='_blank'>Split Chats</Link>
+        {' · '}<Link href='https://support.myapps.ai' target='_blank'>Call AGI</Link>
+        {' · '}<Link href='https://support.myapps.ai' target='_blank'>Persona Creator</Link>
+        {' · '}<Link href='https://support.myapps.ai' target='_blank'>Auto Diagrams</Link>
         {' · '}Imagine · Chat Search · Text Tools · LLM Overheat
       </Typography>
     </FormControl>

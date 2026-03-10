@@ -1,6 +1,7 @@
 import * as z from 'zod/v4';
 
 import { fetchJsonOrTRPCThrow, fetchResponseOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
+import { env } from '~/server/env.server';
 
 import type { SpeexSpeechParticle, SpeexWire_Access_ElevenLabs, SpeexWire_ListVoices_Output } from './rpc.wiretypes';
 import type { SynthesizeBackendFn } from './synthesize.core';
@@ -39,7 +40,7 @@ export const synthesizeElevenLabs: SynthesizeBackendFn<SpeexWire_Access_ElevenLa
   }
 
   // build request - narrow to elevenlabs dialect for type safety
-  const voiceId = voice.ttsVoiceId /*|| env.ELEVENLABS_VOICE_ID*/ || SPEEX_DEFAULTS.ELEVENLABS_VOICE;
+  const voiceId = voice.ttsVoiceId || env.ELEVENLABS_VOICE_ID || SPEEX_DEFAULTS.ELEVENLABS_VOICE;
   const model = voice.ttsModel || _selectModel(priority, languageCode);
 
   const path = `/v1/text-to-speech/${voiceId}${streaming ? '/stream' : ''}`;
@@ -137,11 +138,11 @@ function _parseTTSResponseHeaders(headers: Headers): Pick<Extract<SpeexSpeechPar
 }
 
 function _elevenlabsAccess(access: SpeexWire_Access_ElevenLabs, apiPath: string): { headers: HeadersInit; url: string } {
-  const apiKey = (access.apiKey /*|| env.ELEVENLABS_API_KEY */ || '').trim();
+  const apiKey = (access.apiKey || env.ELEVENLABS_API_KEY || '').trim();
   if (!apiKey)
     throw new Error('Missing ElevenLabs API key');
 
-  let host = (access.apiHost /*|| env.ELEVENLABS_API_HOST*/ || 'api.elevenlabs.io').trim();
+  let host = (access.apiHost || env.ELEVENLABS_API_HOST || 'api.elevenlabs.io').trim();
   if (!host.startsWith('http'))
     host = `https://${host}`;
   if (host.endsWith('/') && apiPath.startsWith('/'))

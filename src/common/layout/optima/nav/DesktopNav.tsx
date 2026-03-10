@@ -36,7 +36,7 @@ import { optimaActions, optimaOpenModels, optimaOpenPreferences, optimaToggleDra
 import { scratchClipSupported, useScratchClipVisibility } from '../scratchclip/store-scratchclip';
 
 
-export const bigAgiProUrl = 'https://big-agi.com' + clientUtmSource('upgrade-apps');
+export const bigAgiProUrl = 'https://account.myapps.ai' + clientUtmSource('upgrade-apps');
 
 
 const desktopNavBarSx: SxProps = {
@@ -176,7 +176,7 @@ export function DesktopNav(props: { component: React.ElementType, currentApp?: N
           <MenuItem component='a' variant='solid' color='primary' href={bigAgiProUrl} target='_blank' sx={{ minHeight: 40 }}>
             {/*<ListItemDecorator>New</ListItemDecorator>*/}
             {/*<ListItemDecorator><RocketLaunchRounded /></ListItemDecorator>*/}
-            Big-AGI Pro
+            My Account
             {/*✨*/}
             <ArrowOutwardRoundedIcon sx={{ ml: 'auto' }}/>
           </MenuItem>

@@ -14,7 +14,7 @@ export const Release = {
   TenantSlug: 'open',
 
   App: {
-    versionCode: '6.0.0-open-rc3',       // 1.92.0 sequentially...
+    versionCode: 'BEAM-RC4',       // 1.92.0 sequentially...
     versionName: 'AI Tutor BEAM',
   },
 
