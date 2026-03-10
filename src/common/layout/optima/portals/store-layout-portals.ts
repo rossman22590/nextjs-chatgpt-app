@@ -8,12 +8,15 @@ export type OptimaPortalId =
   | 'optima-portal-panel'
   | 'optima-portal-toolbar';
 
+export type ToolbarContentKind = 'chat' | 'beam';
 
 interface OptimaPortalState {
   portals: Record<OptimaPortalId, {
     element: HTMLElement | null;
     inputs: number;
   }>;
+  /** When 'beam', the bar uses theme-aligned background (not inverted/dark). */
+  toolbarContentKind: ToolbarContentKind | null;
 }
 
 interface OptimaPortalActions {
@@ -24,6 +27,8 @@ interface OptimaPortalActions {
   // reference counting
   incrementInputs: (id: OptimaPortalId) => void;
   decrementInputs: (id: OptimaPortalId) => void;
+
+  setToolbarContentKind: (kind: ToolbarContentKind | null) => void;
 
 }
 
@@ -36,8 +41,11 @@ export const useLayoutPortalsStore = create<OptimaPortalState & OptimaPortalActi
     'optima-portal-panel': { element: null, inputs: 0 },
     'optima-portal-toolbar': { element: null, inputs: 0 },
   },
+  toolbarContentKind: null,
 
   // actions
+
+  setToolbarContentKind: (kind) => _set({ toolbarContentKind: kind }),
 
   setElement: (id, element) => _set((state) => {
     // sanity check

@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 import type { SxProps } from '@mui/joy/styles/types';
 import { Box, Button, Step, stepClasses, StepIndicator, stepIndicatorClasses, Stepper, Typography } from '@mui/joy';
@@ -9,7 +10,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
 import { ScaledTextBlockRenderer } from '~/modules/blocks/ScaledTextBlockRenderer';
 
-import { BigAgiSquircleIcon } from '~/common/components/icons/big-agi/BigAgiSquircleIcon';
+import { Brand } from '~/common/app.config';
 import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
 import { ShortcutKey, useGlobalShortcuts } from '~/common/components/shortcuts/useGlobalShortcuts';
 import { animationTextShadowLimey } from '~/common/util/animUtils';
@@ -198,7 +199,7 @@ export function ExplainerCarousel(props: {
           whiteSpace: 'balance',
         }}>
         {activeStep?.titlePrefix}{' '}
-        {!!activeStep?.titleSquircle && <BigAgiSquircleIcon inverted sx={{ color: 'white', fontSize: isMobile ? '1.55rem' : '2.04rem', borderRadius: 'md' }} />}
+        {!!activeStep?.titleSquircle && <Image src="/apple-touch-icon.png" alt={Brand.Title.Base} width={isMobile ? 25 : 33} height={isMobile ? 25 : 33} style={{ verticalAlign: 'middle', borderRadius: 6 }} />}
         {!!activeStep?.titleSquircle && '-'}
         {!!activeStep?.titleSpark && <Box component='span' sx={{
           fontWeight: 'lg',

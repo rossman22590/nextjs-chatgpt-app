@@ -1,13 +1,13 @@
 import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Avatar, 
-  Typography, 
-  Button, 
+import {
+  Box,
+  Card,
+  CardContent,
+  Avatar,
+  Typography,
+  Button,
   Stack,
   Divider,
   CircularProgress,
@@ -18,25 +18,26 @@ import {
   Tabs,
   TabList,
   Tab,
-  TabPanel
+  TabPanel,
+  Sheet,
+  Table,
+  LinearProgress,
 } from '@mui/joy';
 import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import SecurityIcon from '@mui/icons-material/Security';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import HistoryIcon from '@mui/icons-material/History';
 
+import Image from 'next/image';
 import { Brand } from '~/common/app.config';
 import { AuthButton } from '~/common/components/auth/AuthButton';
 import { UserAnalytics } from '~/common/components/analytics/UserAnalytics';
 import { apiAsyncNode } from '~/common/util/trpc.client';
-import DataUsageIcon from '@mui/icons-material/DataUsage';
-import HistoryIcon from '@mui/icons-material/History';
-import LinearProgress from '@mui/joy/LinearProgress';
-import { Sheet, Table } from '@mui/joy';
 
 type MyUsageData = Awaited<ReturnType<typeof apiAsyncNode.usage.myUsage.query>>;
 type CheckLimitData = Awaited<ReturnType<typeof apiAsyncNode.usage.checkLimit.query>>;
@@ -92,7 +93,7 @@ export default function Profile() {
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: '100vh',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          bgcolor: 'background.body',
         }}
       >
         <CircularProgress size="lg" />
@@ -109,160 +110,135 @@ export default function Profile() {
     router.back();
   };
 
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return 'Unknown';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
   return (
     <Box
       sx={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        p: 2,
+        bgcolor: 'background.body',
+        py: { xs: 2, md: 3 },
+        px: 2,
       }}
     >
-      <Box
-        sx={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          pt: 4,
-        }}
-      >
-        {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ maxWidth: 720, margin: '0 auto' }}>
+        {/* Page header */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
           <Button
             variant="plain"
             color="neutral"
+            size="sm"
             startDecorator={<ArrowBackIcon />}
             onClick={handleGoBack}
-            sx={{ mr: 2, color: 'white' }}
+            sx={{ '--Icon-fontSize': '1.25rem' }}
           >
             Back
           </Button>
-          <Typography level="h1" sx={{ color: 'white', fontWeight: 'bold' }}>
-            Profile
+          <Image src="/apple-touch-icon.png" alt={Brand.Title.Base} width={28} height={28} />
+          <Typography level="h4" fontWeight="lg">
+            Account
           </Typography>
         </Box>
 
-        {/* Profile Card with Tabs */}
+        {/* Main card */}
         <Card
+          variant="outlined"
           sx={{
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            backdropFilter: 'blur(16px)',
-            background: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: 'lg',
+            borderColor: 'divider',
+            boxShadow: 'sm',
+            bgcolor: 'background.surface',
+            overflow: 'hidden',
           }}
         >
           <CardContent sx={{ p: 0 }}>
-            {/* Profile Header */}
-            <Box sx={{ p: 4, pb: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            {/* Profile hero */}
+            <Box
+              sx={{
+                p: 3,
+                bgcolor: 'background.level1',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 {session?.user?.image ? (
                   <Avatar
                     src={session.user.image}
                     alt={session.user.name || 'User'}
-                    sx={{ width: 80, height: 80, mr: 3 }}
+                    sx={{ width: 56, height: 56 }}
                   />
                 ) : (
-                  <Avatar sx={{ width: 80, height: 80, mr: 3 }}>
-                    <PersonIcon sx={{ fontSize: 40 }} />
+                  <Avatar sx={{ width: 56, height: 56, bgcolor: 'primary.softBg' }}>
+                    <PersonIcon sx={{ color: 'primary.plainColor', fontSize: 28 }} />
                   </Avatar>
                 )}
-                <Box>
-                  <Typography level="h2" fontWeight="bold">
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography level="title-lg" fontWeight="lg">
                     {session?.user?.name || 'User'}
                   </Typography>
-                  <Typography level="body-md" color="neutral">
+                  <Typography level="body-sm" color="neutral" noWrap>
                     {session?.user?.email}
                   </Typography>
-                  <Chip
-                    variant="soft"
-                    color="success"
-                    size="sm"
-                    sx={{ mt: 1 }}
-                  >
-                    Active Account
+                  <Chip variant="solid" color="primary" size="sm" sx={{ mt: 1, color: '#fff' }}>
+                    Active
                   </Chip>
                 </Box>
               </Box>
             </Box>
 
-            {/* Tabs */}
             <Tabs value={activeTab} onChange={(event, newValue) => setActiveTab(newValue as number)}>
-              <TabList sx={{ px: 4 }}>
-                <Tab>
-                  <AccountCircleIcon sx={{ mr: 1 }} />
-                  Account Info
+              <TabList
+                sx={{
+                  px: 2,
+                  pt: 1,
+                  gap: 0.5,
+                  '--List-padding': 0,
+                  '--ListItem-minHeight': '2.5rem',
+                }}
+              >
+                <Tab sx={{ borderRadius: 'md', fontWeight: activeTab === 0 ? 600 : 400 }}>
+                  <AccountCircleIcon sx={{ mr: 1, fontSize: '1.1rem' }} />
+                  Account
                 </Tab>
-                <Tab>
-                  <AnalyticsIcon sx={{ mr: 1 }} />
-                  Analytics & Usage
+                <Tab sx={{ borderRadius: 'md', fontWeight: activeTab === 1 ? 600 : 400 }}>
+                  <AnalyticsIcon sx={{ mr: 1, fontSize: '1.1rem' }} />
+                  Analytics
                 </Tab>
               </TabList>
 
-              {/* Account Information Tab */}
-              <TabPanel value={0} sx={{ p: 4 }}>
-                <Typography level="h3" sx={{ mb: 3 }}>
-                  Account Information
+              {/* Account tab */}
+              <TabPanel value={0} sx={{ p: 3 }}>
+                <Typography level="title-md" fontWeight="lg" sx={{ mb: 2 }}>
+                  Profile
                 </Typography>
-
-                <List>
+                <List size="sm" sx={{ '--ListItem-paddingY': 0.75, '--ListItemDecorator-size': '2rem' }}>
                   <ListItem>
                     <ListItemDecorator>
-                      <PersonIcon />
+                      <PersonIcon sx={{ fontSize: '1.1rem', color: 'text.tertiary' }} />
                     </ListItemDecorator>
                     <Box>
-                      <Typography level="body-sm" color="neutral">
-                        Name
-                      </Typography>
-                      <Typography level="body-md">
-                        {session?.user?.name || 'Not provided'}
-                      </Typography>
+                      <Typography level="body-xs" color="neutral">Name</Typography>
+                      <Typography level="body-sm" fontWeight="md">{session?.user?.name || 'Not provided'}</Typography>
                     </Box>
                   </ListItem>
-
                   <ListItem>
                     <ListItemDecorator>
-                      <EmailIcon />
+                      <EmailIcon sx={{ fontSize: '1.1rem', color: 'text.tertiary' }} />
                     </ListItemDecorator>
                     <Box>
-                      <Typography level="body-sm" color="neutral">
-                        Email
-                      </Typography>
-                      <Typography level="body-md">
-                        {session?.user?.email || 'Not provided'}
-                      </Typography>
+                      <Typography level="body-xs" color="neutral">Email</Typography>
+                      <Typography level="body-sm" fontWeight="md">{session?.user?.email || 'Not provided'}</Typography>
                     </Box>
                   </ListItem>
-
-                  {/* <ListItem>
-                    <ListItemDecorator>
-                      <CalendarTodayIcon />
-                    </ListItemDecorator>
-                    <Box>
-                      <Typography level="body-sm" color="neutral">
-                        Member Since
-                      </Typography>
-                      <Typography level="body-md">
-                        {formatDate(session?.user?.id)}
-                      </Typography>
-                    </Box>
-                  </ListItem> */}
                 </List>
 
                 <Divider sx={{ my: 3 }} />
 
-                {/* Token Credits */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography level="h3">
-                    Token Credits
+                  <Typography level="title-md" fontWeight="lg">
+                    Token usage
                   </Typography>
                   <Button
-                    variant="outlined"
+                    variant="plain"
                     color="neutral"
                     size="sm"
                     startDecorator={<RefreshIcon />}
@@ -277,13 +253,14 @@ export default function Profile() {
                   const used = myUsage.thisMonth._sum.totalTokens ?? 0;
                   const remaining = limit ? Math.max(0, limit - used) : null;
                   const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
+                  const progressColor = pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary';
                   return (
-                    <Card variant='soft' color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'} sx={{ mb: 2 }}>
+                    <Card variant="soft" color={progressColor} sx={{ borderRadius: 'md', mb: 2 }}>
                       <CardContent>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <DataUsageIcon />
-                          <Typography level='title-md'>
-                            {remaining != null ? remaining.toLocaleString() + ' tokens remaining' : 'Unlimited tokens'}
+                          <DataUsageIcon sx={{ fontSize: '1.1rem' }} />
+                          <Typography level="title-sm">
+                            {remaining != null ? `${remaining.toLocaleString()} remaining` : 'Unlimited'}
                           </Typography>
                         </Box>
                         {limit ? (
@@ -291,53 +268,51 @@ export default function Profile() {
                             <LinearProgress
                               determinate
                               value={pct}
-                              color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'}
-                              sx={{ my: 1, height: 10, borderRadius: 5 }}
+                              color={progressColor}
+                              size="sm"
+                              sx={{ borderRadius: 'xl', my: 1 }}
                             />
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <Typography level='body-xs'>{used.toLocaleString()} used</Typography>
-                              <Typography level='body-xs'>{limit.toLocaleString()} limit / month</Typography>
+                              <Typography level="body-xs" color="neutral">{used.toLocaleString()} used</Typography>
+                              <Typography level="body-xs" color="neutral">{limit.toLocaleString()} limit</Typography>
                             </Box>
                           </>
                         ) : (
-                          <Typography level='body-sm'>No monthly token limit set on your account.</Typography>
+                          <Typography level="body-sm" color="neutral">No monthly limit set.</Typography>
                         )}
-                        <Typography level='body-xs' sx={{ mt: 1 }}>
-                          {myUsage.thisMonth._count} requests this month - resets on the 1st of each month
+                        <Typography level="body-xs" color="neutral" sx={{ mt: 1 }}>
+                          {myUsage.thisMonth._count} requests this month
                         </Typography>
                       </CardContent>
                     </Card>
                   );
                 })() : (
-                  <CircularProgress size='sm' />
+                  <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}>
+                    <CircularProgress size="sm" />
+                  </Box>
                 )}
 
-                {/* Monthly History */}
                 {monthlyHistory && monthlyHistory.length > 0 && (
                   <>
-                    <Typography level='h4' sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <HistoryIcon /> Monthly Usage History
+                    <Typography level="title-sm" fontWeight="lg" sx={{ mt: 3, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <HistoryIcon sx={{ fontSize: '1rem' }} /> Monthly history
                     </Typography>
-                    <Sheet variant='outlined' sx={{ borderRadius: 'sm', overflow: 'auto', mb: 2 }}>
-                      <Table size='sm' stickyHeader>
+                    <Sheet variant="outlined" sx={{ borderRadius: 'md', borderColor: 'divider', overflow: 'auto', mb: 2 }}>
+                      <Table size="sm" stickyHeader>
                         <thead>
                           <tr>
                             <th>Month</th>
-                            <th style={{ textAlign: 'right' }}>Tokens Used</th>
-                            <th style={{ textAlign: 'right' }}>Input</th>
-                            <th style={{ textAlign: 'right' }}>Output</th>
+                            <th style={{ textAlign: 'right' }}>Tokens</th>
                             <th style={{ textAlign: 'right' }}>Cost</th>
                             <th style={{ textAlign: 'right' }}>Requests</th>
                           </tr>
                         </thead>
                         <tbody>
                           {monthlyHistory.map((m, i) => (
-                            <tr key={m.month} style={i === 0 ? { fontWeight: 'bold' } : undefined}>
+                            <tr key={m.month}>
                               <td>{m.month}{i === 0 ? ' (current)' : ''}</td>
                               <td style={{ textAlign: 'right' }}>{m.totalTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{m.inputTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{m.outputTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{'$' + (m.costCents / 100 < 0.01 && m.costCents > 0 ? (m.costCents / 100).toFixed(4) : (m.costCents / 100).toFixed(2))}</td>
+                              <td style={{ textAlign: 'right' }}>${(m.costCents / 100).toFixed(2)}</td>
                               <td style={{ textAlign: 'right' }}>{m.requests}</td>
                             </tr>
                           ))}
@@ -347,21 +322,18 @@ export default function Profile() {
                   </>
                 )}
 
-                {/* Recent Deductions */}
                 {myLogs && myLogs.length > 0 && (
                   <>
-                    <Typography level='h4' sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <DataUsageIcon /> Recent Token Deductions
+                    <Typography level="title-sm" fontWeight="lg" sx={{ mt: 3, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <DataUsageIcon sx={{ fontSize: '1rem' }} /> Recent deductions
                     </Typography>
-                    <Sheet variant='outlined' sx={{ borderRadius: 'sm', overflow: 'auto', maxHeight: 350, mb: 2 }}>
-                      <Table size='sm' stickyHeader>
+                    <Sheet variant="outlined" sx={{ borderRadius: 'md', borderColor: 'divider', overflow: 'auto', maxHeight: 280, mb: 2 }}>
+                      <Table size="sm" stickyHeader>
                         <thead>
                           <tr>
                             <th>Time</th>
                             <th>Model</th>
-                            <th style={{ textAlign: 'right' }}>Input</th>
-                            <th style={{ textAlign: 'right' }}>Output</th>
-                            <th style={{ textAlign: 'right' }}>Total</th>
+                            <th style={{ textAlign: 'right' }}>Tokens</th>
                             <th style={{ textAlign: 'right' }}>Cost</th>
                           </tr>
                         </thead>
@@ -369,11 +341,9 @@ export default function Profile() {
                           {myLogs.map(log => (
                             <tr key={log.id}>
                               <td>{new Date(log.createdAt).toLocaleString()}</td>
-                              <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.modelId}</td>
-                              <td style={{ textAlign: 'right' }}>{log.inputTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{log.outputTokens.toLocaleString()}</td>
+                              <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.modelId}</td>
                               <td style={{ textAlign: 'right' }}>{log.totalTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{'$' + (log.costCents / 100).toFixed(4)}</td>
+                              <td style={{ textAlign: 'right' }}>${(log.costCents / 100).toFixed(4)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -384,41 +354,32 @@ export default function Profile() {
 
                 <Divider sx={{ my: 3 }} />
 
-                {/* Actions */}
-                <Typography level="h3" sx={{ mb: 2 }}>
-                  Account Actions
+                <Typography level="title-sm" fontWeight="lg" sx={{ mb: 2 }}>
+                  Actions
                 </Typography>
-
-                <Stack spacing={2}>
+                <Stack spacing={1.5}>
                   <Button
                     variant="outlined"
                     color="neutral"
+                    size="sm"
                     startDecorator={<SecurityIcon />}
                     onClick={() => router.push('/auth/signin?forgot=true')}
+                    sx={{ justifyContent: 'flex-start' }}
                   >
-                    Reset Password
+                    Reset password
                   </Button>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
-                    <AuthButton variant="text" size="lg" />
+                  <Box sx={{ pt: 1 }}>
+                    <AuthButton variant="text" size="sm" />
                   </Box>
                 </Stack>
 
-                <Divider sx={{ my: 3 }} />
-
-                {/* App Information */}
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography level="body-sm" color="neutral">
-                    You&apos;re using {Brand.Title.Base}
-                  </Typography>
-                  <Typography level="body-xs" color="neutral" sx={{ mt: 1 }}>
-                    Enjoy your AI-powered conversations!
-                  </Typography>
-                </Box>
+                <Typography level="body-xs" color="neutral" sx={{ mt: 4, textAlign: 'center' }}>
+                  {Brand.Title.Base}
+                </Typography>
               </TabPanel>
 
-              {/* Analytics Tab */}
-              <TabPanel value={1} sx={{ p: 4 }}>
+              {/* Analytics tab */}
+              <TabPanel value={1} sx={{ p: 3 }}>
                 <UserAnalytics userId={session?.user?.id} />
               </TabPanel>
             </Tabs>

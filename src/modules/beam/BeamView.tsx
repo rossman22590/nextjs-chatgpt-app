@@ -152,24 +152,19 @@ export function BeamView(props: {
 
   return <>
 
-    <Box role='beam-list' sx={{
-      // scroller fill
-      minHeight: '100%',
-      // ...props.sx,
-
-      // enter animation
-      // NOTE: disabled: off-putting/confusing when the beam content is large - things won't combine nicely
-      // animation: `${animationEnterScaleUp} 5s cubic-bezier(.17,.84,.44,1)`,
-
-      // config
-      '--Pad': { xs: '1rem', md: '1.5rem' },
-      '--Pad_2': 'calc(var(--Pad) / 2)',
-
-      // layout
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 'var(--Pad)',
-    }}>
+    <Box
+      role='beam-list'
+      sx={{
+        minHeight: '100%',
+        '--Pad': { xs: '1rem', md: '1.5rem' },
+        '--Pad_2': 'calc(var(--Pad) / 2)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--Pad)',
+        px: { xs: 1, md: 2 },
+        py: 1,
+      }}
+    >
 
       {/* Config Issues */}
       {!!inputIssues && <Alert>{inputIssues}</Alert>}

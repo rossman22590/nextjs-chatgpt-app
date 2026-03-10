@@ -18,6 +18,7 @@ import { ConfirmationModal } from '~/common/components/modals/ConfirmationModal'
 import { ConversationsManager } from '~/common/chat-overlay/ConversationsManager';
 import { ErrorBoundary } from '~/common/components/ErrorBoundary';
 import { getLLMContextTokens, LLM_IF_ANT_PromptCaching, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
+import { useLayoutPortalsStore } from '~/common/layout/optima/portals/store-layout-portals';
 import { OptimaDrawerIn, OptimaPanelIn, OptimaToolbarIn } from '~/common/layout/optima/portals/OptimaPortalsIn';
 import { PanelResizeInset } from '~/common/components/PanelResizeInset';
 import { Release } from '~/common/app.release';
@@ -524,6 +525,12 @@ export function AppChat() {
 
 
   // Effects
+
+  // [effect] Sync toolbar variant so Beam mode uses theme-aligned bar (not dark/inverted)
+  React.useEffect(() => {
+    useLayoutPortalsStore.getState().setToolbarContentKind(beamOpenStoreInFocusedPane ? 'beam' : null);
+    return () => useLayoutPortalsStore.getState().setToolbarContentKind(null);
+  }, [beamOpenStoreInFocusedPane]);
 
   // [effect] Handle the conversation intent
   React.useEffect(() => {

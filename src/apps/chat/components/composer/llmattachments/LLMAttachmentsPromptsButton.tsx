@@ -1,4 +1,5 @@
 import * as React from 'react';
+import Image from 'next/image';
 
 import type { SxProps } from '@mui/joy/styles/types';
 import { Box, CircularProgress, IconButton } from '@mui/joy';
@@ -6,7 +7,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 
 import type { AgiAttachmentPromptsData } from '~/modules/aifn/agiattachmentprompts/useAgiAttachmentPrompts';
 
-import { BigAgiSquircleIcon } from '~/common/components/icons/big-agi/BigAgiSquircleIcon';
+import { Brand } from '~/common/app.config';
 import { GoodTooltip } from '~/common/components/GoodTooltip';
 
 import { AGI_SUGGESTIONS_COLOR } from '../textarea/ComposerTextAreaActions';
@@ -43,7 +44,7 @@ function LLMAttachmentsPromptsButton({ data }: { data: AgiAttachmentPromptsData 
   const tooltipTitle =
     data.error ? (data.error.message || 'Error guessing actions')
       : data.isFetching ? null
-        : data.isPending ? <Box sx={{ display: 'flex', gap: 1 }}><BigAgiSquircleIcon inverted sx={{ color: 'white', borderRadius: '1rem' }} /> What can I do?</Box>
+        : data.isPending ? <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Image src="/apple-touch-icon.png" alt="" width={20} height={20} /> What can I do?</Box>
           : 'Give me more ideas';
 
   const button = (

@@ -3,7 +3,7 @@ import { Box, styled } from '@mui/joy';
 
 import { animationShadowLimey } from '~/common/util/animUtils';
 
-import { BEAM_INVERT_BACKGROUND, BEAM_PANE_ZINDEX } from './beam.config';
+import { BEAM_PANE_ZINDEX } from './beam.config';
 
 
 export const beamCardClasses = {
@@ -22,17 +22,15 @@ export const BeamCard = styled(Box)(({ theme }) => ({
 
   backgroundColor: theme.vars.palette.background.surface,
   border: '1px solid',
-  borderColor: theme.vars.palette.neutral.outlinedBorder,
-  borderRadius: theme.radius.md,
+  borderColor: theme.vars.palette.divider,
+  borderRadius: theme.radius.lg,
+  boxShadow: 'var(--joy-shadow-sm, 0 2px 8px rgba(0 0 0 / 0.06))',
 
   padding: 'var(--Card-padding)',
 
-  // [`&.${beamCardClasses.active}`]: {
-  //   boxShadow: 'inset 0 0 0 2px #00f, inset 0 0 0 4px #00a',
-  // },
-
   [`&.${beamCardClasses.fusionIdle}`]: {
-    backgroundColor: BEAM_INVERT_BACKGROUND ? theme.vars.palette.background.level2 : theme.vars.palette.background.surface,
+    backgroundColor: theme.vars.palette.background.level1,
+    borderColor: theme.vars.palette.divider,
   },
   [`&.${beamCardClasses.selectable}`]: {
     backgroundColor: theme.vars.palette.background.popup,
