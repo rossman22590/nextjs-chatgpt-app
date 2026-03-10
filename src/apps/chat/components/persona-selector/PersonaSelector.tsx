@@ -36,9 +36,7 @@ import { usePurposeStore } from './store-purposes';
 const PURPOSE_ID_PERSONA_CREATOR = '__persona-creator__';
 const TILE_ACTIVE_COLOR = 'primary' as const;
 
-// defined looks
-const tileSize = 7; // rem
-const tileGap = 0.5; // rem
+const tileGap = 0.75; // rem
 
 
 function Tile(props: {
@@ -52,75 +50,118 @@ function Tile(props: {
   onClick: () => void,
   sx?: SxProps,
 }) {
+  const isActiveCard = !props.isEditMode && props.isActive;
+
   return (
-    <Button
-      variant={(!props.isEditMode && props.isActive) ? 'solid' : props.isHighlighted ? 'soft' : 'soft'}
-      color={(!props.isEditMode && props.isActive) ? 'primary' : props.isHighlighted ? 'primary' : TILE_ACTIVE_COLOR}
+    <Box
+      component='button'
       onClick={props.onClick}
+      aria-pressed={isActiveCard}
       sx={{
-        aspectRatio: 1,
-        height: `${tileSize}rem`,
-        fontWeight: 'md',
-        lineHeight: 'xs',
-        paddingInline: 0.5,
-        ...((props.isEditMode || !props.isActive) ? {
-          boxShadow: `0 2px 8px -3px rgb(var(--joy-palette-${TILE_ACTIVE_COLOR}-darkChannel) / 30%)`,
-          // boxShadow: props.isHighlighted
-          //   ? '0 2px 8px -2px rgb(var(--joy-palette-primary-darkChannel) / 30%)'
-          //   : 'sm',
-          backgroundColor: props.isHighlighted ? undefined : 'background.popup',
-          // ...(props.imageUrl && {
-          //   backgroundImage: `linear-gradient(rgba(255 255 255 /0.85), rgba(255 255 255 /1)), url(${props.imageUrl})`,
-          //   backgroundPosition: 'center',
-          //   backgroundSize: 'cover',
-          //   '&:hover': {
-          //     backgroundImage: 'none',
-          //   },
-          // }),
-        } : {}),
-        flexDirection: 'column', gap: props.symbol === '🎭' ? 0.5 : 1.25, pt: 1.25,
+        // reset button
+        border: 'none',
+        font: 'inherit',
+        cursor: 'pointer',
+        outline: 'none',
+        padding: 0,
+        textAlign: 'left',
+
+        // card layout
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 1,
+        p: '0.875rem 0.5rem 0.75rem',
+        borderRadius: '16px',
+
+        // transitions
+        transition: 'transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease',
+
+        ...(props.isHidden && props.isEditMode && { opacity: 0.38 }),
+
+        ...(isActiveCard ? {
+          background: 'linear-gradient(145deg, #a020f0 0%, #c934b8 55%, #e040a0 100%)',
+          boxShadow: '0 6px 24px rgba(160 32 240 / 0.35), 0 2px 8px rgba(160 32 240 / 0.2)',
+          color: '#fff',
+          '&:hover': {
+            transform: 'translateY(-3px)',
+            boxShadow: '0 10px 28px rgba(160 32 240 / 0.42)',
+          },
+          '&:active': { transform: 'translateY(-1px)' },
+          '&:focus-visible': { outline: '2px solid rgba(255 255 255 / 0.7)', outlineOffset: 2 },
+        } : props.isHighlighted ? {
+          background: 'rgba(160 32 240 / 0.08)',
+          boxShadow: '0 2px 10px rgba(160 32 240 / 0.1)',
+          border: '1.5px solid rgba(160 32 240 / 0.22)',
+          color: 'var(--joy-palette-text-primary)',
+          '&:hover': {
+            background: 'rgba(160 32 240 / 0.14)',
+            borderColor: 'rgba(160 32 240 / 0.38)',
+            transform: 'translateY(-3px)',
+            boxShadow: '0 6px 18px rgba(160 32 240 / 0.18)',
+          },
+          '&:active': { transform: 'translateY(-1px)' },
+          '&:focus-visible': { outline: '2px solid rgba(160 32 240 / 0.5)', outlineOffset: 2 },
+        } : {
+          background: 'var(--joy-palette-background-popup)',
+          boxShadow: '0 2px 10px rgba(120 40 180 / 0.07)',
+          border: '1.5px solid rgba(120 60 200 / 0.1)',
+          color: 'var(--joy-palette-text-primary)',
+          '&:hover': {
+            background: 'rgba(160 32 240 / 0.06)',
+            borderColor: 'rgba(160 32 240 / 0.28)',
+            transform: 'translateY(-3px)',
+            boxShadow: '0 6px 18px rgba(120 40 180 / 0.13)',
+          },
+          '&:active': { transform: 'translateY(-1px)' },
+          '&:focus-visible': { outline: '2px solid rgba(160 32 240 / 0.5)', outlineOffset: 2 },
+        }),
+
         ...props.sx,
       }}
     >
-      {/* [Edit mode checkbox] */}
+      {/* Edit mode checkbox */}
       {props.isEditMode && (
         <Checkbox
           variant='soft' color={TILE_ACTIVE_COLOR}
           checked={!props.isHidden}
-          // label={<Typography level='body-xs'>show</Typography>}
-          sx={{ position: 'absolute', left: `${tileGap}rem`, top: `${tileGap}rem` }}
+          sx={{ position: 'absolute', left: '0.5rem', top: '0.5rem', pointerEvents: 'none' }}
         />
       )}
 
-      {/* Icon and Text */}
-      {/*<Box sx={{ fontSize: '2rem' }}>*/}
-      {/*  {props.symbol}*/}
-      {/*</Box>*/}
+      {/* Emoji / image */}
       <Avatar
         variant='plain'
         src={props.imageUrl}
         sx={{
-          '--Avatar-size': '3rem',
-          fontSize: '2rem',
-          borderRadius: props.imageUrl ? 'sm' : 0,
-          boxShadow: (props.imageUrl && !props.isActive) ? 'sm' : undefined,
+          '--Avatar-size': '2.75rem',
+          fontSize: '1.75rem',
+          borderRadius: props.imageUrl ? 'md' : 0,
+          background: 'transparent',
+          boxShadow: (props.imageUrl && !isActiveCard) ? '0 2px 8px rgba(0 0 0 / 0.1)' : 'none',
+          filter: (props.isHidden && props.isEditMode) ? 'grayscale(1)' : 'none',
         }}
       >
         {props.symbol}
       </Avatar>
-      <div style={{
+
+      {/* Title */}
+      <Box sx={{
         width: '100%',
-        fontSize: '0.7rem',
-        lineHeight: 1.2,
+        fontSize: '0.72rem',
+        fontWeight: isActiveCard ? 700 : 500,
+        lineHeight: 1.25,
         textAlign: 'center',
+        color: isActiveCard ? '#fff' : 'var(--joy-palette-text-primary)',
         overflowWrap: 'break-word',
         wordBreak: 'break-word',
         hyphens: 'auto',
-        padding: '0 2px',
+        px: '2px',
       }}>
         {props.text}
-      </div>
-    </Button>
+      </Box>
+    </Box>
   );
 }
 
@@ -316,9 +357,9 @@ export function PersonaSelector(props: {
   return (
     <Box sx={{
       maxWidth: 'md',
-      minWidth: `${2 + 1 + tileSize * 2}rem`, // accomodate at least 2 columns (scroll-x in case)
+      minWidth: '14rem',
       mx: 'auto',
-      minHeight: '90%', // was 60svh - looked too big on desktop stacked
+      minHeight: '90%',
       display: 'grid',
       px: { xs: 0.5, sm: 1, md: 2 },
       py: 2,
@@ -346,10 +387,9 @@ export function PersonaSelector(props: {
 
       <Box sx={{
         my: 'auto',
-        // layout
         display: 'grid',
-        gridTemplateColumns: `repeat(auto-fit, minmax(${tileSize}rem, ${tileSize}rem))`,
-        justifyContent: 'center', gap: `${tileGap}rem`,
+        gridTemplateColumns: 'repeat(auto-fill, minmax(6.5rem, 1fr))',
+        gap: `${tileGap}rem`,
       }}>
 
         {/* [row 0] ...  Edit mode [ ] */}
@@ -417,9 +457,7 @@ export function PersonaSelector(props: {
             isHidden={hidePersonaCreator}
             onClick={() => editMode ? toggleHiddenPurposeId(PURPOSE_ID_PERSONA_CREATOR) : void navigateToPersonas()}
             sx={{
-              fontSize: 'xs',
-              boxShadow: 'xs',
-              backgroundColor: 'neutral.softDisabledBg',
+              opacity: 0.7,
             }}
           />
         )}
@@ -456,7 +494,7 @@ export function PersonaSelector(props: {
                 sx={{
                   // example items 2-col layout
                   display: 'grid',
-                  gridTemplateColumns: `repeat(auto-fit, minmax(${tileSize * 3 + 1}rem, 1fr))`,
+                  gridTemplateColumns: `repeat(auto-fit, minmax(22rem, 1fr))`,
                   gap: 1,
                 }}
               >
