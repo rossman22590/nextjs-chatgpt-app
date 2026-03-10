@@ -95,8 +95,6 @@ const chatBeamWrapperSx: SxProps = {
 const composerOpenSx: SxProps = {
   minWidth: { md: 480 },
   pt: { xs: 1, md: 1.5 },
-  pb: { xs: 0.5, md: 1 },
-  px: { xs: 0, md: 1 },
   transition: 'background-color 0.4s ease-out',
   borderTop: '1px solid',
   borderTopColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.08)',

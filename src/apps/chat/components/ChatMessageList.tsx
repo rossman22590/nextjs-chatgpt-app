@@ -290,8 +290,8 @@ export function ChatMessageList(props: {
 
   // style memo
   const listSx: SxProps = React.useMemo(() => ({
-    px: { xs: 1, md: 2.5 },
-    py: { xs: 1.5, md: 2 },
+    px: { xs: 1, md: 2 },
+    py: { xs: 1, md: 1.5 },
     ...props.sx,
 
     // we added these after removing the minSize={20} (%) from the containing panel.
@@ -304,11 +304,6 @@ export function ChatMessageList(props: {
     // layout
     display: 'flex',
     flexDirection: 'column',
-
-    // max-width column centering - keeps long threads readable on ultra-wide panels
-    maxWidth: '960px',
-    mx: 'auto',
-    width: '100%',
   }), [props.sx]);
 
 

@@ -605,71 +605,71 @@ export function ChatMessage(props: {
   const backgroundColor = messageBackground(messageRole, userCommandApprox, messageHasBeenEdited, false /*isAssistantError && !errorMessage*/);
 
   const listItemSx: SxProps = React.useMemo(() => ({
-    // background - CSS var holds gradient for user, frosted white for assistant
-    background: backgroundColor,
 
-    // spacing - generous padding gives content room to breathe
-    px: { xs: 1.5, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.75 },
-    py: { xs: 1, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.25 },
-    my: { xs: 0.5, md: 0.75 },
+    // multi-layer background: top-shine gloss + CSS variable base
+    background: fromUser
+      ? `linear-gradient(180deg, rgba(255,255,255,0.22) 0%, transparent 42%), ${backgroundColor}`
+      : fromAssistant
+        ? `linear-gradient(180deg, rgba(255,255,255,0.65) 0%, transparent 44%), ${backgroundColor}`
+        : backgroundColor,
 
-    // sizing - user bubbles are narrower and float right; assistant fills more width
+    // generous padding - content needs room
+    px: { xs: 1.5, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 2 },
+    py: { xs: 1.25, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.5 },
+    my: { xs: 0.75, md: 1 },
+
+    // sizing - user floats right as a bubble; assistant fills the thread width
     width: '100%',
     maxWidth: {
       xs: fromUser ? '92%' : '100%',
-      md: fromAssistant ? 'min(100%, 88%)' : fromUser ? 'min(100%, 72%)' : 'min(100%, 100%)',
+      md: fromAssistant ? '100%' : fromUser ? 'min(100%, 78%)' : '100%',
     },
 
-    // border - user gets a vivid purple accent, assistant is almost invisible
+    // border - user: vivid brand ring; assistant: barely-there neutral; system: soft purple
     border: '1px solid',
     borderColor: fromUser
-      ? 'rgba(160 32 240 / 0.32)'
+      ? 'rgba(139, 60, 230, 0.30)'
       : fromAssistant
-        ? 'rgba(160 32 240 / 0.07)'
-        : 'rgba(160 32 240 / 0.1)',
+        ? 'rgba(160, 32, 240, 0.07)'
+        : 'rgba(160, 32, 240, 0.10)',
 
-    // corner radius - speech bubble style: tail corner is tight, others are rounded
+    // corner radius - speech-bubble tail: user tail bottom-right, assistant tail top-left
     borderRadius: fromUser
-      ? { xs: '18px 18px 6px 18px', md: '20px 20px 6px 20px' }
+      ? { xs: '20px 20px 6px 20px', md: '22px 22px 6px 22px' }
       : fromAssistant
-        ? { xs: '6px 18px 18px 18px', md: '6px 20px 20px 20px' }
-        : { xs: '14px', md: '16px' },
+        ? { xs: '6px 20px 20px 20px', md: '6px 22px 22px 22px' }
+        : { xs: '16px', md: '18px' },
 
-    // left accent stripe on assistant messages - brand identity line
-    ...(fromAssistant && {
-      borderInlineStart: '3px solid rgba(160, 32, 240, 0.3)',
-    }),
-
-    // shadow - user has a warm purple lift, assistant has a clean neutral depth
+    // depth - user: purple glow ring + lift shadow; assistant: clean neutral card elevation
     boxShadow: fromUser
-      ? '0 4px 24px rgba(160 32 240 / 0.16), 0 1px 8px rgba(160 32 240 / 0.08)'
+      ? '0 0 0 3px rgba(139, 60, 230, 0.09), 0 8px 40px rgba(139, 60, 230, 0.20), 0 2px 10px rgba(139, 60, 230, 0.10)'
       : fromAssistant
-        ? '0 4px 24px rgba(120 40 180 / 0.07), 0 1px 6px rgba(0 0 0 / 0.04)'
-        : '0 1px 6px rgba(120 40 180 / 0.05)',
+        ? '0 2px 24px rgba(0, 0, 0, 0.06), 0 1px 6px rgba(0, 0, 0, 0.04)'
+        : '0 1px 8px rgba(120, 40, 180, 0.05)',
 
-    backdropFilter: 'blur(20px) saturate(160%)',
+    backdropFilter: 'blur(24px) saturate(180%)',
     overflow: 'hidden',
 
-    // entrance animation
+    // entrance animation - different trajectory per role
     animation: fromUser
-      ? 'agi-message-in-user 0.28s cubic-bezier(0.22, 1, 0.36, 1) both'
-      : 'agi-message-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both',
+      ? 'agi-message-in-user 0.36s cubic-bezier(0.22, 1, 0.36, 1) both'
+      : 'agi-message-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) both',
 
-    transition: 'box-shadow 0.22s ease, border-color 0.22s ease, transform 0.22s ease',
+    transition: 'box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
 
-    // hover - subtle lift effect
+    // hover - lift with amplified shadow
     '&:hover': {
       boxShadow: fromUser
-        ? '0 8px 36px rgba(160 32 240 / 0.22), 0 2px 12px rgba(160 32 240 / 0.1)'
+        ? '0 0 0 3px rgba(139, 60, 230, 0.17), 0 14px 52px rgba(139, 60, 230, 0.28), 0 4px 16px rgba(139, 60, 230, 0.13)'
         : fromAssistant
-          ? '0 8px 32px rgba(120 40 180 / 0.11), 0 2px 8px rgba(0 0 0 / 0.06)'
-          : '0 4px 16px rgba(120 40 180 / 0.07)',
+          ? '0 6px 36px rgba(0, 0, 0, 0.10), 0 2px 10px rgba(0, 0, 0, 0.06)'
+          : '0 4px 18px rgba(120, 40, 180, 0.08)',
       borderColor: fromUser
-        ? 'rgba(160 32 240 / 0.42)'
+        ? 'rgba(139, 60, 230, 0.44)'
         : fromAssistant
-          ? 'rgba(160 32 240 / 0.14)'
-          : 'rgba(160 32 240 / 0.14)',
-      transform: 'translateY(-1px)',
+          ? 'rgba(160, 32, 240, 0.12)'
+          : 'rgba(160, 32, 240, 0.15)',
+      transform: 'translateY(-2px)',
     },
 
     // alignment
