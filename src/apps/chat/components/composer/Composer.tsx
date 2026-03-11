@@ -1046,10 +1046,18 @@ export function Composer(props: {
                       key='composer-stop'
                       fullWidth
                       variant='soft'
+                      color={sendButtonColor}
                       disabled={noConversation}
                       onClick={handleStopClicked}
                       endDecorator={<StopOutlinedIcon sx={{ fontSize: 18 }} />}
-                      sx={{ animation: `${animationEnterBelow} 0.1s ease-out`, minHeight: 40 }}
+                      sx={{
+                        animation: `${animationEnterBelow} 0.1s ease-out`,
+                        minHeight: 40,
+                        /* Theme-aware: match composer primary so Stop is readable in all themes (e.g. neutral) */
+                        backgroundColor: 'var(--joy-palette-primary-softBg)',
+                        color: 'var(--joy-palette-primary-softColor)',
+                        '& svg': { color: 'var(--joy-palette-primary-softColor)' },
+                      }}
                     >
                       Stop
                     </Button>
