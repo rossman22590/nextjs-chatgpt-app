@@ -753,7 +753,7 @@ export function ChatMessage(props: {
 
         {/* [start-Avatar] Avatar (Persona) */}
         {!props.hideAvatar && !isEditingText && (
-          <Box sx={[zenMode ? messageZenAsideColumnSx : messageAsideColumnSx, fromUser && { color: 'var(--agi-message-user-color, inherit)' }]}>
+          <Box sx={{ ...(zenMode ? messageZenAsideColumnSx : messageAsideColumnSx), ...(fromUser ? { color: 'var(--agi-message-user-color, inherit)' } : {}) }}>
 
             {/* Persona Avatar or Menu Button */}
             <Box
@@ -780,15 +780,17 @@ export function ChatMessage(props: {
                   size='sm'
                   variant={opsMenuAnchor ? 'solid' : zenMode ? 'plain' : 'soft'}
                   color={(fromAssistant || fromSystem || zenMode) ? 'neutral' : userCommandApprox === 'draw' ? 'warning' : userCommandApprox === 'react' ? 'success' : 'primary'}
-                  sx={[
-                    avatarIconSx,
-                    fromUser && {
-                      color: 'var(--agi-message-user-color, inherit)',
-                      '--Icon-color': 'var(--agi-message-user-color, inherit)',
-                      backgroundColor: 'rgba(255,255,255,0.12)',
-                      borderColor: 'rgba(255,255,255,0.25)',
-                    },
-                  ]}
+                  sx={{
+                    ...avatarIconSx,
+                    ...(fromUser
+                      ? {
+                          color: 'var(--agi-message-user-color, inherit)',
+                          '--Icon-color': 'var(--agi-message-user-color, inherit)',
+                          backgroundColor: 'rgba(255,255,255,0.12)',
+                          borderColor: 'rgba(255,255,255,0.25)',
+                        }
+                      : {}),
+                  }}
                   aria-label='Message options'
                 >
                   <MoreVertIcon />

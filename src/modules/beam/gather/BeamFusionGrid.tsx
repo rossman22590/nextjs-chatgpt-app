@@ -132,7 +132,7 @@ export function BeamFusionGrid(props: {
               }}
             />
 
-            <Typography level='body-sm' color='text.secondary'>
+            <Typography level='body-sm' color='neutral'>
               {currentFactory.description}
             </Typography>
 
