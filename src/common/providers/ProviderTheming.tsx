@@ -32,6 +32,23 @@ const ThemeBodySync = () => {
   return null;
 };
 
+/** When Minimal (neutral) theme: user message bubble is solid, no gradient. */
+const ThemeMinimalMessageSync = () => {
+  const theme = useTheme();
+  const themeGradientId = useThemeGradientId();
+  const mode = theme.palette.mode;
+  React.useEffect(() => {
+    if (themeGradientId === 'neutral') {
+      const solid = mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+      document.body.style.setProperty('--agi-message-user', solid);
+    } else {
+      document.body.style.removeProperty('--agi-message-user');
+    }
+    return () => document.body.style.removeProperty('--agi-message-user');
+  }, [themeGradientId, mode]);
+  return null;
+};
+
 
 // Client-side cache, shared for the whole session of the user in the browser.
 const clientSideEmotionCache = createEmotionCache();
@@ -89,6 +106,7 @@ export const ProviderTheming = (props: { emotionCache?: EmotionCache, children: 
       <CssVarsProvider defaultMode='light' theme={theme}>
         <CssBaseline />
         <ThemeBodySync />
+        <ThemeMinimalMessageSync />
         {/* Inject sprites to be referenced by SVG rendering */}
         <VendorIconSpriteMemo />
         {/* Disabled for now, we don't use those */}

@@ -90,8 +90,8 @@ export const THEME_GRADIENTS: Record<ThemeGradientId, ThemeGradientCombo> = {
   'lavender-haze': { start: '#e0c3fc', end: '#8ec5fc', hoverStart: '#cab0e8', hoverEnd: '#7ab0e8', label: 'Lavender Haze' },
   'ocean-depths': { start: '#2193b0', end: '#6dd5ed', hoverStart: '#1c7d96', hoverEnd: '#5bc0d9', label: 'Ocean Depths' },
   'berry-sorbet': { start: '#ee9ca7', end: '#ffdde1', hoverStart: '#d98a95', hoverEnd: '#e8c8cc', label: 'Berry Sorbet' },
-  // Last: basic minimal (black/white-ish)
-  'neutral': { start: '#4b5563', end: '#9ca3af', hoverStart: '#374151', hoverEnd: '#6b7280', label: 'Minimal' },
+  // Last: basic minimal (black accent only, no grey)
+  'neutral': { start: '#1a1a1a', end: '#1a1a1a', hoverStart: '#0a0a0a', hoverEnd: '#0a0a0a', label: 'Minimal' },
 };
 
 // ---- Gradient-derived full theme (primary, neutral, background, divider, shadow) ----
@@ -264,24 +264,32 @@ const jetBrainsMono = JetBrains_Mono({
 export const themeCodeFontFamilyCss = jetBrainsMono.style.fontFamily;
 
 
-/** Jet black used for the neutral (Minimal) theme in dark mode instead of grey */
+/** Minimal theme: black accent only, no gradient. Light mode = black on light bg; dark = jet black. */
+const NEUTRAL_LIGHT_BLACK = '#1a1a1a';
+const NEUTRAL_LIGHT_BLACK_END = '#2d2d2d';
 const NEUTRAL_DARK_JET_BLACK = '#0a0a0a';
 const NEUTRAL_DARK_JET_BLACK_END = '#141414';
 
 export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGradientId = 'purple-pink') => {
   const gradient = THEME_GRADIENTS[gradientId] ?? THEME_GRADIENTS['purple-pink'];
   const mainHex = gradient.start;
+  const lightHex = gradientId === 'neutral' ? NEUTRAL_LIGHT_BLACK : mainHex;
+  const lightEndHex = gradientId === 'neutral' ? NEUTRAL_LIGHT_BLACK_END : gradient.end;
   const darkHex = gradientId === 'neutral' ? NEUTRAL_DARK_JET_BLACK : mainHex;
   const darkEndHex = gradientId === 'neutral' ? NEUTRAL_DARK_JET_BLACK_END : gradient.end;
-  const lightPrimary = buildPrimaryPalette(mainHex, 'light', gradient.end);
+  /** Minimal: solid black accent (no gradient); other themes use the gradient */
+  const gradientResolved = gradientId === 'neutral'
+    ? { start: NEUTRAL_LIGHT_BLACK, end: NEUTRAL_LIGHT_BLACK, hoverStart: '#0a0a0a', hoverEnd: '#0a0a0a', label: gradient.label }
+    : gradient;
+  const lightPrimary = buildPrimaryPalette(lightHex, 'light', lightEndHex);
   const darkPrimary = buildPrimaryPalette(darkHex, 'dark', darkEndHex);
-  const lightNeutral = buildNeutralPalette(mainHex, 'light');
+  const lightNeutral = buildNeutralPalette(lightHex, 'light');
   const darkNeutral = buildNeutralPalette(darkHex, 'dark');
-  const lightText = buildTextPalette(mainHex, 'light');
+  const lightText = buildTextPalette(lightHex, 'light');
   const darkText = buildTextPalette(darkHex, 'dark');
-  const lightBackground = buildBackgroundPalette(mainHex, 'light');
+  const lightBackground = buildBackgroundPalette(lightHex, 'light');
   const darkBackground = buildBackgroundPalette(darkHex, 'dark');
-  const shadow = buildShadow(mainHex);
+  const shadow = buildShadow(lightHex);
   return extendTheme({
   fontFamily: {
     body: themeFontFamilyCss,
@@ -303,7 +311,7 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
         neutral: lightNeutral,
         text: lightText,
         background: lightBackground,
-        divider: buildDivider(mainHex, 'light'),
+        divider: buildDivider(lightHex, 'light'),
       },
     },
     dark: {
@@ -320,7 +328,7 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
     JoyButton: {
       styleOverrides: {
         root: ({ ownerState }) => {
-          const g = gradient;
+          const g = gradientResolved;
           return {
           borderRadius: '999px',
           fontWeight: 600,
@@ -453,7 +461,7 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
       styleOverrides: {
         badge: ({ ownerState }) => {
           if ((ownerState.color as any) !== 'color-feature') return undefined;
-          return { background: `linear-gradient(135deg, ${gradient.start}, ${gradient.end})` };
+          return { background: `linear-gradient(135deg, ${gradientResolved.start}, ${gradientResolved.end})` };
         },
       },
     },
