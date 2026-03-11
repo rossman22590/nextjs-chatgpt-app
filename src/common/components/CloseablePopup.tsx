@@ -110,8 +110,9 @@ export function CloseablePopup(props: {
 
   const styleMemoSx: SxProps = React.useMemo(() => ({
 
-    // style
-    backgroundColor: 'background.popup',
+    // style - use theme vars so popup is never wrong in light/dark (avoids dark blue in both modes)
+    backgroundColor: 'var(--joy-palette-background-popup)',
+    color: 'var(--joy-palette-text-primary)',
     boxShadow: props.boxShadow ?? 'md',
     ...(props.maxHeightGapPx !== undefined ? { maxHeight: `calc(100dvh - ${props.maxHeightGapPx}px)`, overflowY: 'auto' } : {}),
     ...(props.maxWidth !== undefined && { maxWidth: props.maxWidth }),

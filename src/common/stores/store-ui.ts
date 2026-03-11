@@ -179,8 +179,9 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
        * 2: new Big-AGI 2 defaults
        * 3: centerMode: 'full' is the new default
        * 4: themeGradientId for gradient combo preference
+       * 5: mint-emerald removed, neutral added; migrate mint-emerald -> purple-pink
        */
-      version: 4,
+      version: 5,
 
       partialize: (state) => {
         if (Release.IsNodeDevBuild) return state; // in dev, persist everything
@@ -207,6 +208,10 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
         }
 
         if (state && fromVersion < 4) {
+          state.themeGradientId = 'purple-pink';
+        }
+
+        if (state && fromVersion < 5 && state.themeGradientId === 'mint-emerald') {
           state.themeGradientId = 'purple-pink';
         }
 

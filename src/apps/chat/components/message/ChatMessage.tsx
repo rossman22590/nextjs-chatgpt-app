@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import TimeAgo from 'react-timeago';
 
 import type { SxProps } from '@mui/joy/styles/types';
-import { Box, ButtonGroup, CircularProgress, Divider, IconButton, ListDivider, ListItem, ListItemDecorator, MenuItem, Switch, Tooltip, Typography } from '@mui/joy';
+import { Box, ButtonGroup, CircularProgress, Divider, IconButton, ListDivider, ListItem, ListItemDecorator, MenuItem, Switch, Tooltip, Typography, useColorScheme } from '@mui/joy';
 import { ClickAwayListener, Popper } from '@mui/base';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
@@ -602,16 +602,23 @@ export function ChatMessage(props: {
 
 
   // style
+  const { mode: colorSchemeMode } = useColorScheme();
+  const isDark = colorSchemeMode === 'dark';
   const backgroundColor = messageBackground(messageRole, userCommandApprox, messageHasBeenEdited, false /*isAssistantError && !errorMessage*/);
 
-  const listItemSx: SxProps = React.useMemo(() => ({
+  const listItemSx: SxProps = React.useMemo(() => {
+    // In dark mode skip white gradient overlay so bubbles stay dark and text stays readable
+    const background = isDark
+      ? backgroundColor
+      : fromUser
+        ? `linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 36%, transparent 52%), ${backgroundColor}`
+        : fromAssistant
+          ? `linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.15) 30%, transparent 50%), ${backgroundColor}`
+          : backgroundColor;
 
-    // multi-layer background: top-shine gloss + CSS variable base
-    background: fromUser
-      ? `linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 36%, transparent 52%), ${backgroundColor}`
-      : fromAssistant
-        ? `linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.15) 30%, transparent 50%), ${backgroundColor}`
-        : backgroundColor,
+    return {
+    // multi-layer background: top-shine gloss + CSS variable base (or plain in dark mode)
+    background,
 
     // generous padding - content needs room
     px: { xs: 1.5, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 2 },
@@ -672,9 +679,9 @@ export function ChatMessage(props: {
       transform: 'translateY(-2px)',
     },
 
-    // alignment
+    // alignment + dark mode: user bubble must use theme text so text is readable (light on dark)
     ...(fromAssistant && { mr: 0, ml: 0 }),
-    ...(fromUser && { ml: { xs: 'auto', md: 'auto' }, mr: 0 }),
+    ...(fromUser && { ml: { xs: 'auto', md: 'auto' }, mr: 0, color: 'var(--joy-palette-text-primary)' }),
     ...(fromSystem && { ml: 0, mr: 0 }),
 
     ...(isUserStarred && {
@@ -707,7 +714,7 @@ export function ChatMessage(props: {
     display: 'block',
 
     ...props.sx,
-  }), [adjContentScaling, backgroundColor, fromAssistant, fromSystem, fromUser, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.sx, uiComplexityMode]);
+  }; }, [adjContentScaling, backgroundColor, fromAssistant, fromSystem, fromUser, isDark, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.sx, uiComplexityMode]);
   // avatar icon & label & tooltip
 
   const zenMode = uiComplexityMode === 'minimal';
@@ -726,6 +733,7 @@ export function ChatMessage(props: {
     <Box
       component='li'
       role='chat-message'
+      data-message-role={messageRole}
       tabIndex={-1 /* for shortcuts navigation */}
       onMouseUp={(ENABLE_BUBBLE && !fromSystem /*&& !isAssistantError*/) ? handleBlocksMouseUp : undefined}
       onTouchEnd={(ENABLE_BUBBLE && !fromSystem /*&& !isAssistantError*/) ? handleBlocksTouchEnd : undefined}

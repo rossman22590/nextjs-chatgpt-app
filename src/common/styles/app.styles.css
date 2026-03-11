@@ -71,6 +71,37 @@
     --agi-body-ambient: linear-gradient(180deg, #0c0c0e 0%, #101012 50%, #141416 100%);
     --agi-thread-fade: #0c0c0e;
     --agi-thread-bg: transparent;
+    /* Global default: light text so nothing is dark-on-dark (user/assistant bubbles, thread, etc.) */
+    color: var(--joy-palette-text-primary, #e8e4f4);
+    /* Assistant/system message bubbles: dark surface in dark mode (no bright white) */
+    --agi-message-assistant: var(--joy-palette-background-level1);
+    --agi-message-system: var(--joy-palette-background-level2);
+    /* Input/textarea - high-contrast fallbacks so composer is always readable */
+    --agi-input-color: var(--joy-palette-text-primary, #e8e4f4);
+    --agi-input-placeholder: var(--joy-palette-text-tertiary, #b8b0d8);
+}
+
+/* User message bubbles: force bright text in dark mode (overrides any theme/child that sets dark) */
+[data-joy-color-scheme="dark"] [data-message-role="user"] {
+    color: #e8e4f4 !important;
+}
+
+[data-joy-color-scheme="dark"] [data-message-role="user"] p,
+[data-joy-color-scheme="dark"] [data-message-role="user"] span,
+[data-joy-color-scheme="dark"] [data-message-role="user"] div {
+    color: inherit !important;
+}
+
+[data-joy-color-scheme="dark"] textarea,
+[data-joy-color-scheme="dark"] input[type="text"],
+[data-joy-color-scheme="dark"] input:not([type]) {
+    color: var(--agi-input-color) !important;
+}
+
+[data-joy-color-scheme="dark"] textarea::placeholder,
+[data-joy-color-scheme="dark"] input::placeholder {
+    color: var(--agi-input-placeholder) !important;
+    opacity: 1;
 }
 
 html,

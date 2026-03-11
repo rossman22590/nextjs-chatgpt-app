@@ -1014,6 +1014,18 @@ export function Composer(props: {
                     gap: { xs: 1, md: 1.5 },
                     backgroundColor: (isMobile && sendButtonVariant === 'outlined') ? 'background.popup' : undefined,
                     boxShadow: (isMobile && sendButtonVariant !== 'outlined') ? 'none' : `0 8px 24px -4px rgb(var(--joy-palette-${sendButtonColor}-mainChannel) / 20%)`,
+                    /* Theme-based hover: smooth transition + contrast text (softColor = dark in light mode, light in dark) */
+                    '& .MuiButton-root, & .MuiIconButton-root': {
+                      transition: 'background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease',
+                    },
+                    '& .MuiButton-root:hover:not(:disabled), & .MuiIconButton-root:hover:not(:disabled)': {
+                      backgroundColor: 'var(--joy-palette-primary-softActiveBg)',
+                      color: 'var(--joy-palette-primary-softColor)',
+                      boxShadow: '0 2px 8px -2px rgb(var(--joy-palette-primary-mainChannel) / 25%)',
+                    },
+                    '& .MuiButton-root:hover:not(:disabled) svg, & .MuiIconButton-root:hover:not(:disabled) svg': {
+                      color: 'var(--joy-palette-primary-softColor)',
+                    },
                   }}
                 >
                   {!assistantAbortible ? (

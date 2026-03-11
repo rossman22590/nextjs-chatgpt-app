@@ -29,7 +29,6 @@ export type ThemeGradientId =
   | 'berry-wine'
   | 'gold-amber'
   | 'ice-blue'
-  | 'mint-emerald'
   | 'coral-peach'
   | 'lavender-plum'
   // Fun row (Coolors-style)
@@ -42,7 +41,8 @@ export type ThemeGradientId =
   | 'mint-lemon'
   | 'lavender-haze'
   | 'ocean-depths'
-  | 'berry-sorbet';
+  | 'berry-sorbet'
+  | 'neutral';
 
 export interface ThemeGradientCombo {
   start: string;
@@ -70,7 +70,6 @@ export const THEME_GRADIENTS: Record<ThemeGradientId, ThemeGradientCombo> = {
   'lime-green': { start: '#22c55e', end: '#84cc16', hoverStart: '#16a34a', hoverEnd: '#65a30d', label: 'Green to Lime' },
   'forest-moss': { start: '#166534', end: '#4d7c0f', hoverStart: '#14532d', hoverEnd: '#3f6212', label: 'Forest to Moss' },
   'ocean-mint': { start: '#0d9488', end: '#34d399', hoverStart: '#0f766e', hoverEnd: '#10b981', label: 'Ocean to Mint' },
-  'mint-emerald': { start: '#2dd4bf', end: '#059669', hoverStart: '#14b8a6', hoverEnd: '#047857', label: 'Mint to Emerald' },
   // Warm / reds & oranges
   'amber-orange': { start: '#d97706', end: '#ea580c', hoverStart: '#b45309', hoverEnd: '#c2410c', label: 'Amber to Orange' },
   'rose-coral': { start: '#e11d48', end: '#f43f5e', hoverStart: '#be123c', hoverEnd: '#e11d48', label: 'Rose to Coral' },
@@ -91,6 +90,8 @@ export const THEME_GRADIENTS: Record<ThemeGradientId, ThemeGradientCombo> = {
   'lavender-haze': { start: '#e0c3fc', end: '#8ec5fc', hoverStart: '#cab0e8', hoverEnd: '#7ab0e8', label: 'Lavender Haze' },
   'ocean-depths': { start: '#2193b0', end: '#6dd5ed', hoverStart: '#1c7d96', hoverEnd: '#5bc0d9', label: 'Ocean Depths' },
   'berry-sorbet': { start: '#ee9ca7', end: '#ffdde1', hoverStart: '#d98a95', hoverEnd: '#e8c8cc', label: 'Berry Sorbet' },
+  // Last: basic minimal (black/white-ish)
+  'neutral': { start: '#4b5563', end: '#9ca3af', hoverStart: '#374151', hoverEnd: '#6b7280', label: 'Minimal' },
 };
 
 // ---- Gradient-derived full theme (primary, neutral, background, divider, shadow) ----
@@ -263,17 +264,23 @@ const jetBrainsMono = JetBrains_Mono({
 export const themeCodeFontFamilyCss = jetBrainsMono.style.fontFamily;
 
 
+/** Jet black used for the neutral (Minimal) theme in dark mode instead of grey */
+const NEUTRAL_DARK_JET_BLACK = '#0a0a0a';
+const NEUTRAL_DARK_JET_BLACK_END = '#141414';
+
 export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGradientId = 'purple-pink') => {
   const gradient = THEME_GRADIENTS[gradientId] ?? THEME_GRADIENTS['purple-pink'];
   const mainHex = gradient.start;
+  const darkHex = gradientId === 'neutral' ? NEUTRAL_DARK_JET_BLACK : mainHex;
+  const darkEndHex = gradientId === 'neutral' ? NEUTRAL_DARK_JET_BLACK_END : gradient.end;
   const lightPrimary = buildPrimaryPalette(mainHex, 'light', gradient.end);
-  const darkPrimary = buildPrimaryPalette(mainHex, 'dark', gradient.end);
+  const darkPrimary = buildPrimaryPalette(darkHex, 'dark', darkEndHex);
   const lightNeutral = buildNeutralPalette(mainHex, 'light');
-  const darkNeutral = buildNeutralPalette(mainHex, 'dark');
+  const darkNeutral = buildNeutralPalette(darkHex, 'dark');
   const lightText = buildTextPalette(mainHex, 'light');
-  const darkText = buildTextPalette(mainHex, 'dark');
+  const darkText = buildTextPalette(darkHex, 'dark');
   const lightBackground = buildBackgroundPalette(mainHex, 'light');
-  const darkBackground = buildBackgroundPalette(mainHex, 'dark');
+  const darkBackground = buildBackgroundPalette(darkHex, 'dark');
   const shadow = buildShadow(mainHex);
   return extendTheme({
   fontFamily: {
@@ -305,7 +312,7 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
         neutral: darkNeutral,
         text: darkText,
         background: darkBackground,
-        divider: buildDivider(mainHex, 'dark'),
+        divider: buildDivider(darkHex, 'dark'),
       },
     },
   },
@@ -472,6 +479,16 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
           ...(ownerState.size === 'md' && {
             '--Switch-thumbSize': '16px',
           }),
+        }),
+      },
+    },
+
+    JoyTooltip: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          /* Use popup background and text so tooltips are never dark purple in light/dark */
+          backgroundColor: theme.palette.background.popup,
+          color: theme.palette.text.primary,
         }),
       },
     },

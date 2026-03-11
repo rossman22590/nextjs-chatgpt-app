@@ -22,7 +22,6 @@ const GRADIENT_IDS: ThemeGradientId[] = [
   'lime-green',
   'forest-moss',
   'ocean-mint',
-  'mint-emerald',
   'amber-orange',
   'rose-coral',
   'sunset-red',
@@ -40,6 +39,7 @@ const GRADIENT_IDS: ThemeGradientId[] = [
   'lavender-haze',
   'ocean-depths',
   'berry-sorbet',
+  'neutral',  // last: basic minimal (black/white-ish)
 ];
 
 export function SettingUITheme() {
