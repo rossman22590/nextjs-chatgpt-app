@@ -32,19 +32,51 @@ const ThemeBodySync = () => {
   return null;
 };
 
-/** When Minimal (neutral) theme: user message bubble is solid, no gradient. */
+/** Neutral (Minimal) theme: plain white/dark bg, no gradients; user bubbles black with white text. */
+const NEUTRAL_LIGHT_BG = '#ffffff';
+const NEUTRAL_DARK_BG = '#0a0a0a';
+const NEUTRAL_USER_BUBBLE_LIGHT = '#1a1a1a';
+const NEUTRAL_USER_BUBBLE_DARK = 'rgba(255,255,255,0.06)';
+const NEUTRAL_USER_TEXT_LIGHT = '#ffffff';
+
 const ThemeMinimalMessageSync = () => {
   const theme = useTheme();
   const themeGradientId = useThemeGradientId();
   const mode = theme.palette.mode;
   React.useEffect(() => {
+    const body = document.body.style;
     if (themeGradientId === 'neutral') {
-      const solid = mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
-      document.body.style.setProperty('--agi-message-user', solid);
+      if (mode === 'light') {
+        body.setProperty('--agi-body-bg', NEUTRAL_LIGHT_BG);
+        body.setProperty('--agi-body-ambient', NEUTRAL_LIGHT_BG);
+        body.setProperty('--agi-page-gradient', NEUTRAL_LIGHT_BG);
+        body.setProperty('--agi-thread-fade', NEUTRAL_LIGHT_BG);
+        body.setProperty('--agi-message-user', NEUTRAL_USER_BUBBLE_LIGHT);
+        body.setProperty('--agi-message-user-color', NEUTRAL_USER_TEXT_LIGHT);
+      } else {
+        body.setProperty('--agi-body-bg', NEUTRAL_DARK_BG);
+        body.setProperty('--agi-body-ambient', NEUTRAL_DARK_BG);
+        body.setProperty('--agi-page-gradient', NEUTRAL_DARK_BG);
+        body.setProperty('--agi-thread-fade', NEUTRAL_DARK_BG);
+        body.setProperty('--agi-message-user', NEUTRAL_USER_BUBBLE_DARK);
+        body.removeProperty('--agi-message-user-color');
+      }
     } else {
-      document.body.style.removeProperty('--agi-message-user');
+      body.removeProperty('--agi-body-bg');
+      body.removeProperty('--agi-body-ambient');
+      body.removeProperty('--agi-page-gradient');
+      body.removeProperty('--agi-thread-fade');
+      body.removeProperty('--agi-message-user');
+      body.removeProperty('--agi-message-user-color');
     }
-    return () => document.body.style.removeProperty('--agi-message-user');
+    return () => {
+      body.removeProperty('--agi-body-bg');
+      body.removeProperty('--agi-body-ambient');
+      body.removeProperty('--agi-page-gradient');
+      body.removeProperty('--agi-thread-fade');
+      body.removeProperty('--agi-message-user');
+      body.removeProperty('--agi-message-user-color');
+    };
   }, [themeGradientId, mode]);
   return null;
 };

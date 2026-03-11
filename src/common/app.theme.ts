@@ -270,8 +270,8 @@ const NEUTRAL_LIGHT_BLACK_END = '#2d2d2d';
 const NEUTRAL_DARK_JET_BLACK = '#0a0a0a';
 const NEUTRAL_DARK_JET_BLACK_END = '#141414';
 
-export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGradientId = 'purple-pink') => {
-  const gradient = THEME_GRADIENTS[gradientId] ?? THEME_GRADIENTS['purple-pink'];
+export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGradientId = 'neutral') => {
+  const gradient = THEME_GRADIENTS[gradientId] ?? THEME_GRADIENTS['neutral'];
   const mainHex = gradient.start;
   const lightHex = gradientId === 'neutral' ? NEUTRAL_LIGHT_BLACK : mainHex;
   const lightEndHex = gradientId === 'neutral' ? NEUTRAL_LIGHT_BLACK_END : gradient.end;

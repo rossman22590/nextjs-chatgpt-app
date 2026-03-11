@@ -92,6 +92,17 @@
     color: inherit !important;
 }
 
+/* Neutral (light): user bubble is black; force white text and icons via --agi-message-user-color */
+[data-message-role="user"] {
+    color: var(--agi-message-user-color, var(--joy-palette-text-primary));
+}
+[data-message-role="user"] p,
+[data-message-role="user"] span,
+[data-message-role="user"] div,
+[data-message-role="user"] li {
+    color: inherit;
+}
+
 [data-joy-color-scheme="dark"] textarea,
 [data-joy-color-scheme="dark"] input[type="text"],
 [data-joy-color-scheme="dark"] input:not([type]) {

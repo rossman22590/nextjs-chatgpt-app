@@ -135,7 +135,7 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
       composerQuickButton: 'beam',
       setComposerQuickButton: (composerQuickButton: 'off' | 'call' | 'beam') => set({ composerQuickButton }),
 
-      themeGradientId: 'purple-pink',
+      themeGradientId: 'neutral',
       setThemeGradientId: (themeGradientId: ThemeGradientId) => set({ themeGradientId }),
 
       // Advanced features
@@ -179,7 +179,7 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
        * 2: new Big-AGI 2 defaults
        * 3: centerMode: 'full' is the new default
        * 4: themeGradientId for gradient combo preference
-       * 5: mint-emerald removed, neutral added; migrate mint-emerald -> purple-pink
+       * 5: mint-emerald removed, neutral added; migrate mint-emerald -> neutral; default is neutral
        */
       version: 5,
 
@@ -208,11 +208,11 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
         }
 
         if (state && fromVersion < 4) {
-          state.themeGradientId = 'purple-pink';
+          state.themeGradientId = 'neutral';
         }
 
         if (state && fromVersion < 5 && state.themeGradientId === 'mint-emerald') {
-          state.themeGradientId = 'purple-pink';
+          state.themeGradientId = 'neutral';
         }
 
         return state;

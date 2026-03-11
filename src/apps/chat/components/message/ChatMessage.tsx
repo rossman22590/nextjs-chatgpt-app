@@ -679,9 +679,9 @@ export function ChatMessage(props: {
       transform: 'translateY(-2px)',
     },
 
-    // alignment + dark mode: user bubble must use theme text so text is readable (light on dark)
+    // alignment + user bubble text (neutral theme sets --agi-message-user-color for white on black)
     ...(fromAssistant && { mr: 0, ml: 0 }),
-    ...(fromUser && { ml: { xs: 'auto', md: 'auto' }, mr: 0, color: 'var(--joy-palette-text-primary)' }),
+    ...(fromUser && { ml: { xs: 'auto', md: 'auto' }, mr: 0, color: 'var(--agi-message-user-color, var(--joy-palette-text-primary))' }),
     ...(fromSystem && { ml: 0, mr: 0 }),
 
     ...(isUserStarred && {
@@ -753,7 +753,7 @@ export function ChatMessage(props: {
 
         {/* [start-Avatar] Avatar (Persona) */}
         {!props.hideAvatar && !isEditingText && (
-          <Box sx={zenMode ? messageZenAsideColumnSx : messageAsideColumnSx}>
+          <Box sx={[zenMode ? messageZenAsideColumnSx : messageAsideColumnSx, fromUser && { color: 'var(--agi-message-user-color, inherit)' }]}>
 
             {/* Persona Avatar or Menu Button */}
             <Box
@@ -768,13 +768,27 @@ export function ChatMessage(props: {
               sx={personaAvatarOrMenuSx}
             >
               {showAvatarIcon && !isHovering && !opsMenuAnchor ? (
-                messageAvatarIcon
+                fromUser ? (
+                  <Box sx={{ color: 'var(--agi-message-user-color, inherit)', '& .MuiSvgIcon-root, & svg': { color: 'inherit' } }}>
+                    {messageAvatarIcon}
+                  </Box>
+                ) : (
+                  messageAvatarIcon
+                )
               ) : (
                 <IconButton
                   size='sm'
                   variant={opsMenuAnchor ? 'solid' : zenMode ? 'plain' : 'soft'}
                   color={(fromAssistant || fromSystem || zenMode) ? 'neutral' : userCommandApprox === 'draw' ? 'warning' : userCommandApprox === 'react' ? 'success' : 'primary'}
-                  sx={avatarIconSx}
+                  sx={[
+                    avatarIconSx,
+                    fromUser && {
+                      color: 'var(--agi-message-user-color, inherit)',
+                      '--Icon-color': 'var(--agi-message-user-color, inherit)',
+                      backgroundColor: 'rgba(255,255,255,0.12)',
+                      borderColor: 'rgba(255,255,255,0.25)',
+                    },
+                  ]}
                   aria-label='Message options'
                 >
                   <MoreVertIcon />
