@@ -24,7 +24,7 @@ export const BeamCard = styled(Box)(({ theme }) => ({
   border: '1px solid',
   borderColor: theme.vars.palette.divider,
   borderRadius: theme.radius.lg,
-  boxShadow: 'var(--joy-shadow-sm, 0 2px 8px rgba(0 0 0 / 0.06))',
+  boxShadow: '0 4px 18px rgba(0 0 0 / 0.06), 0 1px 4px rgba(0 0 0 / 0.04)',
 
   padding: 'var(--Card-padding)',
 
@@ -72,13 +72,16 @@ export const beamCardMessageWrapperSx: SxProps = {
 };
 
 export const beamCardMessageSx: SxProps = {
-  // style: to undo the style of ChatMessage
-  backgroundColor: 'none',
+  // style: to undo the style of ChatMessage so only the card has shadow/radius (no inner square shadow)
+  backgroundColor: 'transparent',
   border: 'none',
-  mx: -1.5, // compensates for the marging (e.g. RenderChatText, )
+  borderRadius: 0,
+  boxShadow: 'none',
+  mx: -1.5, // compensates for the margin (e.g. RenderChatText)
   my: 0,
   px: 0,
   py: 0,
+  '&:hover': { boxShadow: 'none', transform: 'none' },
 };
 
 export const beamCardMessageScrollingSx: SxProps = {

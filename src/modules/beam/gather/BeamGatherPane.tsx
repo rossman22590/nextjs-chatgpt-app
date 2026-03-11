@@ -28,7 +28,7 @@ const gatherPaneSx: SxProps = {
   borderColor: 'divider',
   borderRadius: 'lg',
   backgroundColor: 'background.surface',
-  boxShadow: 'sm',
+  boxShadow: '0 4px 18px rgba(0 0 0 / 0.06), 0 1px 4px rgba(0 0 0 / 0.04)',
   [`&.${gatherPaneClasses.ready}`]: {
     backgroundColor: 'background.surface',
     borderColor: 'divider',

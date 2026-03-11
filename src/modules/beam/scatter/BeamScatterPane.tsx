@@ -23,7 +23,7 @@ const scatterPaneSx: SxProps = {
   border: '1px solid',
   borderColor: 'divider',
   borderRadius: 'lg',
-  boxShadow: 'sm',
+  boxShadow: '0 4px 18px rgba(0 0 0 / 0.06), 0 1px 4px rgba(0 0 0 / 0.04)',
   rowGap: 'var(--Pad)',
 };
 

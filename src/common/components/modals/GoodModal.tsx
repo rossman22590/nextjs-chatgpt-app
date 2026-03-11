@@ -190,7 +190,7 @@ export function GoodModal(props: {
             justifyContent: 'space-between',
           }}>
             {props.startButton}
-            {showBottomClose && <Button aria-label='Close Dialog' variant='solid' color='neutral' onClick={(event) => props.onClose?.(event, 'closeClick')} sx={{ ml: 'auto', minWidth: 100 }}>
+            {showBottomClose && <Button aria-label='Close Dialog' variant='solid' color='neutral' onClick={(event) => props.onClose?.(event, 'closeClick')} sx={{ ml: 'auto', minWidth: 100, color: 'text.primary' }}>
               {props.closeText || 'Close'}
             </Button>}
           </Box>}

@@ -127,13 +127,12 @@ export function BeamFusionGrid(props: {
               onAddFusion={props.onAddFusion}
               sx={{
                 minHeight: props.isMobile ? 'calc(2 * var(--Card-padding) + 2rem - 0.5rem)' : undefined,
-                // marginBottom: 'calc(-1 * var(--Card-padding) + 0.25rem)',
-                // marginInline: 'calc(-1 * var(--Card-padding) + 0.375rem)',
                 whiteSpace: 'nowrap',
+                color: 'text.primary',
               }}
             />
 
-            <Typography level='body-sm' variant='soft' color={GATHER_COLOR}>
+            <Typography level='body-sm' color='text.secondary'>
               {currentFactory.description}
             </Typography>
 
