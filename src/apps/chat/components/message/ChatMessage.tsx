@@ -625,13 +625,13 @@ export function ChatMessage(props: {
       md: fromAssistant ? '100%' : fromUser ? 'min(100%, 78%)' : '100%',
     },
 
-    // border - user: vivid brand ring; assistant: barely-there neutral; system: soft purple
+    // border - user: vivid brand ring; assistant: barely-there; system: soft (theme primary)
     border: '1px solid',
     borderColor: fromUser
-      ? 'rgba(139, 60, 230, 0.30)'
+      ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.3)'
       : fromAssistant
-        ? 'rgba(160, 32, 240, 0.07)'
-        : 'rgba(160, 32, 240, 0.10)',
+        ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.07)'
+        : 'rgba(var(--joy-palette-primary-mainChannel) / 0.1)',
 
     // corner radius - speech-bubble tail: user tail bottom-right, assistant tail top-left
     borderRadius: fromUser
@@ -640,12 +640,12 @@ export function ChatMessage(props: {
         ? { xs: '6px 20px 20px 20px', md: '6px 22px 22px 22px' }
         : { xs: '16px', md: '18px' },
 
-    // depth - user: purple glow ring + lift shadow; assistant: clean neutral card elevation
+    // depth - user: theme glow ring + lift; assistant: neutral card elevation
     boxShadow: fromUser
-      ? '0 0 0 3px rgba(139, 60, 230, 0.09), 0 8px 40px rgba(139, 60, 230, 0.20), 0 2px 10px rgba(139, 60, 230, 0.10)'
+      ? '0 0 0 3px rgba(var(--joy-palette-primary-mainChannel) / 0.09), 0 8px 40px rgba(var(--joy-palette-primary-mainChannel) / 0.2), 0 2px 10px rgba(var(--joy-palette-primary-mainChannel) / 0.1)'
       : fromAssistant
         ? '0 2px 24px rgba(0, 0, 0, 0.06), 0 1px 6px rgba(0, 0, 0, 0.04)'
-        : '0 1px 8px rgba(120, 40, 180, 0.05)',
+        : '0 1px 8px rgba(var(--joy-palette-primary-mainChannel) / 0.05)',
 
     backdropFilter: 'blur(24px) saturate(180%)',
     overflow: 'hidden',
@@ -657,18 +657,18 @@ export function ChatMessage(props: {
 
     transition: 'box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
 
-    // hover - lift with amplified shadow
+    // hover - lift with amplified shadow (theme primary)
     '&:hover': {
       boxShadow: fromUser
-        ? '0 0 0 3px rgba(139, 60, 230, 0.17), 0 14px 52px rgba(139, 60, 230, 0.28), 0 4px 16px rgba(139, 60, 230, 0.13)'
+        ? '0 0 0 3px rgba(var(--joy-palette-primary-mainChannel) / 0.17), 0 14px 52px rgba(var(--joy-palette-primary-mainChannel) / 0.28), 0 4px 16px rgba(var(--joy-palette-primary-mainChannel) / 0.13)'
         : fromAssistant
           ? '0 6px 36px rgba(0, 0, 0, 0.10), 0 2px 10px rgba(0, 0, 0, 0.06)'
-          : '0 4px 18px rgba(120, 40, 180, 0.08)',
+          : '0 4px 18px rgba(var(--joy-palette-primary-mainChannel) / 0.08)',
       borderColor: fromUser
-        ? 'rgba(139, 60, 230, 0.44)'
+        ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.44)'
         : fromAssistant
-          ? 'rgba(160, 32, 240, 0.12)'
-          : 'rgba(160, 32, 240, 0.15)',
+          ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.12)'
+          : 'rgba(var(--joy-palette-primary-mainChannel) / 0.15)',
       transform: 'translateY(-2px)',
     },
 

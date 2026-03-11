@@ -54,13 +54,13 @@ export const DesktopNavIcon = styled(IconButton)(({ theme }) => ({
   '&:hover': {
     backgroundColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.12)',
     color: theme.palette.text.primary,
-    boxShadow: '0 4px 12px rgba(160 32 240 / 0.12)',
+    boxShadow: 'var(--joy-shadow-xs)',
   },
 
   [`&.${navItemClasses.active}`]: {
-    background: 'linear-gradient(135deg, #a020f0 0%, #d040a0 100%)',
-    color: '#fff',
-    boxShadow: '0 4px 14px rgba(160 32 240 / 0.28)',
+    background: 'linear-gradient(135deg, var(--joy-palette-primary-solidBg) 0%, var(--joy-palette-primary-solidHoverBg) 100%)',
+    color: 'var(--joy-palette-primary-solidColor)',
+    boxShadow: 'var(--joy-shadow-sm)',
   },
 
   [`&.${navItemClasses.paneOpen}`]: {

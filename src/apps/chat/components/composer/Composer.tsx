@@ -718,13 +718,13 @@ export function Composer(props: {
     borderRadius: { xs: '16px', md: '18px' },
     background: 'var(--agi-shell-elevated)',
     border: '1px solid var(--agi-shell-border)',
-    boxShadow: '0 4px 24px rgba(160 32 240 / 0.08), 0 1px 8px rgba(224 64 160 / 0.04)',
+    boxShadow: 'var(--joy-shadow-sm)',
     backdropFilter: 'blur(24px) saturate(160%)',
     overflow: 'hidden',
     transition: 'box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
     '&:focus-within': {
-      borderColor: 'rgba(160, 32, 240, 0.35)',
-      boxShadow: '0 0 0 3px rgba(160, 32, 240, 0.12), 0 8px 40px rgba(160, 32, 240, 0.18), 0 2px 12px rgba(224, 64, 160, 0.10)',
+      borderColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.35)',
+      boxShadow: '0 0 0 3px rgba(var(--joy-palette-primary-mainChannel) / 0.12), var(--joy-shadow-lg)',
       transform: 'translateY(-1px)',
     },
     '&::before': {

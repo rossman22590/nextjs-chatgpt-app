@@ -2,7 +2,7 @@ import * as React from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import type { ContentScaling, UIComplexityMode } from '~/common/app.theme';
+import type { ContentScaling, ThemeGradientId, UIComplexityMode } from '~/common/app.theme';
 import { BrowserLang } from '~/common/util/pwaUtils';
 import { Release } from '~/common/app.release';
 
@@ -56,6 +56,9 @@ interface UIPreferencesStore {
 
   composerQuickButton: 'off' | 'call' | 'beam';
   setComposerQuickButton: (composerQuickButton: 'off' | 'call' | 'beam') => void;
+
+  themeGradientId: ThemeGradientId;
+  setThemeGradientId: (themeGradientId: ThemeGradientId) => void;
 
   // Advanced features
 
@@ -132,6 +135,9 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
       composerQuickButton: 'beam',
       setComposerQuickButton: (composerQuickButton: 'off' | 'call' | 'beam') => set({ composerQuickButton }),
 
+      themeGradientId: 'purple-pink',
+      setThemeGradientId: (themeGradientId: ThemeGradientId) => set({ themeGradientId }),
+
       // Advanced features
 
       aixInspector: false,
@@ -172,8 +178,9 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
        * 1: rename 'enterToSend' to 'enterIsNewline' (flip the meaning)
        * 2: new Big-AGI 2 defaults
        * 3: centerMode: 'full' is the new default
+       * 4: themeGradientId for gradient combo preference
        */
-      version: 3,
+      version: 4,
 
       partialize: (state) => {
         if (Release.IsNodeDevBuild) return state; // in dev, persist everything
@@ -199,6 +206,10 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
           state.centerMode = 'full';
         }
 
+        if (state && fromVersion < 4) {
+          state.themeGradientId = 'purple-pink';
+        }
+
         return state;
       },
     },
@@ -208,6 +219,10 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
 
 export function useUIComplexityMode(): UIComplexityMode {
   return useUIPreferencesStore((state) => state.complexityMode);
+}
+
+export function useThemeGradientId(): ThemeGradientId {
+  return useUIPreferencesStore((state) => state.themeGradientId);
 }
 
 export function useUIComplexityIsMinimal(): boolean {

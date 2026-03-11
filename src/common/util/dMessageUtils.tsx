@@ -47,12 +47,12 @@ export const avatarIconSx: SxProps = {
   color: 'primary.plainColor',
   backgroundColor: 'primary.softBg',
   border: '1px solid',
-  borderColor: 'rgba(160, 32, 240, 0.18)',
-  boxShadow: '0 2px 8px rgba(160, 32, 240, 0.12)',
+  borderColor: 'var(--joy-palette-primary-outlinedBorder)',
+  boxShadow: 'var(--joy-shadow-xs)',
   transition: 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease',
   '&:hover': {
     transform: 'scale(1.08)',
-    boxShadow: '0 4px 16px rgba(160, 32, 240, 0.22)',
+    boxShadow: 'var(--joy-shadow-sm)',
   },
 };
 

@@ -28,7 +28,7 @@ const pageCoreSx: SxProps = {
     content: '""',
     position: 'absolute',
     inset: 0,
-    background: 'linear-gradient(140deg, rgba(160 32 240 / 0.04), transparent 28%), var(--agi-shell-glow)',
+    background: 'linear-gradient(140deg, var(--joy-palette-primary-softBg), transparent 28%), var(--agi-shell-glow)',
     opacity: 1,
     pointerEvents: 'none',
   },

@@ -1,12 +1,36 @@
 import * as React from 'react';
 
 import { CacheProvider, EmotionCache } from '@emotion/react';
-import { CssBaseline, CssVarsProvider } from '@mui/joy';
+import { CssBaseline, CssVarsProvider, useTheme } from '@mui/joy';
 
 import { VendorIconSpriteMemo } from '~/modules/llms/components/LLMVendorIconSprite';
 
 import { createAppTheme, createEmotionCache } from '~/common/app.theme';
-import { useUIComplexityIsMinimal } from '~/common/stores/store-ui';
+import { useThemeGradientId, useUIComplexityIsMinimal } from '~/common/stores/store-ui';
+
+
+/** Syncs body background to the chosen theme (body is outside the theme provider). */
+const ThemeBodySync = () => {
+  const theme = useTheme();
+  const body = theme.palette.background?.body;
+  const surface = theme.palette.background?.surface;
+  const level2 = theme.palette.background?.level2;
+  const mode = theme.palette.mode;
+  React.useEffect(() => {
+    if (body) document.body.style.setProperty('--agi-body-bg', body);
+    if (body && surface && level2) {
+      const ambient = mode === 'dark'
+        ? `linear-gradient(180deg, ${body} 0%, ${surface} 50%, ${level2} 100%)`
+        : `linear-gradient(180deg, rgba(255,255,255,0.92), ${body} 40%, ${level2} 100%)`;
+      document.body.style.setProperty('--agi-body-ambient', ambient);
+    }
+    return () => {
+      document.body.style.removeProperty('--agi-body-bg');
+      document.body.style.removeProperty('--agi-body-ambient');
+    };
+  }, [body, surface, level2, mode]);
+  return null;
+};
 
 
 // Client-side cache, shared for the whole session of the user in the browser.
@@ -55,14 +79,16 @@ export const ProviderTheming = (props: { emotionCache?: EmotionCache, children: 
 
   // external state
   const zenMode = useUIComplexityIsMinimal();
+  const themeGradientId = useThemeGradientId();
 
-  // recreate the theme only to apply zen touches
-  const theme = React.useMemo(() => createAppTheme(zenMode), [zenMode]);
+  // recreate the theme when zen or gradient preference changes
+  const theme = React.useMemo(() => createAppTheme(zenMode, themeGradientId), [zenMode, themeGradientId]);
 
   return (
     <CacheProvider value={props.emotionCache || clientSideEmotionCache}>
       <CssVarsProvider defaultMode='light' theme={theme}>
         <CssBaseline />
+        <ThemeBodySync />
         {/* Inject sprites to be referenced by SVG rendering */}
         <VendorIconSpriteMemo />
         {/* Disabled for now, we don't use those */}

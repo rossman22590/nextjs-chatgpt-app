@@ -17,6 +17,7 @@ import { useModelsZeroState } from '~/common/stores/llms/hooks/useModelsZeroStat
 import { SettingUIComplexity } from './SettingUIComplexity';
 import { SettingUIComposerQuickButton } from './SettingUIComposerQuickButton';
 import { SettingUIContentScaling } from './SettingUIContentScaling';
+import { SettingUITheme } from './SettingUITheme';
 
 
 // configuration
@@ -77,6 +78,8 @@ export function AppChatSettingsUI() {
   const handleShowSearchBarChange = (event: React.ChangeEvent<HTMLInputElement>) => setShowPersonaFinder(event.target.checked);
 
   return <>
+
+    <SettingUITheme />
 
     <FormControl orientation='horizontal' sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
       <FormLabelStart title='AI Models'

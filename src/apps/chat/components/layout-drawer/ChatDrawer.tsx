@@ -360,7 +360,7 @@ function ChatDrawer(props: {
           }}
         />
 
-        {/* + New chat - prominent rounded primary button (reference layout) */}
+        {/* + New chat - prominent rounded primary button (reference layout); solidColor ensures readable text on light gradients */}
         <Button
           color='primary'
           variant={disableNewButton ? 'soft' : 'solid'}
@@ -373,10 +373,11 @@ function ChatDrawer(props: {
             borderRadius: 'md',
             '--Button-gap': '0.5rem',
             boxShadow: 'none',
+            color: 'primary.solidColor',
             '&:hover': { boxShadow: 'none' },
             ...(disableNewButton && {
-              '--variant-softDisabledBg': 'rgba(235, 220, 255, 0.85)',
-              '--variant-softDisabledColor': 'rgba(139, 56, 234, 0.45)',
+              '--variant-softDisabledBg': 'var(--joy-palette-primary-softBg)',
+              '--variant-softDisabledColor': 'var(--joy-palette-primary-solidColor)',
             }),
           }}
         >

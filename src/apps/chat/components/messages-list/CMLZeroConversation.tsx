@@ -44,7 +44,7 @@ const _styles = {
     transform: 'translateX(-50%)',
     width: '720px',
     height: '480px',
-    background: 'radial-gradient(ellipse, rgba(160 32 240 / 0.18), rgba(224 64 160 / 0.1) 40%, transparent 68%)',
+    background: 'radial-gradient(ellipse, var(--joy-palette-primary-softBg), var(--joy-palette-primary-softHoverBg) 40%, transparent 68%)',
     pointerEvents: 'none',
     filter: 'blur(80px)',
   } as const,
@@ -75,7 +75,7 @@ const _styles = {
     fontWeight: 700,
     letterSpacing: '-0.04em',
     textAlign: 'center',
-    background: 'linear-gradient(135deg, #a020f0 0%, #e040a0 40%, #c840d8 70%, #a020f0 100%)',
+    background: 'linear-gradient(135deg, var(--joy-palette-primary-solidBg) 0%, var(--joy-palette-primary-softColor) 50%, var(--joy-palette-primary-solidHoverBg) 100%)',
     backgroundSize: '200% 100%',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
@@ -211,7 +211,7 @@ export function CMLZeroConversation(props: {
                 onKeyDown={(e) => e.key === 'Enter' && handlePersonaClick(p.id)}
                 sx={{
                   ..._styles.cardBase,
-                  background: 'linear-gradient(135deg, rgba(160 32 240 / 0.08), rgba(224 64 160 / 0.06))',
+                  background: 'linear-gradient(135deg, var(--joy-palette-primary-softBg), var(--joy-palette-primary-softHoverBg))',
                 }}
               >
                 <Box sx={_styles.cardIconBox}>

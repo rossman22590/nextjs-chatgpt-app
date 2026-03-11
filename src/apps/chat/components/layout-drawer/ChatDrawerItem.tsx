@@ -253,11 +253,11 @@ function ChatDrawerItem(props: {
 
     {/* Title */}
     {!isEditingTitle ? (
-      // using Box to not reset the parent font scaling (active = white on gradient, inactive = secondary)
+      // active = contrast-aware (dark on light gradient, white on dark); inactive = secondary
       <Box
         onDoubleClick={handleTitleEditBegin}
         sx={{
-          color: isActive ? 'common.white' : 'text.secondary',
+          color: isActive ? 'primary.solidColor' : 'text.secondary',
           overflowWrap: 'anywhere',
           flex: 1,
         }}
@@ -299,7 +299,7 @@ function ChatDrawerItem(props: {
   const progressBarFixedComponent = React.useMemo(() =>
     progress > 0 && (
       <Box sx={{
-        background: 'linear-gradient(90deg, #a020f0, #e040a0)',
+        background: 'linear-gradient(90deg, var(--joy-palette-primary-solidBg), var(--joy-palette-primary-solidHoverBg))',
         position: 'absolute', left: 0, bottom: 0, width: progress + '%', height: 4, borderRadius: 999,
       }} />
     ), [progress]);
@@ -320,9 +320,9 @@ function ChatDrawerItem(props: {
           border: '1px solid var(--agi-shell-border)',
         }),
         fontSize: 'inherit',
-        background: isActive ? 'linear-gradient(135deg, #a020f0 0%, #d040a0 100%)' : 'transparent',
-        color: isActive ? 'common.white' : undefined,
-        boxShadow: isActive ? '0 2px 10px rgba(160 32 240 / 0.2)' : 'none',
+        background: isActive ? 'linear-gradient(135deg, var(--joy-palette-primary-solidBg) 0%, var(--joy-palette-primary-solidHoverBg) 100%)' : 'transparent',
+        color: isActive ? 'primary.solidColor' : undefined,
+        boxShadow: isActive ? 'var(--joy-shadow-sm)' : 'none',
         borderRadius: '10px',
         mx: '0.25rem',
         '&:hover > button': {
@@ -346,9 +346,17 @@ function ChatDrawerItem(props: {
           {titleRowComponent}
         </Box>
 
-        {/* buttons row */}
+        {/* buttons row - when no decorator, add left padding so buttons align with title; force contrast-aware icon color on light gradients */}
         {isActive && (
-          <Box sx={{ display: 'flex', gap: 0.5, minHeight: '2.25rem', alignItems: 'center' }}>
+          <Box sx={{
+            display: 'flex',
+            gap: 0.5,
+            minHeight: '2.25rem',
+            alignItems: 'center',
+            color: 'primary.solidColor',
+            '& .MuiIconButton-root': { color: 'inherit' },
+            ...(!props.showSymbols && { pl: 'var(--ListItem-paddingX)' }),
+          }}>
             {props.showSymbols && <ListItemDecorator />}
 
             {/* Current Folder color, and change initiator */}
