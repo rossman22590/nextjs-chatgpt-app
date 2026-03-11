@@ -1,4 +1,5 @@
 import * as React from 'react';
+import Image from 'next/image';
 import {
   Box,
   Button,
@@ -11,7 +12,6 @@ import {
   Alert,
   IconButton,
 } from '@mui/joy';
-import LockIcon from '@mui/icons-material/Lock';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
@@ -85,21 +85,15 @@ export const PasswordProtection: React.FC<PasswordProtectionProps> = ({ onUnlock
         }}
       >
         <CardContent sx={{ p: 4, textAlign: 'center' }}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 64,
-              height: 64,
-              borderRadius: '50%',
-              bgcolor: 'primary.solidBg',
-              color: 'primary.solidColor',
-              mx: 'auto',
-              mb: 3,
-            }}
-          >
-            <LockIcon sx={{ fontSize: 32 }} />
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+            <Image
+              src="/apple-touch-icon.png"
+              alt={Brand.Title.Base}
+              width={56}
+              height={56}
+              priority
+              style={{ borderRadius: 12 }}
+            />
           </Box>
 
           <Typography level="h2" component="h1" fontWeight="bold" sx={{ mb: 1 }}>
@@ -147,7 +141,11 @@ export const PasswordProtection: React.FC<PasswordProtectionProps> = ({ onUnlock
               variant="solid"
               color="primary"
               fullWidth
-              sx={{ borderRadius: 'md', py: 1.5 }}
+              sx={{
+                borderRadius: 'md',
+                py: 1.5,
+                '&.Mui-disabled': { color: 'white' },
+              }}
             >
               {isLoading ? 'Verifying...' : 'Unlock App'}
             </Button>
