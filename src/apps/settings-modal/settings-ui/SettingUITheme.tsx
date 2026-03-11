@@ -8,9 +8,9 @@ import { THEME_GRADIENTS } from '~/common/app.theme';
 import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
 import { useUIPreferencesStore } from '~/common/stores/store-ui';
 
-/** Order: purples/pinks, blues, greens, warm, jewel, then fun row (Coolors-style) */
+/** First = base/original theme; rest = variants by family (no duplicate gradient combos). */
 const GRADIENT_IDS: ThemeGradientId[] = [
-  'purple-pink',
+  'purple-pink',   // base/original
   'fuchsia-pink',
   'violet-rose',
   'lavender-plum',

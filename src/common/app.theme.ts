@@ -10,9 +10,9 @@ import { animationEnterBelow } from '~/common/util/animUtils';
 export type UIComplexityMode = 'minimal' | 'pro' | 'extra';
 export type ContentScaling = 'xs' | 'sm' | 'md';
 
-/** User-selectable gradient combo for primary buttons and accents */
+/** User-selectable gradient combo for primary buttons and accents. First id (purple-pink) is the base/original theme. */
 export type ThemeGradientId =
-  | 'purple-pink'
+  | 'purple-pink'  // base/original theme
   | 'blue-cyan'
   | 'emerald-teal'
   | 'amber-orange'
@@ -53,8 +53,9 @@ export interface ThemeGradientCombo {
   label: string;
 }
 
+/** Theme gradient palettes. No duplicate start+end pairs; first entry is the base/original theme. */
 export const THEME_GRADIENTS: Record<ThemeGradientId, ThemeGradientCombo> = {
-  // Purples & pinks
+  // Base (original) + purples & pinks
   'purple-pink': { start: '#a020f0', end: '#ec4899', hoverStart: '#8916d6', hoverEnd: '#db2777', label: 'Purple to Pink' },
   'fuchsia-pink': { start: '#c026d3', end: '#f472b6', hoverStart: '#a21caf', hoverEnd: '#ec4899', label: 'Fuchsia to Pink' },
   'violet-rose': { start: '#7c3aed', end: '#f43f5e', hoverStart: '#6d28d9', hoverEnd: '#e11d48', label: 'Violet to Rose' },
