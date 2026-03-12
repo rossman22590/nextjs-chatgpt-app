@@ -1,13 +1,13 @@
 import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Avatar, 
-  Typography, 
-  Button, 
+import {
+  Box,
+  Card,
+  CardContent,
+  Avatar,
+  Typography,
+  Button,
   Stack,
   Divider,
   CircularProgress,
@@ -18,7 +18,7 @@ import {
   Tabs,
   TabList,
   Tab,
-  TabPanel
+  TabPanel,
 } from '@mui/joy';
 import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
@@ -66,7 +66,9 @@ export default function Profile() {
       setLimitInfo(limit);
       setMonthlyHistory(history);
       setMyLogs(logs);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setRefreshing(false);
   }, []);
 
@@ -135,13 +137,7 @@ export default function Profile() {
       >
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Button
-            variant="plain"
-            color="neutral"
-            startDecorator={<ArrowBackIcon />}
-            onClick={handleGoBack}
-            sx={{ mr: 2, color: 'white' }}
-          >
+          <Button variant="plain" color="neutral" startDecorator={<ArrowBackIcon />} onClick={handleGoBack} sx={{ mr: 2, color: 'white' }}>
             Back
           </Button>
           <Typography level="h1" sx={{ color: 'white', fontWeight: 'bold' }}>
@@ -162,11 +158,7 @@ export default function Profile() {
             <Box sx={{ p: 4, pb: 0 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                 {session?.user?.image ? (
-                  <Avatar
-                    src={session.user.image}
-                    alt={session.user.name || 'User'}
-                    sx={{ width: 80, height: 80, mr: 3 }}
-                  />
+                  <Avatar src={session.user.image} alt={session.user.name || 'User'} sx={{ width: 80, height: 80, mr: 3 }} />
                 ) : (
                   <Avatar sx={{ width: 80, height: 80, mr: 3 }}>
                     <PersonIcon sx={{ fontSize: 40 }} />
@@ -179,13 +171,8 @@ export default function Profile() {
                   <Typography level="body-md" color="neutral">
                     {session?.user?.email}
                   </Typography>
-                  <Chip
-                    variant="soft"
-                    color="success"
-                    size="sm"
-                    sx={{ mt: 1 }}
-                  >
-                    Active Account
+                  <Chip variant="soft" color={limitInfo?.isActive === false ? 'danger' : 'success'} size="sm" sx={{ mt: 1 }}>
+                    {limitInfo?.isActive === false ? 'Inactive Account' : 'Active Account'}
                   </Chip>
                 </Box>
               </Box>
@@ -219,9 +206,7 @@ export default function Profile() {
                       <Typography level="body-sm" color="neutral">
                         Name
                       </Typography>
-                      <Typography level="body-md">
-                        {session?.user?.name || 'Not provided'}
-                      </Typography>
+                      <Typography level="body-md">{session?.user?.name || 'Not provided'}</Typography>
                     </Box>
                   </ListItem>
 
@@ -233,9 +218,7 @@ export default function Profile() {
                       <Typography level="body-sm" color="neutral">
                         Email
                       </Typography>
-                      <Typography level="body-md">
-                        {session?.user?.email || 'Not provided'}
-                      </Typography>
+                      <Typography level="body-md">{session?.user?.email || 'Not provided'}</Typography>
                     </Box>
                   </ListItem>
 
@@ -258,68 +241,67 @@ export default function Profile() {
 
                 {/* Token Credits */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography level="h3">
-                    Token Credits
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    color="neutral"
-                    size="sm"
-                    startDecorator={<RefreshIcon />}
-                    loading={refreshing}
-                    onClick={refreshUsageData}
-                  >
+                  <Typography level="h3">Token Credits</Typography>
+                  <Button variant="outlined" color="neutral" size="sm" startDecorator={<RefreshIcon />} loading={refreshing} onClick={refreshUsageData}>
                     Refresh
                   </Button>
                 </Box>
-                {myUsage ? (() => {
-                  const limit = myUsage.tokenLimit;
-                  const used = myUsage.thisMonth._sum.totalTokens ?? 0;
-                  const remaining = limit ? Math.max(0, limit - used) : null;
-                  const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
-                  return (
-                    <Card variant='soft' color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'} sx={{ mb: 2 }}>
-                      <CardContent>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <DataUsageIcon />
-                          <Typography level='title-md'>
-                            {remaining != null ? remaining.toLocaleString() + ' tokens remaining' : 'Unlimited tokens'}
+                {myUsage ? (
+                  (() => {
+                    const limit = myUsage.tokenLimit;
+                    const used = myUsage.thisMonth._sum.totalTokens ?? 0;
+                    const isActive = myUsage.isActive;
+                    const remaining = limit == null ? null : Math.max(0, limit - used);
+                    const pct = limit != null && limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+                    const cardColor = !isActive ? 'danger' : limit === 0 ? 'warning' : pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success';
+                    return (
+                      <Card variant="soft" color={cardColor} sx={{ mb: 2 }}>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <DataUsageIcon />
+                            <Typography level="title-md">
+                              {!isActive ? 'Account inactive' : remaining == null ? 'Unlimited tokens' : remaining.toLocaleString() + ' tokens remaining'}
+                            </Typography>
+                          </Box>
+                          {!isActive ? (
+                            <Typography level="body-sm">Your account is inactive. Contact your admin to activate access. If you have an active AI Tutor Ultra account, please reach out to support to get activated.</Typography>
+                          ) : limit == null ? (
+                            <Typography level="body-sm">No monthly token limit is set on your account.</Typography>
+                          ) : limit > 0 ? (
+                            <>
+                              <LinearProgress
+                                determinate
+                                value={pct}
+                                color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'}
+                                sx={{ my: 1, height: 10, borderRadius: 5 }}
+                              />
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography level="body-xs">{used.toLocaleString()} used</Typography>
+                                <Typography level="body-xs">{limit.toLocaleString()} limit / month</Typography>
+                              </Box>
+                            </>
+                          ) : (
+                            <Typography level="body-sm">You currently have 0 monthly credits. Contact your admin to add credits.</Typography>
+                          )}
+                          <Typography level="body-xs" sx={{ mt: 1 }}>
+                            {myUsage.thisMonth._count} requests this month - resets on the 1st of each month
                           </Typography>
-                        </Box>
-                        {limit ? (
-                          <>
-                            <LinearProgress
-                              determinate
-                              value={pct}
-                              color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'}
-                              sx={{ my: 1, height: 10, borderRadius: 5 }}
-                            />
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <Typography level='body-xs'>{used.toLocaleString()} used</Typography>
-                              <Typography level='body-xs'>{limit.toLocaleString()} limit / month</Typography>
-                            </Box>
-                          </>
-                        ) : (
-                          <Typography level='body-sm'>No monthly token limit set on your account.</Typography>
-                        )}
-                        <Typography level='body-xs' sx={{ mt: 1 }}>
-                          {myUsage.thisMonth._count} requests this month - resets on the 1st of each month
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  );
-                })() : (
-                  <CircularProgress size='sm' />
+                        </CardContent>
+                      </Card>
+                    );
+                  })()
+                ) : (
+                  <CircularProgress size="sm" />
                 )}
 
                 {/* Monthly History */}
                 {monthlyHistory && monthlyHistory.length > 0 && (
                   <>
-                    <Typography level='h4' sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography level="h4" sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                       <HistoryIcon /> Monthly Usage History
                     </Typography>
-                    <Sheet variant='outlined' sx={{ borderRadius: 'sm', overflow: 'auto', mb: 2 }}>
-                      <Table size='sm' stickyHeader>
+                    <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', mb: 2 }}>
+                      <Table size="sm" stickyHeader>
                         <thead>
                           <tr>
                             <th>Month</th>
@@ -333,11 +315,16 @@ export default function Profile() {
                         <tbody>
                           {monthlyHistory.map((m, i) => (
                             <tr key={m.month} style={i === 0 ? { fontWeight: 'bold' } : undefined}>
-                              <td>{m.month}{i === 0 ? ' (current)' : ''}</td>
+                              <td>
+                                {m.month}
+                                {i === 0 ? ' (current)' : ''}
+                              </td>
                               <td style={{ textAlign: 'right' }}>{m.totalTokens.toLocaleString()}</td>
                               <td style={{ textAlign: 'right' }}>{m.inputTokens.toLocaleString()}</td>
                               <td style={{ textAlign: 'right' }}>{m.outputTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{'$' + (m.costCents / 100 < 0.01 && m.costCents > 0 ? (m.costCents / 100).toFixed(4) : (m.costCents / 100).toFixed(2))}</td>
+                              <td style={{ textAlign: 'right' }}>
+                                {'$' + (m.costCents / 100 < 0.01 && m.costCents > 0 ? (m.costCents / 100).toFixed(4) : (m.costCents / 100).toFixed(2))}
+                              </td>
                               <td style={{ textAlign: 'right' }}>{m.requests}</td>
                             </tr>
                           ))}
@@ -350,11 +337,11 @@ export default function Profile() {
                 {/* Recent Deductions */}
                 {myLogs && myLogs.length > 0 && (
                   <>
-                    <Typography level='h4' sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography level="h4" sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                       <DataUsageIcon /> Recent Token Deductions
                     </Typography>
-                    <Sheet variant='outlined' sx={{ borderRadius: 'sm', overflow: 'auto', maxHeight: 350, mb: 2 }}>
-                      <Table size='sm' stickyHeader>
+                    <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', maxHeight: 350, mb: 2 }}>
+                      <Table size="sm" stickyHeader>
                         <thead>
                           <tr>
                             <th>Time</th>
@@ -366,7 +353,7 @@ export default function Profile() {
                           </tr>
                         </thead>
                         <tbody>
-                          {myLogs.map(log => (
+                          {myLogs.map((log) => (
                             <tr key={log.id}>
                               <td>{new Date(log.createdAt).toLocaleString()}</td>
                               <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.modelId}</td>
@@ -390,12 +377,7 @@ export default function Profile() {
                 </Typography>
 
                 <Stack spacing={2}>
-                  <Button
-                    variant="outlined"
-                    color="neutral"
-                    startDecorator={<SecurityIcon />}
-                    onClick={() => router.push('/auth/signin?forgot=true')}
-                  >
+                  <Button variant="outlined" color="neutral" startDecorator={<SecurityIcon />} onClick={() => router.push('/auth/signin?forgot=true')}>
                     Reset Password
                   </Button>
 
@@ -427,4 +409,4 @@ export default function Profile() {
       </Box>
     </Box>
   );
-} 
+}

@@ -4,20 +4,20 @@ import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, protectedProcedure } from '~/server/trpc/trpc.server';
 import { prisma } from '~/server/prisma/prisma-client';
 
-
 export const usageRouter = createTRPCRouter({
-
   // Log token usage after an AI response completes
   logUsage: protectedProcedure
-    .input(z.object({
-      modelId: z.string(),
-      vendorId: z.string().optional(),
-      serviceName: z.string().optional(),
-      inputTokens: z.number().int().min(0),
-      outputTokens: z.number().int().min(0),
-      costCents: z.number().min(0).default(0),
-      operation: z.string().default('chat'),
-    }))
+    .input(
+      z.object({
+        modelId: z.string(),
+        vendorId: z.string().optional(),
+        serviceName: z.string().optional(),
+        inputTokens: z.number().int().min(0),
+        outputTokens: z.number().int().min(0),
+        costCents: z.number().min(0).default(0),
+        operation: z.string().default('chat'),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const totalTokens = input.inputTokens + input.outputTokens;
@@ -40,110 +40,108 @@ export const usageRouter = createTRPCRouter({
     }),
 
   // Check if user is within token limit (call before AI request)
-  checkLimit: protectedProcedure
-    .query(async ({ ctx }) => {
-      const userId = ctx.session.user.id;
+  checkLimit: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
 
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { tokenLimit: true, email: true },
-      });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tokenLimit: true, email: true, isActive: true },
+    });
 
-      // Admin is always unlimited
-      if (user?.email === 'rcohen@mytsi.org')
-        return { allowed: true, limit: null, used: 0, remaining: null };
+    // Admin is always unlimited
+    if (user?.email === 'rcohen@mytsi.org') return { allowed: true, reason: 'admin' as const, limit: null, used: 0, remaining: null, isActive: true };
 
-      // No limit set = unlimited
-      if (!user?.tokenLimit)
-        return { allowed: true, limit: null, used: 0, remaining: null };
+    // Only an explicit false blocks legacy accounts that predate activation.
+    if (user?.isActive === false) return { allowed: false, reason: 'inactive' as const, limit: user.tokenLimit ?? 0, used: 0, remaining: 0, isActive: false };
 
-      // Aggregate this month's usage
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    // No limit set = unlimited
+    if (user?.tokenLimit == null) return { allowed: true, reason: 'unlimited' as const, limit: null, used: 0, remaining: null, isActive: true };
 
-      const usage = await prisma.usageLog.aggregate({
-        where: { userId, createdAt: { gte: monthStart } },
-        _sum: { totalTokens: true },
-      });
+    // Aggregate this month's usage
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      const used = usage._sum.totalTokens ?? 0;
-      const remaining = Math.max(0, user.tokenLimit - used);
+    const usage = await prisma.usageLog.aggregate({
+      where: { userId, createdAt: { gte: monthStart } },
+      _sum: { totalTokens: true },
+    });
 
-      return {
-        allowed: used < user.tokenLimit,
-        limit: user.tokenLimit,
-        used,
-        remaining,
-      };
-    }),
+    const used = usage._sum.totalTokens ?? 0;
+    const remaining = Math.max(0, user.tokenLimit - used);
+
+    return {
+      allowed: used < user.tokenLimit,
+      reason: used < user.tokenLimit ? ('within_limit' as const) : ('limit_reached' as const),
+      limit: user.tokenLimit,
+      used,
+      remaining,
+      isActive: true,
+    };
+  }),
 
   // Get own usage summary (for non-admin users to see their own stats)
-  myUsage: protectedProcedure
-    .query(async ({ ctx }) => {
-      const userId = ctx.session.user.id;
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  myUsage: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      const [thisMonth, user] = await Promise.all([
-        prisma.usageLog.aggregate({
-          where: { userId, createdAt: { gte: monthStart } },
-          _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
-          _count: true,
-        }),
-        prisma.user.findUnique({
-          where: { id: userId },
-          select: { tokenLimit: true },
-        }),
-      ]);
+    const [thisMonth, user] = await Promise.all([
+      prisma.usageLog.aggregate({
+        where: { userId, createdAt: { gte: monthStart } },
+        _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
+        _count: true,
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { tokenLimit: true, isActive: true },
+      }),
+    ]);
 
-      return {
-        thisMonth,
-        tokenLimit: user?.tokenLimit ?? null,
-      };
-    }),
+    return {
+      thisMonth,
+      tokenLimit: user?.tokenLimit ?? null,
+      isActive: user?.isActive === false ? false : true,
+    };
+  }),
 
   // Get own recent usage logs (deductions)
-  myLogs: protectedProcedure
-    .input(z.object({ limit: z.number().min(1).max(100).default(30) }).optional())
-    .query(async ({ ctx, input }) => {
-      return prisma.usageLog.findMany({
-        where: { userId: ctx.session.user.id },
-        orderBy: { createdAt: 'desc' },
-        take: input?.limit ?? 30,
-      });
-    }),
+  myLogs: protectedProcedure.input(z.object({ limit: z.number().min(1).max(100).default(30) }).optional()).query(async ({ ctx, input }) => {
+    return prisma.usageLog.findMany({
+      where: { userId: ctx.session.user.id },
+      orderBy: { createdAt: 'desc' },
+      take: input?.limit ?? 30,
+    });
+  }),
 
   // Get monthly usage history (last N months) for profile analytics
-  myMonthlyHistory: protectedProcedure
-    .input(z.object({ months: z.number().min(1).max(24).default(6) }).optional())
-    .query(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
-      const monthCount = input?.months ?? 6;
-      const now = new Date();
+  myMonthlyHistory: protectedProcedure.input(z.object({ months: z.number().min(1).max(24).default(6) }).optional()).query(async ({ ctx, input }) => {
+    const userId = ctx.session.user.id;
+    const monthCount = input?.months ?? 6;
+    const now = new Date();
 
-      const months = [];
-      for (let i = 0; i < monthCount; i++) {
-        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    const months = [];
+    for (let i = 0; i < monthCount; i++) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
 
-        const agg = await prisma.usageLog.aggregate({
-          where: { userId, createdAt: { gte: monthStart, lt: monthEnd } },
-          _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
-          _count: true,
-        });
+      const agg = await prisma.usageLog.aggregate({
+        where: { userId, createdAt: { gte: monthStart, lt: monthEnd } },
+        _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
+        _count: true,
+      });
 
-        months.push({
-          month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-          year: monthStart.getFullYear(),
-          monthIndex: monthStart.getMonth(),
-          inputTokens: agg._sum.inputTokens ?? 0,
-          outputTokens: agg._sum.outputTokens ?? 0,
-          totalTokens: agg._sum.totalTokens ?? 0,
-          costCents: agg._sum.costCents ?? 0,
-          requests: agg._count,
-        });
-      }
+      months.push({
+        month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        year: monthStart.getFullYear(),
+        monthIndex: monthStart.getMonth(),
+        inputTokens: agg._sum.inputTokens ?? 0,
+        outputTokens: agg._sum.outputTokens ?? 0,
+        totalTokens: agg._sum.totalTokens ?? 0,
+        costCents: agg._sum.costCents ?? 0,
+        requests: agg._count,
+      });
+    }
 
-      return months;
-    }),
+    return months;
+  }),
 });

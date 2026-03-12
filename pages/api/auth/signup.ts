@@ -1,7 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { hash } from 'bcryptjs';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
 import { prisma } from '~/server/prisma/prisma-client';
 
 // Validation schema for user registration
@@ -25,11 +24,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Validate request body
     const result = signupSchema.safeParse(req.body);
-    
+
     if (!result.success) {
-      return res.status(400).json({ 
-        message: 'Invalid input', 
-        errors: result.error.issues 
+      return res.status(400).json({
+        message: 'Invalid input',
+        errors: result.error.issues,
       });
     }
 
@@ -53,6 +52,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: {
         name,
         email,
+        isActive: false,
+        tokenLimit: 0,
         // Create a credentials account
         accounts: {
           create: {

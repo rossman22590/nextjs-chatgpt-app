@@ -1,21 +1,7 @@
 import * as React from 'react';
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { 
-  Box, 
-  Button, 
-  Card, 
-  CardContent, 
-  FormControl, 
-  FormLabel, 
-  Input, 
-  Stack, 
-  Typography,
-  Alert,
-  Link,
-  Divider,
-  CircularProgress
-} from '@mui/joy';
+import { Box, Button, Card, CardContent, FormControl, FormLabel, Input, Stack, Typography, Alert, Link, Divider, CircularProgress } from '@mui/joy';
 import LoginIcon from '@mui/icons-material/Login';
 import GoogleIcon from '@mui/icons-material/Google';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -51,7 +37,7 @@ export default function SignIn() {
   // Show registration success message
   React.useEffect(() => {
     if (router.query.registered === 'true') {
-      setSuccessMessage('Account created successfully! Please sign in.');
+      setSuccessMessage('Account created. An admin must activate it and add credits before chat is available.');
     }
     if (router.query.reset === 'true') {
       setSuccessMessage('Password reset email sent! Check your inbox.');
@@ -91,7 +77,7 @@ export default function SignIn() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       await signIn('google', {
         callbackUrl: callbackUrl ? String(callbackUrl) : '/',
@@ -259,11 +245,7 @@ export default function SignIn() {
                     size="lg"
                     sx={{ borderRadius: 'md' }}
                     endDecorator={
-                      <IconButton
-                        variant="plain"
-                        color="neutral"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
+                      <IconButton variant="plain" color="neutral" onClick={() => setShowPassword(!showPassword)}>
                         {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                       </IconButton>
                     }
@@ -271,12 +253,7 @@ export default function SignIn() {
                 </FormControl>
 
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Link
-                    component="button"
-                    type="button"
-                    onClick={() => setShowResetForm(true)}
-                    sx={{ fontSize: 'sm' }}
-                  >
+                  <Link component="button" type="button" onClick={() => setShowResetForm(true)} sx={{ fontSize: 'sm' }}>
                     Forgot password?
                   </Link>
                 </Box>
@@ -323,24 +300,10 @@ export default function SignIn() {
                 </FormControl>
 
                 <Stack direction="row" spacing={2}>
-                  <Button
-                    variant="outlined"
-                    color="neutral"
-                    size="lg"
-                    onClick={() => setShowResetForm(false)}
-                    sx={{ flex: 1 }}
-                  >
+                  <Button variant="outlined" color="neutral" size="lg" onClick={() => setShowResetForm(false)} sx={{ flex: 1 }}>
                     Back to Sign In
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={isResetLoading}
-                    loading={isResetLoading}
-                    size="lg"
-                    variant="solid"
-                    color="primary"
-                    sx={{ flex: 1 }}
-                  >
+                  <Button type="submit" disabled={isResetLoading} loading={isResetLoading} size="lg" variant="solid" color="primary" sx={{ flex: 1 }}>
                     {isResetLoading ? 'Sending...' : 'Send Reset Link'}
                   </Button>
                 </Stack>
@@ -354,11 +317,7 @@ export default function SignIn() {
               <Box sx={{ textAlign: 'center' }}>
                 <Typography level="body-sm" color="neutral">
                   Don&apos;t have an account?{' '}
-                  <Link
-                    component="button"
-                    onClick={() => router.push('/auth/signup')}
-                    fontWeight="md"
-                  >
+                  <Link component="button" onClick={() => router.push('/auth/signup')} fontWeight="md">
                     Sign up for free
                   </Link>
                 </Typography>
