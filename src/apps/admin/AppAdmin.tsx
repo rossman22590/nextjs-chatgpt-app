@@ -76,6 +76,11 @@ function tokenLimitLabel(tokenLimit: number | null | undefined): string {
   return fmtNum(tokenLimit) + ' /mo';
 }
 
+function tokenRemainingLabel(tokenLimit: number | null | undefined, usedTokens: number): string {
+  if (tokenLimit == null) return 'Unlimited';
+  return fmtNum(Math.max(0, tokenLimit - usedTokens));
+}
+
 function tokenLimitChipProps(tokenLimit: number | null | undefined, usedTokens: number, iconSize: number = 14) {
   if (tokenLimit == null) {
     return {
@@ -992,6 +997,7 @@ export function AppAdmin() {
                         <th onClick={() => handleSort('monthTokens')} style={{ textAlign: 'right' }}>
                           Month Tokens <SortArrow field="monthTokens" />
                         </th>
+                        <th style={{ textAlign: 'right' }}>Remaining</th>
                         <th onClick={() => handleSort('monthCost')} style={{ textAlign: 'right' }}>
                           Month Cost <SortArrow field="monthCost" />
                         </th>
@@ -1055,6 +1061,11 @@ export function AppAdmin() {
                             </td>
                             <td style={{ textAlign: 'right' }}>
                               <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                                {tokenRemainingLabel(user.tokenLimit, mTokens)}
+                              </Typography>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                                 {fmtCost(mCost)}
                               </Typography>
                             </td>
@@ -1093,7 +1104,7 @@ export function AppAdmin() {
                       })}
                       {sorted.length === 0 && (
                         <tr>
-                          <td colSpan={10}>
+                          <td colSpan={11}>
                             <Box sx={{ py: 4, textAlign: 'center', opacity: 0.4 }}>
                               <Typography level="body-sm">No users match your search</Typography>
                             </Box>
