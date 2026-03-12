@@ -81,6 +81,11 @@ function tokenRemainingLabel(tokenLimit: number | null | undefined, usedTokens: 
   return fmtNum(Math.max(0, tokenLimit - usedTokens));
 }
 
+function tokenRemainingValue(tokenLimit: number | null | undefined, usedTokens: number): number | null {
+  if (tokenLimit == null) return null;
+  return Math.max(0, tokenLimit - usedTokens);
+}
+
 function tokenLimitChipProps(tokenLimit: number | null | undefined, usedTokens: number, iconSize: number = 14) {
   if (tokenLimit == null) {
     return {
@@ -729,21 +734,17 @@ export function AppAdmin() {
         av = a._count.conversations;
         bv = b._count.conversations;
         break;
-      case 'messages':
-        av = a._count.messages;
-        bv = b._count.messages;
-        break;
-      case 'usageLogs':
-        av = a._count.usageLogs;
-        bv = b._count.usageLogs;
-        break;
       case 'monthTokens':
         av = a.monthUsage?._sum?.totalTokens ?? 0;
         bv = b.monthUsage?._sum?.totalTokens ?? 0;
         break;
-      case 'monthCost':
-        av = a.monthUsage?._sum?.costCents ?? 0;
-        bv = b.monthUsage?._sum?.costCents ?? 0;
+      case 'remaining':
+        av = tokenRemainingValue(a.tokenLimit, a.monthUsage?._sum?.totalTokens ?? 0) ?? Number.POSITIVE_INFINITY;
+        bv = tokenRemainingValue(b.tokenLimit, b.monthUsage?._sum?.totalTokens ?? 0) ?? Number.POSITIVE_INFINITY;
+        break;
+      case 'limit':
+        av = a.tokenLimit ?? Number.POSITIVE_INFINITY;
+        bv = b.tokenLimit ?? Number.POSITIVE_INFINITY;
         break;
       default:
         av = a.name || '';
@@ -770,6 +771,10 @@ export function AppAdmin() {
       <ArrowDownwardIcon sx={{ fontSize: 14, ml: 0.3, verticalAlign: 'middle' }} />
     );
   };
+
+  const activeUsersCount = users.filter((user: any) => isUserActive(user.isActive)).length;
+  const inactiveUsersCount = users.length - activeUsersCount;
+  const zeroCreditUsersCount = users.filter((user: any) => user.tokenLimit === 0).length;
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--joy-palette-background-body)' }}>
@@ -940,180 +945,198 @@ export function AppAdmin() {
             {/* ====== USERS ====== */}
             {activeView === 'users' && (
               <Stack spacing={2} sx={{ maxWidth: 1400, mx: 'auto' }}>
-                {/* Search bar */}
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <Input
-                    size="sm"
-                    placeholder="Search by name or email..."
-                    startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    sx={{ flex: 1, maxWidth: 380, borderRadius: 'xl', '--Input-focusedThickness': '2px' }}
-                  />
-                  <Chip variant="soft" color="neutral" size="sm" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {sorted.length === users.length ? `${users.length} users` : `${sorted.length} of ${users.length}`}
-                  </Chip>
-                </Box>
-
-                {/* Table */}
-                <Sheet variant="outlined" sx={{ borderRadius: 'xl', overflow: 'auto' }}>
-                  <Table
-                    size="sm"
-                    stickyHeader
-                    hoverRow
+                <Box
+                  sx={{
+                    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                    borderRadius: 'xl',
+                    background: 'var(--joy-palette-background-surface)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Box
                     sx={{
-                      '--TableCell-headBackground': 'var(--joy-palette-background-level1)',
-                      '& th': {
-                        py: 1.5,
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                        whiteSpace: 'nowrap',
-                        fontWeight: 700,
-                        fontSize: '0.7rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: 0.5,
-                      },
-                      '& td': { py: 1.25, verticalAlign: 'middle' },
-                      '& tbody tr': { cursor: 'pointer', transition: 'background 0.08s' },
+                      px: 2.5,
+                      py: 2,
+                      display: 'flex',
+                      gap: 1.5,
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                      background: 'var(--joy-palette-background-level1)',
                     }}
                   >
-                    <thead>
-                      <tr>
-                        <th onClick={() => handleSort('name')}>
-                          User <SortArrow field="name" />
-                        </th>
-                        <th onClick={() => handleSort('email')}>
-                          Email <SortArrow field="email" />
-                        </th>
-                        <th onClick={() => handleSort('status')}>
-                          Status <SortArrow field="status" />
-                        </th>
-                        <th onClick={() => handleSort('conversations')} style={{ textAlign: 'right' }}>
-                          Convos <SortArrow field="conversations" />
-                        </th>
-                        <th onClick={() => handleSort('messages')} style={{ textAlign: 'right' }}>
-                          Messages <SortArrow field="messages" />
-                        </th>
-                        <th onClick={() => handleSort('monthTokens')} style={{ textAlign: 'right' }}>
-                          Month Tokens <SortArrow field="monthTokens" />
-                        </th>
-                        <th style={{ textAlign: 'right' }}>Remaining</th>
-                        <th onClick={() => handleSort('monthCost')} style={{ textAlign: 'right' }}>
-                          Month Cost <SortArrow field="monthCost" />
-                        </th>
-                        <th onClick={() => handleSort('usageLogs')} style={{ textAlign: 'right' }}>
-                          Logs <SortArrow field="usageLogs" />
-                        </th>
-                        <th>Limit</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sorted.map((user: any) => {
-                        const mTokens = user.monthUsage?._sum?.totalTokens ?? 0;
-                        const mCost = user.monthUsage?._sum?.costCents ?? 0;
-                        const mReqs = user.monthUsage?._count ?? 0;
-                        const userActive = isUserActive(user.isActive);
-                        const limitChip = tokenLimitChipProps(user.tokenLimit, mTokens, 12);
-                        return (
-                          <tr key={user.id} onClick={() => setSelectedUserId(user.id)}>
-                            <td>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <Avatar size="sm" src={user.image} sx={{ width: 30, height: 30, fontSize: 12, flexShrink: 0 }}>
-                                  {(user.name || '?')[0]}
-                                </Avatar>
-                                <Typography level="body-sm" noWrap sx={{ maxWidth: 150, fontWeight: 600 }}>
-                                  {user.name || 'Unnamed'}
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+                      <Input
+                        size="sm"
+                        placeholder="Search by name or email..."
+                        startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        sx={{ flex: 1, minWidth: 260, maxWidth: 420, borderRadius: 'xl', '--Input-focusedThickness': '2px' }}
+                      />
+                      <Chip variant="soft" color="neutral" size="sm" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {sorted.length === users.length ? `${users.length} users` : `${sorted.length} of ${users.length}`}
+                      </Chip>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip size="sm" variant="soft" color="success" startDecorator={<CheckCircleIcon sx={{ fontSize: 12 }} />}>
+                        {activeUsersCount} active
+                      </Chip>
+                      <Chip size="sm" variant="soft" color="danger" startDecorator={<BlockIcon sx={{ fontSize: 12 }} />}>
+                        {inactiveUsersCount} inactive
+                      </Chip>
+                      <Chip size="sm" variant="soft" color="warning" startDecorator={<TokenIcon sx={{ fontSize: 12 }} />}>
+                        {zeroCreditUsersCount} zero credit
+                      </Chip>
+                    </Box>
+                  </Box>
+
+                  <Sheet variant="plain" sx={{ overflowX: 'auto' }}>
+                    <Table
+                      size="md"
+                      stickyHeader
+                      hoverRow
+                      sx={{
+                        minWidth: 980,
+                        '--TableCell-headBackground': 'var(--joy-palette-background-level1)',
+                        '& th': {
+                          py: 1.5,
+                          px: 2,
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          whiteSpace: 'nowrap',
+                          fontWeight: 700,
+                          fontSize: '0.7rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.5,
+                          borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                        },
+                        '& td': {
+                          py: 1.5,
+                          px: 2,
+                          verticalAlign: 'middle',
+                          borderBottom: '1px solid rgba(0,0,0,0.05)',
+                        },
+                        '& tbody tr': { cursor: 'pointer', transition: 'background 0.08s' },
+                      }}
+                    >
+                      <thead>
+                        <tr>
+                          <th onClick={() => handleSort('name')}>
+                            Member <SortArrow field="name" />
+                          </th>
+                          <th onClick={() => handleSort('status')}>
+                            Status <SortArrow field="status" />
+                          </th>
+                          <th onClick={() => handleSort('conversations')} style={{ textAlign: 'right' }}>
+                            Convos <SortArrow field="conversations" />
+                          </th>
+                          <th onClick={() => handleSort('monthTokens')} style={{ textAlign: 'right' }}>
+                            Used <SortArrow field="monthTokens" />
+                          </th>
+                          <th onClick={() => handleSort('remaining')} style={{ textAlign: 'right' }}>
+                            Remaining <SortArrow field="remaining" />
+                          </th>
+                          <th onClick={() => handleSort('limit')}>
+                            Limit <SortArrow field="limit" />
+                          </th>
+                          <th style={{ textAlign: 'right' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sorted.map((user: any) => {
+                          const mTokens = user.monthUsage?._sum?.totalTokens ?? 0;
+                          const mReqs = user.monthUsage?._count ?? 0;
+                          const userActive = isUserActive(user.isActive);
+                          const limitChip = tokenLimitChipProps(user.tokenLimit, mTokens, 12);
+                          return (
+                            <tr key={user.id} onClick={() => setSelectedUserId(user.id)}>
+                              <td>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 260 }}>
+                                  <Avatar size="sm" src={user.image} sx={{ width: 36, height: 36, fontSize: 13, flexShrink: 0 }}>
+                                    {(user.name || '?')[0]}
+                                  </Avatar>
+                                  <Box sx={{ minWidth: 0 }}>
+                                    <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>
+                                      {user.name || 'Unnamed'}
+                                    </Typography>
+                                    <Typography level="body-xs" noWrap sx={{ opacity: 0.6 }}>
+                                      {user.email}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </td>
+                              <td>
+                                <Chip
+                                  size="sm"
+                                  variant="soft"
+                                  color={userActive ? 'success' : 'danger'}
+                                  startDecorator={userActive ? <CheckCircleIcon sx={{ fontSize: 12 }} /> : <BlockIcon sx={{ fontSize: 12 }} />}
+                                >
+                                  {userActive ? 'Active' : 'Inactive'}
+                                </Chip>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <Typography level="body-sm" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                                  {user._count.conversations}
                                 </Typography>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <Tooltip title={`${mReqs} requests this month`}>
+                                  <Typography level="body-sm" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                                    {fmtNum(mTokens)}
+                                  </Typography>
+                                </Tooltip>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums', opacity: 0.8 }}>
+                                  {tokenRemainingLabel(user.tokenLimit, mTokens)}
+                                </Typography>
+                              </td>
+                              <td>
+                                <Chip
+                                  size="sm"
+                                  variant="soft"
+                                  color={limitChip.color}
+                                  startDecorator={limitChip.icon}
+                                  sx={{ fontVariantNumeric: 'tabular-nums' }}
+                                >
+                                  {limitChip.label}
+                                </Chip>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <Button
+                                  size="sm"
+                                  variant={userActive ? 'outlined' : 'solid'}
+                                  color={userActive ? 'danger' : 'success'}
+                                  loading={statusSavingUserId === user.id}
+                                  sx={{ minWidth: 112, borderRadius: 'lg' }}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleToggleUserActive(user.id, userActive);
+                                  }}
+                                >
+                                  {userActive ? 'Set Inactive' : 'Activate'}
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {sorted.length === 0 && (
+                          <tr>
+                            <td colSpan={7}>
+                              <Box sx={{ py: 5, textAlign: 'center', opacity: 0.45 }}>
+                                <Typography level="body-sm">No users match your search</Typography>
                               </Box>
                             </td>
-                            <td>
-                              <Typography level="body-xs" noWrap sx={{ maxWidth: 200, opacity: 0.7 }}>
-                                {user.email}
-                              </Typography>
-                            </td>
-                            <td>
-                              <Chip
-                                size="sm"
-                                variant="soft"
-                                color={userActive ? 'success' : 'danger'}
-                                startDecorator={userActive ? <CheckCircleIcon sx={{ fontSize: 12 }} /> : <BlockIcon sx={{ fontSize: 12 }} />}
-                              >
-                                {userActive ? 'Active' : 'Inactive'}
-                              </Chip>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                {user._count.conversations}
-                              </Typography>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                {user._count.messages}
-                              </Typography>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Tooltip title={`${mReqs} requests this month`}>
-                                <Typography level="body-sm" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                                  {fmtNum(mTokens)}
-                                </Typography>
-                              </Tooltip>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                {tokenRemainingLabel(user.tokenLimit, mTokens)}
-                              </Typography>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                {fmtCost(mCost)}
-                              </Typography>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums', opacity: 0.6 }}>
-                                {user._count.usageLogs}
-                              </Typography>
-                            </td>
-                            <td>
-                              <Chip
-                                size="sm"
-                                variant="soft"
-                                color={limitChip.color}
-                                startDecorator={limitChip.icon}
-                                sx={{ fontVariantNumeric: 'tabular-nums' }}
-                              >
-                                {limitChip.label}
-                              </Chip>
-                            </td>
-                            <td>
-                              <Button
-                                size="sm"
-                                variant="soft"
-                                color={userActive ? 'danger' : 'success'}
-                                loading={statusSavingUserId === user.id}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleToggleUserActive(user.id, userActive);
-                                }}
-                              >
-                                {userActive ? 'Set Inactive' : 'Activate'}
-                              </Button>
-                            </td>
                           </tr>
-                        );
-                      })}
-                      {sorted.length === 0 && (
-                        <tr>
-                          <td colSpan={11}>
-                            <Box sx={{ py: 4, textAlign: 'center', opacity: 0.4 }}>
-                              <Typography level="body-sm">No users match your search</Typography>
-                            </Box>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </Table>
-                </Sheet>
+                        )}
+                      </tbody>
+                    </Table>
+                  </Sheet>
+                </Box>
               </Stack>
             )}
 
