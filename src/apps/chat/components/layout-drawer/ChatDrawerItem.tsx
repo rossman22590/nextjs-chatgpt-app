@@ -282,7 +282,7 @@ function ChatDrawerItem(props: {
     {searchFrequency > 0 ? (
       // Display search frequency if it exists and is greater than 0
       <Typography level='body-sm'>
-        {searchFrequency}
+        {Math.round(searchFrequency * 10) / 10}
       </Typography>
     ) : (props.showSymbols && (userFlagsSummary || containsDocAttachments || containsImageAssets)) ? (
       <Box sx={{
@@ -308,6 +308,7 @@ function ChatDrawerItem(props: {
 
     // Active or Also Open
     <Sheet
+      aria-current={isActive ? 'true' : undefined}
       variant={isActive ? 'solid' : 'outlined'}
       invertedColors={isActive}
       onClick={!isActive ? handleConversationActivate : undefined}

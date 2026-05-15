@@ -30,6 +30,8 @@ const orModelFamilyOrder = [
   'mistralai/', 'meta-llama/', 'amazon/', 'cohere/',
   // Specialized/AI companies
   'perplexity/', 'inflection/',
+  // Chinese majors (now surfaced on OpenRouter directly)
+  'alibaba/', 'minimax/', 'bytedance/', 'bytedance-seed/', 'tencent/', 'baidu/', 'stepfun/',
   // Research/open models
   'nvidia/', 'microsoft/', 'nousresearch/', 'openchat/', // 'huggingfaceh4/',
   // Community/other providers
@@ -160,8 +162,11 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
   // -- Vendor parameter & interface inheritance --
   const llmRef = model.id.replace(/^[^/]+\//, '');
   let initialTemperature: number | undefined;
+  let pubDate: string | undefined;
 
   const _mergeLookup = (lookup: OrtVendorLookupResult | undefined) => {
+    if (lookup?.pubDate !== undefined)
+      pubDate = lookup.pubDate;
     if (lookup?.interfaces)
       for (const iface of lookup.interfaces)
         if (!interfaces.includes(iface))
@@ -194,7 +199,7 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
         DEV_DEBUG_OPENROUTER_MODELS && console.log(`[DEV] openRouterModelToModelDescription: unexpected ${antLookup ? 'KNOWN' : 'unknown'} Anthropic reasoning model:`, model.id);
         parameterSpecs.push({ paramId: 'llmVndAntThinkingBudget' }); // configurable thinking budget
         if (!parameterSpecs.some(p => p.paramId === 'llmVndAntEffort'))
-          parameterSpecs.push({ paramId: 'llmVndAntEffort', enumValues: ['low', 'medium', 'high'] }); // 'max' is Opus 4.6-only and not available through OpenRouter
+          parameterSpecs.push({ paramId: 'llmVndAntEffort', enumValues: ['low', 'medium', 'high', 'xhigh', 'max'] }); // tunneled via OpenRouter's `verbosity` field
       }
       break;
 
@@ -244,7 +249,10 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
       // 0-day: xAI/Grok/Moonshot/Z.ai/DeepSeek models get default reasoning effort if not inherited
       if (interfaces.includes(LLM_IF_OAI_Reasoning) && !parameterSpecs.some(p => p.paramId === 'llmVndMiscEffort')) {
         // console.log('[DEV] openRouterModelToModelDescription: unexpected xAI/Grok/DeepSeek reasoning model:', model.id);
-        parameterSpecs.push({ paramId: 'llmVndMiscEffort' }); // binary thinking for these vendors
+        // Binary thinking only: OpenRouter's unified reasoning API currently rejects 'max' (see openai.chatCompletions.ts).
+        // We pin enumValues here so the shared llmVndMiscEffort registry (which also includes 'max' for native DeepSeek V4)
+        // does not surface 'max' in the UI for OR-routed models that can't honor it.
+        parameterSpecs.push({ paramId: 'llmVndMiscEffort', enumValues: ['none', 'high'] });
       }
       break;
 
@@ -265,6 +273,7 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
     idPrefix: model.id,
     // latest: ...
     label,
+    ...(pubDate !== undefined && { pubDate }),
     description: model.description?.length > 280 ? model.description.slice(0, 277) + '...' : model.description,
     contextWindow,
     maxCompletionTokens,

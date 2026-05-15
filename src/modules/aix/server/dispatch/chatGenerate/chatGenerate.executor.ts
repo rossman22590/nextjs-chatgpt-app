@@ -1,6 +1,6 @@
 import { createEmptyReadableStream, safeErrorString } from '~/server/wire';
-import { createRetryablePromise, RetryAttempt } from '~/server/trpc/trpc.fetchers.retrier';
 import { fetchResponseOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
+import { fetchWithAbortableConnectionRetry, RetryAttempt } from '~/server/trpc/trpc.fetchers.retrier';
 
 import { objectDeepCloneWithStringLimit } from '~/common/util/objectUtils';
 
@@ -11,7 +11,8 @@ import { AixDebugObject } from './chatGenerate.debug';
 import { AixDemuxers } from '../stream.demuxers';
 import { ChatGenerateDispatch, ChatGenerateDispatchRequest, ChatGenerateParseFunction } from './chatGenerate.dispatch';
 import { ChatGenerateTransmitter } from './ChatGenerateTransmitter';
-import { RequestRetryError } from './chatGenerate.retrier';
+import { DispatchContinuationSignal } from './chatGenerate.continuation';
+import { OperationRetrySignal } from './chatGenerate.operation-retry';
 import { heartbeatsWhileAwaiting } from '../heartbeatsWhileAwaiting';
 
 
@@ -23,9 +24,8 @@ import { heartbeatsWhileAwaiting } from '../heartbeatsWhileAwaiting';
  *
  * Can be called directly from server-side code or wrapped in retry logic, batching, etc.
  */
-export async function* executeChatGenerate(
+export async function* executeChatGenerateDispatch(
   dispatchCreatorFn: () => Promise<ChatGenerateDispatch>,
-  streaming: boolean,
   intakeAbortSignal: AbortSignal,
   _d: AixDebugObject,
   parseContext?: { retriesAvailable: boolean },
@@ -49,27 +49,47 @@ export async function* executeChatGenerate(
   if (_d.requestBodyOverride && 'body' in dispatch.request)
     dispatch.request.body = { ...dispatch.request.body, ..._d.requestBodyOverride };
 
-  // Connect to the dispatch
-  const dispatchResponse = yield* _connectToDispatch(dispatch.request, intakeAbortSignal, chatGenerateTx, _d);
+  // Connect to the dispatch (yields debug echo particles directly, bypasses particle transforms)
+  const dispatchResponse = yield* _connectToDispatch(dispatch.request, dispatch.customConnect, intakeAbortSignal, chatGenerateTx, _d);
   if (!dispatchResponse)
     return; // exit: error already handled
 
-  // Consume dispatch response
-  if (!streaming)
-    yield* _consumeDispatchUnified(dispatchResponse, dispatch.chatGenerateParse, chatGenerateTx, _d, parseContext);
-  else
-    yield* _consumeDispatchStream(dispatchResponse, dispatch.bodyTransform ?? null, dispatch.demuxerFormat, dispatch.chatGenerateParse, chatGenerateTx, _d, parseContext);
+  // Inner stream
+  const innerStream = (async function* () {
 
-  // Tack profiling particles if generated
-  if (_d.profiler) {
-    chatGenerateTx.addDebugProfilerData(_d.profiler.getResultsData());
-    // performanceProfilerLog('AIX Router Performance', profiler?.getResultsData()); // uncomment to log to server console
-    _d.profiler.clearMeasurements();
+    // Consume dispatch response
+    if (dispatch.demuxerFormat === null /* NS */)
+      yield* _consumeDispatchUnified(dispatchResponse, dispatch.chatGenerateParse, chatGenerateTx, _d, parseContext);
+    else
+      yield* _consumeDispatchStream(dispatchResponse, dispatch.bodyTransform ?? null, dispatch.demuxerFormat, dispatch.chatGenerateParse, chatGenerateTx, _d, parseContext);
+
+    // Tack profiling particles if generated
+    if (_d.profiler) {
+      chatGenerateTx.addDebugProfilerData(_d.profiler.getResultsData());
+      // performanceProfilerLog('AIX Router Performance', profiler?.getResultsData()); // uncomment to log to server console
+      _d.profiler.clearMeasurements();
+    }
+
+    // Flush everything that's left; if we're here we have encountered a clean end condition,
+    // or an error that has already been queued up for this last flush
+    yield* chatGenerateTx.flushParticles();
+
+  })();
+
+  // Transform (optional): pipe the stream through a 1:1 async particle transformer (see anthropic.transform-fileInline.ts)
+  const transform = dispatch.particleTransform;
+  if (!transform) {
+    yield* innerStream; // no transform, passthrough
+    return;
   }
-
-  // Flush everything that's left; if we're here we have encountered a clean end condition,
-  // or an error that has already been queued up for this last flush
-  yield* chatGenerateTx.flushParticles();
+  for await (const particle of innerStream) {
+    try {
+      yield await transform(particle);
+    } catch (error: any) {
+      console.warn(`[AIX] ${_d.prettyDialect}: particle transform '${transform.name}' threw, passing original particle through`, { error: error?.message || error });
+      yield particle;
+    }
+  }
 }
 
 
@@ -82,6 +102,7 @@ export async function* executeChatGenerate(
  */
 async function* _connectToDispatch(
   request: ChatGenerateDispatchRequest,
+  customConnect: ((signal: AbortSignal) => Promise<Response>) | undefined,
   intakeAbortSignal: AbortSignal,
   chatGenerateTx: ChatGenerateTransmitter,
   _d: AixDebugObject,
@@ -101,7 +122,8 @@ async function* _connectToDispatch(
 
     // Blocking fetch with heartbeats - combats timeouts, for instance with long Anthropic requests (>25s on large requests for Opus 3 models)
     _d.profiler?.measureStart('connect');
-    const connectionOperationCreator = () => fetchResponseOrTRPCThrow({
+    // [customConnect] dialects that need multi-step I/O (e.g. Gemini Interactions poll loop) own the connection
+    const connectionOperationCreator = customConnect ? () => customConnect(intakeAbortSignal) : () => fetchResponseOrTRPCThrow({
       ...request,
       signal: intakeAbortSignal,
       name: `Aix.${_d.prettyDialect}`,
@@ -109,9 +131,15 @@ async function* _connectToDispatch(
     });
     const onRetryAttempt = (info: RetryAttempt) => {
       // -> retry-server-dispatch
-      chatGenerateTx.sendControl({ cg: 'retry-reset', rScope: 'srv-dispatch', rShallClear: false, reason: 'retrying initial connection', ...info });
+      chatGenerateTx.sendCGControl({
+        cg: 'aix-retry-reset', rScope: 'srv-dispatch',
+        rClearStrategy: 'none', // clear nothing, because no content has been streamed while trying to connect
+        reason: 'retrying connection',
+        ...info, attempt: info.attempt - 1, maxAttempts: info.maxAttempts - 1,
+      });
     };
-    const chatGenerateResponsePromise = createRetryablePromise(connectionOperationCreator, intakeAbortSignal, onRetryAttempt);
+    // throws the original error (TRPCFetcherError) from fetchResponseOrTRPCThrow when: not retryable, aborted, or all attempts exhausted
+    const chatGenerateResponsePromise = fetchWithAbortableConnectionRetry(connectionOperationCreator, intakeAbortSignal, onRetryAttempt);
     const dispatchResponse = yield* heartbeatsWhileAwaiting(chatGenerateResponsePromise);
     _d.profiler?.measureEnd('connect');
 
@@ -178,6 +206,10 @@ async function* _consumeDispatchUnified(
     }
 
   } catch (error: any) {
+    // NS pass-through dispatch signals - thrown by parsers to request operation retry or continuation
+    if (error instanceof DispatchContinuationSignal) throw error;
+    if (error instanceof OperationRetrySignal) throw error;
+
     if (dispatchBody === undefined)
       chatGenerateTx.setDispatchRpcTerminatingIssue('dispatch-read', `**[Reading Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream reading error'}`, 'srv-warn');
     else
@@ -301,8 +333,9 @@ async function* _consumeDispatchStream(
           yield* chatGenerateTx.emitParticles();
 
       } catch (error: any) {
-        // special: pass-through ONLY our retriable errors, for full operation-level retry - these are thrown by Parsers to remand reconnection
-        if (error instanceof RequestRetryError) throw error;
+        // pass-through dispatch signals - thrown by parsers to request operation retry or continuation
+        if (error instanceof DispatchContinuationSignal) throw error;
+        if (error instanceof OperationRetrySignal) throw error;
 
         // Handle parsing issue (likely a schema break); print it to the server console as well
         chatGenerateTx.setDispatchRpcTerminatingIssue('dispatch-parse', ` **[Service Parsing Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream parsing error'}.\n\nInput data: ${objectDeepCloneWithStringLimit(demuxedItem.data, 'aix.service-parsing-issue', 2048)}.\n\nPlease open a support ticket on GitHub.`, 'srv-warn');

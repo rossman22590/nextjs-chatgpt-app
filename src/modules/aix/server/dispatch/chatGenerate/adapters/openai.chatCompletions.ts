@@ -37,6 +37,7 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
   const chatGenerate = aixSpillSystemToUser(_chatGenerate);
 
   // Dialect incompatibilities -> Hotfixes
+  // [DeepSeek, 2026-04-24] V4 doesn't require strict alternation but we keep coalescing for cleanliness; the reducer only merges assistant/user, tool messages stay separate (parallel tool_calls).
   const hotFixAlternateUserAssistantRoles = openAIDialect === 'deepseek' || openAIDialect === 'perplexity';
   const hotFixRemoveEmptyMessages = openAIDialect === 'moonshot' || openAIDialect === 'perplexity'; // [Moonshot, 2026-02-10] consecutive assistant messages (empty + content) break Moonshot - coalesce to fix
   const hotFixRemoveStreamOptions = openAIDialect === 'azure' || openAIDialect === 'mistral';
@@ -59,7 +60,7 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     throw new Error('This service does not support function calls');
 
   // Convert the chat messages to the OpenAI 4-Messages format
-  let chatMessages = _toOpenAIMessages(chatGenerate.systemMessage, chatGenerate.chatSequence, hotFixOpenAIOFamily);
+  let chatMessages = _toOpenAIMessages(openAIDialect, chatGenerate.systemMessage, chatGenerate.chatSequence, hotFixOpenAIOFamily);
 
   // Apply hotfixes
 
@@ -68,6 +69,13 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
 
   if (hotFixAlternateUserAssistantRoles)
     chatMessages = _fixAlternateUserAssistantRoles(chatMessages);
+
+  // [DeepSeek, 2026-04-24] When tools are present and thinking isn't disabled, V4 demands reasoning_content on EVERY assistant message in history
+  // Inject '' placeholder where missing; real reasoning is attached by _toOpenAIMessages
+  if (openAIDialect === 'deepseek' && chatGenerate.tools?.length)
+    for (const m of chatMessages)
+      if (m.role === 'assistant' && m.reasoning_content === undefined)
+        m.reasoning_content = '';
 
 
   // constrained output modes - both JSON and tool invocations
@@ -145,18 +153,23 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     && openAIDialect !== 'deepseek' && openAIDialect !== 'moonshot' && openAIDialect !== 'zai' // MoonShot maps to none->disabled / high->enabled
     && openAIDialect !== 'perplexity' // Perplexity has its own block below with stricter validation
   ) {
-    if (reasoningEffort === 'max') // domain validation
-      throw new Error(`OpenAI ChatCompletions API does not support '${reasoningEffort}' reasoning effort`);
+    // for: 'alibaba' | 'azure' | 'groq' | 'lmstudio' | 'localai' | 'mistral' | 'openai' | 'openpipe' | 'togetherai' | 'xai'
     payload.reasoning_effort = reasoningEffort;
   }
 
   // [Moonshot] Kimi K2.5 reasoning effort -> thinking mode (only 'none' and 'high' supported for now)
   // [Z.ai] GLM thinking mode: binary enabled/disabled (supports GLM-4.5 series and higher) - https://docs.z.ai/guides/capabilities/thinking-mode
+  // [DeepSeek, 2026-04-23] V4 thinking control https://api-docs.deepseek.com/guides/thinking_mode
   if (reasoningEffort && (openAIDialect === 'deepseek' || openAIDialect === 'moonshot' || openAIDialect === 'zai')) {
-    if (reasoningEffort !== 'none' && reasoningEffort !== 'high') // domain validation
-      throw new Error(`${openAIDialect} only supports reasoning effort 'none' or 'high', got '${reasoningEffort}'`);
+    const allowedEffort = openAIDialect === 'deepseek' ? ['none', 'high', 'max'] : ['none', 'high'];
+    if (!allowedEffort.includes(reasoningEffort)) // domain validation
+      throw new Error(`${openAIDialect} only supports reasoning effort ${allowedEffort.join(', ')}, got '${reasoningEffort}'`);
 
-    payload.thinking = { type: reasoningEffort === 'none' ? 'disabled' : 'enabled' };
+    payload.thinking = { type: reasoningEffort !== 'none' ? 'enabled' : 'disabled' };
+
+    // [DeepSeek, 2026-04-23] DeepSeek also supports effort control for reasoning-enabled requests - set it here as it was carved from the reasoningEffort setter before
+    if (openAIDialect === 'deepseek' && reasoningEffort !== 'none')
+      payload.reasoning_effort = reasoningEffort;
   }
 
 
@@ -245,9 +258,10 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     const isTunneledGemini = model.id.startsWith('google/');
     if (isTunneledAnt) {
       // Effort -> OpenRouter verbosity -> Anthropic upstream output_config.effort
+      // OR verbosity supports low/medium/high/xhigh/max (2026-04-16). 'none'/'minimal' are OpenAI-only.
       const antEffort = model.reasoningEffort; // ?? model.vndAntEffort;
       if (antEffort) {
-        if (antEffort === 'none' || antEffort === 'minimal' || antEffort === 'xhigh') // domain validation
+        if (antEffort === 'none' || antEffort === 'minimal') // domain validation
           throw new Error(`OpenRouter->Anthropic API does not support '${antEffort}' reasoning effort`);
         payload.verbosity = antEffort;
       }
@@ -347,19 +361,23 @@ function _fixAlternateUserAssistantRoles(chatMessages: TRequestMessages): TReque
       };
     }
 
-    // if the current item has the same role as the last item, concatenate their content
+    // If current item has the same role as the last, coalesce ONLY assistant/user.
+    // Tool/system/developer must stay separate - tool messages each pair with a tool_call_id; merging corrupts the protocol.
     if (acc.length > 0) {
       const lastItem = acc[acc.length - 1];
       if (lastItem.role === historyItem.role) {
         if (lastItem.role === 'assistant') {
           lastItem.content += hotFixSquashTextSeparator + historyItem.content;
-        } else if (lastItem.role === 'user') {
+          return acc;
+        }
+        if (lastItem.role === 'user') {
           lastItem.content = [
             ...(Array.isArray(lastItem.content) ? lastItem.content : [OpenAIWire_ContentParts.TextContentPart(lastItem.content)]),
             ...(Array.isArray(historyItem.content) ? historyItem.content : historyItem.content ? [OpenAIWire_ContentParts.TextContentPart(historyItem.content)] : []),
           ];
+          return acc;
         }
-        return acc;
+        // fall through to push for tool/system/developer - each stays its own message
       }
     }
 
@@ -441,7 +459,10 @@ function _fixVndOaiRestoreMarkdown_Inline(payload: TRequest) {
 }*/
 
 
-function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chatSequence: AixMessages_ChatMessage[], hotFixOpenAIo1Family: boolean): TRequestMessages {
+function _toOpenAIMessages(openAIDialect: OpenAIDialects, systemMessage: AixMessages_SystemMessage | null, chatSequence: AixMessages_ChatMessage[], hotFixOpenAIo1Family: boolean): TRequestMessages {
+
+  // [DeepSeek, 2026-04-24] V4 thinking-by-default - reasoning_content must round-trip on tool-call turns; payload is the 'ma' part's aText (unlike Gemini/OpenAI-Responses which carry opaque handles).
+  const echoDeepseekReasoning = openAIDialect === 'deepseek';
 
   // Transform the chat messages into OpenAI's format (an array of 'system', 'user', 'assistant', and 'tool' messages)
   const chatMessages: TRequestMessages = [];
@@ -554,6 +575,8 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chat
         break;
 
       case 'model':
+        // Accumulate 'ma' reasoning text across this turn; echoed below onto the assistant message if it carries tool_calls (DeepSeek only).
+        let pendingReasoningText = '';
         for (const part of parts) {
           const currentMessage = chatMessages[chatMessages.length - 1];
           switch (part.pt) {
@@ -629,7 +652,17 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chat
               break;
 
             case 'ma':
-              // ignore this thinking block - Anthropic only
+              // [DeepSeek only] accumulate reasoning text for the echo-back below. Other dialects ignore 'ma' (reasoning continuity flows via _vnd opaque handles, not via this adapter).
+              if (echoDeepseekReasoning && part.aType === 'reasoning' && part.aText)
+                pendingReasoningText += part.aText;
+              break;
+
+            case 'tool_response':
+              const toolErrorPrefix = part.error ? (typeof part.error === 'string' ? `[ERROR] ${part.error} - ` : '[ERROR] ') : '';
+              if (part.response.type === 'function_call' || part.response.type === 'code_execution')
+                chatMessages.push(OpenAIWire_Messages.ToolMessage(part.id, toolErrorPrefix + part.response.result));
+              else
+                throw new Error(`Unsupported tool response type in Model message: ${(part as any).pt}`);
               break;
 
             case 'meta_cache_control':
@@ -642,29 +675,18 @@ function _toOpenAIMessages(systemMessage: AixMessages_SystemMessage | null, chat
           }
 
         }
-        break;
 
-      case 'tool':
-        for (const part of parts) {
-          switch (part.pt) {
-
-            case 'tool_response':
-              const toolErrorPrefix = part.error ? (typeof part.error === 'string' ? `[ERROR] ${part.error} - ` : '[ERROR] ') : '';
-              if (part.response.type === 'function_call' || part.response.type === 'code_execution')
-                chatMessages.push(OpenAIWire_Messages.ToolMessage(part.id, toolErrorPrefix + part.response.result));
-              else
-                throw new Error(`Unsupported tool response type in Tool message: ${(part as any).pt}`);
-              break;
-
-            case 'meta_cache_control':
-              // ignore this breakpoint hint - Anthropic only
-              break;
-
-            default:
-              const _exhaustiveCheck: never = part;
-              throw new Error(`Unsupported part type in Tool message: ${(part as any).pt}`);
+        // [DeepSeek] attach accumulated reasoning to this turn's assistant message only if it carries tool_calls; plain-text turns don't need the echo per docs.
+        if (echoDeepseekReasoning && pendingReasoningText) {
+          for (let i = chatMessages.length - 1; i >= 0; i--) {
+            const m = chatMessages[i];
+            if (m.role !== 'assistant') continue;
+            if (m.tool_calls?.length)
+              m.reasoning_content = pendingReasoningText;
+            break; // stop at the most recent assistant message from this turn
           }
         }
+
         break;
     }
   }

@@ -18,6 +18,7 @@ import { useScaledCodeSx, useScaledImageSx, useScaledTypographySx, useToggleExpa
 
 // configuration
 const DISABLE_MARKDOWN_PROGRESSIVE_PREPROCESS = true; // set to false to render LaTeX inline formulas as they come in, not at the end of the message
+const STREAMING_TAIL_MAX_HIDDEN_CHARS = 280; // safety: stop hiding the post-newline tail if it grows past this (~2 classic tweets)
 // import '~/common/util/forceTouchToDoubleClick'; // Future: Mac trackpad: force press → double-click
 
 
@@ -59,6 +60,12 @@ export function AutoBlocksRenderer(props: {
    */
   optiAllowSubBlocksMemo?: boolean;
 
+  /**
+   * optimization: streaming + last content fragment: clip last md block to last newline
+   * to avoid inline-markdown flicker
+   */
+  optiStreamingLastFragment?: boolean;
+
   onContextMenu?: (event: React.MouseEvent) => void;
   onDoubleClick?: (event: React.MouseEvent) => void;
 
@@ -89,8 +96,15 @@ export function AutoBlocksRenderer(props: {
 
   // handlers
   const { setText } = props;
+
+  // Perf: stabilize text alteration callbacks. During streaming, `text` changes every packet, and we don't want to
+  // re-render completed non-last Code/Markdown blocks.
+  const curTextRef = React.useRef(text);
+  curTextRef.current = text;
+
   const handleReplaceCode = React.useCallback((search: string, replace: string): boolean => {
     if (setText) {
+      const text = curTextRef.current;
       const newText = text.replace(search, replace);
       if (newText !== text) {
         setText(newText);
@@ -98,7 +112,7 @@ export function AutoBlocksRenderer(props: {
       }
     }
     return false;
-  }, [setText, text]);
+  }, [setText]);
 
 
   // Memo the styles, to minimize re-renders
@@ -121,6 +135,8 @@ export function AutoBlocksRenderer(props: {
 
         // Optimization: only memo the non-currently-rendered components, if the message is still in flux
         const optimizeMemoBeforeLastBlock = props.optiAllowSubBlocksMemo === true && index < (autoBlocksStable.length - 1);
+        // Optimization: Code being written won't get tooltips or snap to page
+        const optimizeLightweightLastBlock = props.optiAllowSubBlocksMemo === true && index === (autoBlocksStable.length - 1);
         // Optimization: disable the markdown preprocessor on the last block, only do it at the end not while in progress
         const optimizeDisableProcessorsOnLast = DISABLE_MARKDOWN_PROGRESSIVE_PREPROCESS && props.optiAllowSubBlocksMemo === true && index === (autoBlocksStable.length - 1);
 
@@ -128,6 +144,13 @@ export function AutoBlocksRenderer(props: {
 
           case 'md-bk':
             const RenderMarkdownMemoOrNot = optimizeMemoBeforeLastBlock ? RenderMarkdownMemo : RenderMarkdown;
+            // streaming smoothness: parse up to last newline only (tail reappears on next newline; full on completion)
+            let mdContent = bkInput.content;
+            if (props.optiStreamingLastFragment && index === (autoBlocksStable.length - 1)) {
+              const lastNewline = bkInput.content.lastIndexOf('\n');
+              if (lastNewline >= 0 && bkInput.content.length - lastNewline - 1 < STREAMING_TAIL_MAX_HIDDEN_CHARS)
+                mdContent = bkInput.content.slice(0, lastNewline + 1);
+            }
             return (props.textRenderVariant === 'text' || fromSystem || isUserCommand) ? (
               // Keep in sync with ScaledPlainTextRenderer
               <RenderPlainText
@@ -139,7 +162,7 @@ export function AutoBlocksRenderer(props: {
               // Keep in sync with ScaledMarkdownRenderer
               <RenderMarkdownMemoOrNot
                 key={'md-bk-' + index}
-                content={bkInput.content}
+                content={mdContent}
                 disablePreprocessor={optimizeDisableProcessorsOnLast}
                 sx={scaledTypographySx}
               />
@@ -168,7 +191,7 @@ export function AutoBlocksRenderer(props: {
                 initialShowHTML={props.showUnsafeHtmlCode}
                 initialIsCollapsed={enhancedStartCollapsed}
                 noCopyButton={props.blocksProcessor === 'diagram' || isTextCollapsed}
-                optimizeLightweight={optimizeMemoBeforeLastBlock}
+                optimizeLightweight={optimizeLightweightLastBlock}
                 onReplaceInCode={(!setText || isTextCollapsed) ? undefined : handleReplaceCode}
                 codeSx={scaledCodeSx}
               />
@@ -180,7 +203,7 @@ export function AutoBlocksRenderer(props: {
                 fitScreen={props.fitScreen}
                 initialShowHTML={props.showUnsafeHtmlCode /* && !bkInput.isPartial NOTE: with this, it would be only auto-rendered at the end, preventing broken renders */}
                 noCopyButton={props.blocksProcessor === 'diagram' || isTextCollapsed}
-                optimizeLightweight={optimizeMemoBeforeLastBlock}
+                optimizeLightweight={optimizeLightweightLastBlock}
                 onReplaceInCode={(!setText || isTextCollapsed) ? undefined : handleReplaceCode}
                 sx={scaledCodeSx}
               />

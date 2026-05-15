@@ -9,6 +9,9 @@
     "moduleDetection": "force",
     "isolatedModules": true,
 
+    /* Typescript 6.0 transition: side effects imports are denied by default */
+    "noUncheckedSideEffectImports": false,
+
     /* Strictness */
     "strict": true,
     "noUncheckedIndexedAccess": false,
@@ -34,10 +37,11 @@
     /* Path Aliases */
     "baseUrl": ".",
     "paths": {
-      "~/common/*": ["src/common/*"],
-      "~/modules/*": ["src/modules/*"],
-      "~/server/*": ["src/server/*"],
-      "~/pages/*": ["src/pages/*"]
+      "*": ["."],
+      "~/common/*": ["./src/common/*"],
+      "~/modules/*": ["./src/modules/*"],
+      "~/server/*": ["./src/server/*"],
+      "~/pages/*": ["./src/pages/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts",

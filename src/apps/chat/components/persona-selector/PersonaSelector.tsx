@@ -423,7 +423,8 @@ export function PersonaSelector(props: {
 
         {/* [row -3] Example incipits */}
         {systemPurposeId !== 'Custom' && (
-          <ExpanderControlledBox expanded={showExamples || (!isCustomPurpose && showPrompt)} sx={{ gridColumn: '1 / -1', pt: 1 }}>
+          <Box sx={{ gridColumn: '1 / -1', pt: 1 }}>
+          <ExpanderControlledBox expanded={showExamples || (!isCustomPurpose && showPrompt)}>
             {showExamples && (
               <List
                 aria-label='Persona Conversation Starters'
@@ -489,6 +490,7 @@ export function PersonaSelector(props: {
               </Card>
             )}
           </ExpanderControlledBox>
+          </Box>
         )}
 
         {/* [row -1] Custom Prompt box */}

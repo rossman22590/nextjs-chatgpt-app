@@ -35,6 +35,7 @@ export type DMessageContentFragment = _DMessageFragmentWrapper<'content',
   | DMessageImageRefPart          // large image
   | DMessageToolInvocationPart    // shown to dev only, signature of the llm function call
   | DMessageToolResponsePart      // shown to dev only, response of the llm
+  | DMessageHostedResourcePart    // provider-hosted resource (e.g. Anthropic file from Skills) with download affordance
   | DMessageErrorPart             // red message, e.g. non-content application issues
   | _SentinelPart
 >;
@@ -101,7 +102,17 @@ export type DMessageFragmentVendorState = Record<string, unknown> & {
   gemini?: {
     thoughtSignature?: string; // Gemini 3+ - echoed back to maintain reasoning context
   };
-  // Future: openai?: { ... }, anthropic?: { ... }
+  openai?: {
+    // Responses API reasoning item continuity handle.
+    // IMPORTANT: OpenAI-private encryption + server-side item id; never round-trip to xAI.
+    reasoningItem?: { id?: string; encryptedContent?: string; };
+  };
+  xai?: {
+    // xAI Responses API reasoning item continuity handle.
+    // IMPORTANT: xAI-private encryption + server-side item id; never round-trip to OpenAI.
+    reasoningItem?: { id?: string; encryptedContent?: string; };
+  };
+  // Future: anthropic?: { ... }
 }
 
 
@@ -199,7 +210,7 @@ export type DMessageToolInvocationPart = {
   id: string,
   invocation: {
     type: 'function_call'
-    name: string;             // Name of the function as passed from the definition
+    name: string;             // REQUIRED. Name of the function as passed from the definition
     args: string /*| null*/;  // JSON-encoded object (only objects are supported), if null there are no args and it's just a plain invocation
     // temporary, not stored
     _description?: string;    // Description from the definition
@@ -231,6 +242,15 @@ export type DMessageToolResponsePart = {
 type DMessageToolEnvironment = 'upstream' | 'server' | 'client';
 type DMessageToolCodeExecutor = 'gemini_auto_inline' | 'code_interpreter';
 
+
+/** Hosted resource - a provider-hosted resource (e.g. Anthropic container file from Skills/code execution). */
+export type DMessageHostedResourcePart = {
+  pt: 'hosted_resource';
+  resource:
+    | { via: 'anthropic', fileId: string, containerId?: string };
+};
+
+
 type DVoidModelAnnotationsPart = {
   pt: 'annotations',
   annotations: readonly DVoidWebCitation[],
@@ -255,17 +275,34 @@ export type DVoidModelAuxPart = {
   redactedData?: readonly string[],
 };
 
+
 export type DVoidPlaceholderPart = {
   pt: 'ph',
   pText: string,
-  pType?: 'chat-gen-follow-up',  // a follow-up is being generated
-  modelOp?: DVoidPlaceholderModelOp,
-  aixControl?: DVoidPlaceholderAixControlRetry,
+
+  // render type
+  pType?:
+    | 'chat-gen-follow-up',  // a follow-up is being generated
+
+  // operation history for stacked progress UI
+  opLog?: readonly DVoidPlaceholderMOp[],
+
+  // NOTE: the following should be extracted as its own part over time
+  aixControl?:
+    | { ctl: 'ac-info', ait: 'flow-cont' }
+    | DVoidPlaceholderAixControlRetry,
 };
 
-export type DVoidPlaceholderModelOp = {
-  mot: 'search-web' | 'gen-image' | 'code-exec',
-  cts: number, // client-based timestamp
+export type DVoidPlaceholderMOp = {
+  readonly opId: string,  // upstream operation ID (srvtoolu_*, item_id, etc.)
+  readonly mot: 'search-web' | 'gen-image' | 'code-exec',
+  text: string,  // latest status text
+  state: 'active' | 'done' | 'error',  // lifecycle state
+  iTexts?: readonly string[],  // decorative input context (e.g., search queries, code snippets, gen image prompt)
+  oTexts?: readonly string[],  // decorative output context (e.g., result urls, code exec outputs, file IDs, error details)
+  readonly parentOpId?: string,  // parent operation ID for nesting (e.g., code_execution that triggered this web_search)
+  readonly level: number,  // nesting depth (0 = root, inferred from parentOpId)
+  readonly cts: number,  // client timestamp (first seen)
 };
 
 type DVoidPlaceholderAixControlRetry = {
@@ -276,6 +313,7 @@ type DVoidPlaceholderAixControlRetry = {
   rCauseHttp?: number,  // HTTP status code if available (e.g., 429, 503, 502)
   rCauseConn?: string,  // connection error type if available (e.g., 'net-disconnected', 'timeout')
 };
+
 
 type _SentinelPart = { pt: '_pt_sentinel' };
 
@@ -304,6 +342,10 @@ export function isContentFragment(fragment: DMessageFragment): fragment is DMess
 
 export function isTextContentFragment(fragment: DMessageFragment): fragment is DMessageContentFragment & { part: DMessageTextPart } {
   return fragment.ft === 'content' && fragment.part.pt === 'text';
+}
+
+export function isErrorContentFragment(fragment: DMessageFragment): fragment is DMessageContentFragment & { part: DMessageErrorPart } {
+  return fragment.ft === 'content' && fragment.part.pt === 'error';
 }
 
 export function isAttachmentFragment(fragment: DMessageFragment): fragment is DMessageAttachmentFragment {
@@ -372,6 +414,10 @@ export function isToolResponseFunctionCallPart(part: DMessageContentFragment['pa
   return part.pt === 'tool_response' && part.response.type === 'function_call';
 }
 
+export function isHostedResourcePart(part: DMessageContentFragment['part']): part is DMessageHostedResourcePart {
+  return part.pt === 'hosted_resource';
+}
+
 export function isAnnotationsPart(part: DMessageVoidFragment['part']) {
   return part.pt === 'annotations';
 }
@@ -415,6 +461,10 @@ export function create_CodeExecutionResponse_ContentFragment(id: string, error: 
   return _createContentFragment(_create_CodeExecutionResponse_Part(id, error, result, executor, environment));
 }
 
+export function createHostedResourceContentFragment(resource: DMessageHostedResourcePart['resource']): DMessageContentFragment {
+  return _createContentFragment({ pt: 'hosted_resource', resource });
+}
+
 function _createContentFragment(part: DMessageContentFragment['part']): DMessageContentFragment {
   return { ft: 'content', fId: agiId('chat-dfragment' /* -content */), part };
 }
@@ -456,8 +506,8 @@ export function createModelAuxVoidFragment(aType: DVoidModelAuxPart['aType'], aT
   return _createVoidFragment(_create_ModelAux_Part(aType, aText, textSignature, redactedData));
 }
 
-export function createPlaceholderVoidFragment(placeholderText: string, placeholderType?: DVoidPlaceholderPart['pType'], modelOp?: DVoidPlaceholderModelOp, aixControl?: DVoidPlaceholderPart['aixControl']): DMessageVoidFragment {
-  return _createVoidFragment(_create_Placeholder_Part(placeholderText, placeholderType, modelOp, aixControl));
+export function createPlaceholderVoidFragment(placeholderText: string, placeholderType?: DVoidPlaceholderPart['pType'], aixControl?: DVoidPlaceholderPart['aixControl'], opLog?: readonly DVoidPlaceholderMOp[]): DMessageVoidFragment {
+  return _createVoidFragment(_create_Placeholder_Part(placeholderText, placeholderType, aixControl, opLog));
 }
 
 function _createVoidFragment(part: DMessageVoidFragment['part']): DMessageVoidFragment {
@@ -588,8 +638,8 @@ function _create_ModelAux_Part(aType: DVoidModelAuxPart['aType'], aText: string,
   };
 }
 
-function _create_Placeholder_Part(placeholderText: string, pType?: DVoidPlaceholderPart['pType'], modelOp?: DVoidPlaceholderModelOp, aixControl?: DVoidPlaceholderPart['aixControl']): DVoidPlaceholderPart {
-  return { pt: 'ph', pText: placeholderText, ...(pType ? { pType } : undefined), ...(modelOp ? { modelOp: { ...modelOp } } : undefined), ...(aixControl ? { aixControl: { ...aixControl } } : undefined) };
+function _create_Placeholder_Part(placeholderText: string, pType?: DVoidPlaceholderPart['pType'], aixControl?: DVoidPlaceholderPart['aixControl'], opLog?: readonly DVoidPlaceholderMOp[]): DVoidPlaceholderPart {
+  return { pt: 'ph', pText: placeholderText, ...(pType ? { pType } : undefined), ...(opLog ? { opLog: opLog.map(e => ({ ...e })) } : undefined), ...(aixControl ? { aixControl: { ...aixControl } } : undefined) };
 }
 
 function _create_Sentinel_Part(): _SentinelPart {
@@ -644,7 +694,7 @@ function _duplicate_Part<TPart extends (DMessageContentFragment | DMessageAttach
       return _create_ModelAux_Part(part.aType, part.aText, part.textSignature, part.redactedData) as TPart;
 
     case 'ph':
-      return _create_Placeholder_Part(part.pText, part.pType, part.modelOp, part.aixControl) as TPart;
+      return _create_Placeholder_Part(part.pText, part.pType, part.aixControl, part.opLog) as TPart;
 
     case 'text':
       return _create_Text_Part(part.text) as TPart;
@@ -658,6 +708,9 @@ function _duplicate_Part<TPart extends (DMessageContentFragment | DMessageAttach
       return part.response.type === 'function_call'
         ? _create_FunctionCallResponse_Part(part.id, part.error, part.response.name, part.response.result, part.environment) as TPart
         : _create_CodeExecutionResponse_Part(part.id, part.error, part.response.result, part.response.executor, part.environment) as TPart;
+
+    case 'hosted_resource':
+      return { pt: 'hosted_resource', resource: { ...part.resource } } as TPart;
 
     case '_pt_sentinel':
       return _create_Sentinel_Part() as TPart;
@@ -724,8 +777,14 @@ function _duplicate_DataReference(ref: DMessageDataRef): DMessageDataRef {
 
 /// Editor Helpers - Fragment Editing
 
+/** Sets the originId on a single fragment (mutates in place). */
+export function fragmentSetOriginId<T extends DMessageContentFragment | DMessageAttachmentFragment | DMessageVoidFragment>(fragment: T, originId: DMessageContentFragment['originId']): T {
+  fragment.originId = originId;
+  return fragment;
+}
+
 /** Creates a new array of fragments with a specific originId assigned to each. */
-export function fragmentsSetOriginId(fragments: ReadonlyArray<Readonly<DMessageFragment>>, originId: string): Readonly<DMessageFragment>[] {
+export function fragmentsSetOriginId(fragments: ReadonlyArray<Readonly<DMessageFragment>>, originId: DMessageContentFragment['originId']): Readonly<DMessageFragment>[] {
 
   // shallow copy if empty or no originId
   if (!fragments.length || !originId) return [...fragments];
@@ -849,6 +908,7 @@ export function updateFragmentWithEditedText(
         break;
 
       case 'image_ref':
+      case 'hosted_resource':
       case '_pt_sentinel':
         // nothing to do here - not editable
         break;

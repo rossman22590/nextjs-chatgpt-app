@@ -2,6 +2,7 @@ import * as React from 'react';
 import { keyframes } from '@emotion/react';
 import type { FileWithHandle } from 'browser-fs-access';
 
+import type { SxProps } from '@mui/joy/styles/types';
 import { Box, Button, Checkbox, ColorPaletteProp, Dropdown, IconButton, ListDivider, ListItem, ListItemDecorator, Menu, MenuButton, MenuItem } from '@mui/joy';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import AddToDriveRoundedIcon from '@mui/icons-material/AddToDriveRounded';
@@ -15,8 +16,10 @@ import ScreenshotMonitorIcon from '@mui/icons-material/ScreenshotMonitor';
 import { useBrowseStore } from '~/modules/browse/store-module-browsing';
 
 import { ButtonAttachFilesMemo, openFileForAttaching } from '~/common/components/ButtonAttachFiles';
+import { TooltipOutlined } from '~/common/components/TooltipOutlined';
 import { supportsClipboardRead } from '~/common/util/clipboardUtils';
 import { takeScreenCapture } from '~/common/util/screenCaptureUtils';
+import { themeZIndexOverMobileDrawer } from '~/common/app.theme';
 
 import { ButtonAttachCameraMemo } from './ButtonAttachCamera';
 import { ButtonAttachClipboardMemo } from './ButtonAttachClipboard';
@@ -41,39 +44,56 @@ const _style = {
     py: 0.5, // was 1
     minHeight: 60,
     // minHeight: '3.25rem', // now 52, was 60
-  } as const,
+  },
   menuItemContent: {
     display: 'flex',
     flexDirection: 'column',
     gap: 0.125,
-  } as const,
+  },
+  menuItemContentDisabled: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 0.125,
+    opacity: 0.5,
+  },
   menuItemName: {
     typography: 'title-sm',
     fontWeight: 600,
     // fontSize: '15px',
-  } as const,
+  },
   menuItemDescription: {
     fontSize: 'xs',
     color: 'text.tertiary',
-    fontWeight: 400,
-  } as const,
-};
+    // fontWeight: 400,
+  },
+  liveFeedButton: {
+    ml: 1,
+    // outline: '1px solid transparent',
+    // '&:hover': {
+    //   outlineColor: 'currentColor',
+    // },
+  },
+} as const satisfies Record<string, SxProps>;
 
 
 // Live feed record button - returns null if onClick is undefined
-function LiveFeedButton(props: { isActive: boolean, onClick: () => void }) {
+function LiveFeedButton(props: { isActive: boolean, tooltip: string, onClick: () => void }) {
   return (
-    <IconButton
-      size='sm'
-      variant={props.isActive ? 'solid' : 'soft'}
-      color='danger'
-      onClick={(e) => {
-        e.stopPropagation();
-        props.onClick();
-      }}
-    >
-      <FiberManualRecordIcon sx={{ fontSize: 16 }} />
-    </IconButton>
+    <TooltipOutlined title={props.tooltip} placement='top'>
+      <IconButton
+        size='sm'
+        variant={props.isActive ? 'solid' : 'outlined'}
+        color='danger'
+        onClick={(e) => {
+          e.stopPropagation();
+          props.onClick();
+        }}
+        sx={_style.liveFeedButton}
+      >
+        <FiberManualRecordIcon sx={{ fontSize: 16 }} />
+        {/*{props.isActive ? <AddRoundedIcon sx={{ fontSize: 18 }} /> : <FiberManualRecordIcon sx={{ fontSize: 16 }} />}*/}
+      </IconButton>
+    </TooltipOutlined>
   );
 }
 
@@ -82,7 +102,7 @@ function LiveFeedButton(props: { isActive: boolean, onClick: () => void }) {
 function RichMenuItem(props: {
   name: React.ReactNode;
   description: React.ReactNode;
-  icon: React.ReactNode;
+  Icon: React.ComponentType;
   onClick: () => void;
   delay?: number;
   disabled?: boolean;
@@ -100,9 +120,9 @@ function RichMenuItem(props: {
       }}
     >
       <ListItemDecorator>
-        {props.icon}
+        <props.Icon />
       </ListItemDecorator>
-      <Box sx={_style.menuItemContent}>
+      <Box sx={props.disabled ? _style.menuItemContentDisabled : _style.menuItemContent}>
         <Box sx={_style.menuItemName}>
           {props.name}
         </Box>
@@ -184,6 +204,7 @@ function AttachmentSources(props: {
   mode: 'menu-compact' | 'menu-rich' | 'inline-buttons' | 'menu-message',
   color?: ColorPaletteProp, // menu-rich and inline-buttons
   richButtonStandOut?: boolean, // menu-rich only
+  menuButton?: React.ReactNode, // custom MenuButton trigger for menu-compact/menu-message modes
   // source availability - note that hasGoogleDriveCapability is local
   canBrowse: boolean, // whether browsing is available (for Web button and showing the auto-attach toggle)
   hasCamera: boolean,
@@ -191,11 +212,6 @@ function AttachmentSources(props: {
   hasScreenCapture: boolean,
   // configuration
   onlyImages?: boolean, // makes clipboard/drive/web unavailable
-  // live feeds - end action buttons (presence if the callback is set, active state if the boolean is true)
-  hasActiveCameraFeed?: boolean,
-  hasActiveScreenFeed?: boolean,
-  onStartLiveCameraFeed?: () => void,
-  onStartLiveScreenFeed?: () => void,
   // callbacks
   onAttachClipboard: () => void,
   onAttachFiles: (files: FileWithHandle[], errorMessage: string | null) => void,
@@ -203,6 +219,11 @@ function AttachmentSources(props: {
   onOpenCamera: () => void,
   onOpenGoogleDrivePicker?: () => void, // optional because requires additional external setup (e.g. user-storage of tokens)
   onOpenWebInput: () => void,
+  // live feeds - end action buttons (presence if the callback is set, active state if the boolean is true)
+  hasActiveCameraFeed?: boolean,
+  hasActiveScreenFeed?: boolean,
+  onStartLiveCameraFeed?: () => void,
+  onStartLiveScreenFeed?: () => void,
 }) {
 
   // state (screen capture - used in menu modes where the component handles the capture)
@@ -271,7 +292,7 @@ function AttachmentSources(props: {
     return <>
 
       <Dropdown>
-        {!isMessage ? (
+        {props.menuButton ? props.menuButton : !isMessage ? (
           <MenuButton slots={{ root: IconButton }}>
             <AddRoundedIcon />
           </MenuButton>
@@ -288,14 +309,14 @@ function AttachmentSources(props: {
             Attach
           </MenuButton>
         )}
-        <Menu sx={{ '--List-padding': '0.5rem' }}>
+        <Menu sx={{ '--List-padding': '0.5rem', zIndex: themeZIndexOverMobileDrawer /* menu-compact or menu-message: above dialogs */ }}>
 
           {/* Files */}
           {/*<MenuItem onClick={handleAttachFilePicker}>*/}
           {/*  <ListItemDecorator><AttachFileRoundedIcon /></ListItemDecorator>*/}
           {/*  {props.onlyImages ? 'Images' : 'File'}*/}
           {/*</MenuItem>*/}
-          <RichMenuItem name={props.onlyImages ? 'Images' : 'Files'} description='PDF, DOCX, images, code' color={props.color} icon={<AttachFileRoundedIcon />} onClick={handleAttachFilePicker} />
+          <RichMenuItem name={props.onlyImages ? 'Images' : 'Files'} description='PDF, DOCX, images, code' color={props.color} Icon={AttachFileRoundedIcon} onClick={handleAttachFilePicker} />
 
           {/* Web */}
           {!props.onlyImages && /*props.canBrowse &&*/ (
@@ -303,7 +324,7 @@ function AttachmentSources(props: {
             //   <ListItemDecorator><LanguageRoundedIcon /></ListItemDecorator>
             //   Web
             // </MenuItem>
-            <RichMenuItem name='Web' description='Import from web pages' color={props.color} icon={<LanguageRoundedIcon />} onClick={props.onOpenWebInput} disabled={!props.canBrowse} />
+            <RichMenuItem name='Web' description='Import from web pages' color={props.color} Icon={LanguageRoundedIcon} onClick={props.onOpenWebInput} disabled={!props.canBrowse} />
           )}
 
           {/* Google Drive */}
@@ -312,7 +333,7 @@ function AttachmentSources(props: {
             //   <ListItemDecorator><AddToDriveRoundedIcon /></ListItemDecorator>
             //   Drive
             // </MenuItem>
-            <RichMenuItem name='Drive' description='Attach Google Drive files' color={props.color} icon={<AddToDriveRoundedIcon />} onClick={props.onOpenGoogleDrivePicker} />
+            <RichMenuItem name='Drive' description='Attach Google Drive files' color={props.color} Icon={AddToDriveRoundedIcon} onClick={props.onOpenGoogleDrivePicker} />
           )}
 
           {/* Clipboard */}
@@ -321,7 +342,7 @@ function AttachmentSources(props: {
             //   <ListItemDecorator><ContentPasteGoIcon /></ListItemDecorator>
             //   Paste
             // </MenuItem>
-            <RichMenuItem name='Clipboard' description='Auto-convert to the best format' color={props.color} icon={<ContentPasteGoIcon />} onClick={props.onAttachClipboard} />
+            <RichMenuItem name='Clipboard' description='Auto-convert to the best format' color={props.color} Icon={ContentPasteGoIcon} onClick={props.onAttachClipboard} />
           )}
 
           {/* Screen Capture */}
@@ -334,10 +355,10 @@ function AttachmentSources(props: {
               name='Screen'
               color={screenCaptureError ? 'danger' : props.color}
               description={screenCaptureError ? `Error: ${screenCaptureError}` : 'Capture tabs, apps, and screens'}
-              icon={<ScreenshotMonitorIcon />}
+              Icon={ScreenshotMonitorIcon}
               disabled={capturingScreen}
               onClick={handleTakeScreenCapture}
-              endAction={!isMessage && props.onStartLiveScreenFeed && <LiveFeedButton isActive={!!props.hasActiveScreenFeed} onClick={props.onStartLiveScreenFeed} />}
+              endAction={!isMessage && props.onStartLiveScreenFeed && <LiveFeedButton isActive={!!props.hasActiveScreenFeed} tooltip='Live Screen chat' onClick={props.onStartLiveScreenFeed} />}
             />
           )}
 
@@ -350,10 +371,10 @@ function AttachmentSources(props: {
             <RichMenuItem
               name='Camera'
               color={props.color}
-              icon={<CameraAltOutlinedIcon />}
+              Icon={CameraAltOutlinedIcon}
               description='Capture photos with optional OCR'
               onClick={props.onOpenCamera}
-              endAction={!isMessage && props.onStartLiveCameraFeed && <LiveFeedButton isActive={!!props.hasActiveCameraFeed} onClick={props.onStartLiveCameraFeed} />}
+              endAction={!isMessage && props.onStartLiveCameraFeed && <LiveFeedButton isActive={!!props.hasActiveCameraFeed} tooltip='Live Camera chat' onClick={props.onStartLiveCameraFeed} />}
             />
           )}
 
@@ -410,6 +431,7 @@ function AttachmentSources(props: {
         sx={{
           minWidth: 280,
           '--List-padding': '0.5rem',
+          zIndex: themeZIndexOverMobileDrawer,
           animation: `${animationMenu} 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94)`,
           // boxShadow: '0 16px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
           boxShadow: 'md',
@@ -424,7 +446,7 @@ function AttachmentSources(props: {
         {/* File Attachment */}
         <RichMenuItem
           name={props.onlyImages ? 'Images' : 'Files'}
-          icon={<AttachFileRoundedIcon />}
+          Icon={AttachFileRoundedIcon}
           description={props.onlyImages ? 'PNG, JPG, WEBP images to edit' : 'PDF, DOCX, images, code'}
           onClick={handleAttachFilePicker}
           delay={0}
@@ -434,8 +456,8 @@ function AttachmentSources(props: {
         {!props.onlyImages && /*props.canBrowse &&*/ (
           <RichMenuItem
             name='Web'
-            icon={<LanguageRoundedIcon />}
-            description='Import from websites, including screenshots'
+            Icon={LanguageRoundedIcon}
+            description='Import web pages, including screenshots'
             onClick={props.onOpenWebInput}
             disabled={!props.canBrowse}
             delay={0.02}
@@ -446,7 +468,7 @@ function AttachmentSources(props: {
         {!props.onlyImages && hasGoogleDriveCapability && !!props.onOpenGoogleDrivePicker && (
           <RichMenuItem
             name='Drive'
-            icon={<AddToDriveRoundedIcon />}
+            Icon={AddToDriveRoundedIcon}
             description='Attach Google Drive files'
             onClick={props.onOpenGoogleDrivePicker}
             delay={0.04}
@@ -457,7 +479,7 @@ function AttachmentSources(props: {
         {!props.onlyImages && supportsClipboardRead() && (
           <RichMenuItem
             name='Clipboard'
-            icon={<ContentPasteGoIcon />}
+            Icon={ContentPasteGoIcon}
             // description='Auto-converts images and text to the best format'
             description='Auto-adapts images and text'
             onClick={props.onAttachClipboard}
@@ -496,13 +518,13 @@ function AttachmentSources(props: {
         {props.hasScreenCapture && (
           <RichMenuItem
             name='Screen'
-            icon={<ScreenshotMonitorIcon />}
+            Icon={ScreenshotMonitorIcon}
             description={screenCaptureError ? `Error: ${screenCaptureError}` : 'Capture tabs, apps, and screens'}
             onClick={handleTakeScreenCapture}
             disabled={capturingScreen}
             color={screenCaptureError ? 'danger' : undefined}
             delay={0.08}
-            endAction={props.onStartLiveScreenFeed && <LiveFeedButton isActive={!!props.hasActiveScreenFeed} onClick={props.onStartLiveScreenFeed} />}
+            endAction={props.onStartLiveScreenFeed && <LiveFeedButton isActive={!!props.hasActiveScreenFeed} tooltip='Live Screen chat' onClick={props.onStartLiveScreenFeed} />}
           />
         )}
 
@@ -510,11 +532,11 @@ function AttachmentSources(props: {
         {props.hasCamera && (
           <RichMenuItem
             name='Camera'
-            icon={<CameraAltOutlinedIcon />}
+            Icon={CameraAltOutlinedIcon}
             description='Capture photos with optional OCR'
             onClick={props.onOpenCamera}
             delay={0.1}
-            endAction={props.onStartLiveCameraFeed && <LiveFeedButton isActive={!!props.hasActiveCameraFeed} onClick={props.onStartLiveCameraFeed} />}
+            endAction={props.onStartLiveCameraFeed && <LiveFeedButton isActive={!!props.hasActiveCameraFeed} tooltip='Live Camera chat' onClick={props.onStartLiveCameraFeed} />}
           />
         )}
 

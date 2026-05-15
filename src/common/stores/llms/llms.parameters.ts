@@ -151,7 +151,7 @@ export const DModelParameterRegistry = {
     label: 'Effort',
     type: 'enum',
     description: 'Controls reasoning depth. Works alongside thinking budget.',
-    values: ['low', 'medium', 'high', 'max'],
+    values: ['low', 'medium', 'high', 'xhigh', 'max'],
     // undefined means high effort (default)
   }),
 
@@ -175,7 +175,8 @@ export const DModelParameterRegistry = {
     label: 'Thinking',
     type: 'enum',
     description: 'Enable or disable extended thinking mode.',
-    values: ['none', 'high'],
+    values: ['none', 'high', 'max'],
+    // 'max' is for now DeepSeek V4-specific (reasoning_effort=max); other vendors restrict via enumValues
     // undefined means vendor default (usually 'high', i.e. thinking enabled)
   }),
 
@@ -224,6 +225,13 @@ export const DModelParameterRegistry = {
       meaning: 'Disable extended thinking',
     },
     // undefined means model default
+  },
+
+  llmVndAntWebDynamic: { // applies to both web search and web fetch when enabled
+    label: 'Dynamic Filtering',
+    type: 'boolean',
+    description: 'Use dynamic filtering for search/fetch - more accurate, reduces tokens (Opus/Sonnet 4.6+, not ZDR-eligible)',
+    // undefined means false (standard versions)
   },
 
   llmVndAntWebFetch: _enumDef({ // implies: LLM_IF_Tools_WebSearch
@@ -340,6 +348,15 @@ export const DModelParameterRegistry = {
     range: [0, 24576],
     // when undefined, the model chooses automatically
   },
+
+  // Gemini Interactions API agent_config - per-agent knobs (Deep Research only today)
+  llmVndGeminiAgentViz: _enumDef({
+    label: 'Visualizations',
+    type: 'enum',
+    description: 'Charts and images in Deep Research reports. Disable for text-only output (helpful when merging multiple reports).',
+    values: ['auto', 'off'],
+    // undefined means upstream default ('auto'); we only forward when explicitly 'off'
+  }),
 
   // NOTE: we don't have this as a parameter, as for now we use it in tandem with llmVndGeminiGoogleSearch
   // llmVndGeminiUrlContext: {
@@ -533,7 +550,7 @@ export type DModelParameterSpecAny = {
  * Note: This is the client-side TypeScript definition that matches
  * ModelParameterSpec_schema in `llm.server.types.ts`.
  */
-interface DModelParameterSpec<T extends DModelParameterId> {
+export interface DModelParameterSpec<T extends DModelParameterId> {
   paramId: T;
   required?: boolean;
   hidden?: boolean;
@@ -549,7 +566,7 @@ interface DModelParameterSpec<T extends DModelParameterId> {
    * The UI will only show these values. Analogous to rangeOverride for numeric params.
    * Example: llmVndOaiEffort registry has 6 values, but a specific model may only support ['low', 'medium', 'high'].
    */
-  enumValues?: readonly string[];
+  enumValues?: readonly DModelParameterValue<T>[];
 }
 
 

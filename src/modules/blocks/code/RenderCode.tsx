@@ -2,10 +2,9 @@ import * as React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import type { SxProps } from '@mui/joy/styles/types';
-import { Box, ButtonGroup, Dropdown, ListItem, Menu, MenuButton, Sheet, Tooltip, Typography } from '@mui/joy';
+import { Box, ButtonGroup, Sheet, Typography } from '@mui/joy';
 import ChangeHistoryTwoToneIcon from '@mui/icons-material/ChangeHistoryTwoTone';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import FitScreenIcon from '@mui/icons-material/FitScreen';
 import HtmlIcon from '@mui/icons-material/Html';
 import NumbersRoundedIcon from '@mui/icons-material/NumbersRounded';
@@ -18,14 +17,13 @@ import { copyToClipboard } from '~/common/util/clipboardUtils';
 import { useFullscreenElement } from '~/common/components/useFullscreenElement';
 import { useUIPreferencesStore } from '~/common/stores/store-ui';
 
-import { OVERLAY_BUTTON_RADIUS, OverlayButton, overlayButtonsActiveSx, overlayButtonsClassName, overlayButtonsTopRightSx, overlayGroupWithShadowSx, StyledOverlayButton } from '../OverlayButton';
+import { OVERLAY_BUTTON_RADIUS, OverlayButton, overlayButtonsActiveSx, overlayButtonsClassName, overlayButtonsTopRightSx, overlayGroupWithShadowSx } from '../OverlayButton';
 import { RenderCodeHtmlIFrame } from './code-renderers/RenderCodeHtmlIFrame';
 import { RenderCodeMermaid } from './code-renderers/RenderCodeMermaid';
 import { heuristicIsSVGCode, RenderCodeSVG } from './code-renderers/RenderCodeSVG';
 import { RenderCodeSyntax } from './code-renderers/RenderCodeSyntax';
 import { heuristicIsBlockPureHTML } from '../danger-html/RenderDangerousHtml';
 import { heuristicIsCodePlantUML, RenderCodePlantUML, usePlantUmlSvg } from './code-renderers/RenderCodePlantUML';
-import { useOpenInWebEditors } from './code-buttons/useOpenInWebEditors';
 import { useStickyCodeOverlay } from './useStickyCodeOverlay';
 
 // style for line-numbers
@@ -34,6 +32,11 @@ import './RenderCode.css';
 
 // configuration
 const ALWAYS_SHOW_OVERLAY = true;
+
+// Perf: while streaming a large code block, throttle Prism re-highlighting (decimator ~15Hz -> capped here to ~7Hz).
+// Set BYTES to 0 to disable the optimization entirely (zero runtime cost when disabled).
+const PARTIAL_HIGHLIGHT_THROTTLE_BYTES = 8 * 1024;
+const PARTIAL_HIGHLIGHT_THROTTLE_MS = 150;
 
 
 // RenderCode
@@ -50,7 +53,7 @@ interface RenderCodeBaseProps {
   fitScreen?: boolean,
   initialShowHTML?: boolean,
   noCopyButton?: boolean,
-  optimizeLightweight?: boolean,
+  optimizeLightweight?: boolean, // set when non-memoed and partial
   onReplaceInCode?: (search: string, replace: string) => boolean;
   renderHideTitle?: boolean,
   sx?: SxProps,
@@ -62,7 +65,7 @@ function RenderCode(props: RenderCodeBaseProps) {
       fallback={
         // Mimic the structure of the RenderCodeImpl - to mitigate race conditions that could cause problematic rendering
         // of code (where two components were missing from the structure)
-        <Box sx={renderCodecontainerSx}>
+        <Box sx={_styles.renderCodecontainer}>
           <Box component='code' className='language-unknown' aria-label='Displaying Code...' sx={{ p: 1.5, display: 'block', ...props.sx }}>
             <Box component='span' sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <Box component='span' className='code-container' aria-label='Code block'>
@@ -93,16 +96,38 @@ const _DynamicPrism = React.lazy(async () => {
 
 // Actual implemetation of the code rendering
 
-const renderCodecontainerSx: SxProps = {
-  // position the overlay buttons - this has to be one level up from the code, otherwise the buttons will h-scroll with the code
-  position: 'relative',
+const _styles = {
+  renderCodecontainer: {
+    // position the overlay buttons - this has to be one level up from the code, otherwise the buttons will h-scroll with the code
+    position: 'relative',
 
-  // style
-  '--IconButton-radius': OVERLAY_BUTTON_RADIUS,
+    // style
+    '--IconButton-radius': OVERLAY_BUTTON_RADIUS,
 
-  // fade in children buttons
-  [`&:hover > .${overlayButtonsClassName}`]: overlayButtonsActiveSx,
-};
+    // fade in children buttons
+    [`&:hover > .${overlayButtonsClassName}`]: overlayButtonsActiveSx,
+  },
+
+  blockTitle: {
+    backgroundColor: 'background.popup',
+    boxShadow: 'xs',
+    borderRadius: 'sm',
+    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+    m: -0.5,
+    mb: 1.5,
+  },
+  blockTitleText: {
+    px: 1,
+    py: 0.5,
+    color: 'text.primary',
+  },
+
+  fullscreenSyntaxFix: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+} as const satisfies Record<string, SxProps>;
 
 const overlayGridSx: SxProps = {
   ...overlayButtonsTopRightSx,
@@ -111,11 +136,11 @@ const overlayGridSx: SxProps = {
   justifyItems: 'end',
 };
 
-
 const overlayFirstRowSx: SxProps = {
   display: 'flex',
   gap: 0.5,
 };
+
 
 function RenderCodeImpl(props: RenderCodeBaseProps & {
   highlightCode: (inferredCodeLanguage: string | null, code: string, addLineNumbers: boolean) => string,
@@ -163,10 +188,13 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
 
   // const handleMouseOverLeave = React.useCallback(() => setIsHovering(false), []);
 
+  // Optimization: stabilize the copy handler
+  const codeRef = React.useRef(code);
+  codeRef.current = code;
   const handleCopyToClipboard = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    copyToClipboard(code, 'Code');
-  }, [code]);
+    copyToClipboard(codeRef.current, 'Code');
+  }, []);
 
 
   // heuristics for specialized rendering
@@ -202,12 +230,28 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
     return inferCodeLanguage(blockTitle, code);
   }, [blockTitle, code, inferCodeLanguage, isHTMLCode]);
 
-  const highlightedCode = React.useMemo(() => {
+
+  // Optimization 1: highlight decimation: max 6.6Hz throttle during large partial streams, as skipped intermediates are harmless.
+  const snapRef = React.useRef({ at: 0, code });
+  const throttle = !!PARTIAL_HIGHLIGHT_THROTTLE_BYTES && blockIsPartial && code.length > PARTIAL_HIGHLIGHT_THROTTLE_BYTES;
+  const now = throttle ? performance.now() : 0;
+  if (!throttle || now - snapRef.current.at >= PARTIAL_HIGHLIGHT_THROTTLE_MS) {
+    snapRef.current.at = now;
+    snapRef.current.code = code;
+  }
+  const throttledCodeForHighlight = snapRef.current.code;
+
+  // Optimization 2: highlight cancellation: React-defer the *input* to Prism syntax highlight memo -> the highlight pass runs in a low-priority, interruptible render.
+  // A higher-priority update (input, scroll, another state change) aborts the pending pass -- so rapid streaming updates coalesce
+  // into fewer Prism runs under pressure.
+  const deferredCodeForHighlight = React.useDeferredValue(throttledCodeForHighlight);
+
+  const codeSyntaxHtml = React.useMemo(() => {
     // fast-off
-    if (!renderSyntaxHighlight || !code)
+    if (!renderSyntaxHighlight || !deferredCodeForHighlight)
       return null;
-    return highlightCode(inferredCodeLanguage, code, renderLineNumbers);
-  }, [code, highlightCode, inferredCodeLanguage, renderLineNumbers, renderSyntaxHighlight]);
+    return highlightCode(inferredCodeLanguage, deferredCodeForHighlight, renderLineNumbers);
+  }, [deferredCodeForHighlight, highlightCode, inferredCodeLanguage, renderLineNumbers, renderSyntaxHighlight]);
 
 
   // Title
@@ -218,13 +262,9 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
   const isBorderless = (renderHTML || renderSVG) && !showBlockTitle;
 
 
-  // External Buttons
-  const openExternallyItems = useOpenInWebEditors(code, blockTitle, blockIsPartial, inferredCodeLanguage, isSVGCode);
-
   // style
 
   const isRenderingDiagram = renderMermaid || renderPlantUML;
-  const hasExternalButtons = openExternallyItems.length > 0;
 
   const codeSx: SxProps = React.useMemo(() => ({
 
@@ -238,16 +278,16 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
     flexDirection: 'column',
     // justifyContent: (renderMermaid || renderPlantUML) ? 'center' : undefined,
 
+    // in fullscreen mode, amplify contrast
+    ...isFullscreen && { backgroundColor: 'background.surface' },
+
     // fix for SVG diagrams over dark mode: https://github.com/enricoros/big-AGI/issues/520
     '[data-joy-color-scheme="dark"] &': isRenderingDiagram ? { backgroundColor: 'neutral.500' } : {},
 
     // lots more style, incl font, background, embossing, radius, etc.
     ...props.sx,
 
-    // patch the min height if we have the second row
-    // ...(hasExternalButtons ? { minHeight: '5.25rem' } : {}),
-
-  }), [isBorderless, isRenderingDiagram, props.sx, showSoftWrap]);
+  }), [isBorderless, isFullscreen, isRenderingDiagram, props.sx, showSoftWrap]);
 
 
   return (
@@ -255,20 +295,20 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
       ref={overlayBoundaryRef}
       // onMouseEnter={handleMouseOverEnter}
       // onMouseLeave={handleMouseOverLeave}
-      sx={renderCodecontainerSx}
+      sx={_styles.renderCodecontainer}
     >
 
       <Box
         ref={fullScreenElementRef}
         component='code'
         className={`language-${inferredCodeLanguage || 'unknown'}${renderLineNumbers ? ' line-numbers' : ''}`}
-        sx={!isFullscreen ? codeSx : { ...codeSx, backgroundColor: 'background.surface' }}
+        sx={codeSx}
       >
 
         {/* Markdown Title (File/Type) */}
         {showBlockTitle && (
-          <Sheet sx={{ backgroundColor: 'background.popup', boxShadow: 'xs', borderRadius: 'sm', border: '1px solid var(--joy-palette-neutral-outlinedBorder)', m: -0.5, mb: 1.5 }}>
-            <Typography level='body-sm' sx={{ px: 1, py: 0.5, color: 'text.primary' }} className='agi-ellipsize'>
+          <Sheet sx={_styles.blockTitle}>
+            <Typography level='body-sm' sx={_styles.blockTitleText} className='agi-ellipsize'>
               {blockTitle}
               {/*{inferredCodeLanguage}*/}
             </Typography>
@@ -280,14 +320,14 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
             chars in a non-proper way.
             Since this damages the 'fullscreen' operation, we restore it somehow.
         */}
-        <Box component='span' sx={!isFullscreen ? undefined : { flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <span style={!isFullscreen ? undefined : _styles.fullscreenSyntaxFix}>
           {/* Renders HTML, or inline SVG, inline plantUML rendered, or highlighted code */}
           {renderHTML ? <RenderCodeHtmlIFrame key={htmlReloadKey} htmlCode={code} isFullscreen={isFullscreen} />
             : renderMermaid ? <RenderCodeMermaid mermaidCode={code} fitScreen={fitScreen} />
               : renderSVG ? <RenderCodeSVG svgCode={code} fitScreen={fitScreen} />
                 : (renderPlantUML && (plantUmlSvgData || plantUmlError)) ? <RenderCodePlantUML svgCode={plantUmlSvgData ?? null} error={plantUmlError} fitScreen={fitScreen} />
-                  : <RenderCodeSyntax highlightedSyntaxAsHtml={highlightedCode} presenterMode={isFullscreen} />}
-        </Box>
+                  : <RenderCodeSyntax highlightedSyntaxAsHtml={codeSyntaxHtml} presenterMode={isFullscreen} />}
+        </span>
 
       </Box>
 
@@ -368,26 +408,6 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
                 </OverlayButton>
               )}
 
-              {/* Open In Web Editors */}
-              {hasExternalButtons && (
-                <Dropdown>
-                  <Tooltip disableInteractive arrow placement='top' title='Web Editors'>
-                    <MenuButton
-                      slots={{ root: StyledOverlayButton }}
-                      slotProps={{ root: { variant: 'outlined' } }}
-                    >
-                      <EditRoundedIcon />
-                    </MenuButton>
-                  </Tooltip>
-                  <Menu sx={{ minWidth: 160 }} placement='bottom-end'>
-                    <ListItem>
-                      <Typography level='body-sm'>Edit with:</Typography>
-                    </ListItem>
-                    {openExternallyItems}
-                  </Menu>
-                </Dropdown>
-              )}
-
               {/* Copy */}
               {props.noCopyButton !== true && (
                 <OverlayButton tooltip={noTooltips ? null : 'Copy Code'} variant='outlined' onClick={handleCopyToClipboard}>
@@ -397,14 +417,6 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
             </ButtonGroup>
 
           </Box>
-
-          {/* DISABLED: Converted to a Dropdown */}
-          {/* [row 2, optional] Group: Open Externally */}
-          {/*{!!openExternallyButtons.length && (*/}
-          {/*  <ButtonGroup aria-label='Open code in external editors' sx={overlayGroupWithShadowSx}>*/}
-          {/*    {openExternallyButtons}*/}
-          {/*  </ButtonGroup>*/}
-          {/*)}*/}
 
         </Box>
       )}
