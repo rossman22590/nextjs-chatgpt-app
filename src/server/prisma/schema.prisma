@@ -56,7 +56,8 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  tokenLimit    Int?      @default(2000000) // default 2M/month, null = unlimited (admin override)
+  isActive      Boolean?  @default(false) // false = blocked, null = legacy active user, true = active
+  tokenLimit    Int?      @default(0) // 0 = no credits, null = unlimited (admin override)
   accounts      Account[]
   sessions      Session[]
   links         LinkStorage[]

@@ -174,8 +174,8 @@ export default function Profile() {
                   <Typography level="body-sm" color="neutral" noWrap>
                     {session?.user?.email}
                   </Typography>
-                  <Chip variant="solid" color="primary" size="sm" sx={{ mt: 1 }}>
-                    Active
+                  <Chip variant="soft" color={limitInfo?.isActive === false ? 'danger' : 'success'} size="sm" sx={{ mt: 1 }}>
+                    {limitInfo?.isActive === false ? 'Inactive Account' : 'Active Account'}
                   </Chip>
                 </Box>
               </Box>
@@ -258,19 +258,26 @@ export default function Profile() {
                 {myUsage ? (() => {
                   const limit = myUsage.tokenLimit;
                   const used = myUsage.thisMonth._sum.totalTokens ?? 0;
-                  const remaining = limit ? Math.max(0, limit - used) : null;
-                  const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
-                  const progressColor = pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary';
+                  const isActive = myUsage.isActive;
+                  const remaining = limit == null ? null : Math.max(0, limit - used);
+                  const pct = limit != null && limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+                  const progressColor = !isActive ? 'danger' : limit === 0 ? 'warning' : pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary';
                   return (
                     <Card variant="soft" color={progressColor} sx={{ borderRadius: 'md', mb: 2 }}>
                       <CardContent>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                           <DataUsageIcon sx={{ fontSize: '1.1rem' }} />
                           <Typography level="title-sm">
-                            {remaining != null ? `${remaining.toLocaleString()} remaining` : 'Unlimited'}
+                            {!isActive ? 'Account inactive' : remaining != null ? `${remaining.toLocaleString()} remaining` : 'Unlimited'}
                           </Typography>
                         </Box>
-                        {limit ? (
+                        {!isActive ? (
+                          <Typography level="body-sm" color="neutral">
+                            Your account is inactive. Contact your admin to activate access. If you have an active AI Tutor Ultra account, please reach out to support to get activated.
+                          </Typography>
+                        ) : limit == null ? (
+                          <Typography level="body-sm" color="neutral">No monthly limit set.</Typography>
+                        ) : limit > 0 ? (
                           <>
                             <LinearProgress
                               determinate
@@ -285,10 +292,10 @@ export default function Profile() {
                             </Box>
                           </>
                         ) : (
-                          <Typography level="body-sm" color="neutral">No monthly limit set.</Typography>
+                          <Typography level="body-sm" color="neutral">You currently have 0 monthly credits. Contact your admin to add credits.</Typography>
                         )}
                         <Typography level="body-xs" color="neutral" sx={{ mt: 1 }}>
-                          {myUsage.thisMonth._count} requests this month
+                          {myUsage.thisMonth._count} requests this month - resets on the 1st of each month
                         </Typography>
                       </CardContent>
                     </Card>
@@ -407,4 +414,4 @@ export default function Profile() {
       </Box>
     </Box>
   );
-} 
+}

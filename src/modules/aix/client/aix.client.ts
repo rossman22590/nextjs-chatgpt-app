@@ -259,11 +259,18 @@ export async function aixChatGenerateContent_DMessage_FromConversation(
     // Check token limit before proceeding (best-effort, skip on error)
     try {
       const limitCheck = await apiAsyncNode.usage.checkLimit.query();
-      if (!limitCheck.allowed)
+      if (!limitCheck.allowed) {
+        if (limitCheck.reason === 'inactive')
+          throw new Error('Your account is inactive. Contact your admin to activate your access. If you have an active AI Tutor Ultra account, please reach out to support to get activated.');
+
+        if (limitCheck.limit === 0)
+          throw new Error('You have 0 monthly credits. Contact your admin to add credits to your account.');
+
         throw new Error(`Monthly token limit reached (${limitCheck.used?.toLocaleString()} / ${limitCheck.limit?.toLocaleString()} tokens used). Contact your admin to increase your limit.`);
+      }
     } catch (limitError: any) {
-      // Only throw if it's our limit error, ignore network/auth errors
-      if (limitError?.message?.includes('token limit'))
+      // Only throw if it's our access/credit error, ignore network/auth errors
+      if (limitError?.message?.includes('token limit') || limitError?.message?.includes('inactive') || limitError?.message?.includes('0 monthly credits'))
         throw limitError;
     }
 

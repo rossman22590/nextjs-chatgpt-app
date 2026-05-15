@@ -51,7 +51,7 @@ export default function SignIn() {
   // Show registration success message
   React.useEffect(() => {
     if (router.query.registered === 'true') {
-      setSuccessMessage('Account created successfully! Please sign in.');
+      setSuccessMessage('Account created. An admin must activate it and add credits before chat is available.');
     }
     if (router.query.reset === 'true') {
       setSuccessMessage('Password reset email sent! Check your inbox.');
