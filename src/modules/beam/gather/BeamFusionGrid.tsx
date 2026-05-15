@@ -137,7 +137,7 @@ export function BeamFusionGrid(props: {
             </Typography>
 
           </Box> : (
-            <Typography level='body-sm' color='neutral'>
+            <Typography level='body-sm' color='neutral' sx={{ opacity: 0.8 }}>
               Waiting for responses from the beams above. Add a merge once two or more are ready.
             </Typography>
           )}

@@ -14,25 +14,16 @@ const DEV_DEBUG_GROQ_MODELS = Release.IsNodeDevBuild; // not in staging to reduc
  * Groq models.
  * - models list: https://console.groq.com/docs/models
  * - pricing: https://groq.com/pricing/
- * - updated: 2026-02-18
+ * - updated: 2026-04-16
  */
 const _knownGroqModels: ManualMappings = [
 
   // Preview Models
   {
     isPreview: true,
-    idPrefix: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-    label: 'Llama 4 Maverick · 17B × 128E (Preview)',
-    description: 'Llama 4 Maverick 17B MoE with 128 experts (400B total params), native multimodal with vision support. 131K context, 8K max output. ~600 t/s on Groq.',
-    contextWindow: 131072,
-    maxCompletionTokens: 8192,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    chatPrice: { input: 0.20, output: 0.60 },
-  },
-  {
-    isPreview: true,
     idPrefix: 'meta-llama/llama-4-scout-17b-16e-instruct',
     label: 'Llama 4 Scout · 17B × 16E (Preview)',
+    pubDate: '20250405',
     description: 'Llama 4 Scout 17B MoE with 16 experts (109B total params), native multimodal with vision support. 131K context, 8K max output. ~750 t/s on Groq.',
     contextWindow: 131072,
     maxCompletionTokens: 8192,
@@ -43,6 +34,7 @@ const _knownGroqModels: ManualMappings = [
     isPreview: true,
     idPrefix: 'qwen/qwen3-32b',
     label: 'Qwen 3 · 32B (Preview)',
+    pubDate: '20250428',
     description: 'Qwen3 32B by Alibaba Cloud. Supports thinking/non-thinking modes, 100+ languages. 131K context, 40K max output. ~400 t/s on Groq.',
     contextWindow: 131072,
     maxCompletionTokens: 40960,
@@ -53,22 +45,35 @@ const _knownGroqModels: ManualMappings = [
     isPreview: true,
     idPrefix: 'moonshotai/kimi-k2-instruct-0905',
     label: 'Kimi K2 Instruct 0905 (Preview)',
+    pubDate: '20250905',
     description: 'Kimi K2 1T MoE model (32B active, 384 experts). Advanced agentic coding. 262K context, 16K max output. ~200 t/s on Groq.',
     contextWindow: 262144,
     maxCompletionTokens: 16384,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    chatPrice: { input: 1.00, output: 3.00 },
+    chatPrice: { input: 1.00, output: 3.00, cache: { cType: 'oai-ac', read: 0.50 } },
   },
+  // Deprecated redirects (still returned by API)
+  {
+    idPrefix: 'moonshotai/kimi-k2-instruct',
+    label: 'Kimi K2 Instruct (Deprecated)',
+    pubDate: '20250711',
+    symLink: 'moonshotai/kimi-k2-instruct-0905',
+    contextWindow: 131072, // API returns 131K (vs 262K for the 0905 version)
+    maxCompletionTokens: 16384,
+  },
+
   // REMOVED MODELS (no longer returned by API):
   // - (Jan 21, 2026) qwen-qwq-32b, qwen-2.5-32b, qwen-2.5-coder-32b
   // - (Jan 21, 2026) deepseek-r1-distill-llama-70b, deepseek-r1-distill-qwen-32b
-  // - (Feb 18, 2026) moonshotai/kimi-k2-instruct (deprecated redirect, removed from docs)
+  // - (Feb 18, 2026) moonshotai/kimi-k2-instruct (deprecated redirect, removed from docs; still returned by API -> symlink above)
+  // - (Apr 02, 2026) meta-llama/llama-4-maverick-17b-128e-instruct (removed from docs and pricing)
 
 
   // Production Models - Compound Systems (pass-through pricing to underlying models)
   {
     idPrefix: 'groq/compound',
     label: 'Compound (Agentic System)',
+    pubDate: '20250904',
     description: 'Groq agentic AI with web search, code execution, browser automation. Uses GPT-OSS 120B, Llama 4 Scout, Llama 3.3 70B. Pricing based on underlying model usage.',
     contextWindow: 131072,
     maxCompletionTokens: 8192,
@@ -78,6 +83,7 @@ const _knownGroqModels: ManualMappings = [
   {
     idPrefix: 'groq/compound-mini',
     label: 'Compound Mini (Agentic System)',
+    pubDate: '20250904',
     description: 'Lighter Groq agentic AI with web search, code execution. Pricing based on underlying model usage.',
     contextWindow: 131072,
     maxCompletionTokens: 8192,
@@ -89,16 +95,18 @@ const _knownGroqModels: ManualMappings = [
   {
     idPrefix: 'openai/gpt-oss-120b',
     label: 'GPT OSS 120B',
+    pubDate: '20250805',
     description: 'OpenAI flagship open-weight MoE (120B total, 5.1B active). Reasoning, browser search, code execution. 131K context, 65K max output. ~500 t/s on Groq.',
     contextWindow: 131072,
     maxCompletionTokens: 65536,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    chatPrice: { input: 0.15, output: 0.60 },
+    chatPrice: { input: 0.15, output: 0.60, cache: { cType: 'oai-ac', read: 0.075 } },
   },
   {
     isPreview: true,
     idPrefix: 'openai/gpt-oss-safeguard-20b',
     label: 'GPT OSS Safeguard 20B (Preview)',
+    pubDate: '20251029',
     description: 'OpenAI safety classification model (20B MoE). Purpose-built for content moderation with Harmony response format. 131K context, 65K max output. ~1000 t/s on Groq.',
     contextWindow: 131072,
     maxCompletionTokens: 65536,
@@ -108,11 +116,12 @@ const _knownGroqModels: ManualMappings = [
   {
     idPrefix: 'openai/gpt-oss-20b',
     label: 'GPT OSS 20B',
+    pubDate: '20250805',
     description: 'OpenAI efficient open-weight MoE (20B total, 3.6B active). Tool use, browser search, code execution. 131K context, 65K max output. ~1000 t/s on Groq.',
     contextWindow: 131072,
     maxCompletionTokens: 65536,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    chatPrice: { input: 0.075, output: 0.30 },
+    chatPrice: { input: 0.075, output: 0.30, cache: { cType: 'oai-ac', read: 0.0375 } },
   },
 
   // Production Models - Meta
@@ -120,6 +129,7 @@ const _knownGroqModels: ManualMappings = [
   {
     idPrefix: 'llama-3.3-70b-versatile',
     label: 'Llama 3.3 · 70B Versatile',
+    pubDate: '20241206',
     description: 'Meta Llama 3.3 (70B params) with GQA. Strong reasoning, coding, multilingual. 131K context, 32K max output. ~280 t/s on Groq.',
     contextWindow: 131072,
     maxCompletionTokens: 32768,
@@ -129,6 +139,7 @@ const _knownGroqModels: ManualMappings = [
   {
     idPrefix: 'llama-3.1-8b-instant',
     label: 'Llama 3.1 · 8B Instant',
+    pubDate: '20240723',
     description: 'Meta Llama 3.1 (8B params). Fast, cost-effective for high-volume tasks. 131K context and max output. ~560 t/s on Groq.',
     contextWindow: 131072,
     maxCompletionTokens: 131072,
@@ -136,7 +147,7 @@ const _knownGroqModels: ManualMappings = [
     chatPrice: { input: 0.05, output: 0.08 },
   },
 
-  // (Feb 18, 2026) allam-2-7b (SDAIA) removed from docs and pricing
+  // (Feb 18, 2026) allam-2-7b (SDAIA) removed from docs and pricing, still returned by API -> deny list
 
 ];
 
@@ -147,6 +158,7 @@ const groqDenyList: string[] = [
   'playai-tts',
   'canopylabs/orpheus', // TTS models
   'llama-prompt-guard', // Text classification models
+  'allam-2-7b', // SDAIA model, removed from docs and pricing (Feb 2026), API still returns it
 ];
 
 export function groqModelFilter(model: { id: string }): boolean {

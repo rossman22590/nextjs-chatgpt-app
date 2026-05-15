@@ -5,8 +5,6 @@ import TimeAgo from 'react-timeago';
 import type { SxProps } from '@mui/joy/styles/types';
 import { Box, ButtonGroup, CircularProgress, Divider, IconButton, ListDivider, ListItem, ListItemDecorator, MenuItem, Switch, Tooltip, Typography, useColorScheme } from '@mui/joy';
 import { ClickAwayListener, Popper } from '@mui/base';
-import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
-import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -17,7 +15,7 @@ import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import ForkRightIcon from '@mui/icons-material/ForkRight';
 import FormatBoldIcon from '@mui/icons-material/FormatBold';
 import FormatPaintOutlinedIcon from '@mui/icons-material/FormatPaintOutlined';
-import InsertLinkIcon from '@mui/icons-material/InsertLink';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
@@ -31,16 +29,19 @@ import VerticalAlignBottomIcon from '@mui/icons-material/VerticalAlignBottom';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
+import type { AixReattachMode } from '~/modules/aix/client/aix.client';
 import { ModelVendorAnthropic } from '~/modules/llms/vendors/anthropic/anthropic.vendor';
 
 import { AnthropicIcon } from '~/common/components/icons/vendors/AnthropicIcon';
 import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
 import { CloseablePopup } from '~/common/components/CloseablePopup';
-import { DMessage, DMessageId, DMessageUserFlag, DMetaReferenceItem, MESSAGE_FLAG_AIX_SKIP, MESSAGE_FLAG_NOTIFY_COMPLETE, MESSAGE_FLAG_STARRED, MESSAGE_FLAG_VND_ANT_CACHE_AUTO, MESSAGE_FLAG_VND_ANT_CACHE_USER, messageFragmentsReduceText, messageHasUserFlag } from '~/common/stores/chat/chat.message';
+import { DMessage, DMessageGenerator, DMessageId, DMessageUserFlag, DMetaReferenceItem, MESSAGE_FLAG_AIX_SKIP, MESSAGE_FLAG_NOTIFY_COMPLETE, MESSAGE_FLAG_STARRED, MESSAGE_FLAG_VND_ANT_CACHE_AUTO, MESSAGE_FLAG_VND_ANT_CACHE_USER, messageFragmentsReduceText, messageHasUserFlag } from '~/common/stores/chat/chat.message';
 import { KeyStroke } from '~/common/components/KeyStroke';
 import { MarkHighlightIcon } from '~/common/components/icons/MarkHighlightIcon';
+import { PhTreeStructure } from '~/common/components/icons/phosphor/PhTreeStructure';
 import { PhVoice } from '~/common/components/icons/phosphor/PhVoice';
 import { Release } from '~/common/app.release';
+import { StarredState } from '~/common/components/StarIcons';
 import { TooltipOutlined } from '~/common/components/TooltipOutlined';
 import { adjustContentScaling, themeScalingMap, themeZIndexChatBubble } from '~/common/app.theme';
 import { avatarIconSx, makeMessageAvatarIcon, messageBackground, useMessageAvatarLabel } from '~/common/util/dMessageUtils';
@@ -53,6 +54,7 @@ import { BlockOpContinue } from './BlockOpContinue';
 import { BlockOpOptions, optionsExtractFromFragments_dangerModifyFragment } from './BlockOpOptions';
 import { BlockOpUpstreamResume } from './BlockOpUpstreamResume';
 import { ChatMessageEditAttachments, type EditModeAttachmentsHandle } from './ChatMessageEditAttachments';
+import { ChatMessageInfoPopup } from './ChatMessageInfoPopup';
 import { ContentFragments } from './fragments-content/ContentFragments';
 import { DocumentAttachmentFragments } from './fragments-attachment-doc/DocumentAttachmentFragments';
 import { ImageAttachmentFragments } from './fragments-attachment-image/ImageAttachmentFragments';
@@ -160,6 +162,10 @@ export function ChatMessage(props: {
   onMessageBeam?: (messageId: string) => Promise<void>,
   onMessageBranch?: (messageId: string) => void,
   onMessageContinue?: (messageId: string, continueText: null | string) => void,
+  onMessageUpstreamResume?: (generator: DMessageGenerator, messageId: string, mode: AixReattachMode) => Promise<void>,
+  onMessageUpstreamDetach?: (messageId: string) => void,
+  onMessageUpstreamDelete?: (generator: DMessageGenerator, messageId: string) => Promise<void>,
+  upstreamResumeMode?: AixReattachMode, // set by parent while a resume is in flight on this message
   onMessageDelete?: (messageId: string) => void,
   onMessageFragmentAppend?: (messageId: DMessageId, fragment: DMessageFragment) => void
   onMessageFragmentDelete?: (messageId: DMessageId, fragmentId: DMessageFragmentId) => void,
@@ -180,6 +186,7 @@ export function ChatMessage(props: {
   const [contextMenuAnchor, setContextMenuAnchor] = React.useState<HTMLElement | null>(null);
   const [opsMenuAnchor, setOpsMenuAnchor] = React.useState<HTMLElement | null>(null);
   const [textContentEditState, setTextContentEditState] = React.useState<ChatMessageTextPartEditState | null>(null);
+  const [showInfoModal, setShowInfoModal] = React.useState(false);
   const attachmentsEditRef = React.useRef<EditModeAttachmentsHandle>(null);
 
   // external state
@@ -221,7 +228,6 @@ export function ChatMessage(props: {
     interleavedFragments,   // Reasoning, Placeholders, Text, Code, Tools (interleaved in temporal order)
     imageAttachments,       // Stamp-sized Images
     nonImageAttachments,    // Document Attachments, likely the User dropped them in
-    lastFragmentIsError,
   } = useFragmentBuckets(messageFragments);
 
   const fragmentFlattenedText = React.useMemo(() => messageFragmentsReduceText(messageFragments), [messageFragments]);
@@ -243,7 +249,7 @@ export function ChatMessage(props: {
   // const wordsDiff = useWordsDifference(textSubject, props.diffPreviousText, showDiff);
 
 
-  const { onMessageAssistantFrom, onMessageDelete, onMessageFragmentAppend, onMessageFragmentDelete, onMessageFragmentReplace, onMessageContinue } = props;
+  const { onMessageAssistantFrom, onMessageDelete, onMessageFragmentAppend, onMessageFragmentDelete, onMessageFragmentReplace, onMessageContinue, onMessageUpstreamResume, onMessageUpstreamDetach, onMessageUpstreamDelete } = props;
 
   const handleFragmentNew = React.useCallback(() => {
     onMessageFragmentAppend?.(messageId, createTextContentFragment(''));
@@ -260,6 +266,20 @@ export function ChatMessage(props: {
   const handleMessageContinue = React.useCallback((continueText: null | string) => {
     onMessageContinue?.(messageId, continueText);
   }, [messageId, onMessageContinue]);
+
+  const handleUpstreamResume = React.useCallback((mode: AixReattachMode) => {
+    if (!messageGenerator) return;
+    return onMessageUpstreamResume?.(messageGenerator, messageId, mode);
+  }, [messageGenerator, messageId, onMessageUpstreamResume]);
+
+  const handleUpstreamDetach = React.useCallback(() => {
+    onMessageUpstreamDetach?.(messageId);
+  }, [messageId, onMessageUpstreamDetach]);
+
+  const handleUpstreamDelete = React.useCallback(() => {
+    if (!messageGenerator) return;
+    return onMessageUpstreamDelete?.(messageGenerator, messageId);
+  }, [messageGenerator, messageId, onMessageUpstreamDelete]);
 
 
   // Text Editing
@@ -358,6 +378,13 @@ export function ChatMessage(props: {
   const handleOpsToggleStarred = React.useCallback(() => {
     onMessageToggleUserFlag?.(messageId, MESSAGE_FLAG_STARRED);
   }, [messageId, onMessageToggleUserFlag]);
+
+  const handleOpsShowInfo = React.useCallback(() => {
+    setOpsMenuAnchor(null);
+    setShowInfoModal(true);
+  }, []);
+
+  const handleInfoClose = React.useCallback(() => setShowInfoModal(false), []);
 
   const handleOpsToggleNotifyComplete = React.useCallback(() => {
     // also remember the preference, for auto-setting flags by the persona
@@ -945,13 +972,15 @@ export function ChatMessage(props: {
             />
           )}
 
-          {/* Upstream Resume... */}
-          {props.isBottom && fromAssistant && lastFragmentIsError && messageGenerator?.upstreamHandle?.responseId && (
+          {/* Upstream Resume - shows whenever there's a stored handle (incl. post-reload, and while streaming so Stop can cancel the upstream run) */}
+          {props.isBottom && fromAssistant && messageGenerator?.upstreamHandle && (!!onMessageUpstreamResume || !!onMessageUpstreamDelete) && (
             <BlockOpUpstreamResume
               upstreamHandle={messageGenerator.upstreamHandle}
-              onResume={console.error}
-              onCancel={console.error}
-              onDelete={console.error}
+              pending={messagePendingIncomplete}
+              inFlightMode={props.upstreamResumeMode}
+              onResume={onMessageUpstreamResume ? handleUpstreamResume : undefined}
+              onDetach={onMessageUpstreamDetach ? handleUpstreamDetach : undefined}
+              onDelete={onMessageUpstreamDelete ? handleUpstreamDelete : undefined}
             />
           )}
 
@@ -963,6 +992,13 @@ export function ChatMessage(props: {
               onContinue={handleMessageContinue}
             />
           )}
+
+          {/* Char & Word count */}
+          {/*{!zenMode && !isEditingText && !messagePendingIncomplete && fragmentFlattenedText.length > 0 && (*/}
+          {/*  <Typography level='body-xs' sx={{ mx: 1.5, mt: 0.5, textAlign: fromAssistant ? 'left' : 'right', opacity: 0.5 }}>*/}
+          {/*    {fragmentFlattenedText.length.toLocaleString()} chars · {(fragmentFlattenedText.match(/\S+/g) || []).length.toLocaleString()} words*/}
+          {/*  </Typography>*/}
+          {/*)}*/}
 
         </Box>
 
@@ -1033,18 +1069,15 @@ export function ChatMessage(props: {
             {/* Starred */}
             {!!onMessageToggleUserFlag && (
               <MenuItem onClick={handleOpsToggleStarred} sx={{ flexGrow: 0, px: 1 }}>
-                <Tooltip disableInteractive title={!isUserStarred ? 'Link message - use @ to refer to it from another chat' : 'Remove link'}>
-                  {isUserStarred
-                    ? <AlternateEmailIcon color='primary' sx={{ fontSize: 'xl' }} />
-                    : <InsertLinkIcon sx={{ rotate: '45deg' }} />
-                  }
-                  {/*{isUserStarred*/}
-                  {/*  ? <StarRoundedIcon color='primary' sx={{ fontSize: 'xl2' }} />*/}
-                  {/*  : <StarOutlineRoundedIcon sx={{ fontSize: 'xl2' }} />*/}
-                  {/*}*/}
+                <Tooltip disableInteractive title={!isUserStarred ? 'Star message - use @ to refer to it from another chat' : 'Remove star'}>
+                  <StarredState isStarred={isUserStarred} />
                 </Tooltip>
               </MenuItem>
             )}
+            {/* Info */}
+            <MenuItem onClick={handleOpsShowInfo} sx={{ flexGrow: 0, px: 1 }}>
+              <InfoOutlinedIcon sx={{ fontSize: 'xl' }} />
+            </MenuItem>
           </Box>
 
           {/* Notify Complete */}
@@ -1107,7 +1140,7 @@ export function ChatMessage(props: {
           {!!props.onTextDiagram && <ListDivider />}
           {!!props.onTextDiagram && (
             <MenuItem onClick={handleOpsDiagram} disabled={!couldDiagram}>
-              <ListItemDecorator><AccountTreeOutlinedIcon /></ListItemDecorator>
+              <ListItemDecorator><PhTreeStructure /></ListItemDecorator>
               Auto-Diagram ...
             </MenuItem>
           )}
@@ -1237,7 +1270,7 @@ export function ChatMessage(props: {
               {/* Intelligent functions */}
               {!!props.onTextDiagram && <Tooltip disableInteractive arrow placement='top' title={couldDiagram ? 'Auto-Diagram...' : 'Too short to Auto-Diagram'}>
                 <IconButton aria-label={couldDiagram ? 'Auto-diagram' : 'Auto-diagram (selection too short)'} color='success' onClick={couldDiagram ? handleOpsDiagram : undefined}>
-                  <AccountTreeOutlinedIcon sx={{ color: couldDiagram ? 'primary' : 'neutral.plainDisabledColor' }} />
+                  <PhTreeStructure sx={{ color: couldDiagram ? 'primary' : 'neutral.plainDisabledColor' }} />
                 </IconButton>
               </Tooltip>}
               {!!props.onTextImagine && <Tooltip disableInteractive arrow placement='top' title='Auto-Draw'>
@@ -1259,6 +1292,14 @@ export function ChatMessage(props: {
                 </IconButton>
               </Tooltip>
 
+              {/* Selection char & word count */}
+              {!!selText && <Divider />}
+              {!!selText && (
+                <Typography level='body-xs' sx={{ px: 1, whiteSpace: 'nowrap' }}>
+                  {selText.length.toLocaleString()}c · {(selText.match(/\S+/g) || []).length.toLocaleString()}w
+                </Typography>
+              )}
+
             </ButtonGroup>
           </ClickAwayListener>
         </Popper>
@@ -1279,7 +1320,7 @@ export function ChatMessage(props: {
           </MenuItem>
           {!!props.onTextDiagram && <ListDivider />}
           {!!props.onTextDiagram && <MenuItem onClick={handleOpsDiagram} disabled={!couldDiagram || props.isImagining}>
-            <ListItemDecorator><AccountTreeOutlinedIcon /></ListItemDecorator>
+            <ListItemDecorator><PhTreeStructure /></ListItemDecorator>
             Auto-Diagram ...
           </MenuItem>}
           {!!props.onTextImagine && <MenuItem onClick={handleOpsImagine} disabled={!couldImagine || props.isImagining}>
@@ -1291,6 +1332,16 @@ export function ChatMessage(props: {
             Speak
           </MenuItem>}
         </CloseablePopup>
+      )}
+
+
+      {/* Message Info Modal */}
+      {showInfoModal && (
+        <ChatMessageInfoPopup
+          open
+          onClose={handleInfoClose}
+          message={props.message}
+        />
       )}
 
     </Box>

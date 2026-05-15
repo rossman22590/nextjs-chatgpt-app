@@ -38,7 +38,6 @@ import { getModelParameterValueWithFallback } from '~/common/stores/llms/llms.pa
 import { launchAppCall, removeQueryParam, useRouterQuery } from '~/common/app.routes';
 import { lineHeightTextareaMd, themeBgAppChatComposer } from '~/common/app.theme';
 import { optimaOpenPreferences } from '~/common/layout/optima/useOptima';
-import { platformAwareKeystrokes } from '~/common/components/KeyStroke';
 import { supportsCameraCapture } from '~/common/components/camera/useCameraCapture';
 import { supportsScreenCapture } from '~/common/util/screenCaptureUtils';
 import { useAttachHandler_CameraOpen, useAttachHandler_Files, useAttachHandler_PasteIntercept, useAttachHandler_ScreenCapture, useAttachHandler_UrlWebLinks } from '~/common/attachment-drafts/attachment-sources/useAttachmentSourceHandlers';
@@ -140,8 +139,7 @@ export function Composer(props: {
   })));
   const timeToShowTips = useLogicSherpaStore(state => state.usageCount >= SHOW_TIPS_AFTER_RELOADS);
   const { novel: explainShiftEnter, touch: touchShiftEnter } = useUICounter('composer-shift-enter');
-  const { novel: explainAltEnter, touch: touchAltEnter } = useUICounter('composer-alt-enter');
-  const { novel: explainCtrlEnter, touch: touchCtrlEnter } = useUICounter('composer-ctrl-enter');
+
   const [startupText, setStartupText] = useComposerStartupText();
   const enterIsNewline = useUIPreferencesStore(state => state.enterIsNewline);
   const composerQuickButton = useUIPreferencesStore(state => state.composerQuickButton);
@@ -170,8 +168,8 @@ export function Composer(props: {
   const chatLLMSupportsImages = !!props.chatLLM?.interfaces?.includes(LLM_IF_OAI_Vision);
 
   // don't load URLs if the user is typing a command or there's no capability
-  const hasComposerBrowseCapability = useBrowseCapability().inComposer;
-  const enableLoadURLsInComposer = hasComposerBrowseCapability && !composeText.startsWith('/');
+  const browseCapability = useBrowseCapability();
+  const enableLoadURLsInComposer = browseCapability.inComposer && !composeText.startsWith('/');
 
   // user message for attachments
   const { onConversationBeamEdit, onConversationsImportFromFiles } = props;
@@ -548,16 +546,14 @@ export function Composer(props: {
       // Alt (Windows) or Option (Mac) + Enter: append the message instead of sending it
       if (e.altKey && !e.metaKey && !e.ctrlKey) {
         if (await handleSendAction('append-user', composeText)) // 'alt+enter' -> write
-          touchAltEnter();
+          e.stopPropagation();
         return e.preventDefault();
       }
 
       // Ctrl (Windows) or Command (Mac) + Enter: send for beaming
       if (e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (await handleSendAction('beam-content', composeText)) { // 'ctrl+enter' -> beam
-          touchCtrlEnter();
+        if (await handleSendAction('beam-content', composeText)) // 'ctrl+enter' -> beam
           e.stopPropagation();
-        }
         return e.preventDefault();
       }
 
@@ -571,7 +567,7 @@ export function Composer(props: {
       }
     }
 
-  }, [actileInterceptKeydown, assistantAbortible, chatExecuteMode, composeText, enterIsNewline, handleSendAction, touchAltEnter, touchCtrlEnter, touchShiftEnter]);
+  }, [actileInterceptKeydown, assistantAbortible, chatExecuteMode, composeText, enterIsNewline, handleSendAction, touchShiftEnter]);
 
 
   // Focus mode
@@ -662,6 +658,7 @@ export function Composer(props: {
 
   const showChatInReferenceTo = !!inReferenceTo?.length;
   const showChatExtras = isText && !showChatInReferenceTo && !assistantAbortible && composerQuickButton !== 'off';
+  const speechMayWork = browserSpeechRecognitionCapability().mayWork;
 
   const sendButtonVariant: VariantProp = (isAppend || (isMobile && isTextBeam)) ? 'outlined' : 'solid';
 
@@ -705,10 +702,6 @@ export function Composer(props: {
   if (isDesktop && timeToShowTips && !isDraw) {
     if (explainShiftEnter)
       textPlaceholder += !enterIsNewline ? '\n\nTip: Shift + Enter adds a new line' : '\n\nTip: Shift + Enter sends';
-      // else if (explainAltEnter)
-    //   textPlaceholder += platformAwareKeystrokes('\n\nTip: Alt + Enter appends the message');
-    else if (explainCtrlEnter)
-      textPlaceholder += platformAwareKeystrokes('\n\nTip: Ctrl + Enter beams');
   }
 
   const stableGridSx: SxProps = React.useMemo(() => ({
@@ -779,7 +772,7 @@ export function Composer(props: {
                 {showChatAttachments === true && (
                   <AttachmentSourcesMemo
                     mode='menu-compact'
-                    canBrowse={hasComposerBrowseCapability}
+                    canBrowse={browseCapability.mayWork}
                     hasScreenCapture={supportsScreenCapture}
                     hasCamera={supportsCameraCapture()}
                     onlyImages={false /* because if yes, we only show the attach files above */}
@@ -807,7 +800,7 @@ export function Composer(props: {
                   mode={!labsComposerAttachmentsInline ? 'menu-rich' : 'inline-buttons'}
                   color={!labsComposerAttachmentsInline ? (showTint || 'neutral') : showTint}
                   richButtonStandOut={!isText && !isAppend}
-                  canBrowse={hasComposerBrowseCapability}
+                  canBrowse={browseCapability.mayWork}
                   hasScreenCapture={supportsScreenCapture}
                   hasCamera={supportsCameraCapture()}
                   onlyImages={showChatAttachments === 'only-images'}
@@ -997,7 +990,7 @@ export function Composer(props: {
 
                 {/* [mobile] bottom-corner secondary button */}
                 {isMobile && (showChatExtras
-                    ? (composerQuickButton === 'call'
+                    ? (composerQuickButton === 'call' && speechMayWork
                       ? <ButtonCallMemo isMobile disabled={noConversation || noLLM} onClick={handleCallClicked} />
                       : <ButtonBeamMemo isMobile disabled={noConversation /*|| noLLM*/} color={beamButtonColor} hasContent={!!composeText} onClick={handleSendTextBeamClicked} />)
                     : isDraw
@@ -1112,8 +1105,8 @@ export function Composer(props: {
               {/* [desktop] secondary bottom-buttons (aligned to bottom for now, and mutually exclusive) */}
               {isDesktop && <Box sx={{ mt: 'auto', display: 'grid', gap: 1 }}>
 
-                {/* [desktop] Call secondary button */}
-                {showChatExtras && <ButtonCallMemo disabled={noConversation || noLLM || assistantAbortible} onClick={handleCallClicked} />}
+                {/* [desktop] Call secondary button - hidden when speech recognition is not available */}
+                {showChatExtras && speechMayWork && <ButtonCallMemo disabled={noConversation || noLLM || assistantAbortible} onClick={handleCallClicked} />}
 
                 {/* [desktop] Draw Options secondary button */}
                 {isDraw && <ButtonOptionsDraw onClick={handleDrawOptionsClicked} />}

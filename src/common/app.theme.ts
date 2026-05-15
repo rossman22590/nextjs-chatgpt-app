@@ -3,7 +3,7 @@ import createCache, { StylisElement, StylisPlugin } from '@emotion/cache';
 import { JetBrains_Mono, Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
 import { extendTheme } from '@mui/joy';
 
-import { animationEnterBelow } from '~/common/util/animUtils';
+import { animationEnterBelow, animationOpacityFadeIn } from '~/common/util/animUtils';
 
 
 // Definitions
@@ -308,9 +308,21 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
     light: {
       palette: {
         primary: lightPrimary,
-        neutral: lightNeutral,
-        text: lightText,
-        background: lightBackground,
+        neutral: {
+          ...lightNeutral,
+          plainColor: 'var(--joy-palette-neutral-800)',
+          solidBg: 'var(--joy-palette-neutral-700)',
+          solidHoverBg: 'var(--joy-palette-neutral-800)',
+        },
+        text: {
+          ...lightText,
+          icon: 'var(--joy-palette-neutral-700)',
+          secondary: 'var(--joy-palette-neutral-800)',
+        },
+        background: {
+          ...lightBackground,
+          backdrop: 'rgba(var(--joy-palette-neutral-darkChannel, 11 13 14) / 0.3333)',
+        },
         divider: buildDivider(lightHex, 'light'),
       },
     },
@@ -468,16 +480,26 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
 
     JoyModal: {
       styleOverrides: {
-        backdrop: !uiComplexityMinimal ? {
-          backdropFilter: 'blur(8px) saturate(120%)',
-        } : {
+        backdrop: uiComplexityMinimal ? {
           backdropFilter: 'none',
+        } : {
+          backdropFilter: 'blur(8px) saturate(120%)',
+          animation: `${animationOpacityFadeIn} 0.16s ease-out`,
         },
-        root: uiComplexityMinimal ? undefined : {
-          '& .agi-animate-enter': {
-            animation: `${animationEnterBelow} 0.2s cubic-bezier(.4,0,.2,1)`,
+      },
+    },
+    JoyModalDialog: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          [theme.breakpoints.down('sm')]: {
+            '--Card-padding': '1rem',
           },
-        },
+          ...(!uiComplexityMinimal && {
+            '& .agi-animate-enter': {
+              animation: `${animationEnterBelow} 0.16s ease-out`,
+            },
+          }),
+        }),
       },
     },
 

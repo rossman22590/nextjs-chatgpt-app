@@ -3,6 +3,7 @@ import type { StateCreator } from 'zustand/vanilla';
 import { AixChatGenerateContent_DMessageGuts, aixChatGenerateContent_DMessage_FromConversation } from '~/modules/aix/client/aix.client';
 
 import type { DLLMId } from '~/common/stores/llms/llms.types';
+import { abortWithReason } from '~/common/util/errorUtils';
 import { agiUuid } from '~/common/util/idUtils';
 import { createDMessageEmpty, DMessage, duplicateDMessage, messageWasInterruptedAtStart } from '~/common/stores/chat/chat.message';
 import { createPlaceholderVoidFragment, DMessageFragment, DMessageFragmentId } from '~/common/stores/chat/chat.fragments';
@@ -60,15 +61,17 @@ function rayScatterStart(ray: BRay, llmId: DLLMId | null, inputHistory: DMessage
 
   const abortController = new AbortController();
 
-  const onMessageUpdated = (incrementalMessage: AixChatGenerateContent_DMessageGuts, completed: boolean) => {
-    const { fragments: incrementalFragments, ...incrementalRest } = incrementalMessage;
+  const onMessageUpdated = (messageOverwriteShallow: AixChatGenerateContent_DMessageGuts, completed: boolean) => {
+
+    // fragments and generator are already immutable (new refs per update) - no deep clone needed
+    const { fragments, ...rest } = messageOverwriteShallow;
+    const hasFragments = !!fragments?.length;
     _rayUpdate(ray.rayId, (ray) => ({
       message: {
         ...ray.message,
-        ...(incrementalFragments?.length ? { fragments: [...incrementalFragments] } : {}),
-        ...incrementalRest,
+        ...(hasFragments ? { fragments, updated: Date.now() } : {}),
+        ...rest,
         ...(completed ? { pendingIncomplete: undefined } : {}), // clear the pending flag once the message is complete
-        ...(incrementalFragments?.length ? { updated: Date.now() } : {}), // refresh the update timestamp once the content comes
       },
     }));
   };
@@ -86,10 +89,10 @@ function rayScatterStart(ray: BRay, llmId: DLLMId | null, inputHistory: DMessage
       const clearFragments = messageWasInterruptedAtStart(status.lastDMessage);
       _rayUpdate(ray.rayId, {
         ...(clearFragments && { message: createDMessageEmpty('assistant') }),
-        status: (status.outcome === 'success') ? 'success'
+        status: (status.outcome === 'completed') ? 'success'
           : (status.outcome === 'aborted') ? 'stopped'
-            : (status.outcome === 'errored') ? 'error' : 'empty',
-        scatterIssue: status.errorMessage || undefined,
+            : (status.outcome === 'failed') ? 'error' : 'empty',
+        scatterIssue: status.outcomeFailedMessage || undefined,
         genAbortController: undefined,
       });
     })
@@ -118,7 +121,7 @@ function rayScatterStart(ray: BRay, llmId: DLLMId | null, inputHistory: DMessage
 }
 
 function rayScatterStop(ray: BRay): BRay {
-  ray.genAbortController?.abort('Beam Stopped');
+  abortWithReason(ray.genAbortController, 'Beam Stopped');
   return {
     ...ray,
     ...(ray.status === 'scattering' ? { status: 'stopped' } : {}),

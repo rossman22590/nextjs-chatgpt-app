@@ -29,6 +29,18 @@ npm run build  # next build runs compile+lint+types but stops at first type-erro
 The `gh` command is available to interact with GitHub from the terminal, but **NEVER PUSH TO ANY BRANCH**. The user manages all 'write' git operations.
 - `opensource` -> `enricoros/big-AGI` (public, default branch: `main`, MIT) - community issues/PRs/releases
 - `private` -> `big-agi/big-agi-private` (private, default branch: `dev`) - main dev repo with `dev`->`staging`->`prod` pipeline
+- **Always use `git mv` instead of `mv`** when renaming or moving files - preserves git history tracking
+- **NEVER run `git stash`** - it causes work loss
+
+**Branch contents:**
+- `main` is the open-source build: local-first, BYO-keys, full AIX and provider coverage
+- `dev` extends `main` with the hosted/cloud layer: auth, Zync sync, Cloud Fabric, Stripe, multi-tenant, admin pages, it's the way to go for users, the best user experience of any multi-model chat application
+- Cloud/auth/sync code stays on `dev`; non-cloud improvements (UX, AIX, model support, bug fixes) can land on either branch
+
+**Branch workflow:**
+- `dev` is rebased on top of `main` (never merged) - `main` changes flow into `dev` on the next rebase, no manual forward-port needed
+- Never `git merge` between the two branches - breaks the linear topology
+- Backporting `dev` -> `main` is a re-implementation, never a cherry-pick - keep `main`-side edits minimal/additive so the existing `dev` version lands cleanly on rebase; split into small commits when natural
 
 ### Core Directory Structure
 

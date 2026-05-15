@@ -13,7 +13,6 @@ import { FormSliderControl } from '~/common/components/forms/FormSliderControl';
 import { FormSwitchControl } from '~/common/components/forms/FormSwitchControl';
 import { FormTextField } from '~/common/components/forms/FormTextField';
 import { InlineError } from '~/common/components/InlineError';
-import { useUIComplexityMode } from '~/common/stores/store-ui';
 import { webGeolocationRequest } from '~/common/util/webGeolocationUtils';
 
 import { AnthropicSkillsConfig } from './AnthropicSkillsConfig';
@@ -26,6 +25,7 @@ const _UNSPECIFIED = '_UNSPECIFIED' as const;
 
 const _antEffortOptions = [
   { value: 'max', label: 'Max', description: 'Deepest reasoning' } as const,
+  { value: 'xhigh', label: 'X-High', description: 'Extended' } as const,
   { value: 'high', label: 'High', description: 'Maximum capability' } as const,
   { value: 'medium', label: 'Medium', description: 'Balanced' } as const,
   { value: 'low', label: 'Low', description: 'Most efficient' } as const,
@@ -51,6 +51,7 @@ const _oaiEffortOptions = [
 ] as const;
 
 const _miscEffortOptions = [
+  { value: 'max', label: 'Max', description: 'Hardest thinking' } as const,
   { value: 'high', label: 'On', description: 'Multi-step reasoning' } as const,
   { value: 'none', label: 'Off', description: 'Disable thinking mode' } as const,
   { value: _UNSPECIFIED, label: 'Default', description: 'Model Default' } as const,
@@ -120,6 +121,11 @@ const _geminiGoogleSearchOptions = [
   { value: '1y', label: 'Last Year', description: 'Results since last year' },
   // { value: '6m', label: 'Last 6 Months', description: 'Results from last 6 months' },
   { value: _UNSPECIFIED, label: 'Off', description: 'Default (disabled)' },
+] as const;
+
+const _geminiAgentVizOptions = [
+  { value: _UNSPECIFIED, label: 'Auto', description: 'Default - agent may include charts/images' },
+  { value: 'off', label: 'Off', description: 'Text only (better when merging multiple reports)' },
 ] as const;
 
 const _geminiMediaResolutionOptions = [
@@ -208,10 +214,6 @@ export function LLMParametersEditor(props: {
   simplified?: boolean,
 }) {
 
-  // external state
-  const isExtra = useUIComplexityMode() === 'extra';
-
-
   // registry (const) values
   const defAntTB = DModelParameterRegistry['llmVndAntThinkingBudget'];
   const defGemTB = DModelParameterRegistry['llmVndGeminiThinkingBudget'];
@@ -242,11 +244,13 @@ export function LLMParametersEditor(props: {
     llmVndAntInfSpeed,
     llmVndAntSkills,
     llmVndAntThinkingBudget,
+    llmVndAntWebDynamic,
     llmVndAntWebFetch,
     llmVndAntWebFetchMaxUses,
     llmVndAntWebSearch,
     llmVndAntWebSearchMaxUses,
     llmVndGemEffort,
+    llmVndGeminiAgentViz,
     llmVndGeminiAspectRatio,
     llmVndGeminiCodeExecution,
     llmVndGeminiGoogleSearch,
@@ -529,6 +533,20 @@ export function LLMParametersEditor(props: {
       />
     </Box>}
 
+    {showParam('llmVndAntWebDynamic') && (
+      <FormSwitchControl
+        title='Web Dynamic Filtering'
+        description='Code-based web refinement'
+        tooltip='Use dynamic filtering for search/fetch - more accurate, reduces tokens (Opus/Sonnet 4.6+, not ZDR-eligible)'
+        disabled={llmVndAntWebSearch !== 'auto' && llmVndAntWebFetch !== 'auto'}
+        checked={!!llmVndAntWebDynamic}
+        onChange={checked => {
+          if (!checked) onRemoveParameter('llmVndAntWebDynamic');
+          else onChangeParameter({ llmVndAntWebDynamic: true });
+        }}
+      />
+    )}
+
     {showParam('llmVndAnt1MContext') && (
       <FormSwitchControl
         title='1M Context Window (Beta)'
@@ -556,7 +574,7 @@ export function LLMParametersEditor(props: {
       />
     )}
 
-    {isExtra && showParam('llmVndAntSkills') && (
+    {showParam('llmVndAntSkills') && (
       <AnthropicSkillsConfig llmVndAntSkills={llmVndAntSkills} onChangeParameter={onChangeParameter} onRemoveParameter={onRemoveParameter} />
     )}
 
@@ -672,6 +690,19 @@ export function LLMParametersEditor(props: {
           else onChangeParameter({ llmVndGeminiMediaResolution: value });
         }}
         options={_geminiMediaResolutionOptions}
+      />
+    )}
+
+    {showParam('llmVndGeminiAgentViz') && (
+      <FormSelectControl
+        title='Visualizations'
+        tooltip='Charts and images in Deep Research reports. Disable for text-only output (helpful when merging multiple reports).'
+        value={llmVndGeminiAgentViz ?? _UNSPECIFIED}
+        onChange={(value) => {
+          if (value === _UNSPECIFIED || !value) onRemoveParameter('llmVndGeminiAgentViz');
+          else onChangeParameter({ llmVndGeminiAgentViz: value });
+        }}
+        options={_geminiAgentVizOptions}
       />
     )}
 

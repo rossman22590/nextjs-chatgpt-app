@@ -23,11 +23,19 @@ Architecture and system documentation is available in the `/kb/` knowledge base,
 - **[design-language.md](design-language.md)** - Theme, typography, color, radius, shadows, shell vars, chat/composer patterns, and usage guidelines
 - **[app-audit-ux-design.md](app-audit-ux-design.md)** - App-wide UX/design audit: aria-labels, theme alignment, auth pages, and remaining follow-ups
 
+#### LLM - Language Model Metadata
+- **[LLM-editorial-control.md](modules/LLM-editorial-pubdate.md)** - Where we have editorial control over per-model metadata vs dynamic discovery; `pubDate` field semantics, propagation chain, resolution rules, per-vendor matrix
+- **[LLM-models-catalog-pipeline.md](modules/LLM-models-catalog-pipeline.md)** - Forward-looking pipeline: extraction script, snapshot artifact, website consumption, future schema extensions
+
+#### LLM - Vendor APIs
+- **[LLM-gemini-interactions.md](modules/LLM-gemini-interactions.md)** - Gemini Interactions API (Deep Research): endpoints, status taxonomy, two retrieval paths (SSE replay vs JSON GET), known failure modes (10-min cuts, zombies), UI surface
+
 ### Systems Documentation
 
 #### Core Platform Systems
 - **[app-routing.md](systems/app-routing.md)** - Next.js routing, provider stack, and display state hierarchy
 - **[LLM-parameters-system.md](systems/LLM-parameters-system.md)** - Language model parameter flow across the system
+- **[LLM-vendor-integration.md](modules/LLM-vendor-integration.md)** - Adding new LLM providers
 
 ### KB Guidelines
 

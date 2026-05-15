@@ -92,7 +92,13 @@ const tooltipCreationTimeSx: SxProps = {
   color: 'text.tertiary',
 };
 
-const tooltipMetricsGridSx: SxProps = {
+function _isToday(timestamp: number): boolean {
+  const now = new Date();
+  const date = new Date(timestamp);
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+}
+
+export const tooltipMetricsGridSx: SxProps = {
   // grid of 2 columns, the first fits the labels, the other expends with the values
   display: 'grid',
   gridTemplateColumns: 'auto 1fr',
@@ -243,7 +249,7 @@ export function useMessageAvatarLabel(
 
   // OPTIMIZATION - THIS COULD BACKFIRE - THE ICON MAY NOT BE UPDATED AS OFTEN AS WE NEED
   // -> we will only trigger updates on: updated, pendingIncomplete changes, name changes
-  // generator will change at every step (due to some structuredClone in AIX); we choose to 'lag' behind it and
+  // generator ref changes during streaming (new ref per update); we 'lag' behind it and
   // refresh this when other variables change
   const laggedGeneratorRef = React.useRef<DMessageGenerator | undefined>(undefined);
   laggedGeneratorRef.current = generator;
@@ -287,8 +293,8 @@ export function useMessageAvatarLabel(
     const modelId = generator.aix?.mId ?? null;
     const vendorId = generator.aix?.vId ?? null;
     const VendorIcon = (vendorId && complexity !== 'minimal') ? llmsGetVendorIcon(vendorId) : null;
-    const metrics = generator.metrics ? _prettyMetrics(generator.metrics, complexity) : null;
-    const stopReason = generator.tokenStopReason ? _prettyTokenStopReason(generator.tokenStopReason, complexity) : null;
+    const metrics = generator.metrics ? prettyMessageMetrics(generator.metrics, complexity) : null;
+    const stopReason = generator.tokenStopReason ? prettyTokenStopReason(generator.tokenStopReason, complexity) : null;
 
     // aix tooltip: more details
     return {
@@ -300,14 +306,18 @@ export function useMessageAvatarLabel(
           {(modelId && complexity === 'extra') && <div>{modelId}</div>}
           {metrics && <div>{metrics}</div>}
           {stopReason && <div>{stopReason}</div>}
-          {complexity === 'extra' && !!created && <Box sx={tooltipCreationTimeSx}>{updated ? 'Updated' : 'Created'} <TimeAgo date={updated || created} />.</Box>}
+          {!!created && <Box sx={tooltipCreationTimeSx}>
+            {(updated && updated !== created) ? 'Updated' : 'Created'}{' '}
+            {_isToday(updated || created) ? <TimeAgo date={updated || created} /> : new Date(updated || created).toLocaleString()}
+          </Box>}
         </Box>
       ),
     };
   }, [complexity, created, generatorName, pendingIncomplete, updated]);
 }
 
-function _prettyMetrics(metrics: DMessageGenerator['metrics'], uiComplexityMode: UIComplexityMode): React.ReactNode {
+/** Renders chat generation metrics as a grid. Exported for reuse in message info popup. */
+export function prettyMessageMetrics(metrics: DMessageGenerator['metrics'], uiComplexityMode: UIComplexityMode): React.ReactNode {
   if (!metrics) return null;
 
   const showWaitingTime = metrics?.dtStart !== undefined && (uiComplexityMode === 'extra' || metrics.dtStart >= 10000);
@@ -382,7 +392,7 @@ function _prettyCostCode(code: MetricsChatGenerateCost_Md['$code']): string | nu
   }
 }
 
-function _prettyTokenStopReason(reason: DMessageGenerator['tokenStopReason'], complexity: UIComplexityMode): string | null {
+export function prettyTokenStopReason(reason: DMessageGenerator['tokenStopReason'], complexity: UIComplexityMode): string | null {
   if (!reason) return null;
   switch (reason) {
     case 'client-abort':
@@ -401,7 +411,7 @@ function _prettyTokenStopReason(reason: DMessageGenerator['tokenStopReason'], co
 
 
 const oaiORegex = /gpt-[345](?:o|\.\d+)?-|o[1345]-|osb-|chatgpt-[45]o?|gpt-5-chat|computer-use-/;
-const geminiRegex = /gemini-|gemma-|learnlm-/;
+const geminiRegex = /gemini-|gemma-|learnlm-|deep-research-|nano-banana-/;
 
 
 /** Pretty name for a chat model ID - VERY HARDCODED - shall use the Avatar Label-style code instead */
@@ -409,6 +419,10 @@ export function prettyShortChatModelName(model: string | undefined): string {
   if (!model) return '';
 
   // TODO: fully reform this function to be using information from the DLLM, rather than this manual mapping
+
+  // [Gemini / Google] short-circuit canonical 'models/' prefix before OpenAI regex, to avoid substring collisions (e.g. '-computer-use-' in 'models/gemini-2.5-computer-use-...')
+  if (model.startsWith('models/'))
+    return _prettyGeminiModelName(model.slice(7));
 
   // [OpenAI]
   let prefixIndex = model.search(oaiORegex);
@@ -428,6 +442,7 @@ export function prettyShortChatModelName(model: string | undefined): string {
       .replace('-realtime', ' Realtime')
       .replace('-search-preview', ' Search')
       .replace('-search', ' Search')
+      .replace('-deep-research', ' Deep Research')
       .replace('-tts', ' TTS')
       .replace('-turbo', ' Turbo')
       // price variants
@@ -457,41 +472,10 @@ export function prettyShortChatModelName(model: string | undefined): string {
   // [Anthropic]
   const prettyAnthropic = _prettyAnthropicModelName(model);
   if (prettyAnthropic) return prettyAnthropic;
-  // [Gemini]
+  // [Gemini / Google] fallback regex path (e.g. openrouter 'google/gemini-...' form); canonical 'models/' path is handled earlier
   prefixIndex = model.search(geminiRegex);
-  if (prefixIndex !== -1) {
-    let cutModel = prefixIndex === -1 ? model : model.slice(prefixIndex);
-    // Check for -NN-NN at the end (e.g., -05-15)
-    let datePattern = '';
-    const dateMatch = cutModel.match(/-(\d{2}-\d{2})$/);
-    if (dateMatch) {
-      datePattern = ' ' + dateMatch[1]; // extract '05-15'
-      cutModel = cutModel.slice(0, cutModel.length - dateMatch[0].length); // remove '-05-15'
-    }
-    const geminiName = cutModel
-      // commercial aliases
-      .replace('gemini-3-pro-image', 'Nano Banana Pro')
-      .replace('gemini-2.5-flash-image', 'Nano Banana')
-      // root changes
-      .replace('non-thinking', '') // NOTE: this is our variant, injected in gemini.models.ts
-      .replaceAll('-', ' ')
-      // products
-      .replace('gemini', 'Gemini')
-      .replace('gemma', 'Gemma')
-      .replace('learnlm', 'LearnLM')
-      // price variants
-      .replace('pro', 'Pro')
-      .replace('flash', 'Flash')
-      // feature variants
-      .replace('robotics er', 'Robotics')
-      .replace('generation', 'Gen')
-      .replace('image', 'Image')
-      .replace('thinking', 'Thinking')
-      .replace('preview', '')
-      .replace('experimental', 'exp')
-      .replace('exp', '(exp)');
-    return geminiName + datePattern;
-  }
+  if (prefixIndex !== -1)
+    return _prettyGeminiModelName(model.slice(prefixIndex));
   // [Deepseek]
   if (model.includes('deepseek-')) {
     // start past the last /, if any
@@ -556,28 +540,63 @@ export function prettyShortChatModelName(model: string | undefined): string {
   return model;
 }
 
-function _prettyAnthropicModelName(modelId: string): string | null {
-  const claudeIndex = modelId.indexOf('claude-');
-  if (claudeIndex === -1) return null; // not a Claude model
+function _prettyGeminiModelName(cutModel: string): string {
+  // strip stable numeric revision suffix: '-001', '-002', ...
+  cutModel = cutModel.replace(/-00\d$/, '');
+  // date suffix: try '-MM-YYYY$' first (e.g. '-04-2026' -> '(2026-04)'), then '-MM-YY$' (e.g. '-05-15' -> '05-15')
+  let datePattern = '';
+  const longDateMatch = cutModel.match(/-(\d{2})-(\d{4})$/);
+  if (longDateMatch) {
+    datePattern = ` (${longDateMatch[2]}-${longDateMatch[1]})`;
+    cutModel = cutModel.slice(0, -longDateMatch[0].length);
+  } else {
+    const shortDateMatch = cutModel.match(/-(\d{2}-\d{2})$/);
+    if (shortDateMatch) {
+      datePattern = ' ' + shortDateMatch[1];
+      cutModel = cutModel.slice(0, -shortDateMatch[0].length);
+    }
+  }
+  const geminiName = cutModel
+    // commercial aliases (applied before separator normalization)
+    .replace('gemini-3-pro-image', 'Nano Banana Pro')
+    .replace('gemini-2.5-flash-image', 'Nano Banana')
+    // root changes
+    .replace('non-thinking', '') // NOTE: this is our variant, injected in gemini.models.ts
+    .replaceAll('-', ' ')
+    // products
+    .replace('gemini', 'Gemini')
+    .replace('gemma', 'Gemma')
+    .replace('learnlm', 'LearnLM')
+    .replace('deep research', 'Deep Research')
+    .replace('nano banana', 'Nano Banana')
+    // size/price variants
+    .replace('pro', 'Pro')
+    .replace('flash', 'Flash')
+    .replace('max', 'Max')
+    .replace('lite', 'Lite')
+    // feature variants
+    .replace('robotics er', 'Robotics')
+    .replace('computer use', 'Computer Use')
+    .replace('generation', 'Gen')
+    .replace('image', 'Image')
+    .replace('tts', 'TTS')
+    .replace('thinking', 'Thinking')
+    .replace('preview', '')
+    .replace('experimental', 'exp')
+    .replace('exp', '(exp)')
+    // collapse extra whitespace left by removals
+    .replace(/\s+/g, ' ')
+    .trim();
+  return geminiName + datePattern;
+}
 
-  const subStr = modelId.slice(claudeIndex);
-  // Check dot-format versions first (OpenRouter style: claude-4.5-haiku, claude-haiku-4.5)
-  // then dash-format versions (Anthropic direct style: claude-haiku-4-5)
-  const version =
-    subStr.includes('-4.6') ? '4.6'
-      : subStr.includes('-4.5') ? '4.5'
-        : subStr.includes('-4.1') ? '4.1'
-          : subStr.includes('-3.7') ? '3.7'
-            : subStr.includes('-3.5') ? '3.5'
-              : subStr.includes('-4-6') ? '4.6'
-                : subStr.includes('-4-5') ? '4.5'
-                  : subStr.includes('-3-5') ? '3.5'
-                    : subStr.includes('-5') ? '5'
-                      : subStr.includes('-4-1') ? '4.1'
-                        : subStr.includes('-4') ? '4'
-                          : subStr.includes('-3-7') ? '3.7'
-                            : subStr.includes('-3') ? '3'
-                              : '?';
+function _prettyAnthropicModelName(modelId: string): string | null {
+  if (!modelId.includes('claude-')) return null;
+
+  const subStr = modelId.slice(modelId.indexOf('claude-'));
+  const dotted = subStr.match(/-(\d)\.(\d)(?!\d)/);
+  const dashed = subStr.match(/-(\d)(?:-(\d)(?!\d))?/);
+  const version = dotted ? `${dotted[1]}.${dotted[2]}` : dashed ? (dashed[2] ? `${dashed[1]}.${dashed[2]}` : dashed[1]) : '?';
 
   if (subStr.includes('-opus')) return `Claude Opus ${version}`;
   if (subStr.includes('-sonnet')) return `Claude Sonnet ${version}`;

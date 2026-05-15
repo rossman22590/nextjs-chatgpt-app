@@ -4,6 +4,12 @@
   "theme_color": "#32383E",
   "background_color": "#9FA6AD",
   "description": "Personal AGI App",
+  "categories": [
+    "productivity",
+    "AI",
+    "tool",
+    "utilities"
+  ],
   "display": "standalone",
   "start_url": "/",
   "icons": [
