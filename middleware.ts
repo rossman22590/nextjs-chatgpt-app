@@ -17,7 +17,7 @@ export default withAuth({
 
 export const config = {
   matcher: [
-    // Protect app routes only: run middleware for paths that are NOT in the exclusion list
-    '/((?!api|_next|auth|favicon\\.ico|link/callback_openrouter).*)',
+    // Protect app routes only; public files with extensions must bypass auth.
+    '/((?!api|_next|auth|link/callback_openrouter|.*\\..*).*)',
   ],
 };
