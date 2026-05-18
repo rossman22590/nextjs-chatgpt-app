@@ -3,6 +3,7 @@ import { LinkStorageDataType } from '@prisma/client';
 
 import { prisma } from '~/server/prisma/prisma-client';
 import { protectedProcedure } from '~/server/trpc/trpc.server';
+import { ADMIN_BANNER_STORAGE_TITLE } from '~/server/admin/admin.banner';
 
 /**
  * Returns all chat objects for the authenticated user
@@ -33,6 +34,7 @@ export const listUserChatsProcedure =
         where: {
           ownerId: userId,
           dataType: LinkStorageDataType.CHAT_V1,
+          OR: [{ dataTitle: null }, { dataTitle: { not: ADMIN_BANNER_STORAGE_TITLE } }],
           isDeleted: false,
         },
         orderBy: {

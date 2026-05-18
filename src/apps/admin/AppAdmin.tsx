@@ -3,53 +3,143 @@ import * as React from 'react';
 import { useSession } from 'next-auth/react';
 
 import {
+  Alert,
   Avatar,
   Box,
   Button,
-  Card,
   Chip,
   CircularProgress,
   Divider,
+  FormControl,
+  FormLabel,
   IconButton,
   Input,
   LinearProgress,
   Modal,
   ModalClose,
   ModalDialog,
+  Option,
+  Select,
   Sheet,
   Stack,
+  Switch,
   Table,
+  Textarea,
   Tooltip,
   Typography,
 } from '@mui/joy';
-import SearchIcon from '@mui/icons-material/Search';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import EditIcon from '@mui/icons-material/Edit';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import GroupIcon from '@mui/icons-material/Group';
-import SettingsIcon from '@mui/icons-material/Settings';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import TokenIcon from '@mui/icons-material/Token';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import SpeedIcon from '@mui/icons-material/Speed';
-import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
-import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
-import TuneIcon from '@mui/icons-material/Tune';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WarningIcon from '@mui/icons-material/Warning';
-import BlockIcon from '@mui/icons-material/Block';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import AddIcon from '@mui/icons-material/Add';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import BlockIcon from '@mui/icons-material/Block';
+import BoltIcon from '@mui/icons-material/Bolt';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import CreditScoreIcon from '@mui/icons-material/CreditScore';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import GroupIcon from '@mui/icons-material/Group';
+import InsightsIcon from '@mui/icons-material/Insights';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import PaidIcon from '@mui/icons-material/Paid';
+import PersonIcon from '@mui/icons-material/Person';
+import PersonOffIcon from '@mui/icons-material/PersonOff';
+import QueryStatsIcon from '@mui/icons-material/QueryStats';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SaveIcon from '@mui/icons-material/Save';
+import SearchIcon from '@mui/icons-material/Search';
+import ShieldIcon from '@mui/icons-material/Shield';
+import SpeedIcon from '@mui/icons-material/Speed';
+import TokenIcon from '@mui/icons-material/Token';
+import TuneIcon from '@mui/icons-material/Tune';
+import WarningIcon from '@mui/icons-material/Warning';
 
+import { isAdminEmail } from '~/common/auth/adminEmails';
 import { apiAsyncNode } from '~/common/util/trpc.client';
 
-// --- Tokens / Cost format ---
+type AdminStats = Awaited<ReturnType<typeof apiAsyncNode.admin.globalStats.query>>;
+type AdminUser = Awaited<ReturnType<typeof apiAsyncNode.admin.listUsers.query>>[number];
+type TopUser = Awaited<ReturnType<typeof apiAsyncNode.admin.topUsers.query>>[number];
+type UsageOverview = Awaited<ReturnType<typeof apiAsyncNode.admin.usageOverview.query>>;
+type AdminBanner = Awaited<ReturnType<typeof apiAsyncNode.admin.getAdminBanner.query>>;
+type UserUsage = Awaited<ReturnType<typeof apiAsyncNode.admin.getUserUsage.query>>;
+type UserLog = Awaited<ReturnType<typeof apiAsyncNode.admin.getUserLogs.query>>[number];
+type AdminSystemPersona = Awaited<ReturnType<typeof apiAsyncNode.admin.listSystemPersonas.query>>[number];
+
+type ActiveView = 'overview' | 'people' | 'credits' | 'personas' | 'broadcast';
+type UserFilter = 'all' | 'attention' | 'active' | 'inactive' | 'zero' | 'near' | 'unlimited';
+type SortField = 'name' | 'status' | 'monthTokens' | 'remaining' | 'limit' | 'lastSeen' | 'conversations';
+type SortDir = 'asc' | 'desc';
+type BannerTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
+type JoyColor = 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
+
+type BannerDraft = {
+  enabled: boolean;
+  tone: BannerTone;
+  title: string;
+  message: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  expiresAt: string;
+};
+
+type PersonaDraft = {
+  id: string;
+  title: string;
+  description: string;
+  systemMessage: string;
+  systemMessageNotes: string;
+  symbol: string;
+  imageUri: string;
+  examplesText: string;
+  highlighted: boolean;
+  isActive: boolean;
+};
+
+const emptyBannerDraft: BannerDraft = {
+  enabled: false,
+  tone: 'warning',
+  title: '',
+  message: '',
+  ctaLabel: '',
+  ctaUrl: '',
+  expiresAt: '',
+};
+
+const emptyPersonaDraft: PersonaDraft = {
+  id: '',
+  title: '',
+  description: '',
+  systemMessage: '',
+  systemMessageNotes: '',
+  symbol: '',
+  imageUri: '',
+  examplesText: '',
+  highlighted: false,
+  isActive: true,
+};
+
+const creditPresets = [
+  { label: '250K', value: 250_000 },
+  { label: '1M', value: 1_000_000 },
+  { label: '2M', value: 2_000_000 },
+  { label: '5M', value: 5_000_000 },
+];
 
 function fmtNum(n: number | null | undefined): string {
   if (n == null) return '0';
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + 'B';
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
   return n.toLocaleString();
@@ -57,12 +147,34 @@ function fmtNum(n: number | null | undefined): string {
 
 function fmtCost(cents: number | null | undefined): string {
   if (!cents) return '$0.00';
-  const d = cents / 100;
-  return d < 0.01 ? '$' + d.toFixed(4) : '$' + d.toFixed(2);
+  const dollars = cents / 100;
+  return dollars < 0.01 ? '$' + dollars.toFixed(4) : '$' + dollars.toFixed(2);
+}
+
+function fmtDateTime(value: Date | string | null | undefined): string {
+  if (!value) return 'Never';
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Never';
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function fmtDate(value: Date | string | null | undefined): string {
+  if (!value) return 'Never';
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Never';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function isUserActive(isActive: boolean | null | undefined): boolean {
   return isActive !== false;
+}
+
+function getMonthTokens(user: AdminUser): number {
+  return user.monthUsage?._sum?.totalTokens ?? 0;
+}
+
+function getLastSeen(user: AdminUser): Date | null {
+  return user.allTimeUsage?._max?.createdAt ?? null;
 }
 
 function tokenLimitPct(tokenLimit: number | null | undefined, usedTokens: number): number {
@@ -76,138 +188,220 @@ function tokenLimitLabel(tokenLimit: number | null | undefined): string {
   return fmtNum(tokenLimit) + ' /mo';
 }
 
-function tokenRemainingLabel(tokenLimit: number | null | undefined, usedTokens: number): string {
-  if (tokenLimit == null) return 'Unlimited';
-  return fmtNum(Math.max(0, tokenLimit - usedTokens));
-}
-
 function tokenRemainingValue(tokenLimit: number | null | undefined, usedTokens: number): number | null {
   if (tokenLimit == null) return null;
   return Math.max(0, tokenLimit - usedTokens);
 }
 
-function tokenLimitChipProps(tokenLimit: number | null | undefined, usedTokens: number, iconSize: number = 14) {
-  if (tokenLimit == null) {
-    return {
-      color: 'neutral' as const,
-      icon: <AllInclusiveIcon sx={{ fontSize: iconSize }} />,
-      label: 'Unlimited',
-    };
-  }
+function tokenRemainingLabel(tokenLimit: number | null | undefined, usedTokens: number): string {
+  const remaining = tokenRemainingValue(tokenLimit, usedTokens);
+  return remaining == null ? 'Unlimited' : fmtNum(remaining);
+}
 
-  if (tokenLimit === 0) {
-    return {
-      color: 'danger' as const,
-      icon: <BlockIcon sx={{ fontSize: iconSize }} />,
-      label: '0 /mo',
-    };
-  }
+function attentionScore(user: AdminUser): number {
+  const used = getMonthTokens(user);
+  const pct = tokenLimitPct(user.tokenLimit, used);
+  if (!isUserActive(user.isActive)) return 100;
+  if (user.tokenLimit === 0) return 92;
+  if (user.tokenLimit != null && user.tokenLimit > 0 && used >= user.tokenLimit) return 88;
+  if (pct >= 90) return 72;
+  if (pct >= 75) return 54;
+  return 0;
+}
 
-  const pct = tokenLimitPct(tokenLimit, usedTokens);
-  const color: 'danger' | 'warning' | 'primary' = pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary';
+function userHealth(user: AdminUser): { label: string; color: JoyColor; icon: React.ReactNode; detail: string } {
+  const used = getMonthTokens(user);
+  const pct = tokenLimitPct(user.tokenLimit, used);
+
+  if (!isUserActive(user.isActive)) return { label: 'Inactive', color: 'danger', icon: <PersonOffIcon sx={{ fontSize: 14 }} />, detail: 'Account blocked' };
+  if (user.tokenLimit === 0) return { label: 'No credits', color: 'danger', icon: <BlockIcon sx={{ fontSize: 14 }} />, detail: 'Cannot chat' };
+  if (user.tokenLimit != null && user.tokenLimit > 0 && used >= user.tokenLimit)
+    return { label: 'Exhausted', color: 'danger', icon: <WarningIcon sx={{ fontSize: 14 }} />, detail: 'Limit reached' };
+  if (pct >= 90) return { label: 'Critical', color: 'danger', icon: <WarningIcon sx={{ fontSize: 14 }} />, detail: `${pct.toFixed(0)}% used` };
+  if (pct >= 75) return { label: 'Near cap', color: 'warning', icon: <WarningIcon sx={{ fontSize: 14 }} />, detail: `${pct.toFixed(0)}% used` };
+  if (user.tokenLimit == null) return { label: 'Unlimited', color: 'neutral', icon: <AllInclusiveIcon sx={{ fontSize: 14 }} />, detail: 'No monthly cap' };
+  return { label: 'Healthy', color: 'success', icon: <CheckCircleIcon sx={{ fontSize: 14 }} />, detail: 'Within budget' };
+}
+
+function toDateTimeLocalValue(value: string | null | undefined): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function fromDateTimeLocalValue(value: string): string | null {
+  if (!value.trim()) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function bannerToDraft(banner: AdminBanner | null): BannerDraft {
+  if (!banner) return emptyBannerDraft;
   return {
-    color,
-    icon: pct > 90 ? <WarningIcon sx={{ fontSize: iconSize }} /> : <CheckCircleIcon sx={{ fontSize: iconSize }} />,
-    label: tokenLimitLabel(tokenLimit),
+    enabled: banner.enabled,
+    tone: banner.tone,
+    title: banner.title ?? '',
+    message: banner.message ?? '',
+    ctaLabel: banner.ctaLabel ?? '',
+    ctaUrl: banner.ctaUrl ?? '',
+    expiresAt: toDateTimeLocalValue(banner.expiresAt),
   };
 }
 
-// --- Glassmorphic metric tile ---
+function examplesToText(examples: unknown): string {
+  if (!Array.isArray(examples)) return '';
+  return examples
+    .map((example) =>
+      typeof example === 'string'
+        ? example
+        : example && typeof example === 'object' && 'prompt' in example
+          ? String((example as { prompt?: unknown }).prompt ?? '')
+          : '',
+    )
+    .filter(Boolean)
+    .join('\n');
+}
 
-const ACCENT = {
-  blue: { bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', glow: 'rgba(102,126,234,0.25)' },
-  green: { bg: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', glow: 'rgba(17,153,142,0.25)' },
-  orange: { bg: 'linear-gradient(135deg, #f2994a 0%, #f2c94c 100%)', glow: 'rgba(242,153,74,0.20)' },
-  red: { bg: 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)', glow: 'rgba(235,51,73,0.20)' },
-  purple: { bg: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', glow: 'rgba(161,140,209,0.20)' },
-  cyan: { bg: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', glow: 'rgba(56,249,215,0.20)' },
-} as const;
-type AccentKey = keyof typeof ACCENT;
+function personaToDraft(persona: AdminSystemPersona): PersonaDraft {
+  return {
+    id: persona.id,
+    title: persona.title,
+    description: persona.description ?? '',
+    systemMessage: persona.systemMessage,
+    systemMessageNotes: persona.systemMessageNotes ?? '',
+    symbol: persona.symbol ?? '',
+    imageUri: persona.imageUri ?? '',
+    examplesText: examplesToText(persona.examples),
+    highlighted: persona.highlighted,
+    isActive: persona.isActive,
+  };
+}
 
-function MetricTile(props: { icon: React.ReactNode; label: string; value: string | number; sub?: string; accent: AccentKey }) {
-  const a = ACCENT[props.accent];
+function personaDraftPayload(draft: PersonaDraft, includeId: boolean) {
+  return {
+    ...(includeId || draft.id.trim() ? { id: draft.id.trim() } : {}),
+    title: draft.title.trim(),
+    description: draft.description,
+    systemMessage: draft.systemMessage,
+    systemMessageNotes: draft.systemMessageNotes,
+    symbol: draft.symbol,
+    imageUri: draft.imageUri,
+    examples: draft.examplesText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean),
+    highlighted: draft.highlighted,
+    isActive: draft.isActive,
+  };
+}
+
+function Surface(props: { children: React.ReactNode; sx?: any }) {
   return (
     <Box
       sx={{
-        flex: '1 1 200px',
-        minWidth: 170,
-        position: 'relative',
-        p: 2.5,
-        borderRadius: 'xl',
+        border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+        borderRadius: 8,
         background: 'var(--joy-palette-background-surface)',
-        boxShadow: `0 0 0 1px var(--joy-palette-neutral-outlinedBorder), 0 8px 24px -4px ${a.glow}`,
         overflow: 'hidden',
-        transition: 'transform 0.15s, box-shadow 0.15s',
-        '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 0 0 1px var(--joy-palette-neutral-outlinedBorder), 0 12px 32px -4px ${a.glow}` },
+        ...props.sx,
       }}
     >
-      {/* gradient bar */}
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: a.bg }} />
+      {props.children}
+    </Box>
+  );
+}
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+function SectionHeader(props: { icon: React.ReactNode; title: string; right?: React.ReactNode; sub?: string }) {
+  return (
+    <Box sx={{ px: 2.5, py: 2, display: 'flex', alignItems: 'center', gap: 1.25, borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)' }}>
+      <Box
+        sx={{
+          display: 'grid',
+          placeItems: 'center',
+          width: 30,
+          height: 30,
+          borderRadius: 8,
+          background: 'var(--joy-palette-neutral-softBg)',
+          color: 'text.secondary',
+        }}
+      >
+        {props.icon}
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography level="title-md" sx={{ fontWeight: 800 }}>
+          {props.title}
+        </Typography>
+        {props.sub && (
+          <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+            {props.sub}
+          </Typography>
+        )}
+      </Box>
+      {props.right && <Box sx={{ ml: 'auto' }}>{props.right}</Box>}
+    </Box>
+  );
+}
+
+function MetricTile(props: { icon: React.ReactNode; label: string; value: string | number; sub?: string; color: JoyColor }) {
+  return (
+    <Surface sx={{ flex: '1 1 190px', minWidth: 170, p: 2, position: 'relative' }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
         <Box
           sx={{
-            width: 40,
-            height: 40,
-            borderRadius: 'lg',
             display: 'grid',
             placeItems: 'center',
-            background: a.bg,
-            color: '#fff',
-            fontSize: 20,
+            width: 38,
+            height: 38,
+            borderRadius: 8,
+            color: `var(--joy-palette-${props.color}-plainColor)`,
+            background: `var(--joy-palette-${props.color}-softBg)`,
             flexShrink: 0,
           }}
         >
           {props.icon}
         </Box>
         <Box sx={{ minWidth: 0 }}>
-          <Typography level="body-xs" sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.8, opacity: 0.55 }}>
+          <Typography level="body-xs" sx={{ color: 'text.tertiary', fontWeight: 700 }}>
             {props.label}
           </Typography>
-          <Typography level="h3" sx={{ fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+          <Typography level="h3" sx={{ fontWeight: 900, lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' }}>
             {props.value}
           </Typography>
           {props.sub && (
-            <Typography level="body-xs" sx={{ mt: 0.25, opacity: 0.6 }}>
+            <Typography level="body-xs" sx={{ color: 'text.tertiary', mt: 0.25 }}>
               {props.sub}
             </Typography>
           )}
         </Box>
       </Box>
-    </Box>
+    </Surface>
   );
 }
 
-// --- Nav pill ---
-
-function NavPill(props: { icon: React.ReactNode; label: string; active: boolean; badge?: number; onClick: () => void }) {
+function NavButton(props: { icon: React.ReactNode; label: string; active: boolean; badge?: number; onClick: () => void }) {
   return (
     <Button
       variant={props.active ? 'solid' : 'plain'}
-      color={props.active ? 'primary' : 'neutral'}
+      color={props.active ? 'neutral' : 'neutral'}
       size="sm"
-      onClick={props.onClick}
       startDecorator={props.icon}
       endDecorator={
         props.badge != null ? (
-          <Chip size="sm" variant="soft" color={props.active ? 'primary' : 'neutral'} sx={{ ml: 0.5, minWidth: 22, fontWeight: 700 }}>
+          <Chip size="sm" variant="soft">
             {props.badge}
           </Chip>
         ) : undefined
       }
+      onClick={props.onClick}
       sx={{
-        borderRadius: 'xl',
-        px: 2,
-        py: 0.75,
-        fontWeight: 600,
+        borderRadius: 8,
+        justifyContent: 'flex-start',
+        fontWeight: 800,
         ...(props.active
-          ? {
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              boxShadow: '0 4px 14px rgba(102,126,234,0.35)',
-            }
-          : {
-              '&:hover': { background: 'var(--joy-palette-neutral-softBg)' },
-            }),
+          ? { background: 'var(--joy-palette-neutral-900)', color: '#fff', '&:hover': { background: 'var(--joy-palette-neutral-800)' } }
+          : { color: 'text.secondary' }),
       }}
     >
       {props.label}
@@ -215,80 +409,237 @@ function NavPill(props: { icon: React.ReactNode; label: string; active: boolean;
   );
 }
 
-// --- Leaderboard row ---
+function SortArrow(props: { field: SortField; sortField: SortField; sortDir: SortDir }) {
+  if (props.sortField !== props.field) return null;
+  return props.sortDir === 'asc' ? (
+    <ArrowUpwardIcon sx={{ fontSize: 14, ml: 0.4, verticalAlign: 'middle' }} />
+  ) : (
+    <ArrowDownwardIcon sx={{ fontSize: 14, ml: 0.4, verticalAlign: 'middle' }} />
+  );
+}
 
-function LeaderboardRow(props: {
-  rank: number;
-  name: string;
-  email: string;
-  image?: string;
-  tokens: string;
-  cost: string;
-  requests: number;
-  onClick: () => void;
-}) {
-  const medal = props.rank === 1 ? '🥇' : props.rank === 2 ? '🥈' : props.rank === 3 ? '🥉' : null;
+function UserIdentity(props: { user: Pick<AdminUser, 'name' | 'email' | 'image'> }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+      <Avatar size="sm" src={props.user.image ?? undefined} sx={{ width: 34, height: 34, fontSize: 13, flexShrink: 0 }}>
+        {(props.user.name || props.user.email || '?')[0]}
+      </Avatar>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography level="body-sm" noWrap sx={{ fontWeight: 800 }}>
+          {props.user.name || 'Unnamed'}
+        </Typography>
+        <Typography level="body-xs" noWrap sx={{ color: 'text.tertiary' }}>
+          {props.user.email}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+function UsageProgress(props: { used: number; limit: number | null | undefined }) {
+  const pct = tokenLimitPct(props.limit, props.used);
+  const isUnlimited = props.limit == null;
+  const isZeroCredit = props.limit === 0;
+  const state: { label: string; color: JoyColor; fill: string; track: string; text: string } = isUnlimited
+    ? { label: 'Unlimited', color: 'neutral', fill: '#64748b', track: 'rgba(100, 116, 139, 0.18)', text: 'No cap' }
+    : isZeroCredit
+      ? { label: 'No credits', color: 'danger', fill: '#dc2626', track: 'rgba(220, 38, 38, 0.16)', text: '0%' }
+      : pct >= 90
+        ? { label: 'Critical', color: 'danger', fill: '#dc2626', track: 'rgba(220, 38, 38, 0.16)', text: `${pct.toFixed(0)}%` }
+        : pct >= 75
+          ? { label: 'Near cap', color: 'warning', fill: '#d97706', track: 'rgba(217, 119, 6, 0.18)', text: `${pct.toFixed(0)}%` }
+          : { label: 'Healthy', color: 'success', fill: '#059669', track: 'rgba(5, 150, 105, 0.16)', text: `${pct.toFixed(0)}%` };
+  const width = isUnlimited ? 100 : isZeroCredit ? 0 : Math.max(props.used > 0 ? 4 : 0, pct);
+
+  return (
+    <Tooltip title={`${fmtNum(props.used)} used${props.limit == null ? '' : ` of ${fmtNum(props.limit)}`} - ${state.label}`}>
+      <Box sx={{ minWidth: 190 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 0.65 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography level="body-xs" sx={{ fontWeight: 900, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+              {fmtNum(props.used)}
+            </Typography>
+            <Typography level="body-xs" sx={{ color: 'text.tertiary', lineHeight: 1.1 }}>
+              {state.label}
+            </Typography>
+          </Box>
+          <Chip
+            size="sm"
+            variant="soft"
+            color={state.color}
+            sx={{ height: 22, minWidth: 52, justifyContent: 'center', fontVariantNumeric: 'tabular-nums', fontWeight: 900 }}
+          >
+            {state.text}
+          </Chip>
+        </Box>
+        <Box
+          className="admin-usage-track"
+          sx={{
+            height: 12,
+            borderRadius: 8,
+            overflow: 'hidden',
+            background: state.track,
+            border: '1px solid rgba(15, 23, 42, 0.14)',
+            boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.12)',
+          }}
+        >
+          <Box
+            sx={{
+              width: `${width}%`,
+              minWidth: width > 0 ? 5 : 0,
+              height: '100%',
+              borderRadius: 8,
+              background: state.fill,
+              boxShadow: width > 0 ? `0 0 0 1px ${state.fill}, 0 0 12px ${state.track}` : undefined,
+              transition: 'width 160ms ease',
+            }}
+          />
+        </Box>
+        {props.limit != null && props.limit > 0 && (
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.45 }}>
+            <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: 10 }}>
+              0
+            </Typography>
+            <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
+              {fmtNum(props.limit)}
+            </Typography>
+          </Box>
+        )}
+      </Box>
+    </Tooltip>
+  );
+}
+
+function DailyUsageBars(props: { overview: UsageOverview | null }) {
+  const daily = props.overview?.daily ?? [];
+  const max = Math.max(1, ...daily.map((day) => day.tokens));
+
+  return (
+    <Box sx={{ px: 2.5, py: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${daily.length || 14}, minmax(10px, 1fr))`, gap: 0.75, alignItems: 'end', height: 150 }}>
+        {(daily.length ? daily : Array.from({ length: 14 }, (_, index) => ({ date: String(index), tokens: 0, requests: 0, users: 0, costCents: 0 }))).map(
+          (day) => {
+            const height = Math.max(6, (day.tokens / max) * 130);
+            return (
+              <Tooltip key={day.date} title={`${fmtDate(day.date)} - ${fmtNum(day.tokens)} tokens, ${fmtNum(day.requests)} requests`}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%', gap: 0.75 }}>
+                  <Box
+                    sx={{
+                      height,
+                      borderRadius: 6,
+                      background: day.tokens ? 'linear-gradient(180deg, #0ea5a4 0%, #2563eb 100%)' : 'var(--joy-palette-neutral-softBg)',
+                    }}
+                  />
+                  <Typography level="body-xs" sx={{ color: 'text.tertiary', textAlign: 'center', fontSize: 10 }}>
+                    {fmtDate(day.date).split(' ')[1]}
+                  </Typography>
+                </Box>
+              </Tooltip>
+            );
+          },
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+function BannerPreview(props: { draft: BannerDraft }) {
+  if (!props.draft.enabled && !props.draft.message.trim()) {
+    return (
+      <Alert color="neutral" variant="soft" sx={{ borderRadius: 8 }}>
+        No live banner
+      </Alert>
+    );
+  }
+
+  return (
+    <Alert
+      color={props.draft.tone}
+      variant="soft"
+      startDecorator={<CampaignIcon />}
+      endDecorator={
+        props.draft.ctaLabel && props.draft.ctaUrl ? (
+          <Button component="a" href={props.draft.ctaUrl} size="sm" color={props.draft.tone}>
+            {props.draft.ctaLabel}
+          </Button>
+        ) : undefined
+      }
+      sx={{ borderRadius: 8, alignItems: 'center' }}
+    >
+      <Box>
+        {props.draft.title.trim() && (
+          <Typography level="title-sm" color={props.draft.tone} sx={{ fontWeight: 900 }}>
+            {props.draft.title.trim()}
+          </Typography>
+        )}
+        <Typography level="body-sm">{props.draft.message.trim() || 'Banner message'}</Typography>
+      </Box>
+    </Alert>
+  );
+}
+
+function LeaderboardRow(props: { rank: number; entry: TopUser; onOpen: () => void }) {
+  const user = props.entry.user;
+  if (!user) return null;
+
   return (
     <Box
-      onClick={props.onClick}
+      onClick={props.onOpen}
       sx={{
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: '36px minmax(0, 1fr) auto auto',
+        gap: 1.5,
         alignItems: 'center',
-        gap: 2,
         px: 2.5,
-        py: 1.5,
+        py: 1.35,
         cursor: 'pointer',
-        borderRadius: 'lg',
-        transition: 'background 0.1s',
         '&:hover': { background: 'var(--joy-palette-neutral-softBg)' },
       }}
     >
-      <Typography level="body-sm" sx={{ width: 28, textAlign: 'center', fontWeight: 800, fontSize: medal ? 18 : 14 }}>
-        {medal || props.rank}
-      </Typography>
-      <Avatar size="sm" src={props.image} sx={{ width: 32, height: 32, fontSize: 13 }}>
-        {(props.name || '?')[0]}
-      </Avatar>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography level="body-sm" noWrap sx={{ fontWeight: 600 }}>
-          {props.name || 'Unknown'}
-        </Typography>
-        <Typography level="body-xs" noWrap sx={{ opacity: 0.5 }}>
-          {props.email}
-        </Typography>
+      <Box
+        sx={{
+          width: 28,
+          height: 28,
+          display: 'grid',
+          placeItems: 'center',
+          borderRadius: 8,
+          background: props.rank <= 3 ? 'var(--joy-palette-warning-softBg)' : 'var(--joy-palette-neutral-softBg)',
+          fontWeight: 900,
+        }}
+      >
+        {props.rank}
       </Box>
+      <UserIdentity user={user} />
       <Box sx={{ textAlign: 'right' }}>
-        <Typography level="body-sm" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-          {props.tokens}
+        <Typography level="body-sm" sx={{ fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
+          {fmtNum(props.entry._sum.totalTokens)}
         </Typography>
-        <Typography level="body-xs" sx={{ opacity: 0.55 }}>
-          {props.cost}
+        <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+          {fmtCost(props.entry._sum.costCents)}
         </Typography>
       </Box>
       <Chip size="sm" variant="outlined" sx={{ minWidth: 46, fontVariantNumeric: 'tabular-nums' }}>
-        {props.requests}
+        {props.entry._count}
       </Chip>
     </Box>
   );
 }
 
-// --- User detail modal (premium) ---
-
 function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh: () => void }) {
-  const [usage, setUsage] = React.useState<any>(null);
-  const [logs, setLogs] = React.useState<any[]>([]);
+  const [usage, setUsage] = React.useState<UserUsage | null>(null);
+  const [logs, setLogs] = React.useState<UserLog[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [editingLimit, setEditingLimit] = React.useState(false);
   const [limitValue, setLimitValue] = React.useState('');
   const [saving, setSaving] = React.useState(false);
   const [statusSaving, setStatusSaving] = React.useState(false);
 
   const loadData = React.useCallback(() => {
     setIsLoading(true);
-    Promise.all([apiAsyncNode.admin.getUserUsage.query({ userId: props.userId }), apiAsyncNode.admin.getUserLogs.query({ userId: props.userId, limit: 50 })])
-      .then(([u, l]) => {
-        setUsage(u);
-        setLogs(l);
+    Promise.all([apiAsyncNode.admin.getUserUsage.query({ userId: props.userId }), apiAsyncNode.admin.getUserLogs.query({ userId: props.userId, limit: 80 })])
+      .then(([userUsage, userLogs]) => {
+        setUsage(userUsage);
+        setLogs(userLogs);
+        setLimitValue(userUsage.user?.tokenLimit == null ? '' : String(userUsage.user.tokenLimit));
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -298,9 +649,9 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
     loadData();
   }, [loadData]);
 
-  const handleSetLimit = () => {
-    const val = limitValue.trim();
-    const parsed = val === '' ? null : Number.parseInt(val, 10);
+  const handleSetLimit = (nextLimit?: number | null) => {
+    const parsed = nextLimit !== undefined ? nextLimit : limitValue.trim() === '' ? null : Number.parseInt(limitValue.trim(), 10);
+
     if (parsed !== null && (!Number.isFinite(parsed) || parsed < 0)) {
       alert('Enter 0 or a positive number. Leave blank for unlimited.');
       return;
@@ -308,16 +659,12 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
 
     setSaving(true);
     apiAsyncNode.admin.setTokenLimit
-      .mutate({
-        userId: props.userId,
-        tokenLimit: parsed,
-      })
+      .mutate({ userId: props.userId, tokenLimit: parsed })
       .then(() => {
-        setEditingLimit(false);
         loadData();
         props.onRefresh();
       })
-      .catch(() => {})
+      .catch((error) => alert(error?.message || 'Failed to update credits'))
       .finally(() => setSaving(false));
   };
 
@@ -325,40 +672,37 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
     const nextIsActive = !isUserActive(usage?.user?.isActive);
     setStatusSaving(true);
     apiAsyncNode.admin.setUserActive
-      .mutate({
-        userId: props.userId,
-        isActive: nextIsActive,
-      })
+      .mutate({ userId: props.userId, isActive: nextIsActive })
       .then(() => {
         loadData();
         props.onRefresh();
       })
-      .catch(() => {})
+      .catch((error) => alert(error?.message || 'Failed to update account status'))
       .finally(() => setStatusSaving(false));
   };
 
   const user = usage?.user;
   const monthTokens = usage?.thisMonth?._sum?.totalTokens ?? 0;
-  const pct = tokenLimitPct(user?.tokenLimit, monthTokens);
+  const allTimeTokens = usage?.allTime?._sum?.totalTokens ?? 0;
   const userActive = isUserActive(user?.isActive);
-  const limitChip = tokenLimitChipProps(user?.tokenLimit, monthTokens);
+  const pct = tokenLimitPct(user?.tokenLimit, monthTokens);
+  const health = user
+    ? userHealth({ ...user, monthUsage: usage?.thisMonth as any, allTimeUsage: null, _count: { conversations: 0, messages: 0, usageLogs: 0 } } as AdminUser)
+    : null;
 
   return (
     <Modal open onClose={props.onClose}>
       <ModalDialog
         sx={{
-          width: '94vw',
-          maxWidth: 880,
+          width: 'min(1120px, 96vw)',
           maxHeight: '92vh',
           overflow: 'auto',
           p: 0,
-          borderRadius: 'xl',
-          boxShadow: '0 24px 80px -12px rgba(0,0,0,0.45)',
+          borderRadius: 8,
           border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
         }}
       >
-        <ModalClose sx={{ zIndex: 2 }} />
-
+        <ModalClose />
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
             <CircularProgress />
@@ -368,233 +712,356 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
             <Typography color="danger">User not found</Typography>
           </Box>
         ) : (
-          <>
-            {/* Banner */}
+          <Box>
             <Box
               sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                px: 4,
-                pt: 4,
-                pb: 5,
-                position: 'relative',
+                px: 3,
+                py: 2.5,
+                borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                flexWrap: 'wrap',
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
-                <Avatar
-                  src={user.image}
-                  sx={{
-                    width: 64,
-                    height: 64,
-                    border: '3px solid rgba(255,255,255,0.3)',
-                    fontSize: 24,
-                    fontWeight: 700,
-                  }}
+              <Avatar src={user.image ?? undefined} sx={{ width: 54, height: 54, fontWeight: 900 }}>
+                {(user.name || user.email || '?')[0]}
+              </Avatar>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography level="h3" sx={{ fontWeight: 900 }}>
+                  {user.name || 'Unnamed user'}
+                </Typography>
+                <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
+                  {user.email}
+                </Typography>
+              </Box>
+              <Box sx={{ ml: 'auto', display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                {health && (
+                  <Chip color={health.color} variant="soft" startDecorator={health.icon}>
+                    {health.label}
+                  </Chip>
+                )}
+                <Button
+                  color={userActive ? 'danger' : 'success'}
+                  variant={userActive ? 'outlined' : 'solid'}
+                  loading={statusSaving}
+                  onClick={handleToggleActive}
+                  sx={{ borderRadius: 8 }}
                 >
-                  {(user.name || '?')[0]}
-                </Avatar>
-                <Box>
-                  <Typography level="h3" sx={{ color: '#fff', fontWeight: 800 }}>
-                    {user.name || 'Unnamed'}
-                  </Typography>
-                  <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                    {user.email}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, mt: 1.25, flexWrap: 'wrap' }}>
-                    <Chip
-                      size="sm"
-                      variant="soft"
-                      color={userActive ? 'success' : 'danger'}
-                      startDecorator={userActive ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : <BlockIcon sx={{ fontSize: 14 }} />}
-                    >
-                      {userActive ? 'Active' : 'Inactive'}
-                    </Chip>
-                    <Button size="sm" variant="soft" color={userActive ? 'danger' : 'success'} loading={statusSaving} onClick={handleToggleActive}>
-                      {userActive ? 'Set Inactive' : 'Activate'}
-                    </Button>
-                  </Box>
-                </Box>
+                  {userActive ? 'Set Inactive' : 'Activate'}
+                </Button>
               </Box>
             </Box>
 
-            {/* Content */}
-            <Box sx={{ px: 3.5, py: 3, mt: -2.5 }}>
-              {/* Token Limit Card */}
-              <Box
-                sx={{
-                  background: 'var(--joy-palette-background-surface)',
-                  border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                  borderRadius: 'xl',
-                  p: 2.5,
-                  mb: 3,
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <TuneIcon sx={{ fontSize: 18, opacity: 0.6 }} />
-                  <Typography level="title-sm" sx={{ fontWeight: 700 }}>
-                    Token Limit
-                  </Typography>
-                  {editingLimit ? (
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
+            <Box sx={{ p: 3 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.1fr 0.9fr' }, gap: 2.5 }}>
+                <Surface>
+                  <SectionHeader
+                    icon={<CreditScoreIcon sx={{ fontSize: 18 }} />}
+                    title="Credits"
+                    right={
+                      <Chip
+                        variant="soft"
+                        color={
+                          user.tokenLimit === 0 ? 'danger' : user.tokenLimit == null ? 'neutral' : pct >= 90 ? 'danger' : pct >= 75 ? 'warning' : 'success'
+                        }
+                      >
+                        {tokenLimitLabel(user.tokenLimit)}
+                      </Chip>
+                    }
+                  />
+                  <Box sx={{ p: 2.5 }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5, mb: 2 }}>
+                      <MetricTile
+                        color="primary"
+                        icon={<TokenIcon />}
+                        label="Used This Month"
+                        value={fmtNum(monthTokens)}
+                        sub={`${fmtNum(usage?.thisMonth?._count ?? 0)} requests`}
+                      />
+                      <MetricTile
+                        color="success"
+                        icon={<AllInclusiveIcon />}
+                        label="Remaining"
+                        value={tokenRemainingLabel(user.tokenLimit, monthTokens)}
+                        sub={user.tokenLimit == null ? 'Unlimited account' : `${pct.toFixed(0)}% used`}
+                      />
+                      <MetricTile
+                        color="warning"
+                        icon={<AttachMoneyIcon />}
+                        label="Month Cost"
+                        value={fmtCost(usage?.thisMonth?._sum?.costCents)}
+                        sub="Estimated spend"
+                      />
+                    </Box>
+                    {user.tokenLimit != null && user.tokenLimit > 0 && (
+                      <LinearProgress
+                        determinate
+                        value={pct}
+                        color={pct >= 90 ? 'danger' : pct >= 75 ? 'warning' : 'success'}
+                        sx={{ height: 8, borderRadius: 8, mb: 2 }}
+                      />
+                    )}
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ alignItems: { xs: 'stretch', md: 'center' } }}>
                       <Input
                         size="sm"
-                        placeholder="Blank = Unlimited, 0 = None"
+                        placeholder="Blank = unlimited, 0 = no credits"
                         value={limitValue}
-                        onChange={(e) => setLimitValue(e.target.value)}
-                        sx={{ width: 160 }}
+                        onChange={(event) => setLimitValue(event.target.value)}
+                        sx={{ minWidth: 220, borderRadius: 8 }}
                       />
-                      <Button size="sm" onClick={handleSetLimit} loading={saving} sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                      <Button size="sm" startDecorator={<SaveIcon />} loading={saving} onClick={() => handleSetLimit()} sx={{ borderRadius: 8 }}>
                         Save
                       </Button>
-                      <Button size="sm" variant="plain" color="neutral" onClick={() => setEditingLimit(false)}>
-                        Cancel
-                      </Button>
-                    </Box>
-                  ) : (
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
-                      <Chip size="sm" variant="soft" color={limitChip.color} startDecorator={limitChip.icon}>
-                        {limitChip.label}
-                      </Chip>
-                      <IconButton
-                        size="sm"
-                        variant="plain"
-                        onClick={() => {
-                          setLimitValue(user.tokenLimit == null ? '' : user.tokenLimit.toString());
-                          setEditingLimit(true);
-                        }}
-                      >
-                        <EditIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Box>
-                  )}
-                </Box>
-                {user.tokenLimit != null && user.tokenLimit > 0 && (
-                  <Box sx={{ mt: 1 }}>
-                    <LinearProgress
-                      determinate
-                      value={pct}
-                      color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'primary'}
-                      sx={{ height: 8, borderRadius: 99 }}
+                      <Divider orientation="vertical" sx={{ display: { xs: 'none', md: 'block' } }} />
+                      <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                        {creditPresets.map((preset) => (
+                          <Button
+                            key={preset.value}
+                            size="sm"
+                            variant="soft"
+                            color="neutral"
+                            disabled={saving}
+                            onClick={() => handleSetLimit(preset.value)}
+                            sx={{ borderRadius: 8 }}
+                          >
+                            {preset.label}
+                          </Button>
+                        ))}
+                        <Button size="sm" variant="soft" color="neutral" disabled={saving} onClick={() => handleSetLimit(null)} sx={{ borderRadius: 8 }}>
+                          Unlimited
+                        </Button>
+                        <Button size="sm" variant="soft" color="danger" disabled={saving} onClick={() => handleSetLimit(0)} sx={{ borderRadius: 8 }}>
+                          No credits
+                        </Button>
+                      </Box>
+                    </Stack>
+                  </Box>
+                </Surface>
+
+                <Surface>
+                  <SectionHeader icon={<QueryStatsIcon sx={{ fontSize: 18 }} />} title="Usage" />
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5, p: 2.5 }}>
+                    <MetricTile
+                      color="primary"
+                      icon={<SpeedIcon />}
+                      label="All Time Tokens"
+                      value={fmtNum(allTimeTokens)}
+                      sub={`${fmtNum(usage?.allTime?._count ?? 0)} requests`}
                     />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                      <Typography level="body-xs" sx={{ opacity: 0.5 }}>
-                        {pct.toFixed(0)}% used
-                      </Typography>
-                      <Typography level="body-xs" sx={{ opacity: 0.5 }}>
-                        {fmtNum(monthTokens)} of {fmtNum(user.tokenLimit)}
-                      </Typography>
-                    </Box>
+                    <MetricTile color="success" icon={<PaidIcon />} label="All Time Cost" value={fmtCost(usage?.allTime?._sum?.costCents)} />
+                  </Box>
+                </Surface>
+              </Box>
+
+              <Surface sx={{ mt: 2.5 }}>
+                <SectionHeader
+                  icon={<AccessTimeIcon sx={{ fontSize: 18 }} />}
+                  title="Recent Activity"
+                  right={
+                    <IconButton size="sm" variant="plain" onClick={loadData}>
+                      <RefreshIcon />
+                    </IconButton>
+                  }
+                />
+                {logs.length ? (
+                  <Sheet variant="plain" sx={{ overflowX: 'auto' }}>
+                    <Table
+                      size="sm"
+                      stickyHeader
+                      sx={{ minWidth: 760, '& th': { fontWeight: 800, color: 'text.tertiary' }, '& td': { verticalAlign: 'middle' } }}
+                    >
+                      <thead>
+                        <tr>
+                          <th>Time</th>
+                          <th>Model</th>
+                          <th>Operation</th>
+                          <th style={{ textAlign: 'right' }}>Input</th>
+                          <th style={{ textAlign: 'right' }}>Output</th>
+                          <th style={{ textAlign: 'right' }}>Total</th>
+                          <th style={{ textAlign: 'right' }}>Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {logs.map((log) => (
+                          <tr key={log.id}>
+                            <td>{fmtDateTime(log.createdAt)}</td>
+                            <td>
+                              <Typography level="body-xs" noWrap sx={{ maxWidth: 240 }}>
+                                {log.modelId}
+                              </Typography>
+                            </td>
+                            <td>
+                              <Chip size="sm" variant="soft">
+                                {log.operation}
+                              </Chip>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>{fmtNum(log.inputTokens)}</td>
+                            <td style={{ textAlign: 'right' }}>{fmtNum(log.outputTokens)}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 800 }}>{fmtNum(log.totalTokens)}</td>
+                            <td style={{ textAlign: 'right' }}>{fmtCost(log.costCents)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </Sheet>
+                ) : (
+                  <Box sx={{ py: 5, textAlign: 'center', color: 'text.tertiary' }}>
+                    <Typography level="body-sm">No usage logs recorded yet</Typography>
                   </Box>
                 )}
-                {user.tokenLimit === 0 && (
-                  <Typography level="body-xs" sx={{ mt: 1, opacity: 0.6 }}>
-                    This user has no monthly credits. Activate the account and assign credits to enable chat access.
-                  </Typography>
-                )}
-              </Box>
-
-              {/* Stats Grid */}
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
-                <MetricTile
-                  accent="blue"
-                  icon={<TokenIcon sx={{ fontSize: 20 }} />}
-                  label="Month Tokens"
-                  value={fmtNum(usage.thisMonth._sum.totalTokens)}
-                  sub={`${fmtNum(usage.thisMonth._count)} requests`}
-                />
-                <MetricTile
-                  accent="orange"
-                  icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
-                  label="Month Cost"
-                  value={fmtCost(usage.thisMonth._sum.costCents)}
-                />
-                <MetricTile
-                  accent="green"
-                  icon={<SpeedIcon sx={{ fontSize: 20 }} />}
-                  label="All Time Tokens"
-                  value={fmtNum(usage.allTime._sum.totalTokens)}
-                  sub={`${fmtNum(usage.allTime._count)} total requests`}
-                />
-                <MetricTile accent="red" icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />} label="All Time Cost" value={fmtCost(usage.allTime._sum.costCents)} />
-              </Box>
-
-              {/* Logs */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <AccessTimeIcon sx={{ fontSize: 18, opacity: 0.5 }} />
-                <Typography level="title-sm" sx={{ fontWeight: 700 }}>
-                  Recent Activity
-                </Typography>
-                <Typography level="body-xs" sx={{ ml: 'auto', opacity: 0.5 }}>
-                  {logs.length} entries
-                </Typography>
-                <IconButton size="sm" variant="plain" onClick={loadData}>
-                  <RefreshIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Box>
-
-              {logs.length > 0 ? (
-                <Sheet variant="outlined" sx={{ borderRadius: 'lg', overflow: 'auto', maxHeight: 320 }}>
-                  <Table
-                    size="sm"
-                    stickyHeader
-                    sx={{
-                      '--TableCell-headBackground': 'var(--joy-palette-background-level1)',
-                      '& th': { py: 1.25, fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5 },
-                      '& td': { py: 1, fontSize: '0.78rem' },
-                    }}
-                  >
-                    <thead>
-                      <tr>
-                        <th style={{ width: 140 }}>Time</th>
-                        <th>Model</th>
-                        <th style={{ textAlign: 'right' }}>In</th>
-                        <th style={{ textAlign: 'right' }}>Out</th>
-                        <th style={{ textAlign: 'right' }}>Total</th>
-                        <th style={{ textAlign: 'right' }}>Cost</th>
-                        <th style={{ width: 55 }}>Op</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {logs.map((log) => (
-                        <tr key={log.id}>
-                          <td>
-                            <Typography level="body-xs">{new Date(log.createdAt).toLocaleString()}</Typography>
-                          </td>
-                          <td>
-                            <Typography level="body-xs" noWrap sx={{ maxWidth: 180 }}>
-                              {log.modelId}
-                            </Typography>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>{fmtNum(log.inputTokens)}</td>
-                          <td style={{ textAlign: 'right' }}>{fmtNum(log.outputTokens)}</td>
-                          <td style={{ textAlign: 'right' }}>
-                            <strong>{fmtNum(log.totalTokens)}</strong>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>{fmtCost(log.costCents)}</td>
-                          <td>
-                            <Chip size="sm" variant="soft" sx={{ fontSize: '0.6rem', height: 20 }}>
-                              {log.operation}
-                            </Chip>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </Sheet>
-              ) : (
-                <Box sx={{ py: 3, textAlign: 'center', opacity: 0.4 }}>
-                  <Typography level="body-sm">No usage logs recorded yet</Typography>
-                </Box>
-              )}
+              </Surface>
             </Box>
-          </>
+          </Box>
         )}
       </ModalDialog>
     </Modal>
   );
 }
 
-// --- Main Admin Panel ---
+function PersonaEditorModal(props: {
+  mode: 'create' | 'edit';
+  draft: PersonaDraft;
+  saving: boolean;
+  onClose: () => void;
+  onDraftChange: (draft: PersonaDraft) => void;
+  onSave: () => void;
+}) {
+  const setField = <K extends keyof PersonaDraft>(field: K, value: PersonaDraft[K]) => {
+    props.onDraftChange({ ...props.draft, [field]: value });
+  };
+
+  const canSave = !!props.draft.title.trim() && !!props.draft.systemMessage.trim() && (props.mode === 'create' || !!props.draft.id.trim());
+
+  return (
+    <Modal open onClose={props.onClose}>
+      <ModalDialog
+        sx={{
+          width: 'min(980px, 96vw)',
+          maxHeight: '92vh',
+          overflow: 'auto',
+          p: 0,
+          borderRadius: 8,
+          border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+        }}
+      >
+        <ModalClose />
+        <SectionHeader
+          icon={<PersonIcon sx={{ fontSize: 18 }} />}
+          title={props.mode === 'create' ? 'Add Persona' : 'Edit Persona'}
+          sub={props.mode === 'create' ? 'Create a new admin-managed persona' : props.draft.id}
+        />
+        <Box sx={{ p: 2.5 }}>
+          <Stack spacing={2}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.75fr 1.25fr' }, gap: 1.5 }}>
+              <FormControl>
+                <FormLabel>ID</FormLabel>
+                <Input
+                  value={props.draft.id}
+                  disabled={props.mode === 'edit'}
+                  placeholder="CareerAI"
+                  onChange={(event) => setField('id', event.target.value)}
+                  sx={{ borderRadius: 8 }}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Title</FormLabel>
+                <Input value={props.draft.title} placeholder="Career AI" onChange={(event) => setField('title', event.target.value)} sx={{ borderRadius: 8 }} />
+              </FormControl>
+            </Box>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '140px 1fr' }, gap: 1.5 }}>
+              <FormControl>
+                <FormLabel>Symbol</FormLabel>
+                <Input value={props.draft.symbol} placeholder="🎭" onChange={(event) => setField('symbol', event.target.value)} sx={{ borderRadius: 8 }} />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Image URI</FormLabel>
+                <Input
+                  value={props.draft.imageUri}
+                  placeholder="/images/personas/avatar.webp"
+                  onChange={(event) => setField('imageUri', event.target.value)}
+                  sx={{ borderRadius: 8 }}
+                />
+              </FormControl>
+            </Box>
+
+            <FormControl>
+              <FormLabel>Description</FormLabel>
+              <Textarea
+                minRows={2}
+                value={props.draft.description}
+                onChange={(event) => setField('description', event.target.value)}
+                placeholder="Short admin and selector description"
+                sx={{ borderRadius: 8 }}
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>System Prompt</FormLabel>
+              <Textarea
+                minRows={9}
+                value={props.draft.systemMessage}
+                onChange={(event) => setField('systemMessage', event.target.value)}
+                placeholder="Persona system prompt"
+                sx={{ borderRadius: 8, '& textarea': { fontFamily: 'var(--joy-fontFamily-code)', fontSize: '0.84rem' } }}
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Prompt Notes</FormLabel>
+              <Textarea
+                minRows={2}
+                value={props.draft.systemMessageNotes}
+                onChange={(event) => setField('systemMessageNotes', event.target.value)}
+                placeholder="Optional internal notes"
+                sx={{ borderRadius: 8 }}
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Examples</FormLabel>
+              <Textarea
+                minRows={4}
+                value={props.draft.examplesText}
+                onChange={(event) => setField('examplesText', event.target.value)}
+                placeholder="One starter prompt per line"
+                sx={{ borderRadius: 8 }}
+              />
+            </FormControl>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                <Switch checked={props.draft.isActive} onChange={(event) => setField('isActive', event.target.checked)} />
+                <Typography level="body-sm" sx={{ fontWeight: 800 }}>
+                  Active
+                </Typography>
+                <Switch checked={props.draft.highlighted} onChange={(event) => setField('highlighted', event.target.checked)} />
+                <Typography level="body-sm" sx={{ fontWeight: 800 }}>
+                  Highlighted
+                </Typography>
+              </Stack>
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                <Button variant="plain" color="neutral" onClick={props.onClose} sx={{ borderRadius: 8 }}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!canSave}
+                  loading={props.saving}
+                  startDecorator={props.mode === 'create' ? <AddIcon /> : <SaveIcon />}
+                  onClick={props.onSave}
+                  sx={{ borderRadius: 8 }}
+                >
+                  {props.mode === 'create' ? 'Add Persona' : 'Save Persona'}
+                </Button>
+              </Box>
+            </Box>
+          </Stack>
+        </Box>
+      </ModalDialog>
+    </Modal>
+  );
+}
 
 export function AppAdmin() {
   const { data: session } = useSession();
@@ -602,27 +1069,51 @@ export function AppAdmin() {
   const [checkingAdmin, setCheckingAdmin] = React.useState(true);
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
-  const [globalStats, setGlobalStats] = React.useState<any>(null);
-  const [users, setUsers] = React.useState<any[]>([]);
-  const [topUsers, setTopUsers] = React.useState<any[]>([]);
+  const [globalStats, setGlobalStats] = React.useState<AdminStats | null>(null);
+  const [users, setUsers] = React.useState<AdminUser[]>([]);
+  const [topUsers, setTopUsers] = React.useState<TopUser[]>([]);
+  const [usageOverview, setUsageOverview] = React.useState<UsageOverview | null>(null);
+  const [adminBanner, setAdminBanner] = React.useState<AdminBanner | null>(null);
+  const [systemPersonas, setSystemPersonas] = React.useState<AdminSystemPersona[]>([]);
 
+  const [activeView, setActiveView] = React.useState<ActiveView>('overview');
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [personaSearchQuery, setPersonaSearchQuery] = React.useState('');
+  const [userFilter, setUserFilter] = React.useState<UserFilter>('all');
+  const [sortField, setSortField] = React.useState<SortField>('name');
+  const [sortDir, setSortDir] = React.useState<SortDir>('asc');
   const [selectedUserId, setSelectedUserId] = React.useState<string | null>(null);
   const [bulkLimit, setBulkLimit] = React.useState('');
   const [bulkSaving, setBulkSaving] = React.useState(false);
   const [statusSavingUserId, setStatusSavingUserId] = React.useState<string | null>(null);
-  const [activeView, setActiveView] = React.useState<'overview' | 'users' | 'settings'>('overview');
-  const [sortField, setSortField] = React.useState<string>('name');
-  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
+  const [bannerDraft, setBannerDraft] = React.useState<BannerDraft>(emptyBannerDraft);
+  const [bannerSaving, setBannerSaving] = React.useState(false);
+  const [personaDraft, setPersonaDraft] = React.useState<PersonaDraft>(emptyPersonaDraft);
+  const [personaEditorMode, setPersonaEditorMode] = React.useState<'create' | 'edit' | null>(null);
+  const [personaSaving, setPersonaSaving] = React.useState(false);
+  const [personaDeletingId, setPersonaDeletingId] = React.useState<string | null>(null);
+  const [personaSeeding, setPersonaSeeding] = React.useState(false);
 
   const loadAllData = React.useCallback(() => {
     if (!isAdmin) return;
+
     setLoading(true);
-    Promise.all([apiAsyncNode.admin.globalStats.query(), apiAsyncNode.admin.listUsers.query(), apiAsyncNode.admin.topUsers.query()])
-      .then(([stats, userList, top]) => {
+    Promise.all([
+      apiAsyncNode.admin.globalStats.query(),
+      apiAsyncNode.admin.listUsers.query(),
+      apiAsyncNode.admin.topUsers.query({ limit: 10 }),
+      apiAsyncNode.admin.usageOverview.query(),
+      apiAsyncNode.admin.getAdminBanner.query(),
+      apiAsyncNode.admin.listSystemPersonas.query(),
+    ])
+      .then(([stats, userList, top, overview, banner, personas]) => {
         setGlobalStats(stats);
         setUsers(userList);
         setTopUsers(top);
+        setUsageOverview(overview);
+        setAdminBanner(banner);
+        setSystemPersonas(personas);
+        setBannerDraft(bannerToDraft(banner));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -633,6 +1124,7 @@ export function AppAdmin() {
       setCheckingAdmin(false);
       return;
     }
+
     setCheckingAdmin(true);
     apiAsyncNode.admin.isAdmin
       .query()
@@ -645,6 +1137,149 @@ export function AppAdmin() {
     loadAllData();
   }, [loadAllData]);
 
+  const accountCounts = React.useMemo(() => {
+    const active = users.filter((user) => isUserActive(user.isActive)).length;
+    const inactive = users.length - active;
+    const zeroCredit = users.filter((user) => user.tokenLimit === 0).length;
+    const unlimited = users.filter((user) => user.tokenLimit == null).length;
+    const nearCap = users.filter((user) => {
+      const pct = tokenLimitPct(user.tokenLimit, getMonthTokens(user));
+      return user.tokenLimit != null && user.tokenLimit > 0 && pct >= 75;
+    }).length;
+    const attention = users.filter((user) => attentionScore(user) > 0).length;
+    return { active, inactive, zeroCredit, unlimited, nearCap, attention };
+  }, [users]);
+
+  const creditStats = React.useMemo(() => {
+    let allocated = 0;
+    let usedAgainstAllocated = 0;
+    let finiteUsers = 0;
+    for (const user of users) {
+      if (user.tokenLimit != null && user.tokenLimit > 0) {
+        allocated += user.tokenLimit;
+        usedAgainstAllocated += getMonthTokens(user);
+        finiteUsers += 1;
+      }
+    }
+    return {
+      allocated,
+      usedAgainstAllocated,
+      finiteUsers,
+      pct: allocated > 0 ? Math.min(100, (usedAgainstAllocated / allocated) * 100) : 0,
+    };
+  }, [users]);
+
+  const priorityUsers = React.useMemo(() => {
+    return [...users]
+      .filter((user) => attentionScore(user) > 0)
+      .sort((a, b) => attentionScore(b) - attentionScore(a))
+      .slice(0, 8);
+  }, [users]);
+
+  const filteredUsers = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return users.filter((user) => {
+      const health = userHealth(user);
+      const matchesQuery = !query || user.name?.toLowerCase().includes(query) || user.email?.toLowerCase().includes(query);
+      if (!matchesQuery) return false;
+
+      switch (userFilter) {
+        case 'attention':
+          return attentionScore(user) > 0;
+        case 'active':
+          return isUserActive(user.isActive);
+        case 'inactive':
+          return !isUserActive(user.isActive);
+        case 'zero':
+          return user.tokenLimit === 0;
+        case 'near':
+          return health.label === 'Near cap' || health.label === 'Critical' || health.label === 'Exhausted';
+        case 'unlimited':
+          return user.tokenLimit == null;
+        default:
+          return true;
+      }
+    });
+  }, [searchQuery, userFilter, users]);
+
+  const sortedUsers = React.useMemo(() => {
+    return [...filteredUsers].sort((a, b) => {
+      let av: string | number = '';
+      let bv: string | number = '';
+
+      switch (sortField) {
+        case 'name':
+          av = (a.name || a.email || '').toLowerCase();
+          bv = (b.name || b.email || '').toLowerCase();
+          break;
+        case 'status':
+          av = attentionScore(a);
+          bv = attentionScore(b);
+          break;
+        case 'monthTokens':
+          av = getMonthTokens(a);
+          bv = getMonthTokens(b);
+          break;
+        case 'remaining':
+          av = tokenRemainingValue(a.tokenLimit, getMonthTokens(a)) ?? Number.POSITIVE_INFINITY;
+          bv = tokenRemainingValue(b.tokenLimit, getMonthTokens(b)) ?? Number.POSITIVE_INFINITY;
+          break;
+        case 'limit':
+          av = a.tokenLimit ?? Number.POSITIVE_INFINITY;
+          bv = b.tokenLimit ?? Number.POSITIVE_INFINITY;
+          break;
+        case 'lastSeen':
+          av = getLastSeen(a)?.getTime() ?? 0;
+          bv = getLastSeen(b)?.getTime() ?? 0;
+          break;
+        case 'conversations':
+          av = a._count.conversations;
+          bv = b._count.conversations;
+          break;
+      }
+
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredUsers, sortDir, sortField]);
+
+  const filteredPersonas = React.useMemo(() => {
+    const query = personaSearchQuery.trim().toLowerCase();
+    if (!query) return systemPersonas;
+    return systemPersonas.filter(
+      (persona) =>
+        persona.id.toLowerCase().includes(query) || persona.title.toLowerCase().includes(query) || (persona.description ?? '').toLowerCase().includes(query),
+    );
+  }, [personaSearchQuery, systemPersonas]);
+
+  const personaCounts = React.useMemo(() => {
+    const active = systemPersonas.filter((persona) => persona.isActive).length;
+    const highlighted = systemPersonas.filter((persona) => persona.highlighted).length;
+    return {
+      active,
+      inactive: systemPersonas.length - active,
+      highlighted,
+    };
+  }, [systemPersonas]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) setSortDir((direction) => (direction === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortField(field);
+      setSortDir(field === 'name' ? 'asc' : 'desc');
+    }
+  };
+
+  const handleToggleUserActive = (userId: string, currentIsActive: boolean) => {
+    setStatusSavingUserId(userId);
+    apiAsyncNode.admin.setUserActive
+      .mutate({ userId, isActive: !currentIsActive })
+      .then(() => loadAllData())
+      .catch((error) => alert(error?.message || 'Failed to update account status'))
+      .finally(() => setStatusSavingUserId(null));
+  };
+
   const handleSetAllLimits = (tokenLimit: number | null) => {
     setBulkSaving(true);
     apiAsyncNode.admin.setAllTokenLimits
@@ -654,27 +1289,100 @@ export function AppAdmin() {
         alert('Updated ' + data.updated + ' users');
         loadAllData();
       })
-      .catch(() => alert('Failed to update limits'))
+      .catch((error) => alert(error?.message || 'Failed to update limits'))
       .finally(() => setBulkSaving(false));
   };
 
-  const handleToggleUserActive = (userId: string, currentIsActive: boolean) => {
-    setStatusSavingUserId(userId);
-    apiAsyncNode.admin.setUserActive
+  const handlePublishBanner = (enabledOverride?: boolean) => {
+    const enabled = enabledOverride ?? bannerDraft.enabled;
+    const expiresAt = fromDateTimeLocalValue(bannerDraft.expiresAt);
+
+    if (enabled && !bannerDraft.message.trim()) {
+      alert('Banner message is required when the banner is live.');
+      return;
+    }
+
+    setBannerSaving(true);
+    apiAsyncNode.admin.setAdminBanner
       .mutate({
-        userId,
-        isActive: !currentIsActive,
+        enabled,
+        tone: bannerDraft.tone,
+        title: bannerDraft.title.trim() || null,
+        message: bannerDraft.message.trim(),
+        ctaLabel: bannerDraft.ctaLabel.trim() || null,
+        ctaUrl: bannerDraft.ctaUrl.trim() || null,
+        expiresAt,
       })
-      .then(() => loadAllData())
-      .catch(() => alert('Failed to update account status'))
-      .finally(() => setStatusSavingUserId(null));
+      .then((banner) => {
+        setAdminBanner(banner);
+        setBannerDraft(bannerToDraft(banner));
+      })
+      .catch((error) => alert(error?.message || 'Failed to publish banner'))
+      .finally(() => setBannerSaving(false));
   };
 
-  // Auth gates
+  const handleOpenCreatePersona = () => {
+    setPersonaDraft(emptyPersonaDraft);
+    setPersonaEditorMode('create');
+  };
+
+  const handleOpenEditPersona = (persona: AdminSystemPersona) => {
+    setPersonaDraft(personaToDraft(persona));
+    setPersonaEditorMode('edit');
+  };
+
+  const handleSavePersona = () => {
+    if (!personaEditorMode) return;
+    if (!personaDraft.title.trim() || !personaDraft.systemMessage.trim()) {
+      alert('Title and system prompt are required.');
+      return;
+    }
+
+    setPersonaSaving(true);
+    const payload = personaDraftPayload(personaDraft, personaEditorMode === 'edit');
+    const request =
+      personaEditorMode === 'create'
+        ? apiAsyncNode.admin.createSystemPersona.mutate(payload as any)
+        : apiAsyncNode.admin.updateSystemPersona.mutate(payload as any);
+
+    request
+      .then(() => {
+        setPersonaEditorMode(null);
+        loadAllData();
+      })
+      .catch((error) => alert(error?.message || 'Failed to save persona'))
+      .finally(() => setPersonaSaving(false));
+  };
+
+  const handleDeletePersona = (persona: AdminSystemPersona) => {
+    if (!confirm('Delete "' + persona.title + '"?')) return;
+
+    setPersonaDeletingId(persona.id);
+    apiAsyncNode.admin.deleteSystemPersona
+      .mutate({ id: persona.id })
+      .then(() => loadAllData())
+      .catch((error) => alert(error?.message || 'Failed to delete persona'))
+      .finally(() => setPersonaDeletingId(null));
+  };
+
+  const handleSeedPersonas = () => {
+    if (!confirm('Seed/refresh personas from the current JSON? Existing seeded IDs will be overwritten.')) return;
+
+    setPersonaSeeding(true);
+    apiAsyncNode.admin.seedSystemPersonas
+      .mutate()
+      .then((result) => {
+        alert('Seeded ' + result.upserted + ' personas.');
+        loadAllData();
+      })
+      .catch((error) => alert(error?.message || 'Failed to seed personas'))
+      .finally(() => setPersonaSeeding(false));
+  };
+
   if (!session?.user)
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--joy-palette-background-body)' }}>
-        <Typography level="h4" sx={{ opacity: 0.6 }}>
+      <Box sx={{ display: 'grid', placeItems: 'center', minHeight: '100%', background: 'var(--joy-palette-background-body)' }}>
+        <Typography level="h4" sx={{ color: 'text.tertiary' }}>
           Sign in required
         </Typography>
       </Box>
@@ -682,314 +1390,687 @@ export function AppAdmin() {
 
   if (checkingAdmin)
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--joy-palette-background-body)' }}>
+      <Box sx={{ display: 'grid', placeItems: 'center', minHeight: '100%', background: 'var(--joy-palette-background-body)' }}>
         <CircularProgress size="lg" />
       </Box>
     );
 
   if (!isAdmin)
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          gap: 2,
-          background: 'var(--joy-palette-background-body)',
-        }}
-      >
-        <BlockIcon sx={{ fontSize: 48, opacity: 0.3 }} />
-        <Typography level="h4" sx={{ opacity: 0.6 }}>
-          Access Denied
-        </Typography>
-        <Typography level="body-sm" sx={{ opacity: 0.4 }}>
-          Admin privileges required
-        </Typography>
+      <Box sx={{ display: 'grid', placeItems: 'center', minHeight: '100%', background: 'var(--joy-palette-background-body)', p: 3 }}>
+        <Stack spacing={1.25} sx={{ alignItems: 'center' }}>
+          <ShieldIcon sx={{ fontSize: 48, color: 'text.tertiary' }} />
+          <Typography level="h4">Access denied</Typography>
+          <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
+            Admin privileges required
+          </Typography>
+        </Stack>
       </Box>
     );
 
-  // Filtering + sorting
-  const filtered = users.filter(
-    (u: any) => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
-  const sorted = [...filtered].sort((a: any, b: any) => {
-    let av: any, bv: any;
-    switch (sortField) {
-      case 'name':
-        av = (a.name || '').toLowerCase();
-        bv = (b.name || '').toLowerCase();
-        break;
-      case 'email':
-        av = (a.email || '').toLowerCase();
-        bv = (b.email || '').toLowerCase();
-        break;
-      case 'status':
-        av = isUserActive(a.isActive) ? 1 : 0;
-        bv = isUserActive(b.isActive) ? 1 : 0;
-        break;
-      case 'conversations':
-        av = a._count.conversations;
-        bv = b._count.conversations;
-        break;
-      case 'monthTokens':
-        av = a.monthUsage?._sum?.totalTokens ?? 0;
-        bv = b.monthUsage?._sum?.totalTokens ?? 0;
-        break;
-      case 'remaining':
-        av = tokenRemainingValue(a.tokenLimit, a.monthUsage?._sum?.totalTokens ?? 0) ?? Number.POSITIVE_INFINITY;
-        bv = tokenRemainingValue(b.tokenLimit, b.monthUsage?._sum?.totalTokens ?? 0) ?? Number.POSITIVE_INFINITY;
-        break;
-      case 'limit':
-        av = a.tokenLimit ?? Number.POSITIVE_INFINITY;
-        bv = b.tokenLimit ?? Number.POSITIVE_INFINITY;
-        break;
-      default:
-        av = a.name || '';
-        bv = b.name || '';
-    }
-    if (av < bv) return sortDir === 'asc' ? -1 : 1;
-    if (av > bv) return sortDir === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const handleSort = (field: string) => {
-    if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortField(field);
-      setSortDir('desc');
-    }
-  };
-
-  const SortArrow = ({ field }: { field: string }) => {
-    if (sortField !== field) return null;
-    return sortDir === 'asc' ? (
-      <ArrowUpwardIcon sx={{ fontSize: 14, ml: 0.3, verticalAlign: 'middle' }} />
-    ) : (
-      <ArrowDownwardIcon sx={{ fontSize: 14, ml: 0.3, verticalAlign: 'middle' }} />
-    );
-  };
-
-  const activeUsersCount = users.filter((user: any) => isUserActive(user.isActive)).length;
-  const inactiveUsersCount = users.length - activeUsersCount;
-  const zeroCreditUsersCount = users.filter((user: any) => user.tokenLimit === 0).length;
-
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--joy-palette-background-body)' }}>
-      {/* === Top Bar === */}
+    <Box sx={{ minHeight: '100%', display: 'flex', flexDirection: 'column', background: 'var(--joy-palette-background-body)' }}>
       <Box
         sx={{
-          px: 3,
-          py: 1.75,
+          px: { xs: 1.5, md: 2.5 },
+          py: 1.5,
           display: 'flex',
           alignItems: 'center',
-          gap: 2,
-          flexShrink: 0,
+          gap: 1.5,
           borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
           background: 'var(--joy-palette-background-surface)',
-          backdropFilter: 'blur(12px)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          flexWrap: 'wrap',
         }}
       >
-        {/* Brand */}
         <Box
           sx={{
-            width: 36,
-            height: 36,
-            borderRadius: 'lg',
+            width: 38,
+            height: 38,
             display: 'grid',
             placeItems: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: 8,
+            background: 'var(--joy-palette-neutral-900)',
             color: '#fff',
             flexShrink: 0,
           }}
         >
-          <DashboardIcon sx={{ fontSize: 20 }} />
+          <AdminPanelSettingsIcon />
         </Box>
-        <Box sx={{ mr: 2 }}>
-          <Typography level="title-md" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-            Admin
+        <Box sx={{ mr: { xs: 0, md: 2 }, minWidth: 170 }}>
+          <Typography level="title-lg" sx={{ fontWeight: 900, lineHeight: 1 }}>
+            Admin Command
           </Typography>
-          <Typography level="body-xs" sx={{ opacity: 0.45, lineHeight: 1 }}>
-            Control Panel
+          <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+            {session.user.email}
           </Typography>
         </Box>
-
-        {/* Nav pills */}
-        <Box sx={{ display: 'flex', gap: 0.75, flex: 1 }}>
-          <NavPill
-            icon={<DashboardIcon sx={{ fontSize: 16 }} />}
+        <Box sx={{ display: 'flex', gap: 0.75, flex: 1, flexWrap: 'wrap' }}>
+          <NavButton
+            icon={<DashboardIcon sx={{ fontSize: 17 }} />}
             label="Overview"
             active={activeView === 'overview'}
             onClick={() => setActiveView('overview')}
           />
-          <NavPill
-            icon={<GroupIcon sx={{ fontSize: 16 }} />}
-            label="Users"
-            active={activeView === 'users'}
+          <NavButton
+            icon={<GroupIcon sx={{ fontSize: 17 }} />}
+            label="People"
             badge={users.length}
-            onClick={() => setActiveView('users')}
+            active={activeView === 'people'}
+            onClick={() => setActiveView('people')}
           />
-          <NavPill
-            icon={<SettingsIcon sx={{ fontSize: 16 }} />}
-            label="Settings"
-            active={activeView === 'settings'}
-            onClick={() => setActiveView('settings')}
+          <NavButton
+            icon={<CreditScoreIcon sx={{ fontSize: 17 }} />}
+            label="Credits"
+            badge={accountCounts.attention || undefined}
+            active={activeView === 'credits'}
+            onClick={() => setActiveView('credits')}
+          />
+          <NavButton
+            icon={<PersonIcon sx={{ fontSize: 17 }} />}
+            label="Personas"
+            badge={systemPersonas.length}
+            active={activeView === 'personas'}
+            onClick={() => setActiveView('personas')}
+          />
+          <NavButton
+            icon={<CampaignIcon sx={{ fontSize: 17 }} />}
+            label="Broadcast"
+            active={activeView === 'broadcast'}
+            onClick={() => setActiveView('broadcast')}
           />
         </Box>
-
-        {/* Right side */}
-        <Typography level="body-xs" sx={{ opacity: 0.4, display: { xs: 'none', md: 'block' } }}>
-          {session.user?.email}
-        </Typography>
-        <Tooltip title="Refresh all data">
-          <IconButton variant="outlined" size="sm" onClick={loadAllData} disabled={loading} sx={{ borderRadius: 'lg' }}>
+        <Chip color={adminBanner?.enabled ? adminBanner.tone : 'neutral'} variant="soft" startDecorator={<FiberManualRecordIcon sx={{ fontSize: 10 }} />}>
+          {adminBanner?.enabled ? 'Banner live' : 'No live banner'}
+        </Chip>
+        <Tooltip title="Refresh">
+          <IconButton size="sm" variant="outlined" onClick={loadAllData} disabled={loading} sx={{ borderRadius: 8 }}>
             <RefreshIcon
-              sx={{
-                fontSize: 18,
-                ...(loading ? { animation: 'spin 1s linear infinite', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } } } : {}),
-              }}
+              sx={loading ? { animation: 'admin-spin 1s linear infinite', '@keyframes admin-spin': { '100%': { transform: 'rotate(360deg)' } } } : undefined}
             />
           </IconButton>
         </Tooltip>
       </Box>
 
-      {/* === Content === */}
-      <Box sx={{ flex: 1, overflow: 'auto', px: 3, py: 3 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', px: { xs: 1.5, md: 3 }, py: { xs: 2, md: 3 } }}>
         {loading && !globalStats ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}>
+          <Box sx={{ display: 'grid', placeItems: 'center', py: 12 }}>
             <CircularProgress size="lg" />
           </Box>
         ) : (
           <>
-            {/* ====== OVERVIEW ====== */}
             {activeView === 'overview' && (
-              <Stack spacing={3.5} sx={{ maxWidth: 1200, mx: 'auto' }}>
-                {/* Metric tiles */}
-                {globalStats && (
-                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                    <MetricTile accent="blue" icon={<PeopleAltIcon sx={{ fontSize: 20 }} />} label="Total Users" value={globalStats.userCount} />
-                    <MetricTile
-                      accent="cyan"
-                      icon={<SpeedIcon sx={{ fontSize: 20 }} />}
-                      label="Today"
-                      value={fmtNum(globalStats.today._sum.totalTokens)}
-                      sub={`${fmtNum(globalStats.today._count)} requests`}
-                    />
-                    <MetricTile
-                      accent="orange"
-                      icon={<TokenIcon sx={{ fontSize: 20 }} />}
-                      label="This Month"
-                      value={fmtNum(globalStats.thisMonth._sum.totalTokens)}
-                      sub={fmtCost(globalStats.thisMonth._sum.costCents)}
-                    />
-                    <MetricTile
-                      accent="green"
-                      icon={<AttachMoneyIcon sx={{ fontSize: 20 }} />}
-                      label="All Time"
-                      value={fmtNum(globalStats.allTime._sum.totalTokens)}
-                      sub={fmtCost(globalStats.allTime._sum.costCents)}
-                    />
+              <Stack spacing={2.5} sx={{ maxWidth: 1480, mx: 'auto' }}>
+                <Surface
+                  sx={{ p: { xs: 2, md: 3 }, background: 'linear-gradient(135deg, rgba(14,165,164,0.10), rgba(37,99,235,0.08) 52%, rgba(245,158,11,0.08))' }}
+                >
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr auto' }, gap: 2.5, alignItems: 'center' }}>
+                    <Box>
+                      <Typography level="h1" sx={{ fontWeight: 950, lineHeight: 1.02, fontSize: { xs: 34, md: 46 } }}>
+                        Operational cockpit
+                      </Typography>
+                      <Typography level="body-md" sx={{ color: 'text.secondary', mt: 1, maxWidth: 760 }}>
+                        Users, credits, demand, and broadcast status in one place.
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(90px, 1fr))', gap: 1 }}>
+                      <Surface sx={{ p: 1.5, textAlign: 'center' }}>
+                        <Typography level="h3" sx={{ fontWeight: 900 }}>
+                          {accountCounts.attention}
+                        </Typography>
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                          Need action
+                        </Typography>
+                      </Surface>
+                      <Surface sx={{ p: 1.5, textAlign: 'center' }}>
+                        <Typography level="h3" sx={{ fontWeight: 900 }}>
+                          {usageOverview?.activeUsers ?? 0}
+                        </Typography>
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                          Active 14d
+                        </Typography>
+                      </Surface>
+                      <Surface sx={{ p: 1.5, textAlign: 'center' }}>
+                        <Typography level="h3" sx={{ fontWeight: 900 }}>
+                          {fmtNum(globalStats?.today?._count ?? 0)}
+                        </Typography>
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                          Requests today
+                        </Typography>
+                      </Surface>
+                    </Box>
                   </Box>
-                )}
+                </Surface>
 
-                {/* Leaderboard */}
-                {topUsers.length > 0 && (
-                  <Box
-                    sx={{
-                      border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                      borderRadius: 'xl',
-                      overflow: 'hidden',
-                      background: 'var(--joy-palette-background-surface)',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        px: 2.5,
-                        py: 2,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.5,
-                        borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                      }}
-                    >
-                      <EmojiEventsIcon sx={{ fontSize: 20, color: '#f2994a' }} />
-                      <Typography level="title-md" sx={{ fontWeight: 700 }}>
-                        Top Users This Month
-                      </Typography>
-                      <Typography level="body-xs" sx={{ ml: 'auto', opacity: 0.4 }}>
-                        Click to view details
-                      </Typography>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  <MetricTile
+                    color="primary"
+                    icon={<GroupIcon />}
+                    label="Total Users"
+                    value={globalStats?.userCount ?? users.length}
+                    sub={`${accountCounts.active} active, ${accountCounts.inactive} inactive`}
+                  />
+                  <MetricTile
+                    color="success"
+                    icon={<SpeedIcon />}
+                    label="Today"
+                    value={fmtNum(globalStats?.today?._sum?.totalTokens)}
+                    sub={`${fmtNum(globalStats?.today?._count)} requests`}
+                  />
+                  <MetricTile
+                    color="warning"
+                    icon={<TokenIcon />}
+                    label="This Month"
+                    value={fmtNum(globalStats?.thisMonth?._sum?.totalTokens)}
+                    sub={fmtCost(globalStats?.thisMonth?._sum?.costCents)}
+                  />
+                  <MetricTile
+                    color="danger"
+                    icon={<WarningIcon />}
+                    label="Risk Queue"
+                    value={accountCounts.attention}
+                    sub={`${accountCounts.zeroCredit} zero credit, ${accountCounts.nearCap} near cap`}
+                  />
+                </Box>
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.4fr 0.9fr' }, gap: 2.5 }}>
+                  <Surface>
+                    <SectionHeader
+                      icon={<BarChartIcon sx={{ fontSize: 18 }} />}
+                      title="Demand, Last 14 Days"
+                      right={
+                        <Chip variant="soft" color="neutral">
+                          {fmtNum(usageOverview?.daily.reduce((sum, day) => sum + day.requests, 0) ?? 0)} requests
+                        </Chip>
+                      }
+                    />
+                    <DailyUsageBars overview={usageOverview} />
+                  </Surface>
+
+                  <Surface>
+                    <SectionHeader
+                      icon={<InsightsIcon sx={{ fontSize: 18 }} />}
+                      title="Credit Pressure"
+                      right={
+                        <Chip color={creditStats.pct >= 90 ? 'danger' : creditStats.pct >= 75 ? 'warning' : 'success'} variant="soft">
+                          {creditStats.pct.toFixed(0)}%
+                        </Chip>
+                      }
+                    />
+                    <Box sx={{ p: 2.5 }}>
+                      <LinearProgress
+                        determinate
+                        value={creditStats.pct}
+                        color={creditStats.pct >= 90 ? 'danger' : creditStats.pct >= 75 ? 'warning' : 'success'}
+                        sx={{ height: 10, borderRadius: 8, mb: 1.5 }}
+                      />
+                      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.25 }}>
+                        <Box>
+                          <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                            Allocated
+                          </Typography>
+                          <Typography level="title-md" sx={{ fontWeight: 900 }}>
+                            {fmtNum(creditStats.allocated)}
+                          </Typography>
+                        </Box>
+                        <Box>
+                          <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                            Used
+                          </Typography>
+                          <Typography level="title-md" sx={{ fontWeight: 900 }}>
+                            {fmtNum(creditStats.usedAgainstAllocated)}
+                          </Typography>
+                        </Box>
+                        <Box>
+                          <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                            Limited users
+                          </Typography>
+                          <Typography level="title-md" sx={{ fontWeight: 900 }}>
+                            {creditStats.finiteUsers}
+                          </Typography>
+                        </Box>
+                      </Box>
                     </Box>
-                    <Box sx={{ py: 0.5 }}>
-                      {topUsers.map((entry, i) => (
-                        <LeaderboardRow
-                          key={entry.userId}
-                          rank={i + 1}
-                          name={entry.user?.name || 'Unknown'}
-                          email={entry.user?.email || ''}
-                          image={entry.user?.image}
-                          tokens={fmtNum(entry._sum.totalTokens)}
-                          cost={fmtCost(entry._sum.costCents)}
-                          requests={entry._count}
-                          onClick={() => setSelectedUserId(entry.userId)}
-                        />
-                      ))}
-                    </Box>
-                  </Box>
-                )}
+                  </Surface>
+                </Box>
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '0.95fr 1.05fr' }, gap: 2.5 }}>
+                  <Surface>
+                    <SectionHeader
+                      icon={<WarningIcon sx={{ fontSize: 18 }} />}
+                      title="Attention Queue"
+                      right={
+                        <Button
+                          size="sm"
+                          variant="soft"
+                          color="neutral"
+                          onClick={() => {
+                            setUserFilter('attention');
+                            setActiveView('people');
+                          }}
+                          sx={{ borderRadius: 8 }}
+                        >
+                          Open
+                        </Button>
+                      }
+                    />
+                    {priorityUsers.length ? (
+                      <Stack spacing={0} divider={<Divider />}>
+                        {priorityUsers.map((user) => {
+                          const health = userHealth(user);
+                          return (
+                            <Box
+                              key={user.id}
+                              onClick={() => setSelectedUserId(user.id)}
+                              sx={{
+                                display: 'grid',
+                                gridTemplateColumns: 'minmax(0, 1fr) auto',
+                                alignItems: 'center',
+                                gap: 1.5,
+                                px: 2.5,
+                                py: 1.5,
+                                cursor: 'pointer',
+                                '&:hover': { background: 'var(--joy-palette-neutral-softBg)' },
+                              }}
+                            >
+                              <UserIdentity user={user} />
+                              <Box sx={{ textAlign: 'right' }}>
+                                <Chip size="sm" color={health.color} variant="soft" startDecorator={health.icon}>
+                                  {health.label}
+                                </Chip>
+                                <Typography level="body-xs" sx={{ color: 'text.tertiary', mt: 0.5 }}>
+                                  {health.detail}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          );
+                        })}
+                      </Stack>
+                    ) : (
+                      <Box sx={{ p: 3, color: 'text.tertiary' }}>
+                        <Typography level="body-sm">No account needs attention right now</Typography>
+                      </Box>
+                    )}
+                  </Surface>
+
+                  <Surface>
+                    <SectionHeader icon={<BoltIcon sx={{ fontSize: 18 }} />} title="Top Users This Month" />
+                    {topUsers.length ? (
+                      <Box>
+                        {topUsers.map((entry, index) => (
+                          <LeaderboardRow key={entry.userId} rank={index + 1} entry={entry} onOpen={() => setSelectedUserId(entry.userId)} />
+                        ))}
+                      </Box>
+                    ) : (
+                      <Box sx={{ p: 3, color: 'text.tertiary' }}>
+                        <Typography level="body-sm">No monthly usage yet</Typography>
+                      </Box>
+                    )}
+                  </Surface>
+                </Box>
               </Stack>
             )}
 
-            {/* ====== USERS ====== */}
-            {activeView === 'users' && (
-              <Stack spacing={2} sx={{ maxWidth: 1400, mx: 'auto' }}>
-                <Box
-                  sx={{
-                    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                    borderRadius: 'xl',
-                    background: 'var(--joy-palette-background-surface)',
-                    overflow: 'hidden',
-                  }}
-                >
+            {activeView === 'people' && (
+              <Stack spacing={2} sx={{ maxWidth: 1480, mx: 'auto' }}>
+                <Surface>
                   <Box
                     sx={{
                       px: 2.5,
                       py: 2,
                       display: 'flex',
-                      gap: 1.5,
+                      gap: 1.25,
                       alignItems: 'center',
-                      justifyContent: 'space-between',
                       flexWrap: 'wrap',
                       borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                      background: 'var(--joy-palette-background-level1)',
                     }}
                   >
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
-                      <Input
-                        size="sm"
-                        placeholder="Search by name or email..."
-                        startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        sx={{ flex: 1, minWidth: 260, maxWidth: 420, borderRadius: 'xl', '--Input-focusedThickness': '2px' }}
-                      />
-                      <Chip variant="soft" color="neutral" size="sm" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {sorted.length === users.length ? `${users.length} users` : `${sorted.length} of ${users.length}`}
+                    <Input
+                      size="sm"
+                      placeholder="Search users"
+                      startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      sx={{ flex: '1 1 280px', maxWidth: 520, borderRadius: 8 }}
+                    />
+                    <Select
+                      size="sm"
+                      value={userFilter}
+                      onChange={(_, value) => value && setUserFilter(value as UserFilter)}
+                      sx={{ minWidth: 170, borderRadius: 8 }}
+                    >
+                      <Option value="all">All users</Option>
+                      <Option value="attention">Needs action</Option>
+                      <Option value="active">Active</Option>
+                      <Option value="inactive">Inactive</Option>
+                      <Option value="zero">Zero credits</Option>
+                      <Option value="near">Near cap</Option>
+                      <Option value="unlimited">Unlimited</Option>
+                    </Select>
+                    <Chip variant="soft" color="neutral">
+                      {sortedUsers.length === users.length ? `${users.length} users` : `${sortedUsers.length} of ${users.length}`}
+                    </Chip>
+                    <Box sx={{ ml: 'auto', display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                      <Chip size="sm" color="success" variant="soft">
+                        {accountCounts.active} active
+                      </Chip>
+                      <Chip size="sm" color="danger" variant="soft">
+                        {accountCounts.inactive} inactive
+                      </Chip>
+                      <Chip size="sm" color="warning" variant="soft">
+                        {accountCounts.zeroCredit} zero credit
                       </Chip>
                     </Box>
+                  </Box>
+                  <Sheet variant="plain" sx={{ overflowX: 'auto' }}>
+                    <Table
+                      size="md"
+                      stickyHeader
+                      hoverRow
+                      sx={{
+                        minWidth: 1120,
+                        '& th': { py: 1.5, px: 2, fontWeight: 900, color: 'text.tertiary', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' },
+                        '& td': { py: 1.35, px: 2, verticalAlign: 'middle' },
+                        '& tbody tr': { cursor: 'pointer' },
+                      }}
+                    >
+                      <thead>
+                        <tr>
+                          <th onClick={() => handleSort('name')}>
+                            Member <SortArrow field="name" sortField={sortField} sortDir={sortDir} />
+                          </th>
+                          <th onClick={() => handleSort('status')}>
+                            Health <SortArrow field="status" sortField={sortField} sortDir={sortDir} />
+                          </th>
+                          <th onClick={() => handleSort('monthTokens')}>
+                            Monthly Usage <SortArrow field="monthTokens" sortField={sortField} sortDir={sortDir} />
+                          </th>
+                          <th onClick={() => handleSort('remaining')} style={{ textAlign: 'right' }}>
+                            Remaining <SortArrow field="remaining" sortField={sortField} sortDir={sortDir} />
+                          </th>
+                          <th onClick={() => handleSort('limit')}>
+                            Limit <SortArrow field="limit" sortField={sortField} sortDir={sortDir} />
+                          </th>
+                          <th onClick={() => handleSort('conversations')} style={{ textAlign: 'right' }}>
+                            Convos <SortArrow field="conversations" sortField={sortField} sortDir={sortDir} />
+                          </th>
+                          <th onClick={() => handleSort('lastSeen')}>
+                            Last Seen <SortArrow field="lastSeen" sortField={sortField} sortDir={sortDir} />
+                          </th>
+                          <th style={{ textAlign: 'right', cursor: 'default' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedUsers.map((user) => {
+                          const used = getMonthTokens(user);
+                          const health = userHealth(user);
+                          const active = isUserActive(user.isActive);
+                          return (
+                            <tr key={user.id} onClick={() => setSelectedUserId(user.id)}>
+                              <td>
+                                <UserIdentity user={user} />
+                              </td>
+                              <td>
+                                <Chip size="sm" color={health.color} variant="soft" startDecorator={health.icon}>
+                                  {health.label}
+                                </Chip>
+                              </td>
+                              <td>
+                                <UsageProgress used={used} limit={user.tokenLimit} />
+                              </td>
+                              <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{tokenRemainingLabel(user.tokenLimit, used)}</td>
+                              <td>
+                                <Chip size="sm" variant="outlined" color={user.tokenLimit === 0 ? 'danger' : user.tokenLimit == null ? 'neutral' : 'primary'}>
+                                  {tokenLimitLabel(user.tokenLimit)}
+                                </Chip>
+                              </td>
+                              <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{user._count.conversations}</td>
+                              <td>{fmtDateTime(getLastSeen(user))}</td>
+                              <td style={{ textAlign: 'right' }}>
+                                <Button
+                                  size="sm"
+                                  variant={active ? 'outlined' : 'solid'}
+                                  color={active ? 'danger' : 'success'}
+                                  loading={statusSavingUserId === user.id}
+                                  disabled={isAdminEmail(user.email)}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleToggleUserActive(user.id, active);
+                                  }}
+                                  sx={{ borderRadius: 8, minWidth: 108 }}
+                                >
+                                  {active ? 'Set Inactive' : 'Activate'}
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {!sortedUsers.length && (
+                          <tr>
+                            <td colSpan={8}>
+                              <Box sx={{ py: 6, textAlign: 'center', color: 'text.tertiary' }}>
+                                <Typography level="body-sm">No users match this view</Typography>
+                              </Box>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </Table>
+                  </Sheet>
+                </Surface>
+              </Stack>
+            )}
 
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      <Chip size="sm" variant="soft" color="success" startDecorator={<CheckCircleIcon sx={{ fontSize: 12 }} />}>
-                        {activeUsersCount} active
+            {activeView === 'credits' && (
+              <Stack spacing={2.5} sx={{ maxWidth: 1180, mx: 'auto' }}>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  <MetricTile
+                    color="primary"
+                    icon={<CreditScoreIcon />}
+                    label="Allocated Credits"
+                    value={fmtNum(creditStats.allocated)}
+                    sub={`${creditStats.finiteUsers} limited users`}
+                  />
+                  <MetricTile
+                    color="success"
+                    icon={<TokenIcon />}
+                    label="Used Against Caps"
+                    value={fmtNum(creditStats.usedAgainstAllocated)}
+                    sub={`${creditStats.pct.toFixed(0)}% of allocated`}
+                  />
+                  <MetricTile color="danger" icon={<BlockIcon />} label="Zero Credit Users" value={accountCounts.zeroCredit} sub="Cannot chat until funded" />
+                  <MetricTile color="neutral" icon={<AllInclusiveIcon />} label="Unlimited Users" value={accountCounts.unlimited} sub="No monthly cap" />
+                </Box>
+
+                <Surface>
+                  <SectionHeader
+                    icon={<TuneIcon sx={{ fontSize: 18 }} />}
+                    title="Bulk Credit Operations"
+                    right={
+                      <Chip color="warning" variant="soft">
+                        Affects all non-admin users
                       </Chip>
-                      <Chip size="sm" variant="soft" color="danger" startDecorator={<BlockIcon sx={{ fontSize: 12 }} />}>
-                        {inactiveUsersCount} inactive
-                      </Chip>
-                      <Chip size="sm" variant="soft" color="warning" startDecorator={<TokenIcon sx={{ fontSize: 12 }} />}>
-                        {zeroCreditUsersCount} zero credit
-                      </Chip>
+                    }
+                  />
+                  <Box sx={{ p: 2.5 }}>
+                    <Stack spacing={2}>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {creditPresets.map((preset) => (
+                          <Button
+                            key={preset.value}
+                            variant="soft"
+                            color="neutral"
+                            loading={bulkSaving}
+                            startDecorator={<TokenIcon />}
+                            onClick={() => {
+                              if (confirm('Set ' + preset.value.toLocaleString() + ' tokens/month for every non-admin user?')) handleSetAllLimits(preset.value);
+                            }}
+                            sx={{ borderRadius: 8 }}
+                          >
+                            {preset.label} /mo
+                          </Button>
+                        ))}
+                        <Button
+                          variant="soft"
+                          color="danger"
+                          loading={bulkSaving}
+                          startDecorator={<BlockIcon />}
+                          onClick={() => {
+                            if (confirm('Set every non-admin user to 0 monthly credits?')) handleSetAllLimits(0);
+                          }}
+                          sx={{ borderRadius: 8 }}
+                        >
+                          Zero everyone
+                        </Button>
+                        <Button
+                          variant="soft"
+                          color="neutral"
+                          loading={bulkSaving}
+                          startDecorator={<AllInclusiveIcon />}
+                          onClick={() => {
+                            if (confirm('Remove monthly token limits for every non-admin user?')) handleSetAllLimits(null);
+                          }}
+                          sx={{ borderRadius: 8 }}
+                        >
+                          Unlimited everyone
+                        </Button>
+                      </Box>
+                      <Divider />
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Input
+                          size="sm"
+                          placeholder="Custom token limit"
+                          value={bulkLimit}
+                          onChange={(event) => setBulkLimit(event.target.value)}
+                          sx={{ width: 240, borderRadius: 8 }}
+                        />
+                        <Button
+                          size="sm"
+                          loading={bulkSaving}
+                          startDecorator={<SaveIcon />}
+                          onClick={() => {
+                            const value = Number.parseInt(bulkLimit, 10);
+                            if (Number.isNaN(value) || value < 0) return alert('Enter 0 or a positive number');
+                            if (confirm('Set ' + value.toLocaleString() + ' tokens/month for every non-admin user?')) handleSetAllLimits(value);
+                          }}
+                          sx={{ borderRadius: 8 }}
+                        >
+                          Apply custom
+                        </Button>
+                      </Box>
+                    </Stack>
+                  </Box>
+                </Surface>
+
+                <Surface>
+                  <SectionHeader icon={<ManageAccountsIcon sx={{ fontSize: 18 }} />} title="Credit Exceptions" />
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+                      gap: 0,
+                      '& > div': { borderRight: { md: '1px solid var(--joy-palette-neutral-outlinedBorder)' } },
+                      '& > div:last-child': { borderRight: 0 },
+                    }}
+                  >
+                    {[
+                      { title: 'No credits', users: users.filter((user) => user.tokenLimit === 0), color: 'danger' as JoyColor },
+                      {
+                        title: 'Near cap',
+                        users: users.filter((user) => tokenLimitPct(user.tokenLimit, getMonthTokens(user)) >= 75),
+                        color: 'warning' as JoyColor,
+                      },
+                      { title: 'Unlimited', users: users.filter((user) => user.tokenLimit == null), color: 'neutral' as JoyColor },
+                    ].map((group) => (
+                      <Box key={group.title} sx={{ p: 2.5 }}>
+                        <Chip color={group.color} variant="soft" sx={{ mb: 1.5 }}>
+                          {group.title} - {group.users.length}
+                        </Chip>
+                        <Stack spacing={1}>
+                          {group.users.slice(0, 5).map((user) => (
+                            <Box
+                              key={user.id}
+                              onClick={() => setSelectedUserId(user.id)}
+                              sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, cursor: 'pointer' }}
+                            >
+                              <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>
+                                {user.name || user.email}
+                              </Typography>
+                              <Typography level="body-xs" sx={{ color: 'text.tertiary', fontVariantNumeric: 'tabular-nums' }}>
+                                {fmtNum(getMonthTokens(user))}
+                              </Typography>
+                            </Box>
+                          ))}
+                          {!group.users.length && (
+                            <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
+                              None
+                            </Typography>
+                          )}
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Box>
+                </Surface>
+              </Stack>
+            )}
+
+            {activeView === 'personas' && (
+              <Stack spacing={2.5} sx={{ maxWidth: 1480, mx: 'auto' }}>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  <MetricTile
+                    color="primary"
+                    icon={<PersonIcon />}
+                    label="Total Personas"
+                    value={systemPersonas.length}
+                    sub={`${personaCounts.active} active`}
+                  />
+                  <MetricTile color="success" icon={<CheckCircleIcon />} label="Active" value={personaCounts.active} sub="Available for selection" />
+                  <MetricTile color="warning" icon={<BoltIcon />} label="Highlighted" value={personaCounts.highlighted} sub="Promoted in UI" />
+                  <MetricTile color="danger" icon={<BlockIcon />} label="Inactive" value={personaCounts.inactive} sub="Hidden from active catalog" />
+                </Box>
+
+                <Surface>
+                  <Box
+                    sx={{
+                      px: 2.5,
+                      py: 2,
+                      display: 'flex',
+                      gap: 1.25,
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                    }}
+                  >
+                    <Input
+                      size="sm"
+                      placeholder="Search personas"
+                      startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
+                      value={personaSearchQuery}
+                      onChange={(event) => setPersonaSearchQuery(event.target.value)}
+                      sx={{ flex: '1 1 280px', maxWidth: 520, borderRadius: 8 }}
+                    />
+                    <Chip variant="soft" color="neutral">
+                      {filteredPersonas.length === systemPersonas.length
+                        ? `${systemPersonas.length} personas`
+                        : `${filteredPersonas.length} of ${systemPersonas.length}`}
+                    </Chip>
+                    <Box sx={{ ml: 'auto', display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                      <Button
+                        size="sm"
+                        variant="soft"
+                        color="neutral"
+                        startDecorator={<RefreshIcon />}
+                        loading={personaSeeding}
+                        onClick={handleSeedPersonas}
+                        sx={{ borderRadius: 8 }}
+                      >
+                        Seed JSON
+                      </Button>
+                      <Button size="sm" startDecorator={<AddIcon />} onClick={handleOpenCreatePersona} sx={{ borderRadius: 8 }}>
+                        Add Persona
+                      </Button>
                     </Box>
                   </Box>
 
@@ -999,136 +2080,110 @@ export function AppAdmin() {
                       stickyHeader
                       hoverRow
                       sx={{
-                        minWidth: 980,
-                        '--TableCell-headBackground': 'var(--joy-palette-background-level1)',
-                        '& th': {
-                          py: 1.5,
-                          px: 2,
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          whiteSpace: 'nowrap',
-                          fontWeight: 700,
-                          fontSize: '0.7rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: 0.5,
-                          borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                        },
-                        '& td': {
-                          py: 1.5,
-                          px: 2,
-                          verticalAlign: 'middle',
-                          borderBottom: '1px solid rgba(0,0,0,0.05)',
-                        },
-                        '& tbody tr': { cursor: 'pointer', transition: 'background 0.08s' },
+                        minWidth: 1120,
+                        '& th': { py: 1.5, px: 2, fontWeight: 900, color: 'text.tertiary', whiteSpace: 'nowrap' },
+                        '& td': { py: 1.35, px: 2, verticalAlign: 'middle' },
+                        '& tbody tr': { cursor: 'pointer' },
                       }}
                     >
                       <thead>
                         <tr>
-                          <th onClick={() => handleSort('name')}>
-                            Member <SortArrow field="name" />
-                          </th>
-                          <th onClick={() => handleSort('status')}>
-                            Status <SortArrow field="status" />
-                          </th>
-                          <th onClick={() => handleSort('conversations')} style={{ textAlign: 'right' }}>
-                            Convos <SortArrow field="conversations" />
-                          </th>
-                          <th onClick={() => handleSort('monthTokens')} style={{ textAlign: 'right' }}>
-                            Used <SortArrow field="monthTokens" />
-                          </th>
-                          <th onClick={() => handleSort('remaining')} style={{ textAlign: 'right' }}>
-                            Remaining <SortArrow field="remaining" />
-                          </th>
-                          <th onClick={() => handleSort('limit')}>
-                            Limit <SortArrow field="limit" />
-                          </th>
-                          <th style={{ textAlign: 'right' }}>Action</th>
+                          <th>Persona</th>
+                          <th>ID</th>
+                          <th>Status</th>
+                          <th>Prompt</th>
+                          <th style={{ textAlign: 'right' }}>Examples</th>
+                          <th>Updated</th>
+                          <th style={{ textAlign: 'right' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {sorted.map((user: any) => {
-                          const mTokens = user.monthUsage?._sum?.totalTokens ?? 0;
-                          const mReqs = user.monthUsage?._count ?? 0;
-                          const userActive = isUserActive(user.isActive);
-                          const limitChip = tokenLimitChipProps(user.tokenLimit, mTokens, 12);
+                        {filteredPersonas.map((persona) => {
+                          const examplesCount = Array.isArray(persona.examples) ? persona.examples.length : 0;
                           return (
-                            <tr key={user.id} onClick={() => setSelectedUserId(user.id)}>
+                            <tr key={persona.id} onClick={() => handleOpenEditPersona(persona)}>
                               <td>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 260 }}>
-                                  <Avatar size="sm" src={user.image} sx={{ width: 36, height: 36, fontSize: 13, flexShrink: 0 }}>
-                                    {(user.name || '?')[0]}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                                  <Avatar size="sm" src={persona.imageUri ?? undefined} sx={{ width: 36, height: 36, fontSize: 20, flexShrink: 0 }}>
+                                    {persona.symbol || <PersonIcon sx={{ fontSize: 18 }} />}
                                   </Avatar>
                                   <Box sx={{ minWidth: 0 }}>
-                                    <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>
-                                      {user.name || 'Unnamed'}
+                                    <Typography level="body-sm" noWrap sx={{ fontWeight: 900 }}>
+                                      {persona.title}
                                     </Typography>
-                                    <Typography level="body-xs" noWrap sx={{ opacity: 0.6 }}>
-                                      {user.email}
+                                    <Typography level="body-xs" noWrap sx={{ color: 'text.tertiary', maxWidth: 320 }}>
+                                      {persona.description || 'No description'}
                                     </Typography>
                                   </Box>
                                 </Box>
                               </td>
                               <td>
-                                <Chip
-                                  size="sm"
-                                  variant="soft"
-                                  color={userActive ? 'success' : 'danger'}
-                                  startDecorator={userActive ? <CheckCircleIcon sx={{ fontSize: 12 }} /> : <BlockIcon sx={{ fontSize: 12 }} />}
-                                >
-                                  {userActive ? 'Active' : 'Inactive'}
-                                </Chip>
-                              </td>
-                              <td style={{ textAlign: 'right' }}>
-                                <Typography level="body-sm" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                                  {user._count.conversations}
-                                </Typography>
-                              </td>
-                              <td style={{ textAlign: 'right' }}>
-                                <Tooltip title={`${mReqs} requests this month`}>
-                                  <Typography level="body-sm" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                                    {fmtNum(mTokens)}
-                                  </Typography>
-                                </Tooltip>
-                              </td>
-                              <td style={{ textAlign: 'right' }}>
-                                <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums', opacity: 0.8 }}>
-                                  {tokenRemainingLabel(user.tokenLimit, mTokens)}
+                                <Typography level="body-xs" sx={{ fontFamily: 'var(--joy-fontFamily-code)', color: 'text.secondary' }}>
+                                  {persona.id}
                                 </Typography>
                               </td>
                               <td>
-                                <Chip
-                                  size="sm"
-                                  variant="soft"
-                                  color={limitChip.color}
-                                  startDecorator={limitChip.icon}
-                                  sx={{ fontVariantNumeric: 'tabular-nums' }}
-                                >
-                                  {limitChip.label}
-                                </Chip>
+                                <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap' }}>
+                                  <Chip
+                                    size="sm"
+                                    color={persona.isActive ? 'success' : 'danger'}
+                                    variant="soft"
+                                    startDecorator={persona.isActive ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : <BlockIcon sx={{ fontSize: 14 }} />}
+                                  >
+                                    {persona.isActive ? 'Active' : 'Inactive'}
+                                  </Chip>
+                                  {persona.highlighted && (
+                                    <Chip size="sm" color="warning" variant="soft" startDecorator={<BoltIcon sx={{ fontSize: 14 }} />}>
+                                      Highlighted
+                                    </Chip>
+                                  )}
+                                </Stack>
                               </td>
+                              <td>
+                                <Typography level="body-xs" noWrap sx={{ maxWidth: 360, color: 'text.tertiary' }}>
+                                  {persona.systemMessage}
+                                </Typography>
+                              </td>
+                              <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 800 }}>{examplesCount}</td>
+                              <td>{fmtDateTime(persona.updatedAt)}</td>
                               <td style={{ textAlign: 'right' }}>
-                                <Button
-                                  size="sm"
-                                  variant={userActive ? 'outlined' : 'solid'}
-                                  color={userActive ? 'danger' : 'success'}
-                                  loading={statusSavingUserId === user.id}
-                                  sx={{ minWidth: 112, borderRadius: 'lg' }}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    handleToggleUserActive(user.id, userActive);
-                                  }}
-                                >
-                                  {userActive ? 'Set Inactive' : 'Activate'}
-                                </Button>
+                                <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
+                                  <Tooltip title="Edit persona">
+                                    <IconButton
+                                      size="sm"
+                                      variant="plain"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleOpenEditPersona(persona);
+                                      }}
+                                    >
+                                      <EditIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Delete persona">
+                                    <IconButton
+                                      size="sm"
+                                      variant="plain"
+                                      color="danger"
+                                      disabled={personaDeletingId === persona.id}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleDeletePersona(persona);
+                                      }}
+                                    >
+                                      <DeleteIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
                               </td>
                             </tr>
                           );
                         })}
-                        {sorted.length === 0 && (
+                        {!filteredPersonas.length && (
                           <tr>
                             <td colSpan={7}>
-                              <Box sx={{ py: 5, textAlign: 'center', opacity: 0.45 }}>
-                                <Typography level="body-sm">No users match your search</Typography>
+                              <Box sx={{ py: 6, textAlign: 'center', color: 'text.tertiary' }}>
+                                <Typography level="body-sm">No personas match this view</Typography>
                               </Box>
                             </td>
                           </tr>
@@ -1136,142 +2191,192 @@ export function AppAdmin() {
                       </tbody>
                     </Table>
                   </Sheet>
-                </Box>
+                </Surface>
               </Stack>
             )}
 
-            {/* ====== SETTINGS ====== */}
-            {activeView === 'settings' && (
-              <Stack spacing={3} sx={{ maxWidth: 640, mx: 'auto' }}>
-                {/* Bulk Limits */}
-                <Box
-                  sx={{
-                    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                    borderRadius: 'xl',
-                    overflow: 'hidden',
-                    background: 'var(--joy-palette-background-surface)',
-                  }}
-                >
-                  <Box
-                    sx={{
-                      px: 3,
-                      py: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1.5,
-                      borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                      background: 'var(--joy-palette-background-level1)',
-                    }}
-                  >
-                    <TuneIcon sx={{ fontSize: 18 }} />
-                    <Typography level="title-md" sx={{ fontWeight: 700 }}>
-                      Bulk Token Limits
-                    </Typography>
-                  </Box>
-                  <Box sx={{ p: 3 }}>
-                    <Typography level="body-sm" sx={{ mb: 2.5, opacity: 0.7 }}>
-                      Set a monthly token limit for every user at once. Use `0` for no credits. Leave blank only when setting all users to unlimited.
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Input
-                        size="sm"
-                        placeholder="e.g. 2000000"
-                        value={bulkLimit}
-                        onChange={(e) => setBulkLimit(e.target.value)}
-                        sx={{ width: 200, borderRadius: 'lg' }}
-                      />
-                      <Button
-                        size="sm"
-                        loading={bulkSaving}
-                        sx={{ borderRadius: 'lg', background: 'linear-gradient(135deg, #f2994a 0%, #f2c94c 100%)', color: '#000', fontWeight: 700 }}
-                        onClick={() => {
-                          const val = parseInt(bulkLimit, 10);
-                          if (Number.isNaN(val) || val < 0) return alert('Enter 0 or a positive number');
-                          if (confirm('Set ' + val.toLocaleString() + ' tokens/month for ALL users?')) handleSetAllLimits(val);
-                        }}
-                      >
-                        Apply to All
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outlined"
-                        color="neutral"
-                        loading={bulkSaving}
-                        sx={{ borderRadius: 'lg' }}
-                        onClick={() => {
-                          if (confirm('Remove token limit for ALL users (unlimited)?')) handleSetAllLimits(null);
-                        }}
-                      >
-                        Set All Unlimited
-                      </Button>
-                    </Box>
-                  </Box>
-                </Box>
+            {activeView === 'broadcast' && (
+              <Stack spacing={2.5} sx={{ maxWidth: 980, mx: 'auto' }}>
+                <Surface>
+                  <SectionHeader
+                    icon={<NotificationsActiveIcon sx={{ fontSize: 18 }} />}
+                    title="Live User Banner"
+                    right={
+                      <Chip color={bannerDraft.enabled ? bannerDraft.tone : 'neutral'} variant="soft">
+                        {bannerDraft.enabled ? 'Live' : 'Off'}
+                      </Chip>
+                    }
+                  />
+                  <Box sx={{ p: 2.5 }}>
+                    <Stack spacing={2.25}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                        <Box>
+                          <Typography level="title-md" sx={{ fontWeight: 900 }}>
+                            Broadcast state
+                          </Typography>
+                          <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
+                            Last updated {fmtDateTime(adminBanner?.updatedAt)}
+                          </Typography>
+                        </Box>
+                        <Switch
+                          checked={bannerDraft.enabled}
+                          color={bannerDraft.enabled ? bannerDraft.tone : 'neutral'}
+                          onChange={(event) => setBannerDraft((draft) => ({ ...draft, enabled: event.target.checked }))}
+                        />
+                      </Box>
 
-                {/* Admin Info */}
-                <Box
-                  sx={{
-                    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                    borderRadius: 'xl',
-                    overflow: 'hidden',
-                    background: 'var(--joy-palette-background-surface)',
-                  }}
-                >
-                  <Box
-                    sx={{
-                      px: 3,
-                      py: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1.5,
-                      borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                      background: 'var(--joy-palette-background-level1)',
-                    }}
-                  >
-                    <SettingsIcon sx={{ fontSize: 18 }} />
-                    <Typography level="title-md" sx={{ fontWeight: 700 }}>
-                      System Info
-                    </Typography>
-                  </Box>
-                  <Box sx={{ p: 3 }}>
-                    <Stack spacing={1.5}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography level="body-sm" sx={{ opacity: 0.6 }}>
-                          Admin Email
-                        </Typography>
-                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>
-                          rcohen@mytsi.org
-                        </Typography>
+                      <BannerPreview draft={bannerDraft} />
+
+                      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.8fr 1.2fr' }, gap: 2 }}>
+                        <Stack spacing={1.5}>
+                          <FormControl>
+                            <FormLabel>Tone</FormLabel>
+                            <Select
+                              value={bannerDraft.tone}
+                              onChange={(_, value) => value && setBannerDraft((draft) => ({ ...draft, tone: value as BannerTone }))}
+                              sx={{ borderRadius: 8 }}
+                            >
+                              <Option value="neutral">Neutral</Option>
+                              <Option value="primary">Primary</Option>
+                              <Option value="success">Success</Option>
+                              <Option value="warning">Warning</Option>
+                              <Option value="danger">Danger</Option>
+                            </Select>
+                          </FormControl>
+                          <FormControl>
+                            <FormLabel>Expires</FormLabel>
+                            <Input
+                              type="datetime-local"
+                              value={bannerDraft.expiresAt}
+                              onChange={(event) => setBannerDraft((draft) => ({ ...draft, expiresAt: event.target.value }))}
+                              sx={{ borderRadius: 8 }}
+                            />
+                          </FormControl>
+                          <FormControl>
+                            <FormLabel>Link label</FormLabel>
+                            <Input
+                              value={bannerDraft.ctaLabel}
+                              onChange={(event) => setBannerDraft((draft) => ({ ...draft, ctaLabel: event.target.value }))}
+                              placeholder="Status page"
+                              sx={{ borderRadius: 8 }}
+                            />
+                          </FormControl>
+                          <FormControl>
+                            <FormLabel>Link URL</FormLabel>
+                            <Input
+                              value={bannerDraft.ctaUrl}
+                              onChange={(event) => setBannerDraft((draft) => ({ ...draft, ctaUrl: event.target.value }))}
+                              placeholder="/profile or https://..."
+                              endDecorator={bannerDraft.ctaUrl ? <OpenInNewIcon sx={{ fontSize: 16 }} /> : undefined}
+                              sx={{ borderRadius: 8 }}
+                            />
+                          </FormControl>
+                        </Stack>
+                        <Stack spacing={1.5}>
+                          <FormControl>
+                            <FormLabel>Title</FormLabel>
+                            <Input
+                              value={bannerDraft.title}
+                              onChange={(event) => setBannerDraft((draft) => ({ ...draft, title: event.target.value }))}
+                              placeholder="Maintenance tonight"
+                              sx={{ borderRadius: 8 }}
+                            />
+                          </FormControl>
+                          <FormControl sx={{ flex: 1 }}>
+                            <FormLabel>Message</FormLabel>
+                            <Textarea
+                              minRows={7}
+                              maxRows={9}
+                              value={bannerDraft.message}
+                              onChange={(event) => setBannerDraft((draft) => ({ ...draft, message: event.target.value }))}
+                              placeholder="We are performing maintenance at 10 PM ET. Chat may be briefly unavailable."
+                              sx={{ borderRadius: 8 }}
+                            />
+                          </FormControl>
+                        </Stack>
                       </Box>
-                      <Divider />
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography level="body-sm" sx={{ opacity: 0.6 }}>
-                          Admin Token Limit
-                        </Typography>
-                        <Chip size="sm" variant="soft" color="success" startDecorator={<AllInclusiveIcon sx={{ fontSize: 12 }} />}>
-                          Always Unlimited
-                        </Chip>
-                      </Box>
-                      <Divider />
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography level="body-sm" sx={{ opacity: 0.6 }}>
-                          Monthly Reset
-                        </Typography>
-                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>
-                          1st of each month
-                        </Typography>
+
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <Button
+                          variant="soft"
+                          color="neutral"
+                          startDecorator={<CloseIcon />}
+                          disabled={bannerSaving}
+                          onClick={() => setBannerDraft(bannerToDraft(adminBanner))}
+                          sx={{ borderRadius: 8 }}
+                        >
+                          Reset
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="danger"
+                          startDecorator={<BlockIcon />}
+                          loading={bannerSaving}
+                          onClick={() => handlePublishBanner(false)}
+                          sx={{ borderRadius: 8 }}
+                        >
+                          Disable
+                        </Button>
+                        <Button
+                          color={bannerDraft.tone}
+                          startDecorator={<CampaignIcon />}
+                          loading={bannerSaving}
+                          onClick={() => handlePublishBanner(true)}
+                          sx={{ borderRadius: 8 }}
+                        >
+                          Publish live
+                        </Button>
                       </Box>
                     </Stack>
                   </Box>
-                </Box>
+                </Surface>
+
+                <Surface>
+                  <SectionHeader icon={<EventAvailableIcon sx={{ fontSize: 18 }} />} title="Current Banner Record" />
+                  <Box sx={{ p: 2.5, display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
+                    <Box>
+                      <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                        State
+                      </Typography>
+                      <Typography level="title-md" sx={{ fontWeight: 900 }}>
+                        {adminBanner?.enabled ? 'Live' : 'Off'}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                        Expires
+                      </Typography>
+                      <Typography level="title-md" sx={{ fontWeight: 900 }}>
+                        {fmtDateTime(adminBanner?.expiresAt)}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                        Tone
+                      </Typography>
+                      <Typography level="title-md" sx={{ fontWeight: 900 }}>
+                        {adminBanner?.tone ?? 'warning'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Surface>
               </Stack>
             )}
           </>
         )}
       </Box>
 
-      {/* User Detail Modal */}
       {selectedUserId && <UserDetailModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} onRefresh={loadAllData} />}
+      {personaEditorMode && (
+        <PersonaEditorModal
+          mode={personaEditorMode}
+          draft={personaDraft}
+          saving={personaSaving}
+          onClose={() => setPersonaEditorMode(null)}
+          onDraftChange={setPersonaDraft}
+          onSave={handleSavePersona}
+        />
+      )}
     </Box>
   );
 }

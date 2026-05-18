@@ -177,6 +177,28 @@ model Persona {
   @@index([userId, updated])
 }
 
+model SystemPersona {
+  id                 String   @id
+  title              String
+  description        String?
+  systemMessage      String   @db.Text
+  systemMessageNotes String?  @db.Text
+  symbol             String?
+  imageUri           String?
+  examples           Json?
+  highlighted        Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  call               Json?
+  voices             Json?
+  sortOrder          Int      @default(0)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([updatedAt])
+}
+
 //
 // Storage of Linked Data (Legacy - keeping for backward compatibility)
 //

@@ -10,6 +10,7 @@
     "isolatedModules": true,
 
     /* Typescript 6.0 transition: side effects imports are denied by default */
+    "ignoreDeprecations": "6.0",
     "noUncheckedSideEffectImports": false,
 
     /* Strictness */

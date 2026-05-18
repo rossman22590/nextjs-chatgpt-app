@@ -1,7 +1,5 @@
 import { fileOpen, fileSave, FileWithHandle } from 'browser-fs-access';
 
-import { SystemPurposeId, SystemPurposes } from '../../data';
-
 import { Brand } from '~/common/app.config';
 import { DataAtRestV1 } from '~/common/stores/chat/chats.converters';
 import { Release } from '~/common/app.release';
@@ -13,14 +11,13 @@ import { prettyShortChatModelName } from '~/common/util/dMessageUtils';
 import { prettyTimestampForFilenames } from '~/common/util/timeUtils';
 import { useChatStore } from '~/common/stores/chat/store-chats';
 import { useFolderStore } from '~/common/stores/folders/store-chat-folders';
+import { getSystemPurpose } from '~/modules/persona/system-personas.catalog';
 
 import type { ImportedOutcome } from './ImportOutcomeModal';
 
-
 export function tradeFileVariant() {
-  return `${capitalizeFirstLetter(Release.TenantSlug)}`
+  return `${capitalizeFirstLetter(Release.TenantSlug)}`;
 }
-
 
 /// IMPORT ///
 
@@ -33,8 +30,7 @@ export async function importConversationsFromFilesAtRest(files: File[] | null, p
   const outcome: ImportedOutcome = { conversations: [], activateConversationId: null };
 
   // user cancelled
-  if (!files)
-    return outcome;
+  if (!files) return outcome;
 
   // unroll files to conversations
   for (const file of files) {
@@ -54,12 +50,10 @@ export async function importConversationsFromFilesAtRest(files: File[] | null, p
 
   // import conversations
   for (const cOutcome of [...outcome.conversations].reverse()) {
-    if (!cOutcome.success)
-      continue;
+    if (!cOutcome.success) continue;
     cOutcome.importedConversationId = useChatStore.getState().importConversation(cOutcome.conversation, preventClash);
     // the last successfully imported is the one to activate
-    if (cOutcome.importedConversationId)
-      outcome.activateConversationId = cOutcome.importedConversationId;
+    if (cOutcome.importedConversationId) outcome.activateConversationId = cOutcome.importedConversationId;
   }
 
   return outcome;
@@ -82,7 +76,6 @@ export async function openConversationsAtRestPicker(): Promise<FileWithHandle[] 
   }
 }
 
-
 /**
  * Restores all conversations in a JSON
  *  - supports both  DataAtRestV1.RestAllJsonV1B, and DataAtRestV1.RestChatJsonV1 files
@@ -93,18 +86,15 @@ function loadConversationsFromAtRestV1(fileName: string, obj: any, outcome: Impo
   const hasMessages = obj.hasOwnProperty('messages');
 
   switch (true) {
-
     // Heuristic (backup): DataAtRestV1.RestAllJsonV1B
     case hasConversations && !hasMessages:
       const { conversations, folders } = obj as DataAtRestV1.RestAllJsonV1B;
-      for (const conversation of conversations)
-        loadSingleChatFromAtRestV1(fileName, conversation, outcome);
+      for (const conversation of conversations) loadSingleChatFromAtRestV1(fileName, conversation, outcome);
 
       // in ExportedAllJsonV1b+, folders weren't there before
       if (folders?.folders) {
         const dFolders = DataAtRestV1.recreateFolders(folders.folders);
-        if (dFolders.length)
-          useFolderStore.getState().importFoldersAppend(dFolders, folders.enableFolders);
+        if (dFolders.length) useFolderStore.getState().importFoldersAppend(dFolders, folders.enableFolders);
       }
       break;
 
@@ -117,18 +107,14 @@ function loadConversationsFromAtRestV1(fileName: string, obj: any, outcome: Impo
     default:
       outcome.conversations.push({ success: false, fileName, error: `Invalid file: ${fileName}` });
       break;
-
   }
 }
 
 function loadSingleChatFromAtRestV1(fileName: string, part: DataAtRestV1.RestChatJsonV1, outcome: ImportedOutcome) {
   const restored = DataAtRestV1.recreateConversation(part);
-  if (!restored)
-    outcome.conversations.push({ success: false, fileName, error: `Invalid conversation: ${part.id}` });
-  else
-    outcome.conversations.push({ success: true, fileName, conversation: restored });
+  if (!restored) outcome.conversations.push({ success: false, fileName, error: `Invalid conversation: ${part.id}` });
+  else outcome.conversations.push({ success: true, fileName, conversation: restored });
 }
-
 
 /// EXPORT ///
 
@@ -139,11 +125,7 @@ function loadSingleChatFromAtRestV1(fileName: string, part: DataAtRestV1.RestCha
 export async function downloadAllJsonV1B() {
   // conversations and
   const { folders, enableFolders } = useFolderStore.getState();
-  const payload = DataAtRestV1.formatAllToJsonV1B(
-    useChatStore.getState().conversations,
-    llmsStoreState().sources,
-    folders, enableFolders,
-  );
+  const payload = DataAtRestV1.formatAllToJsonV1B(useChatStore.getState().conversations, llmsStoreState().sources, folders, enableFolders);
   const json = JSON.stringify(payload);
   const blob = new Blob([json], { type: 'application/json' });
 
@@ -160,30 +142,28 @@ export async function downloadAllJsonV1B() {
  * @throws {Error} if the user closes the dialog, or file could not be saved
  */
 export async function downloadSingleChat(conversation: DConversation, format: 'json' | 'markdown') {
-
   let blob: Blob;
   let extension: string;
 
   if (format == 'json') {
-
     // remove fields (abortController, etc.) from the export
     const exportableConversation = DataAtRestV1.formatChatToJsonV1(conversation);
     const json = JSON.stringify(exportableConversation, null, 2);
     blob = new Blob([json], { type: 'application/json' });
     extension = '.json';
-
   } else if (format == 'markdown') {
-
     const exportableMarkdown = conversationToMarkdown(conversation, false, true, (name: string) => `## ${name} ##`);
     blob = new Blob([exportableMarkdown], { type: 'text/markdown' });
     extension = '.md';
-
   } else {
     throw new Error(`Invalid download format: ${format}`);
   }
 
   // const fileConvId = conversation.id.slice(0, 8);
-  const fileTitle = conversationTitle(conversation).replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'untitled';
+  const fileTitle =
+    conversationTitle(conversation)
+      .replace(/[^a-z0-9]/gi, '-')
+      .toLowerCase() || 'untitled';
 
   // save file
   await fileSave(blob, {
@@ -195,30 +175,38 @@ export async function downloadSingleChat(conversation: DConversation, format: 'j
 /**
  * Primitive rendering of a Conversation to Markdown
  */
-export function conversationToMarkdown(conversation: DConversation, hideSystemMessage: boolean, exportTitle: boolean, senderWrap?: (text: string) => string): string {
+export function conversationToMarkdown(
+  conversation: DConversation,
+  hideSystemMessage: boolean,
+  exportTitle: boolean,
+  senderWrap?: (text: string) => string,
+): string {
   const mdTitle = exportTitle
-    ? `# ${capitalizeFirstLetter(conversationTitle(conversation, Brand.Title.Common + ' Chat'))}\nA ${Brand.Title.Common} conversation, updated on ${(new Date(conversation.updated || conversation.created)).toLocaleString()}.\n\n`
+    ? `# ${capitalizeFirstLetter(conversationTitle(conversation, Brand.Title.Common + ' Chat'))}\nA ${Brand.Title.Common} conversation, updated on ${new Date(conversation.updated || conversation.created).toLocaleString()}.\n\n`
     : '';
-  return mdTitle + excludeSystemMessages(conversation.messages, !hideSystemMessage).map(message => {
-    let senderName: string = message.role === 'user' ? 'You' : 'Bot'; // from role
-    let text = messageFragmentsReduceText(message.fragments);
-    switch (message.role) {
-      case 'system':
-        // senderName = '✨ System message';
-        senderName = 'System message';
-        text = `*${text}*`;
-        break;
-      case 'assistant':
-        const purpose = message.purposeId || conversation.systemPurposeId || null;
-        senderName = `${purpose || 'Assistant'} · *${prettyShortChatModelName(message.generator?.name || '')}*`.trim();
-        if (purpose && purpose in SystemPurposes)
-          senderName = `${SystemPurposes[purpose as SystemPurposeId]?.symbol || ''} ${senderName}`.trim();
-        break;
-      case 'user':
-        senderName = '👤 You';
-        break;
-    }
-    return (senderWrap?.(senderName) || `### ${senderName}`) + `\n\n${text}\n\n`;
-  }).join('---\n\n');
-
+  return (
+    mdTitle +
+    excludeSystemMessages(conversation.messages, !hideSystemMessage)
+      .map((message) => {
+        let senderName: string = message.role === 'user' ? 'You' : 'Bot'; // from role
+        let text = messageFragmentsReduceText(message.fragments);
+        switch (message.role) {
+          case 'system':
+            // senderName = '✨ System message';
+            senderName = 'System message';
+            text = `*${text}*`;
+            break;
+          case 'assistant':
+            const purpose = message.purposeId || conversation.systemPurposeId || null;
+            senderName = `${purpose || 'Assistant'} · *${prettyShortChatModelName(message.generator?.name || '')}*`.trim();
+            if (purpose) senderName = `${getSystemPurpose(purpose)?.symbol || ''} ${senderName}`.trim();
+            break;
+          case 'user':
+            senderName = '👤 You';
+            break;
+        }
+        return (senderWrap?.(senderName) || `### ${senderName}`) + `\n\n${text}\n\n`;
+      })
+      .join('---\n\n')
+  );
 }

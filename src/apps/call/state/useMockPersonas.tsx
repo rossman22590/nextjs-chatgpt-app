@@ -2,30 +2,30 @@ import * as React from 'react';
 
 import { usePurposeStore } from '../../chat/components/persona-selector/store-purposes';
 
-import { SystemPurposeData, SystemPurposeId, SystemPurposes } from '../../../data';
-
+import { SystemPurposeData, SystemPurposeId } from '../../../data';
+import { useSystemPersonaCatalog } from '~/modules/persona/useSystemPersonaCatalog';
 
 /**
  * This is a 'mock' persona because Soon we'll have real personas definitions
  * and stores. Until then, we just mimic a reactive system here.
  */
 export interface MockPersona extends SystemPurposeData {
-  personaId: SystemPurposeId,
+  personaId: SystemPurposeId;
 }
 
-export function useMockPersonas(): { personas: MockPersona[], personaIDs: SystemPurposeId[] } {
+export function useMockPersonas(): { personas: MockPersona[]; personaIDs: SystemPurposeId[] } {
   // only react to hiddenPurposeIDs changes
-  const hiddenPurposeIDs = usePurposeStore(state => state.hiddenPurposeIDs);
+  const hiddenPurposeIDs = usePurposeStore((state) => state.hiddenPurposeIDs);
+  const systemPersonaCatalog = useSystemPersonaCatalog();
 
-  // Dependency array is empty because SystemPurposes is constant
   return React.useMemo(() => {
-    const personaIDs = Object.keys(SystemPurposes) as SystemPurposeId[];
+    const personaIDs = Object.keys(systemPersonaCatalog) as SystemPurposeId[];
     const personas = personaIDs
       .filter((key) => !hiddenPurposeIDs.includes(key))
       .map((key) => ({
-        ...SystemPurposes[key as SystemPurposeId],
+        ...systemPersonaCatalog[key],
         personaId: key as SystemPurposeId,
       }));
     return { personas, personaIDs };
-  }, [hiddenPurposeIDs]);
+  }, [hiddenPurposeIDs, systemPersonaCatalog]);
 }

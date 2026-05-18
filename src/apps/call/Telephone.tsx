@@ -12,9 +12,10 @@ import { ScrollToBottom } from '~/common/scroll-to-bottom/ScrollToBottom';
 import { ScrollToBottomButton } from '~/common/scroll-to-bottom/ScrollToBottomButton';
 import { useChatLLMDropdown } from '../chat/components/layout-bar/useLLMDropdown';
 
-import { SystemPurposeId, SystemPurposes } from '../../data';
+import { SystemPurposeId } from '../../data';
 
 import { aixChatGenerateContent_DMessage_FromConversation, AixChatGenerateContent_DMessageGuts } from '~/modules/aix/client/aix.client';
+import { getSystemPurpose } from '~/modules/persona/system-personas.catalog';
 import { speakText } from '~/modules/speex/speex.client';
 
 import type { OptimaBarControlMethods } from '~/common/layout/optima/bar/OptimaBarDropdown';
@@ -25,7 +26,13 @@ import { OptimaPanelIn, OptimaToolbarIn } from '~/common/layout/optima/portals/O
 import { SpeechResult, useSpeechRecognition } from '~/common/components/speechrecognition/useSpeechRecognition';
 import { clipboardInterceptCtrlCForCleanup } from '~/common/util/clipboardUtils';
 import { conversationTitle, remapMessagesSysToUsr } from '~/common/stores/chat/chat.conversation';
-import { createDMessageFromFragments, createDMessageTextContent, DMessage, messageFragmentsReduceText, messageWasInterruptedAtStart } from '~/common/stores/chat/chat.message';
+import {
+  createDMessageFromFragments,
+  createDMessageTextContent,
+  DMessage,
+  messageFragmentsReduceText,
+  messageWasInterruptedAtStart,
+} from '~/common/stores/chat/chat.message';
 import { createErrorContentFragment } from '~/common/stores/chat/chat.fragments';
 import { launchAppChat, navigateToIndex } from '~/common/app.routes';
 import { useChatStore } from '~/common/stores/chat/store-chats';
@@ -39,47 +46,37 @@ import { CallMessage } from './components/CallMessage';
 import { CallStatus } from './components/CallStatus';
 import { useAppCallStore } from './state/store-app-call';
 
-
-function CallMenu(props: {
-  pushToTalk: boolean,
-  setPushToTalk: (pushToTalk: boolean) => void,
-}) {
-
+function CallMenu(props: { pushToTalk: boolean; setPushToTalk: (pushToTalk: boolean) => void }) {
   // external state
   const { grayUI, toggleGrayUI } = useAppCallStore();
 
   const handlePushToTalkToggle = () => props.setPushToTalk(!props.pushToTalk);
 
-  return <OptimaPanelGroupedList title='Call'>
+  return (
+    <OptimaPanelGroupedList title="Call">
+      <MenuItem onClick={handlePushToTalkToggle}>
+        <ListItemDecorator>{props.pushToTalk ? <MicNoneIcon /> : <MicIcon />}</ListItemDecorator>
+        Push to talk
+        <Switch checked={props.pushToTalk} onChange={handlePushToTalkToggle} sx={{ ml: 'auto' }} />
+      </MenuItem>
 
-    <MenuItem onClick={handlePushToTalkToggle}>
-      <ListItemDecorator>{props.pushToTalk ? <MicNoneIcon /> : <MicIcon />}</ListItemDecorator>
-      Push to talk
-      <Switch checked={props.pushToTalk} onChange={handlePushToTalkToggle} sx={{ ml: 'auto' }} />
-    </MenuItem>
+      <ListDivider />
 
-    <ListDivider />
+      <MenuItem onClick={toggleGrayUI}>
+        Grayed UI
+        <Switch checked={grayUI} sx={{ ml: 'auto' }} />
+      </MenuItem>
 
-    <MenuItem onClick={toggleGrayUI}>
-      Grayed UI
-      <Switch checked={grayUI} sx={{ ml: 'auto' }} />
-    </MenuItem>
-
-    <MenuItem component={Link} href='https://github.com/enricoros/big-agi/issues/175' target='_blank'>
-      Voice Calls Feedback
-    </MenuItem>
-
-  </OptimaPanelGroupedList>;
+      <MenuItem component={Link} href="https://github.com/enricoros/big-agi/issues/175" target="_blank">
+        Voice Calls Feedback
+      </MenuItem>
+    </OptimaPanelGroupedList>
+  );
 }
 
-
-export function Telephone(props: {
-  callIntent: AppCallIntent,
-  backToContacts: () => void,
-}) {
-
+export function Telephone(props: { callIntent: AppCallIntent; backToContacts: () => void }) {
   // state
-  const [avatarClickCount, setAvatarClickCount] = React.useState<number>(0);// const [micMuted, setMicMuted] = React.useState(false);
+  const [avatarClickCount, setAvatarClickCount] = React.useState<number>(0); // const [micMuted, setMicMuted] = React.useState(false);
   const [callElapsedTime, setCallElapsedTime] = React.useState<string>('00:00');
   const [callMessages, setCallMessages] = React.useState<DMessage[]>([]);
   const [personaTextInterim, setPersonaTextInterim] = React.useState<string | null>(null);
@@ -90,16 +87,18 @@ export function Telephone(props: {
 
   // external state
   const { chatLLMId: modelId, chatLLMDropdown: modelDropdown } = useChatLLMDropdown(llmDropdownRef);
-  const { chatTitle, reMessages } = useChatStore(useShallow(state => {
-    const conversation = props.callIntent.conversationId
-      ? state.conversations.find(conversation => conversation.id === props.callIntent.conversationId) ?? null
-      : null;
-    return {
-      chatTitle: conversation ? conversationTitle(conversation) : null,
-      reMessages: conversation ? conversation.messages : null,
-    };
-  }));
-  const persona = SystemPurposes[props.callIntent.personaId as SystemPurposeId] ?? undefined;
+  const { chatTitle, reMessages } = useChatStore(
+    useShallow((state) => {
+      const conversation = props.callIntent.conversationId
+        ? (state.conversations.find((conversation) => conversation.id === props.callIntent.conversationId) ?? null)
+        : null;
+      return {
+        chatTitle: conversation ? conversationTitle(conversation) : null,
+        reMessages: conversation ? conversation.messages : null,
+      };
+    }),
+  );
+  const persona = getSystemPurpose(props.callIntent.personaId as SystemPurposeId) ?? undefined;
   const personaCallStarters = persona?.call?.starters ?? undefined;
   // const personaVoiceSelector = React.useMemo(() => personaGetVoiceSelector(persona), [persona]);
   const personaSystemMessage = persona?.systemMessage ?? undefined;
@@ -110,8 +109,7 @@ export function Telephone(props: {
     setSpeechInterim(result.done ? null : { ...result });
     if (result.done) {
       const userSpeechTranscribed = result.transcript.trim();
-      if (userSpeechTranscribed.length >= 1)
-        setCallMessages(messages => [...messages, createDMessageTextContent('user', userSpeechTranscribed)]); // [state] append user:speech
+      if (userSpeechTranscribed.length >= 1) setCallMessages((messages) => [...messages, createDMessageTextContent('user', userSpeechTranscribed)]); // [state] append user:speech
     }
   }, []);
   const { recognitionState, startRecognition, stopRecognition, toggleRecognition } = useSpeechRecognition('webSpeechApi', onSpeechResultCallback, 1000);
@@ -122,23 +120,25 @@ export function Telephone(props: {
   const isDeclined = stage === 'declined';
   const isEnded = stage === 'ended';
 
-
   /// Sounds
 
   // pickup / hangup
   React.useEffect(() => {
-    !isRinging && void AudioPlayer.playUrl(isConnected ? '/sounds/chat-begin.mp3' : '/sounds/chat-end.mp3').catch(() => {/* autoplay may be blocked */});
+    !isRinging &&
+      void AudioPlayer.playUrl(isConnected ? '/sounds/chat-begin.mp3' : '/sounds/chat-end.mp3').catch(() => {
+        /* autoplay may be blocked */
+      });
   }, [isRinging, isConnected]);
 
   // ringtone
   usePlayUrlInterval(isRinging ? '/sounds/chat-ringtone.mp3' : null, 300, 2800 * 2);
 
-
   /// Shortcuts
 
-  useGlobalShortcuts('Telephone', React.useMemo(() => [
-    { key: 'm', ctrl: true, action: toggleRecognition },
-  ], [toggleRecognition]));
+  useGlobalShortcuts(
+    'Telephone',
+    React.useMemo(() => [{ key: 'm', ctrl: true, action: toggleRecognition }], [toggleRecognition]),
+  );
 
   /// CONNECTED
 
@@ -168,10 +168,7 @@ export function Telephone(props: {
     setCallMessages([createDMessageTextContent('assistant', firstMessage)]); // [state] set assistant:hello message
 
     // fire/forget - use 'fast' priority for real-time conversation
-    void speakText(firstMessage,
-      undefined,
-      { label: 'Call', priority: 'fast' },
-    );
+    void speakText(firstMessage, undefined, { label: 'Call', priority: 'fast' });
 
     return () => clearInterval(interval);
   }, [isConnected, personaCallStarters]);
@@ -179,13 +176,11 @@ export function Telephone(props: {
   // [E] persona streaming response - upon new user message
   React.useEffect(() => {
     // only act when we have a new user message
-    if (!isConnected || callMessages.length < 1)
-      return;
+    if (!isConnected || callMessages.length < 1) return;
 
     // Voice commands
     const lastUserMessage = callMessages[callMessages.length - 1];
-    if (lastUserMessage.role !== 'user')
-      return;
+    if (lastUserMessage.role !== 'user') return;
     switch (messageFragmentsReduceText(lastUserMessage.fragments)) {
       // do not respond
       case 'Stop.':
@@ -200,7 +195,7 @@ export function Telephone(props: {
       // command: regenerate answer
       case 'Retry.':
       case 'Try again.':
-        setCallMessages(messages => messages.slice(0, messages.length - 2));
+        setCallMessages((messages) => messages.slice(0, messages.length - 2));
         return;
 
       // command: restart chat
@@ -212,20 +207,24 @@ export function Telephone(props: {
     // bail if no llm selected
     if (!modelId) return;
 
-
     // Call Message Generation Prompt
-    const callSystemInstruction = createDMessageTextContent('system', 'You are having a phone call. Your response style is brief and to the point, and according to your personality, defined below.');
+    const callSystemInstruction = createDMessageTextContent(
+      'system',
+      'You are having a phone call. Your response style is brief and to the point, and according to your personality, defined below.',
+    );
     const reMessagesRemapSysToUsr = remapMessagesSysToUsr(reMessages);
     const callGenerationInputHistory: DMessage[] = [
       // Chat messages, including the system prompt which is casted to a user message
       // TODO: when upgrading to dynamic personas, we need to inject the persona message instead - not rely on reMessages, as messages[0] !== 'system'
-      ...(reMessagesRemapSysToUsr ? reMessagesRemapSysToUsr : [createDMessageTextContent('user', personaSystemMessage)]),
+      ...(reMessagesRemapSysToUsr ? reMessagesRemapSysToUsr : [createDMessageTextContent('user', personaSystemMessage || '')]),
       // Call system prompt 2, to indicate the call has started
-      createDMessageTextContent('user', '**You are now on the phone call related to the chat above**.\nRespect your personality and answer with short, friendly and accurate thoughtful brief lines.'),
+      createDMessageTextContent(
+        'user',
+        '**You are now on the phone call related to the chat above**.\nRespect your personality and answer with short, friendly and accurate thoughtful brief lines.',
+      ),
       // Call history
       ...callMessages,
     ];
-
 
     // perform completion
     responseAbortController.current = new AbortController();
@@ -241,36 +240,31 @@ export function Telephone(props: {
       { abortSignal: responseAbortController.current.signal },
       (update: AixChatGenerateContent_DMessageGuts, _isDone: boolean) => {
         const updatedText = messageFragmentsReduceText(update.fragments).trim();
-        if (updatedText)
-          setPersonaTextInterim(finalText = updatedText);
+        if (updatedText) setPersonaTextInterim((finalText = updatedText));
       },
-    ).then((status) => {
+    )
+      .then((status) => {
+        // don't add the message to conversation if it was interrupted with no content
+        if (messageWasInterruptedAtStart(status.lastDMessage)) return;
 
-      // don't add the message to conversation if it was interrupted with no content
-      if (messageWasInterruptedAtStart(status.lastDMessage))
-        return;
+        // whether status.outcome === 'completed' or not, we get a valid DMessage, eventually with Error Fragments inside
+        const fullMessage = createDMessageFromFragments('assistant', status.lastDMessage.fragments);
+        fullMessage.generator = status.lastDMessage.generator;
+        setCallMessages((messages) => [...messages, fullMessage]); // [state] append assistant:call_response
 
-      // whether status.outcome === 'completed' or not, we get a valid DMessage, eventually with Error Fragments inside
-      const fullMessage = createDMessageFromFragments('assistant', status.lastDMessage.fragments);
-      fullMessage.generator = status.lastDMessage.generator;
-      setCallMessages(messages => [...messages, fullMessage]); // [state] append assistant:call_response
-
-      // fire/forget - use 'fast' priority for real-time conversation
-      if (status.outcome === 'completed' && finalText?.length >= 1)
-        void speakText(finalText,
-          undefined,
-          { label: 'Call', priority: 'fast' },
-        );
-
-    }).catch((err: DOMException) => {
-      if (err?.name !== 'AbortError') {
-        // create an error message to explain the exception
-        const errorMessage = createDMessageFromFragments('assistant', [createErrorContentFragment(err.message || err.toString())]);
-        setCallMessages(messages => [...messages, errorMessage]); // [state] append assistant:call_response-ERROR
-      }
-    }).finally(() => {
-      setPersonaTextInterim(null);
-    });
+        // fire/forget - use 'fast' priority for real-time conversation
+        if (status.outcome === 'completed' && finalText?.length >= 1) void speakText(finalText, undefined, { label: 'Call', priority: 'fast' });
+      })
+      .catch((err: DOMException) => {
+        if (err?.name !== 'AbortError') {
+          // create an error message to explain the exception
+          const errorMessage = createDMessageFromFragments('assistant', [createErrorContentFragment(err.message || err.toString())]);
+          setCallMessages((messages) => [...messages, errorMessage]); // [state] append assistant:call_response-ERROR
+        }
+      })
+      .finally(() => {
+        setPersonaTextInterim(null);
+      });
 
     return () => {
       responseAbortController.current?.abort();
@@ -288,14 +282,11 @@ export function Telephone(props: {
     // TODO.. abort current speech
   }, [abortTrigger]);
 
-
   // [E] continuous speech recognition (reload)
   const shouldStartRecording = isConnected && !pushToTalk && speechInterim === null && !recognitionState.hasAudio;
   React.useEffect(() => {
-    if (shouldStartRecording)
-      startRecognition();
+    if (shouldStartRecording) startRecognition();
   }, [shouldStartRecording, startRecognition]);
-
 
   // more derived state
   const personaName = persona?.title ?? 'Unknown';
@@ -304,148 +295,152 @@ export function Telephone(props: {
   const isEnabled = isMicEnabled && isTTSEnabled;
   const micErrorMessage = recognitionState.errorMessage;
 
+  return (
+    <>
+      {/* -> Toolbar */}
+      <OptimaToolbarIn>{modelDropdown}</OptimaToolbarIn>
+      {/* -> Panel */}
+      <OptimaPanelIn>
+        <CallMenu pushToTalk={pushToTalk} setPushToTalk={setPushToTalk} />
+      </OptimaPanelIn>
 
-  return <>
+      <Typography
+        level="h1"
+        sx={{
+          fontSize: { xs: '2.5rem', md: '3rem' },
+          textAlign: 'center',
+          mx: 2,
+        }}
+      >
+        {isConnected ? personaName : 'Hello'}
+      </Typography>
 
-    {/* -> Toolbar */}
-    <OptimaToolbarIn>{modelDropdown}</OptimaToolbarIn>
-    {/* -> Panel */}
-    <OptimaPanelIn>
-      <CallMenu
-        pushToTalk={pushToTalk} setPushToTalk={setPushToTalk}
+      <CallAvatar
+        symbol={persona?.symbol || '?'}
+        imageUrl={persona?.imageUri}
+        isRinging={isRinging}
+        onClick={() => setAvatarClickCount(avatarClickCount + 1)}
       />
-    </OptimaPanelIn>
 
-    <Typography
-      level='h1'
-      sx={{
-        fontSize: { xs: '2.5rem', md: '3rem' },
-        textAlign: 'center',
-        mx: 2,
-      }}
-    >
-      {isConnected ? personaName : 'Hello'}
-    </Typography>
+      <CallStatus
+        callerName={isConnected ? undefined : personaName}
+        statusText={isRinging ? '' /*'is calling you'*/ : isDeclined ? 'call declined' : isEnded ? 'call ended' : callElapsedTime}
+        regardingText={chatTitle}
+        micError={!isMicEnabled}
+        micErrorMessage={micErrorMessage}
+        speakError={!isTTSEnabled}
+      />
 
-    <CallAvatar
-      symbol={persona?.symbol || '?'}
-      imageUrl={persona?.imageUri}
-      isRinging={isRinging}
-      onClick={() => setAvatarClickCount(avatarClickCount + 1)}
-    />
+      {/* Live Transcript, w/ streaming messages, audio indication, etc. */}
+      {(isConnected || isEnded) && (
+        <Card
+          variant="outlined"
+          sx={{
+            flexGrow: 1,
+            maxHeight: '28%',
+            minHeight: '20%',
+            width: '100%',
 
-    <CallStatus
-      callerName={isConnected ? undefined : personaName}
-      statusText={isRinging ? '' /*'is calling you'*/ : isDeclined ? 'call declined' : isEnded ? 'call ended' : callElapsedTime}
-      regardingText={chatTitle}
-      micError={!isMicEnabled} micErrorMessage={micErrorMessage} speakError={!isTTSEnabled}
-    />
+            // style
+            // backgroundColor: 'background.surface',
+            borderRadius: 'lg',
+            // boxShadow: 'sm',
 
-    {/* Live Transcript, w/ streaming messages, audio indication, etc. */}
-    {(isConnected || isEnded) && (
-      <Card variant='outlined' sx={{
-        flexGrow: 1,
-        maxHeight: '28%',
-        minHeight: '20%',
-        width: '100%',
+            // children
+            padding: 0, // move this to the ScrollToBottom component
+          }}
+        >
+          <ScrollToBottom stickToBottomInitial>
+            <Box onCopy={clipboardInterceptCtrlCForCleanup} sx={{ minHeight: '100%', p: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {/* Call Messages [] */}
+              {callMessages.map((message) => (
+                <CallMessage
+                  key={message.id}
+                  text={messageFragmentsReduceText(message.fragments)}
+                  variant={message.role === 'assistant' ? 'solid' : 'soft'}
+                  color={message.role === 'assistant' ? 'neutral' : 'primary'}
+                  role={message.role}
+                />
+              ))}
 
-        // style
-        // backgroundColor: 'background.surface',
-        borderRadius: 'lg',
-        // boxShadow: 'sm',
+              {/* Persona streaming text... */}
+              {!!personaTextInterim && <CallMessage text={personaTextInterim} variant="outlined" color="neutral" role="assistant" />}
 
-        // children
-        padding: 0, // move this to the ScrollToBottom component
-      }}>
+              {/* Listening... */}
+              {recognitionState.isActive && (
+                <CallMessage
+                  text={
+                    <>
+                      {speechInterim?.transcript.trim() || null}
+                      {speechInterim?.interimTranscript.trim() ? <i> {speechInterim.interimTranscript}</i> : null}
+                    </>
+                  }
+                  variant={recognitionState.hasSpeech || !!speechInterim?.transcript ? 'soft' : 'outlined'}
+                  color="primary"
+                  role="user"
+                />
+              )}
+            </Box>
 
-        <ScrollToBottom stickToBottomInitial>
-
-          <Box onCopy={clipboardInterceptCtrlCForCleanup} sx={{ minHeight: '100%', p: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-
-            {/* Call Messages [] */}
-            {callMessages.map((message) =>
-              <CallMessage
-                key={message.id}
-                text={messageFragmentsReduceText(message.fragments)}
-                variant={message.role === 'assistant' ? 'solid' : 'soft'}
-                color={message.role === 'assistant' ? 'neutral' : 'primary'}
-                role={message.role}
-              />,
-            )}
-
-            {/* Persona streaming text... */}
-            {!!personaTextInterim && (
-              <CallMessage
-                text={personaTextInterim}
-                variant='outlined'
-                color='neutral'
-                role='assistant'
-              />
-            )}
-
-            {/* Listening... */}
-            {recognitionState.isActive && (
-              <CallMessage
-                text={<>{speechInterim?.transcript.trim() || null}{speechInterim?.interimTranscript.trim() ? <i> {speechInterim.interimTranscript}</i> : null}</>}
-                variant={(recognitionState.hasSpeech || !!speechInterim?.transcript) ? 'soft' : 'outlined'}
-                color='primary'
-                role='user'
-              />
-            )}
-
-          </Box>
-
-          {/* Visibility and actions are handled via Context */}
-          <ScrollToBottomButton />
-
-        </ScrollToBottom>
-      </Card>
-    )}
-
-    {/* Call Buttons */}
-    <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-evenly', gap: 4 }}>
-
-      {/* [ringing] Decline / Accept */}
-      {isRinging && <CallButton Icon={CallEndIcon} text='Decline' color='danger' variant='solid' onClick={() => setStage('declined')} />}
-      {isRinging && isEnabled && <CallButton Icon={CallIcon} text='Accept' color='success' variant='solid' onClick={() => setStage('connected')} />}
-
-      {/* [Calling] Hang / PTT (mute not enabled yet) */}
-      {isConnected && <CallButton Icon={CallEndIcon} text='Hang up' color='danger' variant='soft' onClick={handleCallStop} />}
-      {isConnected && (pushToTalk ? (
-          <CallButton
-            Icon={MicIcon} onClick={toggleRecognition}
-            text={recognitionState.hasSpeech ? 'Listening...' : recognitionState.isActive ? 'Listening' : 'Push To Talk'}
-            variant={recognitionState.hasSpeech ? 'solid' : recognitionState.isActive ? 'soft' : 'outlined'}
-            color='primary'
-            sx={!recognitionState.isActive ? { backgroundColor: 'background.surface' } : undefined}
-          />
-        ) : null
-        // <CallButton disabled={true} Icon={MicOffIcon} onClick={() => setMicMuted(muted => !muted)}
-        //               text={micMuted ? 'Muted' : 'Mute'}
-        //               color={micMuted ? 'warning' : undefined} variant={micMuted ? 'solid' : 'outlined'} />
+            {/* Visibility and actions are handled via Context */}
+            <ScrollToBottomButton />
+          </ScrollToBottom>
+        </Card>
       )}
 
-      {/* [ended] Back / Call Again */}
-      {(isEnded || isDeclined) && <CallButton Icon={ArrowBackIcon} text='Back' variant='soft' onClick={() => props.callIntent.backTo === 'app-chat' ? navigateToIndex() : props.backToContacts()} />}
-      {(isEnded || isDeclined) && <CallButton Icon={CallIcon} text='Call Again' color='success' variant='soft' onClick={() => setStage('connected')} />}
+      {/* Call Buttons */}
+      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-evenly', gap: 4 }}>
+        {/* [ringing] Decline / Accept */}
+        {isRinging && <CallButton Icon={CallEndIcon} text="Decline" color="danger" variant="solid" onClick={() => setStage('declined')} />}
+        {isRinging && isEnabled && <CallButton Icon={CallIcon} text="Accept" color="success" variant="solid" onClick={() => setStage('connected')} />}
 
-    </Box>
+        {/* [Calling] Hang / PTT (mute not enabled yet) */}
+        {isConnected && <CallButton Icon={CallEndIcon} text="Hang up" color="danger" variant="soft" onClick={handleCallStop} />}
+        {
+          isConnected &&
+            (pushToTalk ? (
+              <CallButton
+                Icon={MicIcon}
+                onClick={toggleRecognition}
+                text={recognitionState.hasSpeech ? 'Listening...' : recognitionState.isActive ? 'Listening' : 'Push To Talk'}
+                variant={recognitionState.hasSpeech ? 'solid' : recognitionState.isActive ? 'soft' : 'outlined'}
+                color="primary"
+                sx={!recognitionState.isActive ? { backgroundColor: 'background.surface' } : undefined}
+              />
+            ) : null)
+          // <CallButton disabled={true} Icon={MicOffIcon} onClick={() => setMicMuted(muted => !muted)}
+          //               text={micMuted ? 'Muted' : 'Mute'}
+          //               color={micMuted ? 'warning' : undefined} variant={micMuted ? 'solid' : 'outlined'} />
+        }
 
-    {/* DEBUG state */}
-    {avatarClickCount > 10 && (avatarClickCount % 2 === 0) && (
-      <Card variant='outlined' sx={{ maxHeight: '25dvh', fontSize: 'sm', overflow: 'auto', whiteSpace: 'pre', py: 0, width: '100%' }}>
-        Special commands: Stop, Retry, Try Again, Restart, Goodbye.<br />
-        {JSON.stringify({ ...recognitionState, speechInterim }, null, 2)}
-      </Card>
-    )}
+        {/* [ended] Back / Call Again */}
+        {(isEnded || isDeclined) && (
+          <CallButton
+            Icon={ArrowBackIcon}
+            text="Back"
+            variant="soft"
+            onClick={() => (props.callIntent.backTo === 'app-chat' ? navigateToIndex() : props.backToContacts())}
+          />
+        )}
+        {(isEnded || isDeclined) && <CallButton Icon={CallIcon} text="Call Again" color="success" variant="soft" onClick={() => setStage('connected')} />}
+      </Box>
 
-    {/*{isEnded && <Card variant='solid' size='lg' color='primary'>*/}
-    {/*  <CardContent>*/}
-    {/*    <Typography>*/}
-    {/*      Please rate the call quality, 1 to 5 - Just a Joke*/}
-    {/*    </Typography>*/}
-    {/*  </CardContent>*/}
-    {/*</Card>}*/}
+      {/* DEBUG state */}
+      {avatarClickCount > 10 && avatarClickCount % 2 === 0 && (
+        <Card variant="outlined" sx={{ maxHeight: '25dvh', fontSize: 'sm', overflow: 'auto', whiteSpace: 'pre', py: 0, width: '100%' }}>
+          Special commands: Stop, Retry, Try Again, Restart, Goodbye.
+          <br />
+          {JSON.stringify({ ...recognitionState, speechInterim }, null, 2)}
+        </Card>
+      )}
 
-  </>;
+      {/*{isEnded && <Card variant='solid' size='lg' color='primary'>*/}
+      {/*  <CardContent>*/}
+      {/*    <Typography>*/}
+      {/*      Please rate the call quality, 1 to 5 - Just a Joke*/}
+      {/*    </Typography>*/}
+      {/*  </CardContent>*/}
+      {/*</Card>}*/}
+    </>
+  );
 }

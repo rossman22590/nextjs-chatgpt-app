@@ -1,62 +1,107 @@
 import * as React from 'react';
 import TimeAgo from 'react-timeago';
 
-import { Box, IconButton, Sheet, Typography } from '@mui/joy';
+import { Box, Button, IconButton, Sheet, Typography } from '@mui/joy';
+import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 
 import { Release } from '~/common/app.release';
 import { frontendHashString } from '~/common/util/textUtils';
 import { themeZIndexPageBar } from '~/common/app.theme';
 import { uiSetDismissed, useUIIsDismissed } from '~/common/stores/store-ui';
+import { apiAsyncNode } from '~/common/util/trpc.client';
 
 
-// configuration
 const MOTD_COLOR = 'primary';
 const MOTD_PREFIX = 'motd-';
+const LIVE_BANNER_PREFIX = 'admin-banner-';
 
+export const optimaHasMOTD = true;
 
-// toggles the component
-export const optimaHasMOTD = !!process.env.NEXT_PUBLIC_MOTD;
+type LiveBanner = Awaited<ReturnType<typeof apiAsyncNode.admin.getBanner.query>>;
+type BannerTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
+
+type RenderBanner = {
+  key: string;
+  tone: BannerTone;
+  title: string | null;
+  message: string;
+  ctaLabel: string | null;
+  ctaUrl: string | null;
+  buildTimestamp: string | null;
+};
 
 
 /**
- * Message of the day. If set, displays a message on this deployment.
- * The message can be permanently dismissed.
+ * Message of the day plus the live admin broadcast banner.
  */
 export function OptimaMOTD() {
+  const [liveBanner, setLiveBanner] = React.useState<LiveBanner>(null);
 
-  // expand special variables in the MOTD
-  const { message, hash, buildTimestamp } = React.useMemo(() => {
+  React.useEffect(() => {
+    let disposed = false;
+
+    const loadBanner = () => {
+      apiAsyncNode.admin.getBanner
+        .query()
+        .then((banner) => {
+          if (!disposed) setLiveBanner(banner);
+        })
+        .catch(() => {
+          if (!disposed) setLiveBanner(null);
+        });
+    };
+
+    loadBanner();
+    const interval = window.setInterval(loadBanner, 60_000);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const deploymentBanner = React.useMemo<RenderBanner | null>(() => {
     const rawMOTD = process.env.NEXT_PUBLIC_MOTD;
-    if (!rawMOTD?.trim()) return { message: null, hash: null, buildTimestamp: null };
+    if (!rawMOTD?.trim()) return null;
 
     const buildInfo = Release.buildInfo('frontend');
     const message = rawMOTD
       .replace(/{{app_build_hash}}/g, buildInfo.gitSha || '')
       .replace(/{{app_build_pkgver}}/g, buildInfo.pkgVersion || '')
-      // .replace(/{{app_build_time}}/g, new Date(buildInfo.timestamp || '').toLocaleDateString()) // we don't do this anymore, as we handle it with TimeAgo.
       .replace(/{{app_deployment_type}}/g, buildInfo.deploymentType || '');
 
     return {
+      key: MOTD_PREFIX + frontendHashString(message),
+      tone: MOTD_COLOR,
+      title: null,
       message,
-      hash: frontendHashString(message),
+      ctaLabel: null,
+      ctaUrl: null,
       buildTimestamp: buildInfo.timestamp || '',
     };
   }, []);
 
+  const banner = React.useMemo<RenderBanner | null>(() => {
+    if (liveBanner?.enabled && liveBanner.message.trim()) {
+      return {
+        key: LIVE_BANNER_PREFIX + frontendHashString(`${liveBanner.updatedAt}:${liveBanner.message}`),
+        tone: liveBanner.tone,
+        title: liveBanner.title,
+        message: liveBanner.message,
+        ctaLabel: liveBanner.ctaLabel,
+        ctaUrl: liveBanner.ctaUrl,
+        buildTimestamp: null,
+      };
+    }
 
-  // external state
-  const dismissed = useUIIsDismissed(!hash ? null : MOTD_PREFIX + hash);
+    return deploymentBanner;
+  }, [deploymentBanner, liveBanner]);
 
-  // skip if no MOTD
-  if (!message || dismissed === true)
-    return null;
+  const dismissed = useUIIsDismissed(banner?.key ?? null);
 
+  if (!banner || dismissed === true) return null;
 
-  /**
-   * Special render function to split '{{app_build_time}}' and insert a TimeAgo component.
-   */
-  function renderMessageWithTimeAgo(message: string) {
+  function renderMessageWithTimeAgo(message: string, buildTimestamp: string | null) {
     if (message.includes('{{app_build_time}}')) {
       const parts = message.split('{{app_build_time}}');
       return <>{parts[0]}{buildTimestamp && <TimeAgo date={buildTimestamp} />}{parts[1]}</>;
@@ -75,13 +120,13 @@ export function OptimaMOTD() {
         component='div'
         level='title-sm'
         variant='soft'
-        color={MOTD_COLOR}
+        color={banner.tone}
         endDecorator={
           <IconButton
             size='sm'
             variant='soft'
-            color={MOTD_COLOR}
-            onClick={() => uiSetDismissed(MOTD_PREFIX + hash)}
+            color={banner.tone}
+            onClick={() => uiSetDismissed(banner.key)}
             sx={{ ml: 'auto' }}
           >
             <CloseRoundedIcon />
@@ -96,8 +141,19 @@ export function OptimaMOTD() {
           justifyContent: 'space-between',
         }}
       >
-        <Box sx={{ p: 1, lineHeight: 'xl' }}>
-          {renderMessageWithTimeAgo(message)}
+        <Box sx={{ p: 1, lineHeight: 'xl', display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
+          <CampaignRoundedIcon sx={{ fontSize: 18, flexShrink: 0 }} />
+          {banner.title && (
+            <Typography component='span' level='title-sm' color={banner.tone} sx={{ fontWeight: 800 }}>
+              {banner.title}
+            </Typography>
+          )}
+          <Box component='span'>{renderMessageWithTimeAgo(banner.message, banner.buildTimestamp)}</Box>
+          {banner.ctaLabel && banner.ctaUrl && (
+            <Button component='a' href={banner.ctaUrl} target={banner.ctaUrl.startsWith('http') ? '_blank' : undefined} size='sm' variant='solid' color={banner.tone}>
+              {banner.ctaLabel}
+            </Button>
+          )}
         </Box>
       </Typography>
     </Sheet>

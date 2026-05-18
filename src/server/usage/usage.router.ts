@@ -1,6 +1,7 @@
 import * as z from 'zod/v4';
 import { TRPCError } from '@trpc/server';
 
+import { isAdminEmail } from '~/common/auth/adminEmails';
 import { createTRPCRouter, protectedProcedure } from '~/server/trpc/trpc.server';
 import { prisma } from '~/server/prisma/prisma-client';
 
@@ -49,7 +50,7 @@ export const usageRouter = createTRPCRouter({
     });
 
     // Admin is always unlimited
-    if (user?.email === 'rcohen@mytsi.org') return { allowed: true, reason: 'admin' as const, limit: null, used: 0, remaining: null, isActive: true };
+    if (isAdminEmail(user?.email)) return { allowed: true, reason: 'admin' as const, limit: null, used: 0, remaining: null, isActive: true };
 
     // Only an explicit false blocks legacy accounts that predate activation.
     if (user?.isActive === false) return { allowed: false, reason: 'inactive' as const, limit: user.tokenLimit ?? 0, used: 0, remaining: 0, isActive: false };
