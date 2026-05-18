@@ -43,15 +43,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Hash the new password
     const hashedPassword = hashSync(password, 12);
 
-    // Update the user's password in the Account table
+    // Update the user's password in the Account table (email on token is normalized; user row may differ in case)
     await (prisma as any).account.updateMany({
       where: {
-        user: { email: resetToken.email },
-        provider: 'credentials'
+        provider: 'credentials',
+        user: { email: { equals: resetToken.email, mode: 'insensitive' } },
       },
       data: {
-        providerAccountId: hashedPassword
-      }
+        providerAccountId: hashedPassword,
+      },
     });
 
     // Mark token as used and clean up

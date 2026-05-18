@@ -29,7 +29,7 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
   };
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/' });
+    await signOut({ callbackUrl: '/auth/signin' });
   };
 
   const handleProfile = () => {

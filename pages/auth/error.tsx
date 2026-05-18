@@ -2,6 +2,8 @@ import { useRouter } from 'next/router';
 import { Box, Typography, Button, Alert } from '@mui/joy';
 import { Warning } from '@mui/icons-material';
 
+import { AuthLightSurface } from '~/common/components/auth/AuthLightSurface';
+
 const errorMessages: Record<string, string> = {
   Configuration: 'There is a problem with the server configuration.',
   AccessDenied: 'Access denied. You do not have permission to sign in.',
@@ -34,17 +36,16 @@ export default function AuthError() {
         p: 2,
       }}
     >
-      <Box
-        sx={{
-          maxWidth: 500,
-          width: '100%',
-          p: 4,
-          bgcolor: 'background.surface',
-          borderRadius: 'lg',
-          boxShadow: 'lg',
-          textAlign: 'center',
-        }}
-      >
+      <AuthLightSurface sx={{ maxWidth: 500, width: '100%' }}>
+        <Box
+          sx={{
+            p: 4,
+            bgcolor: 'background.surface',
+            borderRadius: 'lg',
+            boxShadow: 'lg',
+            textAlign: 'center',
+          }}
+        >
         <Warning 
           sx={{ 
             fontSize: 60, 
@@ -91,7 +92,8 @@ export default function AuthError() {
             Go Home
           </Button>
         </Box>
-      </Box>
+        </Box>
+      </AuthLightSurface>
     </Box>
   );
 } 

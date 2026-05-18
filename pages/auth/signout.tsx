@@ -5,6 +5,8 @@ import { Box, Typography, Button, Card, CardContent, Avatar, CircularProgress } 
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 
+import { AuthLightSurface } from '~/common/components/auth/AuthLightSurface';
+
 export default function SignOut() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -12,12 +14,12 @@ export default function SignOut() {
   // Auto-redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/');
+      router.push('/auth/signin');
     }
   }, [status, router]);
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/' });
+    await signOut({ callbackUrl: '/auth/signin' });
   };
 
   const handleCancel = () => {
@@ -57,15 +59,15 @@ export default function SignOut() {
         p: 2,
       }}
     >
-      <Card
-        sx={{
-          maxWidth: 420,
-          width: '100%',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          backdropFilter: 'blur(16px)',
-          background: 'rgba(255, 255, 255, 0.95)',
-        }}
-      >
+      <AuthLightSurface sx={{ maxWidth: 420, width: '100%' }}>
+        <Card
+          sx={{
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            backdropFilter: 'blur(16px)',
+            background: 'rgba(255, 255, 255, 0.95)',
+          }}
+        >
         <CardContent sx={{ p: 4, textAlign: 'center' }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
             <Box
@@ -140,7 +142,8 @@ export default function SignOut() {
             </Button>
           </Box>
         </CardContent>
-      </Card>
+        </Card>
+      </AuthLightSurface>
     </Box>
   );
 } 

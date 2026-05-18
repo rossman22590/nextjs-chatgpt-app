@@ -22,7 +22,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import IconButton from '@mui/joy/IconButton';
 
 import { Brand } from '~/common/app.config';
-import { useAppStateStore } from '~/common/state/store-appstate';
+import { AuthLightSurface } from '~/common/components/auth/AuthLightSurface';
 
 // Check if signup is disabled via environment variable
 const isSignupDisabled = process.env.DISABLE_SIGNUP === 'true';
@@ -133,15 +133,15 @@ export default function SignUp() {
         p: 2,
       }}
     >
-      <Card
-        sx={{
-          width: '90%',
-          maxWidth: '420px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          backdropFilter: 'blur(16px)',
-          background: 'rgba(255, 255, 255, 0.95)',
-        }}
-      >
+      <AuthLightSurface sx={{ width: '90%', maxWidth: '420px' }}>
+        <Card
+          sx={{
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            backdropFilter: 'blur(16px)',
+            background: 'rgba(255, 255, 255, 0.95)',
+          }}
+        >
         <CardContent sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
             <Box
@@ -276,7 +276,8 @@ export default function SignUp() {
             </Typography>
           </Box>
         </CardContent>
-      </Card>
+        </Card>
+      </AuthLightSurface>
     </Box>
   );
 }

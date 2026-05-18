@@ -1,5 +1,8 @@
 import { createHash, randomBytes } from 'crypto';
 
+/** Normalize email for storage and credential lookup (case-insensitive sign-in). */
+export const normalizeAuthEmail = (email: string) => email.trim().toLowerCase();
+
 /**
  * Simple password hashing function
  */

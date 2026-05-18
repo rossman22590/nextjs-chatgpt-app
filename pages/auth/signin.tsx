@@ -9,7 +9,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import IconButton from '@mui/joy/IconButton';
 
 import { Brand } from '~/common/app.config';
-import { useAppStateStore } from '~/common/state/store-appstate';
+import { AuthLightSurface } from '~/common/components/auth/AuthLightSurface';
 
 // Check if signup is disabled via environment variable
 const isSignupDisabled = process.env.DISABLE_SIGNUP === 'true';
@@ -26,6 +26,24 @@ export default function SignIn() {
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
   const [showResetForm, setShowResetForm] = React.useState(false);
   const { callbackUrl } = router.query;
+  const [oauthProviderIds, setOauthProviderIds] = React.useState<string[] | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/auth/providers')
+      .then((r) => r.json())
+      .then((data: Record<string, unknown>) => {
+        if (!cancelled) setOauthProviderIds(Object.keys(data));
+      })
+      .catch(() => {
+        if (!cancelled) setOauthProviderIds([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const googleSignInAvailable = oauthProviderIds?.includes('google') ?? false;
 
   // Redirect if already authenticated
   React.useEffect(() => {
@@ -152,15 +170,15 @@ export default function SignIn() {
         p: 2,
       }}
     >
-      <Card
-        sx={{
-          width: '90%',
-          maxWidth: '420px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          backdropFilter: 'blur(16px)',
-          background: 'rgba(255, 255, 255, 0.95)',
-        }}
-      >
+      <AuthLightSurface sx={{ width: '90%', maxWidth: '420px' }}>
+        <Card
+          sx={{
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            backdropFilter: 'blur(16px)',
+            background: 'rgba(255, 255, 255, 0.95)',
+          }}
+        >
         <CardContent sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
             <Box
@@ -198,25 +216,29 @@ export default function SignIn() {
             </Alert>
           )}
 
-          {/* Google Sign In Button */}
-          <Button
-            variant="outlined"
-            color="neutral"
-            size="lg"
-            startDecorator={<GoogleIcon />}
-            onClick={handleGoogleSignIn}
-            disabled={isLoading}
-            sx={{
-              width: '100%',
-              borderRadius: 'md',
-              py: 1.5,
-              mb: 3,
-            }}
-          >
-            Continue with Google
-          </Button>
+          {/* Google Sign In — hidden when OAuth is not configured (e.g. local dev) */}
+          {googleSignInAvailable && (
+            <>
+              <Button
+                variant="outlined"
+                color="neutral"
+                size="lg"
+                startDecorator={<GoogleIcon />}
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                sx={{
+                  width: '100%',
+                  borderRadius: 'md',
+                  py: 1.5,
+                  mb: 3,
+                }}
+              >
+                Continue with Google
+              </Button>
 
-          <Divider sx={{ my: 3 }}>or</Divider>
+              <Divider sx={{ my: 3 }}>or</Divider>
+            </>
+          )}
 
           {!showResetForm ? (
             <form onSubmit={handleSubmit}>
@@ -333,7 +355,8 @@ export default function SignIn() {
             </Box>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </AuthLightSurface>
     </Box>
   );
 }

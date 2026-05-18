@@ -26,6 +26,13 @@ import { useLlmServiceAccess } from '~/common/stores/llms/hooks/useLlmServiceAcc
 import { useOverlayComponents } from '~/common/layout/overlays/useOverlayComponents';
 
 
+/** Extra fields merged onto tRPC `error.data` by `errorFormatter` in trpc.server.ts (TRPCFetcherError). */
+type TrpcClientErrorData = {
+  httpStatus?: number;
+  aixFHttpStatus?: number | null;
+};
+
+
 // -- react-query enrichers - stable select functions --
 
 function _enrichMetadataWithMimeFlags<T extends { mime_type: string }>(meta: T) {
@@ -219,7 +226,10 @@ function AnthropicFileChip(props: {
 
   const isBusy = !!busy || metaLoading;
   const hasError = !!metaError || !!actionError;
-  const isFileGone = !!metaError && typeof metaError === 'object' && 'data' in metaError && (metaError.data?.httpStatus === 404 || metaError.data?.aixFHttpStatus === 404);
+  const metaErrData: TrpcClientErrorData | undefined =
+    metaError && typeof metaError === 'object' && 'data' in metaError ? (metaError.data as TrpcClientErrorData) : undefined;
+  const isFileGone =
+    !!metaError && typeof metaError === 'object' && 'data' in metaError && (metaErrData?.httpStatus === 404 || metaErrData?.aixFHttpStatus === 404);
 
 
   return (

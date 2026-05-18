@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Resend } from 'resend';
 import { randomBytes } from 'crypto';
 import { prisma } from '~/server/prisma/prisma-client';
+import { normalizeAuthEmail } from '~/server/auth/auth-utils';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -17,10 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { email } = resetPasswordSchema.parse(req.body);
+    const normalizedEmail = normalizeAuthEmail(email);
 
     // Check if user exists
-    const user = await (prisma as any).user.findUnique({
-      where: { email }
+    const user = await (prisma as any).user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
     });
 
     if (!user) {
@@ -38,20 +40,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Clean up old tokens for this email
     await (prisma as any).passwordResetToken.deleteMany({
       where: {
-        OR: [
-          { email },
-          { expires: { lt: new Date() } }
-        ]
-      }
+        OR: [{ email: normalizedEmail }, { expires: { lt: new Date() } }],
+      },
     });
 
     // Store the token in database
     await (prisma as any).passwordResetToken.create({
       data: {
-        email,
+        email: normalizedEmail,
         token,
         expires,
-      }
+      },
     });
 
     // Create reset URL
@@ -61,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       await resend.emails.send({
         from: 'noreply@myapps.ai', // Your verified domain
-        to: email,
+        to: normalizedEmail,
         subject: 'Reset Your Password',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -90,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `,
       });
 
-      console.log(`Password reset email sent to: ${email} with token: ${token}`);
+      console.log(`Password reset email sent to: ${normalizedEmail} with token: ${token}`);
       
       res.status(200).json({ 
         message: 'Password reset email sent successfully',

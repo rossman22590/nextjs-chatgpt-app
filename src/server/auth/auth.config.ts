@@ -5,15 +5,24 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { z } from 'zod';
-import { JWT } from 'next-auth/jwt';
+
+import { normalizeAuthEmail } from '~/server/auth/auth-utils';
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+const googleAuthConfigured = Boolean(googleClientId && googleClientSecret);
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
+    ...(googleAuthConfigured
+      ? [
+          GoogleProvider({
+            clientId: googleClientId!,
+            clientSecret: googleClientSecret!,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -33,10 +42,11 @@ export const authOptions: NextAuthOptions = {
         }
 
         const { email, password } = result.data;
+        const normalizedEmail = normalizeAuthEmail(email);
 
-        // Find user by email
-        const user = await (prisma as any).user.findUnique({
-          where: { email }
+        // Find user by email (case-insensitive: legacy rows may differ in casing)
+        const user = await (prisma as any).user.findFirst({
+          where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
         });
 
         if (!user || !user.id) {
@@ -91,7 +101,6 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/auth/signin',
-    signOut: '/auth/signout',
     error: '/auth/error',
   },
 }; 

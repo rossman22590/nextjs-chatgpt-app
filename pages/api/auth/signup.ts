@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { hash } from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '~/server/prisma/prisma-client';
+import { normalizeAuthEmail } from '~/server/auth/auth-utils';
 
 // Validation schema for user registration
 const signupSchema = z.object({
@@ -33,11 +34,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const { name, email, password } = result.data;
+    const normalizedEmail = normalizeAuthEmail(email);
 
     // Check if user already exists
     // Using any type assertion as a workaround for TypeScript errors
-    const existingUser = await (prisma as any).user.findUnique({
-      where: { email },
+    const existingUser = await (prisma as any).user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
     });
 
     if (existingUser) {
@@ -51,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const user = await (prisma as any).user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         isActive: false,
         tokenLimit: 0,
         // Create a credentials account

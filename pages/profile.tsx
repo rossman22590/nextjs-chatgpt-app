@@ -31,6 +31,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 
 import { Brand } from '~/common/app.config';
 import { AuthButton } from '~/common/components/auth/AuthButton';
+import { AuthLightSurface } from '~/common/components/auth/AuthLightSurface';
 import { UserAnalytics } from '~/common/components/analytics/UserAnalytics';
 import { apiAsyncNode } from '~/common/util/trpc.client';
 import DataUsageIcon from '@mui/icons-material/DataUsage';
@@ -140,19 +141,21 @@ export default function Profile() {
           <Button variant="plain" color="neutral" startDecorator={<ArrowBackIcon />} onClick={handleGoBack} sx={{ mr: 2, color: 'white' }}>
             Back
           </Button>
-          <Typography level="h1" sx={{ color: 'white', fontWeight: 'bold' }}>
+          <Typography level="h1" sx={{ color: '#fff', fontWeight: 'bold', textShadow: '0 1px 4px rgba(0,0,0,0.45)' }}>
             Profile
           </Typography>
         </Box>
 
         {/* Profile Card with Tabs */}
-        <Card
-          sx={{
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            backdropFilter: 'blur(16px)',
-            background: 'rgba(255, 255, 255, 0.95)',
-          }}
-        >
+        <AuthLightSurface sx={{ width: '100%' }}>
+          <Card
+            sx={{
+              width: '100%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              backdropFilter: 'blur(16px)',
+              background: 'rgba(255, 255, 255, 0.95)',
+            }}
+          >
           <CardContent sx={{ p: 0 }}>
             {/* Profile Header */}
             <Box sx={{ p: 4, pb: 0 }}>
@@ -405,7 +408,8 @@ export default function Profile() {
               </TabPanel>
             </Tabs>
           </CardContent>
-        </Card>
+          </Card>
+        </AuthLightSurface>
       </Box>
     </Box>
   );
