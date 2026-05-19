@@ -163,7 +163,7 @@ export const MessagesSelectionHeader = (props: {
       </Button>
     </Box>
 
-    <IconButton size='sm' onClick={props.onClose}>
+    <IconButton aria-label="Close" size='sm' onClick={props.onClose}>
       <ClearIcon />
     </IconButton>
   </Sheet>;

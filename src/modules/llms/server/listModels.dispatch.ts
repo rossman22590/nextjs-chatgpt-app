@@ -380,7 +380,7 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
     case 'openpipe':
     case 'openrouter':
     case 'togetherai':
- 
+
       // Effective URL and headers - respects OPENAI_API_HOST server env and default hosts
       const { headers: oaiHeaders, url: oaiUrl } = openAIAccess(access, null, OPENAI_API_PATHS.models);
 
@@ -394,10 +394,10 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
           if (bypassFetch) return { data: [] }; // dummy response
 
           _wire?.logRequest('GET', oaiUrl, oaiHeaders);
-          const wireModels = await fetchJsonOrTRPCThrow<OpenAIWire_API_Models_List.Response>({ 
-            url: oaiUrl, 
-            headers: oaiHeaders, 
-            name: `OpenAI/${_capitalize(dialect)}`, 
+          const wireModels = await fetchJsonOrTRPCThrow<OpenAIWire_API_Models_List.Response>({
+            url: oaiUrl,
+            headers: oaiHeaders,
+            name: `OpenAI/${_capitalize(dialect)}`,
             signal,
           });
           _wire?.logResponse(wireModels);

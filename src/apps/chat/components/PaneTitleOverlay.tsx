@@ -140,7 +140,7 @@ export function PaneTitleOverlay(props: {
     >
       {/* Close Others*/}
       {/*<TooltipOutlined title='Close Other Tabs'>*/}
-      {!editingTitle && <IconButton title='Close Other Tabs' size='sm' color={color} variant={variantP} onClick={handleCloseOthers} sx={_styles.toolButton}>
+      {!editingTitle && <IconButton aria-label="Close other tabs" title='Close Other Tabs' size='sm' color={color} variant={variantP} onClick={handleCloseOthers} sx={_styles.toolButton}>
         <OpenInFullIcon sx={_styles.toolIcon} />
       </IconButton>}
       {/*</TooltipOutlined>*/}
@@ -168,7 +168,7 @@ export function PaneTitleOverlay(props: {
           untitled
         </Box>}
         {!hasTitle && <TooltipOutlined title='Edit Chat Title'>
-          <IconButton title='' size='sm' color={color} variant={variantP} onClick={handleTitleEditBegin} sx={_styles.toolButton}>
+          <IconButton aria-label="Edit chat title" size='sm' color={color} variant={variantP} onClick={handleTitleEditBegin} sx={_styles.toolButton}>
             <EditRoundedIcon sx={_styles.toolIcon} />
           </IconButton>
         </TooltipOutlined>}
@@ -185,7 +185,7 @@ export function PaneTitleOverlay(props: {
 
       {/* Close This */}
       {/*<TooltipOutlined title='Close'>*/}
-      {!editingTitle && <IconButton title='Close Tab' size='sm' color={color} variant={variantP} onClick={handleCloseThis} sx={_styles.toolButton}>
+      {!editingTitle && <IconButton aria-label="Close tab" title='Close Tab' size='sm' color={color} variant={variantP} onClick={handleCloseThis} sx={_styles.toolButton}>
         <ClearIcon sx={_styles.toolIconLg} />
       </IconButton>}
       {/*</TooltipOutlined>*/}

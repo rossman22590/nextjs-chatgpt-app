@@ -3,7 +3,7 @@ import { Box, styled } from '@mui/joy';
 
 import { animationShadowLimey } from '~/common/util/animUtils';
 
-import { BEAM_INVERT_BACKGROUND, BEAM_PANE_ZINDEX } from './beam.config';
+import { BEAM_PANE_ZINDEX } from './beam.config';
 
 
 export const beamCardClasses = {
@@ -22,17 +22,15 @@ export const BeamCard = styled(Box)(({ theme }) => ({
 
   backgroundColor: theme.vars.palette.background.surface,
   border: '1px solid',
-  borderColor: theme.vars.palette.neutral.outlinedBorder,
-  borderRadius: theme.radius.md,
+  borderColor: theme.vars.palette.divider,
+  borderRadius: theme.radius.lg,
+  boxShadow: '0 4px 18px rgba(0 0 0 / 0.06), 0 1px 4px rgba(0 0 0 / 0.04)',
 
   padding: 'var(--Card-padding)',
 
-  // [`&.${beamCardClasses.active}`]: {
-  //   boxShadow: 'inset 0 0 0 2px #00f, inset 0 0 0 4px #00a',
-  // },
-
   [`&.${beamCardClasses.fusionIdle}`]: {
-    backgroundColor: BEAM_INVERT_BACKGROUND ? theme.vars.palette.background.level2 : theme.vars.palette.background.surface,
+    backgroundColor: theme.vars.palette.background.level1,
+    borderColor: theme.vars.palette.divider,
   },
   [`&.${beamCardClasses.selectable}`]: {
     backgroundColor: theme.vars.palette.background.popup,
@@ -74,13 +72,16 @@ export const beamCardMessageWrapperSx: SxProps = {
 };
 
 export const beamCardMessageSx: SxProps = {
-  // style: to undo the style of ChatMessage
-  backgroundColor: 'none',
+  // style: to undo the style of ChatMessage so only the card has shadow/radius (no inner square shadow)
+  backgroundColor: 'transparent',
   border: 'none',
-  mx: -1.5, // compensates for the marging (e.g. RenderChatText, )
+  borderRadius: 0,
+  boxShadow: 'none',
+  mx: -1.5, // compensates for the margin (e.g. RenderChatText)
   my: 0,
   px: 0,
   py: 0,
+  '&:hover': { boxShadow: 'none', transform: 'none' },
 };
 
 export const beamCardMessageScrollingSx: SxProps = {

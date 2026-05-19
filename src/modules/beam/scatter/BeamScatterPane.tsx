@@ -12,23 +12,19 @@ import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
 import { TooltipOutlined } from '~/common/components/TooltipOutlined';
 
 import type { BeamStoreApi } from '../store-beam.hooks';
-import { BEAM_BTN_SX, SCATTER_COLOR, SCATTER_RAY_PRESETS } from '../beam.config';
+import { BEAM_BTN_SX, SCATTER_RAY_PRESETS } from '../beam.config';
 import { BeamScatterDropdown } from './BeamScatterPaneDropdown';
 import { beamPaneSx } from '../BeamCard';
 
 
 const scatterPaneSx: SxProps = {
   ...beamPaneSx,
-  backgroundColor: 'background.popup',
-
-  // col gap is pad/2 (8px), row is double (1rem)
+  backgroundColor: 'background.surface',
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: 'lg',
+  boxShadow: '0 4px 18px rgba(0 0 0 / 0.06), 0 1px 4px rgba(0 0 0 / 0.04)',
   rowGap: 'var(--Pad)',
-
-  // [desktop] scatter: primary-chan shadow
-  // boxShadow: '0px 6px 12px -8px rgb(var(--joy-palette-primary-darkChannel) / 35%)',
-  // boxShadow: '0px 16px 16px -24px rgb(var(--joy-palette-primary-darkChannel) / 35%)',
-  boxShadow: '0px 6px 16px -12px rgb(var(--joy-palette-primary-darkChannel) / 50%)',
-  // boxShadow: '0px 8px 20px -16px rgb(var(--joy-palette-primary-darkChannel) / 30%)',
 };
 
 const mobileScatterPaneSx: SxProps = scatterPaneSx;
@@ -92,41 +88,34 @@ export function BeamScatterPane(props: {
 
       {/* Title */}
       <Box>
-        <Typography
-          level='h4' component='h3'
-          endDecorator={dropdownMemo}
-          // sx={{ my: 0.25 }}
-        >
+        <Typography level='h4' component='h3' endDecorator={dropdownMemo} fontWeight='lg'>
           {props.startBusy
             ? <AutoAwesomeIcon sx={_styles.iconActive} />
             : <AutoAwesomeOutlinedIcon sx={_styles.icon} />}
           Beam
         </Typography>
-        <Typography level='body-sm' sx={{ whiteSpace: 'nowrap' }}>
+        <Typography level='body-sm' color='neutral' sx={{ whiteSpace: 'nowrap', mt: 0.25 }}>
           Explore different replies
-          {/* Explore the solution space */}
         </Typography>
       </Box>
 
       {/* Ray presets */}
       <FormControl sx={{ my: '-0.25rem' }}>
-        <FormLabelStart title='Beam Count' sx={/*{ mb: '0.25rem' }*/ undefined} />
-        <ButtonGroup variant='outlined'>
+        <FormLabelStart title='Beam count' />
+        <ButtonGroup variant='outlined' size='sm' sx={{ borderRadius: 'md' }}>
           {SCATTER_RAY_PRESETS.map((n) => {
             const isActive = n === props.rayCount;
             return (
               <Button
                 key={n}
-                // variant={isActive ? 'solid' : undefined}
-                color={isActive ? SCATTER_COLOR : 'neutral'}
-                // color='neutral'
+                color={isActive ? 'primary' : 'neutral'}
                 size='sm'
                 onClick={() => props.setRayCount(n)}
                 sx={{
-                  // backgroundColor: isActive ? 'background.popup' : undefined,
-                  backgroundColor: !isActive ? `${SCATTER_COLOR}.softBg` : 'background.popup',
-                  fontWeight: isActive ? 'xl' : 400, /* reset, from 600 */
+                  backgroundColor: isActive ? 'primary.softBg' : 'background.level1',
+                  fontWeight: isActive ? 600 : 400,
                   width: '3rem',
+                  borderRadius: 'md',
                 }}
               >
                 {n}
@@ -137,14 +126,10 @@ export function BeamScatterPane(props: {
             <Button
               color='neutral'
               size='sm'
+              variant='outlined'
               onClick={() => props.setRayCount(props.rayCount + 1)}
-              sx={{
-                backgroundColor: 'background.popup',
-                fontWeight: 'xl',
-                width: '3rem',
-              }}
+              sx={{ width: '3rem', borderRadius: 'md' }}
             >
-              {/*{'+'}*/}
               <PlusOneRoundedIcon />
             </Button>
           )}
@@ -155,9 +140,10 @@ export function BeamScatterPane(props: {
       {!props.startBusy ? (
         <TooltipOutlined slowEnter title={startRestart ? 'Shift + Click to re-run active Beams' : null} placement='top-end'>
           <Button
-            // key='scatter-start' // used for animation triggering, which we don't have now
-            variant='solid' color={SCATTER_COLOR}
-            disabled={!props.startEnabled || props.startBusy} loading={props.startBusy}
+            variant='solid'
+            color='primary'
+            disabled={!props.startEnabled || props.startBusy}
+            loading={props.startBusy}
             endDecorator={<PlayArrowRoundedIcon />}
             onClick={handleStartClicked}
             sx={BEAM_BTN_SX}

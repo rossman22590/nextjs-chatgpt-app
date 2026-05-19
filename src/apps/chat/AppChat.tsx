@@ -18,11 +18,11 @@ import { ConfirmationModal } from '~/common/components/modals/ConfirmationModal'
 import { ConversationsManager } from '~/common/chat-overlay/ConversationsManager';
 import { ErrorBoundary } from '~/common/components/ErrorBoundary';
 import { getLLMContextTokens, LLM_IF_ANT_PromptCaching, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
+import { useLayoutPortalsStore } from '~/common/layout/optima/portals/store-layout-portals';
 import { OptimaDrawerIn, OptimaPanelIn, OptimaToolbarIn } from '~/common/layout/optima/portals/OptimaPortalsIn';
 import { PanelResizeInset } from '~/common/components/PanelResizeInset';
 import { Release } from '~/common/app.release';
 import { ScrollToBottom } from '~/common/scroll-to-bottom/ScrollToBottom';
-import { ScrollToBottomButton } from '~/common/scroll-to-bottom/ScrollToBottomButton';
 import { ShortcutKey, useGlobalShortcuts } from '~/common/components/shortcuts/useGlobalShortcuts';
 import { WorkspaceIdProvider } from '~/common/stores/workspace/WorkspaceIdProvider';
 import { addSnackbar, removeSnackbar } from '~/common/components/snackbar/useSnackbarsStore';
@@ -30,7 +30,8 @@ import { createDMessageFromFragments, createDMessagePlaceholderIncomplete, DMess
 import { createErrorContentFragment, createTextContentFragment, DMessageAttachmentFragment, DMessageContentFragment, duplicateDMessageFragments } from '~/common/stores/chat/chat.fragments';
 import { gcChatImageAssets } from '~/common/stores/chat/chat.gc';
 import { getChatLLMId } from '~/common/stores/llms/store-llms';
-import { getConversation, getConversationSystemPurposeId, useConversation } from '~/common/stores/chat/store-chats';
+import { usePersonaCacheStore } from '~/common/stores/chat/store-persona-cache';
+import { getConversation, getConversationSystemPurposeId, useChatStore, useConversation } from '~/common/stores/chat/store-chats';
 import { optimaActions, optimaOpenModels, optimaOpenPreferences, useOptimaChromeless } from '~/common/layout/optima/useOptima';
 import { useFolderStore } from '~/common/stores/folders/store-chat-folders';
 import { useIsMobile, useIsTallScreen } from '~/common/components/useMatchMedia';
@@ -68,10 +69,13 @@ export interface AppChatIntent {
 const scrollToBottomSx = {
   display: 'flex',
   flexDirection: 'column',
+  backgroundImage: 'var(--agi-thread-bg)',
 };
 
 const chatMessageListSx: SxProps = {
   flexGrow: 1,
+  // extra bottom space so the last message clears the composer fade gradient
+  pb: { xs: 6, md: 8 },
 };
 
 /*const chatMessageListBrandedSx: SxProps = {
@@ -92,16 +96,13 @@ const chatBeamWrapperSx: SxProps = {
 };
 
 const composerOpenSx: SxProps = {
-  // NOTE: disabled on 2025-03-05: conflicts with the GlobalDragOverlay's
-  // zIndex: 21, // just to allocate a surface, and potentially have a shadow
-  minWidth: { md: 480 }, // don't get compresses too much on desktop
-  // backgroundColor: themeBgAppChatComposer, // inlined in the Composer
-  transition: 'background-color 0.5s ease-out',
-  borderTop: `1px solid`,
-  borderTopColor: 'rgba(var(--joy-palette-neutral-mainChannel, 99 107 116) / 0.4)',
-  // hack: eats the bottom of the last message (as it has a 1px divider)
-  // NOTE: commented on 2024-05-13, as other content was stepping on the border due to it and missing zIndex
-  // mt: '-1px',
+  minWidth: { md: 480 },
+  pt: { xs: 1, md: 1.5 },
+  transition: 'background-color 0.4s ease-out',
+  borderTop: '1px solid',
+  borderTopColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.08)',
+  backdropFilter: 'blur(20px) saturate(150%)',
+  background: 'var(--agi-shell-bg)',
 } as const;
 
 const composerOpenMobileSx: SxProps = {
@@ -346,12 +347,21 @@ export function AppChat() {
 
   // Chat actions
 
-  const handleConversationNewInFocusedPane = React.useCallback((forceNoRecycle: boolean, isIncognito: boolean) => {
+  const handleConversationNewInFocusedPane = React.useCallback((forceNoRecycle: boolean, isIncognito: boolean, initialPurposeId?: import('~/common/stores/chat/chat.conversation').ConversationPurposeId) => {
 
     // create conversation (or recycle the existing top-of-stack empty conversation)
+    const personaId = initialPurposeId ?? getConversationSystemPurposeId(focusedPaneConversationId) ?? undefined;
     const conversationId = (recycleNewConversationId && !forceNoRecycle && !isIncognito)
       ? recycleNewConversationId
-      : prependNewConversation(getConversationSystemPurposeId(focusedPaneConversationId) ?? undefined, isIncognito);
+      : prependNewConversation(personaId, isIncognito);
+
+    // when starting with a custom persona, set userSymbol so the drawer shows the correct icon
+    if (conversationId && initialPurposeId?.startsWith('persona:')) {
+      const personaIdOnly = initialPurposeId.slice(7);
+      const cached = usePersonaCacheStore.getState().getPersona(personaIdOnly);
+      if (cached?.symbol)
+        useChatStore.getState().setUserSymbol(conversationId, cached.symbol);
+    }
 
     // switch the focused pane to the new conversation
     handleOpenConversationInFocusedPane(conversationId);
@@ -514,6 +524,12 @@ export function AppChat() {
 
 
   // Effects
+
+  // [effect] Sync toolbar variant so Beam mode uses theme-aligned bar (not dark/inverted)
+  React.useEffect(() => {
+    useLayoutPortalsStore.getState().setToolbarContentKind(beamOpenStoreInFocusedPane ? 'beam' : null);
+    return () => useLayoutPortalsStore.getState().setToolbarContentKind(null);
+  }, [beamOpenStoreInFocusedPane]);
 
   // [effect] Handle the conversation intent
   React.useEffect(() => {
@@ -732,9 +748,6 @@ export function AppChat() {
                   inlineSx={chatBeamWrapperSx}
                 />
               )}
-
-              {/* Visibility and actions are handled via Context */}
-              <ScrollToBottomButton />
 
             </ScrollToBottom>
 

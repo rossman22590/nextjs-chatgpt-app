@@ -15,29 +15,25 @@ import {
   ListItem,
   ListItemDecorator,
   Chip,
-  Tabs,
-  TabList,
-  Tab,
-  TabPanel,
+  Sheet,
+  Table,
+  LinearProgress,
 } from '@mui/joy';
 import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import SecurityIcon from '@mui/icons-material/Security';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import RefreshIcon from '@mui/icons-material/Refresh';
-
-import { Brand } from '~/common/app.config';
-import { AuthButton } from '~/common/components/auth/AuthButton';
-import { AuthLightSurface } from '~/common/components/auth/AuthLightSurface';
-import { UserAnalytics } from '~/common/components/analytics/UserAnalytics';
-import { apiAsyncNode } from '~/common/util/trpc.client';
 import DataUsageIcon from '@mui/icons-material/DataUsage';
 import HistoryIcon from '@mui/icons-material/History';
-import LinearProgress from '@mui/joy/LinearProgress';
-import { Sheet, Table } from '@mui/joy';
+
+import Image from 'next/image';
+import { Brand } from '~/common/app.config';
+import { AuthButton } from '~/common/components/auth/AuthButton';
+import { UserAnalytics } from '~/common/components/analytics/UserAnalytics';
+import { apiAsyncNode } from '~/common/util/trpc.client';
 
 type MyUsageData = Awaited<ReturnType<typeof apiAsyncNode.usage.myUsage.query>>;
 type CheckLimitData = Awaited<ReturnType<typeof apiAsyncNode.usage.checkLimit.query>>;
@@ -95,7 +91,7 @@ export default function Profile() {
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: '100vh',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          bgcolor: 'background.body',
         }}
       >
         <CircularProgress size="lg" />
@@ -112,66 +108,70 @@ export default function Profile() {
     router.back();
   };
 
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return 'Unknown';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
   return (
     <Box
       sx={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        p: 2,
+        bgcolor: 'background.body',
+        py: { xs: 2, md: 3 },
+        px: 2,
       }}
     >
-      <Box
-        sx={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          pt: 4,
-        }}
-      >
-        {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Button variant="plain" color="neutral" startDecorator={<ArrowBackIcon />} onClick={handleGoBack} sx={{ mr: 2, color: 'white' }}>
+      <Box sx={{ maxWidth: { xs: '100%', sm: 720, md: 880, lg: 1040 }, margin: '0 auto', width: '100%' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+          <Button
+            variant="plain"
+            color="neutral"
+            size="sm"
+            startDecorator={<ArrowBackIcon />}
+            onClick={handleGoBack}
+            sx={{ '--Icon-fontSize': '1.25rem' }}
+          >
             Back
           </Button>
-          <Typography level="h1" sx={{ color: '#fff', fontWeight: 'bold', textShadow: '0 1px 4px rgba(0,0,0,0.45)' }}>
+          <Image src="/apple-touch-icon.png" alt={Brand.Title.Base} width={28} height={28} />
+          <Typography level="h4" fontWeight="lg">
             Profile
           </Typography>
         </Box>
 
-        {/* Profile Card with Tabs */}
-        <AuthLightSurface sx={{ width: '100%' }}>
-          <Card
-            sx={{
-              width: '100%',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              backdropFilter: 'blur(16px)',
-              background: 'rgba(255, 255, 255, 0.95)',
-            }}
-          >
+        <Card
+          variant="outlined"
+          sx={{
+            borderRadius: 'lg',
+            borderColor: 'divider',
+            boxShadow: 'sm',
+            bgcolor: 'background.surface',
+            overflow: 'hidden',
+          }}
+        >
           <CardContent sx={{ p: 0 }}>
-            {/* Profile Header */}
-            <Box sx={{ p: 4, pb: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            {/* Profile hero */}
+            <Box
+              sx={{
+                p: 3,
+                bgcolor: 'background.level1',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 {session?.user?.image ? (
-                  <Avatar src={session.user.image} alt={session.user.name || 'User'} sx={{ width: 80, height: 80, mr: 3 }} />
+                  <Avatar
+                    src={session.user.image}
+                    alt={session.user.name || 'User'}
+                    sx={{ width: 56, height: 56 }}
+                  />
                 ) : (
-                  <Avatar sx={{ width: 80, height: 80, mr: 3 }}>
-                    <PersonIcon sx={{ fontSize: 40 }} />
+                  <Avatar sx={{ width: 56, height: 56, bgcolor: 'primary.softBg' }}>
+                    <PersonIcon sx={{ color: 'primary.plainColor', fontSize: 28 }} />
                   </Avatar>
                 )}
-                <Box>
-                  <Typography level="h2" fontWeight="bold">
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography level="title-lg" fontWeight="lg">
                     {session?.user?.name || 'User'}
                   </Typography>
-                  <Typography level="body-md" color="neutral">
+                  <Typography level="body-sm" color="neutral" noWrap>
                     {session?.user?.email}
                   </Typography>
                   <Chip variant="soft" color={limitInfo?.isActive === false ? 'danger' : 'success'} size="sm" sx={{ mt: 1 }}>
@@ -181,71 +181,68 @@ export default function Profile() {
               </Box>
             </Box>
 
-            {/* Tabs */}
-            <Tabs value={activeTab} onChange={(event, newValue) => setActiveTab(newValue as number)}>
-              <TabList sx={{ px: 4 }}>
-                <Tab>
-                  <AccountCircleIcon sx={{ mr: 1 }} />
-                  Account Info
-                </Tab>
-                <Tab>
-                  <AnalyticsIcon sx={{ mr: 1 }} />
-                  Analytics & Usage
-                </Tab>
-              </TabList>
+            <Box sx={{ px: 2, pt: 1 }}>
+              <Stack direction="row" spacing={0.5} sx={{ '--List-padding': 0, '--ListItem-minHeight': '2.5rem' }}>
+                <Button
+                  variant={activeTab === 0 ? 'soft' : 'plain'}
+                  color="neutral"
+                  size="sm"
+                  onClick={() => setActiveTab(0)}
+                  startDecorator={<AccountCircleIcon sx={{ fontSize: '1.1rem' }} />}
+                  sx={{
+                    borderRadius: 'md',
+                    fontWeight: activeTab === 0 ? 600 : 400,
+                  }}
+                >
+                  Account
+                </Button>
+                <Button
+                  variant={activeTab === 1 ? 'soft' : 'plain'}
+                  color="neutral"
+                  size="sm"
+                  onClick={() => setActiveTab(1)}
+                  startDecorator={<AnalyticsIcon sx={{ fontSize: '1.1rem' }} />}
+                  sx={{
+                    borderRadius: 'md',
+                    fontWeight: activeTab === 1 ? 600 : 400,
+                  }}
+                >
+                  Analytics
+                </Button>
+              </Stack>
+            </Box>
 
-              {/* Account Information Tab */}
-              <TabPanel value={0} sx={{ p: 4 }}>
-                <Typography level="h3" sx={{ mb: 3 }}>
-                  Account Information
+            {activeTab === 0 && (
+              <Box sx={{ p: 3 }}>
+                <Typography level="title-md" fontWeight="lg" sx={{ mb: 2 }}>
+                  Profile
                 </Typography>
-
-                <List>
+                <List size="sm" sx={{ '--ListItem-paddingY': 0.75, '--ListItemDecorator-size': '2rem' }}>
                   <ListItem>
                     <ListItemDecorator>
-                      <PersonIcon />
+                      <PersonIcon sx={{ fontSize: '1.1rem', color: 'text.tertiary' }} />
                     </ListItemDecorator>
                     <Box>
-                      <Typography level="body-sm" color="neutral">
-                        Name
-                      </Typography>
-                      <Typography level="body-md">{session?.user?.name || 'Not provided'}</Typography>
+                      <Typography level="body-xs" color="neutral">Name</Typography>
+                      <Typography level="body-sm" fontWeight="md">{session?.user?.name || 'Not provided'}</Typography>
                     </Box>
                   </ListItem>
-
                   <ListItem>
                     <ListItemDecorator>
-                      <EmailIcon />
+                      <EmailIcon sx={{ fontSize: '1.1rem', color: 'text.tertiary' }} />
                     </ListItemDecorator>
                     <Box>
-                      <Typography level="body-sm" color="neutral">
-                        Email
-                      </Typography>
-                      <Typography level="body-md">{session?.user?.email || 'Not provided'}</Typography>
+                      <Typography level="body-xs" color="neutral">Email</Typography>
+                      <Typography level="body-sm" fontWeight="md">{session?.user?.email || 'Not provided'}</Typography>
                     </Box>
                   </ListItem>
-
-                  {/* <ListItem>
-                    <ListItemDecorator>
-                      <CalendarTodayIcon />
-                    </ListItemDecorator>
-                    <Box>
-                      <Typography level="body-sm" color="neutral">
-                        Member Since
-                      </Typography>
-                      <Typography level="body-md">
-                        {formatDate(session?.user?.id)}
-                      </Typography>
-                    </Box>
-                  </ListItem> */}
                 </List>
 
                 <Divider sx={{ my: 3 }} />
 
-                {/* Token Credits */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography level="h3">Token Credits</Typography>
-                  <Button variant="outlined" color="neutral" size="sm" startDecorator={<RefreshIcon />} loading={refreshing} onClick={refreshUsageData}>
+                  <Typography level="title-md" fontWeight="lg">Token Credits</Typography>
+                  <Button variant="plain" color="neutral" size="sm" startDecorator={<RefreshIcon />} loading={refreshing} onClick={refreshUsageData}>
                     Refresh
                   </Button>
                 </Box>
@@ -258,35 +255,36 @@ export default function Profile() {
                     const pct = limit != null && limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
                     const cardColor = !isActive ? 'danger' : limit === 0 ? 'warning' : pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success';
                     return (
-                      <Card variant="soft" color={cardColor} sx={{ mb: 2 }}>
+                      <Card variant="soft" color={cardColor} sx={{ borderRadius: 'md', mb: 2 }}>
                         <CardContent>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <DataUsageIcon />
-                            <Typography level="title-md">
+                            <DataUsageIcon sx={{ fontSize: '1.1rem' }} />
+                            <Typography level="title-sm">
                               {!isActive ? 'Account inactive' : remaining == null ? 'Unlimited tokens' : remaining.toLocaleString() + ' tokens remaining'}
                             </Typography>
                           </Box>
                           {!isActive ? (
-                            <Typography level="body-sm">Your account is inactive. Contact your admin to activate access. If you have an active AI Tutor Ultra account, please reach out to support to get activated.</Typography>
+                            <Typography level="body-sm" color="neutral">Your account is inactive. Contact your admin to activate access. If you have an active AI Tutor Ultra account, please reach out to support to get activated.</Typography>
                           ) : limit == null ? (
-                            <Typography level="body-sm">No monthly token limit is set on your account.</Typography>
+                            <Typography level="body-sm" color="neutral">No monthly token limit is set on your account.</Typography>
                           ) : limit > 0 ? (
                             <>
                               <LinearProgress
                                 determinate
                                 value={pct}
                                 color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'}
-                                sx={{ my: 1, height: 10, borderRadius: 5 }}
+                                size="sm"
+                                sx={{ borderRadius: 'xl', my: 1 }}
                               />
                               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography level="body-xs">{used.toLocaleString()} used</Typography>
-                                <Typography level="body-xs">{limit.toLocaleString()} limit / month</Typography>
+                                <Typography level="body-xs" color="neutral">{used.toLocaleString()} used</Typography>
+                                <Typography level="body-xs" color="neutral">{limit.toLocaleString()} limit / month</Typography>
                               </Box>
                             </>
                           ) : (
-                            <Typography level="body-sm">You currently have 0 monthly credits. Contact your admin to add credits.</Typography>
+                            <Typography level="body-sm" color="neutral">You currently have 0 monthly credits. Contact your admin to add credits.</Typography>
                           )}
-                          <Typography level="body-xs" sx={{ mt: 1 }}>
+                          <Typography level="body-xs" color="neutral" sx={{ mt: 1 }}>
                             {myUsage.thisMonth._count} requests this month - resets on the 1st of each month
                           </Typography>
                         </CardContent>
@@ -294,23 +292,22 @@ export default function Profile() {
                     );
                   })()
                 ) : (
-                  <CircularProgress size="sm" />
+                  <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}>
+                    <CircularProgress size="sm" />
+                  </Box>
                 )}
 
-                {/* Monthly History */}
                 {monthlyHistory && monthlyHistory.length > 0 && (
                   <>
-                    <Typography level="h4" sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <HistoryIcon /> Monthly Usage History
+                    <Typography level="title-sm" fontWeight="lg" sx={{ mt: 3, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <HistoryIcon sx={{ fontSize: '1rem' }} /> Monthly Usage History
                     </Typography>
-                    <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', mb: 2 }}>
+                    <Sheet variant="outlined" sx={{ borderRadius: 'md', borderColor: 'divider', overflow: 'auto', mb: 2 }}>
                       <Table size="sm" stickyHeader>
                         <thead>
                           <tr>
                             <th>Month</th>
-                            <th style={{ textAlign: 'right' }}>Tokens Used</th>
-                            <th style={{ textAlign: 'right' }}>Input</th>
-                            <th style={{ textAlign: 'right' }}>Output</th>
+                            <th style={{ textAlign: 'right' }}>Tokens</th>
                             <th style={{ textAlign: 'right' }}>Cost</th>
                             <th style={{ textAlign: 'right' }}>Requests</th>
                           </tr>
@@ -323,8 +320,6 @@ export default function Profile() {
                                 {i === 0 ? ' (current)' : ''}
                               </td>
                               <td style={{ textAlign: 'right' }}>{m.totalTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{m.inputTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{m.outputTokens.toLocaleString()}</td>
                               <td style={{ textAlign: 'right' }}>
                                 {'$' + (m.costCents / 100 < 0.01 && m.costCents > 0 ? (m.costCents / 100).toFixed(4) : (m.costCents / 100).toFixed(2))}
                               </td>
@@ -337,21 +332,18 @@ export default function Profile() {
                   </>
                 )}
 
-                {/* Recent Deductions */}
                 {myLogs && myLogs.length > 0 && (
                   <>
-                    <Typography level="h4" sx={{ mt: 3, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <DataUsageIcon /> Recent Token Deductions
+                    <Typography level="title-sm" fontWeight="lg" sx={{ mt: 3, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <DataUsageIcon sx={{ fontSize: '1rem' }} /> Recent Token Deductions
                     </Typography>
-                    <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', maxHeight: 350, mb: 2 }}>
+                    <Sheet variant="outlined" sx={{ borderRadius: 'md', borderColor: 'divider', overflow: 'auto', maxHeight: 350, mb: 2 }}>
                       <Table size="sm" stickyHeader>
                         <thead>
                           <tr>
                             <th>Time</th>
                             <th>Model</th>
-                            <th style={{ textAlign: 'right' }}>Input</th>
-                            <th style={{ textAlign: 'right' }}>Output</th>
-                            <th style={{ textAlign: 'right' }}>Total</th>
+                            <th style={{ textAlign: 'right' }}>Tokens</th>
                             <th style={{ textAlign: 'right' }}>Cost</th>
                           </tr>
                         </thead>
@@ -359,11 +351,9 @@ export default function Profile() {
                           {myLogs.map((log) => (
                             <tr key={log.id}>
                               <td>{new Date(log.createdAt).toLocaleString()}</td>
-                              <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.modelId}</td>
-                              <td style={{ textAlign: 'right' }}>{log.inputTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{log.outputTokens.toLocaleString()}</td>
+                              <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.modelId}</td>
                               <td style={{ textAlign: 'right' }}>{log.totalTokens.toLocaleString()}</td>
-                              <td style={{ textAlign: 'right' }}>{'$' + (log.costCents / 100).toFixed(4)}</td>
+                              <td style={{ textAlign: 'right' }}>${(log.costCents / 100).toFixed(4)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -374,42 +364,49 @@ export default function Profile() {
 
                 <Divider sx={{ my: 3 }} />
 
-                {/* Actions */}
-                <Typography level="h3" sx={{ mb: 2 }}>
-                  Account Actions
+                <Typography level="title-sm" fontWeight="lg" sx={{ mb: 2 }}>
+                  Actions
                 </Typography>
-
-                <Stack spacing={2}>
-                  <Button variant="outlined" color="neutral" startDecorator={<SecurityIcon />} onClick={() => router.push('/auth/signin?forgot=true')}>
+                <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+                  <Button
+                    variant="outlined"
+                    color="neutral"
+                    size="sm"
+                    startDecorator={<SecurityIcon />}
+                    onClick={() => router.push('/auth/signin?forgot=true')}
+                    sx={{ justifyContent: 'flex-start' }}
+                  >
                     Reset Password
                   </Button>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
-                    <AuthButton variant="text" size="lg" />
-                  </Box>
+                  <AuthButton
+                    variant="text"
+                    size="sm"
+                    sx={{
+                      justifyContent: 'flex-start',
+                      flexDirection: 'row',
+                      gap: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 'md',
+                      bgcolor: 'background.body',
+                      '&:hover': { bgcolor: 'background.level1' },
+                    }}
+                  />
                 </Stack>
 
-                <Divider sx={{ my: 3 }} />
+                <Typography level="body-xs" color="neutral" sx={{ mt: 4, textAlign: 'center' }}>
+                  {Brand.Title.Base}
+                </Typography>
+              </Box>
+            )}
 
-                {/* App Information */}
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography level="body-sm" color="neutral">
-                    You&apos;re using {Brand.Title.Base}
-                  </Typography>
-                  <Typography level="body-xs" color="neutral" sx={{ mt: 1 }}>
-                    Enjoy your AI-powered conversations!
-                  </Typography>
-                </Box>
-              </TabPanel>
-
-              {/* Analytics Tab */}
-              <TabPanel value={1} sx={{ p: 4 }}>
+            {activeTab === 1 && (
+              <Box sx={{ p: 3 }}>
                 <UserAnalytics userId={session?.user?.id} />
-              </TabPanel>
-            </Tabs>
+              </Box>
+            )}
           </CardContent>
-          </Card>
-        </AuthLightSurface>
+        </Card>
       </Box>
     </Box>
   );

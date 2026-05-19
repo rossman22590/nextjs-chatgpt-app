@@ -101,7 +101,7 @@ export function ScratchClip() {
           {/* Clear Button */}
           {history.length > 0 && (
             <Tooltip title='Clear All History' variant='solid' placement='bottom'>
-              <IconButton size='sm' variant='plain' color='neutral' onClick={handleClearHistory} sx={{ mr: 1 }}>
+              <IconButton aria-label="Clear scratchpad history" size='sm' variant='plain' color='neutral' onClick={handleClearHistory} sx={{ mr: 1 }}>
                 <ClearAllIcon />
               </IconButton>
             </Tooltip>

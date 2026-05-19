@@ -1,4 +1,5 @@
 import * as React from 'react';
+import Image from 'next/image';
 
 import type { SxProps } from '@mui/joy/styles/types';
 import { Box, IconButton, Typography } from '@mui/joy';
@@ -7,7 +8,6 @@ import MenuIcon from '@mui/icons-material/Menu';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
-import { BigAgiSquircleIcon } from '~/common/components/icons/big-agi/BigAgiSquircleIcon';
 import { Brand } from '~/common/app.config';
 import { LayoutSidebarRight } from '~/common/components/icons/LayoutSidebarRight';
 import { Link } from '~/common/components/Link';
@@ -16,6 +16,7 @@ import { navigateToIndex, ROUTE_INDEX } from '~/common/app.routes';
 
 import { InvertedBar, InvertedBarCornerItem } from '../InvertedBar';
 import { PopupPanel } from '../panel/PopupPanel';
+import { useLayoutPortalsStore } from '../portals/store-layout-portals';
 import { optimaActions, optimaOpenDrawer, optimaOpenPanel, optimaTogglePanel, useOptimaPanelOpen } from '../useOptima';
 import { useOptimaPortalHasInputs } from '../portals/useOptimaPortalHasInputs';
 import { useOptimaPortalOutRef } from '../portals/useOptimaPortalOutRef';
@@ -53,23 +54,16 @@ function CenterItemsPortal(props: { currentApp?: NavItemApp }) {
 }
 
 function CenterItemsFallback(props: { currentApp?: NavItemApp }) {
-  return <Box sx={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: { xs: 1, md: 2 },
-  }}>
-
-    {/* Squircle */}
-    <Link href={ROUTE_INDEX}>
-      <BigAgiSquircleIcon inverted sx={{ width: 32, height: 32, color: 'white' }} />
-    </Link>
-
-    {/* Title */}
-    <Typography level='title-md'>
-      {props.currentApp?.barTitle || props.currentApp?.name || Brand.Title.Base}
-    </Typography>
-
-  </Box>;
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, md: 2 } }}>
+      <Link href={ROUTE_INDEX}>
+        <Image src="/apple-touch-icon.png" alt={Brand.Title.Base} width={32} height={32} />
+      </Link>
+      <Typography level='title-md'>
+        {props.currentApp?.barTitle || props.currentApp?.name || Brand.Title.Base}
+      </Typography>
+    </Box>
+  );
 }
 
 
@@ -87,27 +81,30 @@ export function OptimaBar(props: { component: React.ElementType, currentApp?: Na
 
   // derived state
   const navIsShown = checkVisibleNav(props.currentApp);
+  const toolbarContentKind = useLayoutPortalsStore((s) => s.toolbarContentKind);
 
   // [Desktop] optionally hide the Bar if the current app asks for it
   if (props.currentApp?.hideBar && !props.isMobile && !panelHasContent)
     return null;
 
+  const barSx: SxProps = toolbarContentKind === 'beam'
+    ? { ...(props.sx ?? {}), bgcolor: 'background.surface', borderColor: 'divider', boxShadow: 'sm', '&::before': { opacity: 0 } }
+    : (props.sx ?? {});
+
   return <>
 
     {/* Bar: [Drawer control] [Center Items] [Panel/Menu control] */}
-    <InvertedBar component={props.component} direction='horizontal' sx={props.sx}>
+    <InvertedBar component={props.component} direction='horizontal' sx={barSx}>
 
       {/* [Mobile] Drawer button */}
       {(props.isMobile || !navIsShown) && (
         <InvertedBarCornerItem>
           {(hasDrawerContent && navIsShown) ? (
-            // show the drawer button
-            <IconButton disabled={!hasDrawerContent} onPointerDown={optimaOpenDrawer}>
+            <IconButton aria-label="Open drawer" disabled={!hasDrawerContent} onPointerDown={optimaOpenDrawer}>
               <MenuIcon />
             </IconButton>
           ) : (
-            // back button
-            <IconButton onClick={() => navigateToIndex()}>
+            <IconButton aria-label="Back" onClick={() => navigateToIndex()}>
               <ArrowBackIcon />
             </IconButton>
           )}
@@ -127,10 +124,10 @@ export function OptimaBar(props: { component: React.ElementType, currentApp?: Na
         >
           {/*<Tooltip disableInteractive title={contentToPopup ? (panelIsOpen ? 'Close' : 'Open') + ' Menu' : (panelIsOpen ? 'Close' : 'Open')}>*/}
           <IconButton
+            aria-label={panelShownAsPanel || panelShownAsPopup ? 'Close menu' : 'Open app menu'}
             ref={appMenuAnchor}
-            // disabled={contentToPopup ? !appMenuAnchor : false}
-            onClick={optimaTogglePanel /* onPointerDown doesn't work well with a menu (the 'up' event would close it), so we're still with onClick */}
-            onContextMenu={optimaOpenPanel /* important to get the 'preventDefault' for the Right mouse click (to prevent the menu) */}
+            onClick={optimaTogglePanel}
+            onContextMenu={optimaOpenPanel}
           >
             {panelShownAsPanel ? <NavigateNextIcon />
               : panelAsPopup ? <MoreVertIcon />

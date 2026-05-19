@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import TimeAgo from 'react-timeago';
 
 import type { SxProps } from '@mui/joy/styles/types';
-import { Box, ButtonGroup, CircularProgress, Divider, IconButton, ListDivider, ListItem, ListItemDecorator, MenuItem, Switch, Tooltip, Typography } from '@mui/joy';
+import { Box, ButtonGroup, CircularProgress, Divider, IconButton, ListDivider, ListItem, ListItemDecorator, MenuItem, Switch, Tooltip, Typography, useColorScheme } from '@mui/joy';
 import { ClickAwayListener, Popper } from '@mui/base';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
@@ -76,8 +76,8 @@ export const BUBBLE_MIN_TEXT_LENGTH = 3;
 
 const messageBodySx: SxProps = {
   display: 'flex',
-  alignItems: 'flex-start', // avatars at the top, and honor 'static' position
-  gap: { xs: 0, md: 1 },
+  alignItems: 'flex-start',
+  gap: { xs: 0.75, md: 1 },
 };
 
 const messageBodyReverseSx: SxProps = {
@@ -111,7 +111,7 @@ const fragmentsListSx: SxProps = {
   // layout
   display: 'flex',
   flexDirection: 'column',
-  gap: 1.5,     // we give a bit more space between the 'classes' of fragments (in-reply-to, images, content, attachments, etc.)
+  gap: 1.75,    // slightly more space between fragment groups for better readability
 };
 
 const antCachePromptOffSx: SxProps = {
@@ -629,38 +629,97 @@ export function ChatMessage(props: {
 
 
   // style
+  const { mode: colorSchemeMode } = useColorScheme();
+  const isDark = colorSchemeMode === 'dark';
   const backgroundColor = messageBackground(messageRole, userCommandApprox, messageHasBeenEdited, false /*isAssistantError && !errorMessage*/);
 
-  const listItemSx: SxProps = React.useMemo(() => ({
-    // vars
-    // '--AGI-overlay-start-opacity': uiComplexityMode === 'extra' ? 0.1 : 0, // disabled - looks worse
+  const listItemSx: SxProps = React.useMemo(() => {
+    // In dark mode skip white gradient overlay so bubbles stay dark and text stays readable
+    const background = isDark
+      ? backgroundColor
+      : fromUser
+        ? `linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 36%, transparent 52%), ${backgroundColor}`
+        : fromAssistant
+          ? `linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.15) 30%, transparent 50%), ${backgroundColor}`
+          : backgroundColor;
 
-    // style
-    backgroundColor: backgroundColor,
-    px: { xs: 1, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 2 },
-    py: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 2,
-    // filter: 'url(#agi-futuristic-glow)',
+    return {
+    // multi-layer background: top-shine gloss + CSS variable base (or plain in dark mode)
+    background,
 
-    // style: omit border if set externally
-    ...(!('borderBottom' in (props.sx || {})) && !props.isBottom && {
-      borderBottom: '1px solid',
-      borderBottomColor: 'divider',
-    }),
+    // generous padding - content needs room
+    px: { xs: 1.5, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 2 },
+    py: { xs: 1.25, md: themeScalingMap[adjContentScaling]?.chatMessagePadding ?? 1.5 },
+    my: { xs: 0.75, md: 1 },
 
-    // style: when starred
+    // sizing - user floats right as a bubble; assistant fills the thread width
+    width: '100%',
+    maxWidth: {
+      xs: fromUser ? '92%' : '100%',
+      md: fromAssistant ? '100%' : fromUser ? 'min(100%, 78%)' : '100%',
+    },
+
+    // border - user: vivid brand ring; assistant: barely-there; system: soft (theme primary)
+    border: '1px solid',
+    borderColor: fromUser
+      ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.3)'
+      : fromAssistant
+        ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.07)'
+        : 'rgba(var(--joy-palette-primary-mainChannel) / 0.1)',
+
+    // corner radius - speech-bubble tail: user tail bottom-right, assistant tail top-left
+    borderRadius: fromUser
+      ? { xs: '20px 20px 6px 20px', md: '22px 22px 6px 22px' }
+      : fromAssistant
+        ? { xs: '6px 20px 20px 20px', md: '6px 22px 22px 22px' }
+        : { xs: '16px', md: '18px' },
+
+    // depth - user: theme glow ring + lift; assistant: neutral card elevation
+    boxShadow: fromUser
+      ? '0 0 0 3px rgba(var(--joy-palette-primary-mainChannel) / 0.09), 0 8px 40px rgba(var(--joy-palette-primary-mainChannel) / 0.2), 0 2px 10px rgba(var(--joy-palette-primary-mainChannel) / 0.1)'
+      : fromAssistant
+        ? '0 2px 24px rgba(0, 0, 0, 0.06), 0 1px 6px rgba(0, 0, 0, 0.04)'
+        : '0 1px 8px rgba(var(--joy-palette-primary-mainChannel) / 0.05)',
+
+    backdropFilter: 'blur(24px) saturate(180%)',
+    overflow: 'hidden',
+
+    // entrance animation - different trajectory per role
+    animation: fromUser
+      ? 'agi-message-in-user 0.36s cubic-bezier(0.22, 1, 0.36, 1) both'
+      : 'agi-message-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) both',
+
+    transition: 'box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
+
+    // hover - lift with amplified shadow (theme primary)
+    '&:hover': {
+      boxShadow: fromUser
+        ? '0 0 0 3px rgba(var(--joy-palette-primary-mainChannel) / 0.17), 0 14px 52px rgba(var(--joy-palette-primary-mainChannel) / 0.28), 0 4px 16px rgba(var(--joy-palette-primary-mainChannel) / 0.13)'
+        : fromAssistant
+          ? '0 6px 36px rgba(0, 0, 0, 0.10), 0 2px 10px rgba(0, 0, 0, 0.06)'
+          : '0 4px 18px rgba(var(--joy-palette-primary-mainChannel) / 0.08)',
+      borderColor: fromUser
+        ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.44)'
+        : fromAssistant
+          ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.12)'
+          : 'rgba(var(--joy-palette-primary-mainChannel) / 0.15)',
+      transform: 'translateY(-2px)',
+    },
+
+    // alignment + user bubble text (neutral theme sets --agi-message-user-color for white on black)
+    ...(fromAssistant && { mr: 0, ml: 0 }),
+    ...(fromUser && { ml: { xs: 'auto', md: 'auto' }, mr: 0, color: 'var(--agi-message-user-color, var(--joy-palette-text-primary))' }),
+    ...(fromSystem && { ml: 0, mr: 0 }),
+
     ...(isUserStarred && {
-      outline: '3px solid',
-      outlineColor: 'primary.solidBg',
-      boxShadow: 'lg',
-      borderRadius: 'lg',
+      outline: '2px solid',
+      outlineColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.42)',
+      boxShadow: 'var(--agi-shell-shadow-strong)',
       zIndex: 1,
     }),
 
-    // style: when has a user/automatic breakpoint
     ...(isVndAndCacheUser && {
       borderInlineStart: `0.125rem solid ${ModelVendorAnthropic.brandColor}`,
-      // borderTopLeftRadius: '0.375rem',
-      // borderBottomLeftRadius: '0.375rem',
     }),
     ...(uiComplexityMode === 'extra' && isVndAndCacheAuto && !isVndAndCacheUser && {
       position: 'relative',
@@ -671,27 +730,18 @@ export function ChatMessage(props: {
         top: 0,
         bottom: 0,
         width: '0.125rem',
-        background: `repeating-linear-gradient( -45deg, transparent, transparent 2px, ${ModelVendorAnthropic.brandColor} 2px, ${ModelVendorAnthropic.brandColor} 12px ) repeat`,
+        background: `repeating-linear-gradient(-45deg, transparent, transparent 2px, ${ModelVendorAnthropic.brandColor} 2px, ${ModelVendorAnthropic.brandColor} 12px) repeat`,
       },
     }),
-    // style: when the user skips the message
     ...(isUserMessageSkipped && messageSkippedSx),
-
-    // style: when the message is being edited
     ...(isEditingText && {
-      zIndex: 1, // this is to make the whole message appear on top of Beam Scatter > RayControlsMemo
+      zIndex: 1,
     }),
 
-    // for: ENABLE_COPY_MESSAGE_OVERLAY
-    // '&:hover > button': { opacity: 1 },
-
-    // layout
-    display: 'block', // this is Needed, otherwise there will be a horizontal overflow
+    display: 'block',
 
     ...props.sx,
-  }), [adjContentScaling, backgroundColor, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.isBottom, props.sx, uiComplexityMode]);
-
-
+  }; }, [adjContentScaling, backgroundColor, fromAssistant, fromSystem, fromUser, isDark, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.sx, uiComplexityMode]);
   // avatar icon & label & tooltip
 
   const zenMode = uiComplexityMode === 'minimal';
@@ -710,6 +760,7 @@ export function ChatMessage(props: {
     <Box
       component='li'
       role='chat-message'
+      data-message-role={messageRole}
       tabIndex={-1 /* for shortcuts navigation */}
       onMouseUp={(ENABLE_BUBBLE && !fromSystem /*&& !isAssistantError*/) ? handleBlocksMouseUp : undefined}
       onTouchEnd={(ENABLE_BUBBLE && !fromSystem /*&& !isAssistantError*/) ? handleBlocksTouchEnd : undefined}
@@ -729,7 +780,7 @@ export function ChatMessage(props: {
 
         {/* [start-Avatar] Avatar (Persona) */}
         {!props.hideAvatar && !isEditingText && (
-          <Box sx={zenMode ? messageZenAsideColumnSx : messageAsideColumnSx}>
+          <Box sx={{ ...(zenMode ? messageZenAsideColumnSx : messageAsideColumnSx), ...(fromUser ? { color: 'var(--agi-message-user-color, inherit)' } : {}) }}>
 
             {/* Persona Avatar or Menu Button */}
             <Box
@@ -744,13 +795,30 @@ export function ChatMessage(props: {
               sx={personaAvatarOrMenuSx}
             >
               {showAvatarIcon && !isHovering && !opsMenuAnchor ? (
-                messageAvatarIcon
+                fromUser ? (
+                  <Box sx={{ color: 'var(--agi-message-user-color, inherit)', '& .MuiSvgIcon-root, & svg': { color: 'inherit' } }}>
+                    {messageAvatarIcon}
+                  </Box>
+                ) : (
+                  messageAvatarIcon
+                )
               ) : (
                 <IconButton
                   size='sm'
                   variant={opsMenuAnchor ? 'solid' : zenMode ? 'plain' : 'soft'}
                   color={(fromAssistant || fromSystem || zenMode) ? 'neutral' : userCommandApprox === 'draw' ? 'warning' : userCommandApprox === 'react' ? 'success' : 'primary'}
-                  sx={avatarIconSx}
+                  sx={{
+                    ...avatarIconSx,
+                    ...(fromUser
+                      ? {
+                          color: 'var(--agi-message-user-color, inherit)',
+                          '--Icon-color': 'var(--agi-message-user-color, inherit)',
+                          backgroundColor: 'rgba(255,255,255,0.12)',
+                          borderColor: 'rgba(255,255,255,0.25)',
+                        }
+                      : {}),
+                  }}
+                  aria-label='Message options'
                 >
                   <MoreVertIcon />
                 </IconButton>
@@ -773,7 +841,7 @@ export function ChatMessage(props: {
         {isEditingText && (
           <Box sx={messageAsideColumnSx} className='msg-edit-button'>
             <Tooltip arrow disableInteractive title='Apply Edits'>
-              <IconButton size='sm' variant='solid' color='warning' onClick={handleEditsApplyClicked}>
+              <IconButton aria-label="Apply edits" size='sm' variant='solid' color='warning' onClick={handleEditsApplyClicked}>
                 <CheckRoundedIcon />
               </IconButton>
             </Tooltip>
@@ -939,7 +1007,7 @@ export function ChatMessage(props: {
         {isEditingText && (
           <Box sx={messageAsideColumnSx} className='msg-edit-button'>
             <Tooltip arrow disableInteractive title='Discard Edits'>
-              <IconButton size='sm' variant='solid' onClick={handleEditsCancel}>
+              <IconButton aria-label="Discard edits" size='sm' variant='solid' onClick={handleEditsCancel}>
                 <CloseRoundedIcon />
               </IconButton>
             </Tooltip>
@@ -1153,7 +1221,7 @@ export function ChatMessage(props: {
             >
               {/* Bubble Add Reference */}
               {!!onAddInReferenceTo && <Tooltip disableInteractive arrow placement='top' title={props.hasInReferenceTo ? 'Reply to this too' : fromAssistant ? 'Reply' : 'Refer To'}>
-                <IconButton color='primary' onClick={handleOpsAddInReferenceTo}>
+                <IconButton aria-label={props.hasInReferenceTo ? 'Reply to this too' : fromAssistant ? 'Reply' : 'Refer to'} color='primary' onClick={handleOpsAddInReferenceTo}>
                   {props.hasInReferenceTo ? <ReplyAllRoundedIcon sx={{ fontSize: 'xl' }} /> : <ReplyRoundedIcon sx={{ fontSize: 'xl' }} />}
                 </IconButton>
               </Tooltip>}
@@ -1166,7 +1234,7 @@ export function ChatMessage(props: {
 
               {/* Text Tools (edits fragment, only for assistant messages) */}
               {fromAssistant && <Tooltip disableInteractive arrow placement='top' title='Highlight Text'>
-                <IconButton disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
+                <IconButton aria-label="Highlight text" disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
                   handleHighlightSelText('highlight');
                   closeBubble();
                 }}>
@@ -1174,7 +1242,7 @@ export function ChatMessage(props: {
                 </IconButton>
               </Tooltip>}
               {fromAssistant && <Tooltip disableInteractive arrow placement='top' title='Strike Through'>
-                <IconButton disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
+                <IconButton aria-label="Strike through" disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
                   handleHighlightSelText('strike');
                   closeBubble();
                 }}>
@@ -1182,7 +1250,7 @@ export function ChatMessage(props: {
                 </IconButton>
               </Tooltip>}
               {fromAssistant && <Tooltip disableInteractive arrow placement='top' title='Toggle Bold'>
-                <IconButton disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
+                <IconButton aria-label="Toggle bold" disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
                   handleHighlightSelText('strong');
                   closeBubble();
                 }}>
@@ -1190,7 +1258,7 @@ export function ChatMessage(props: {
                 </IconButton>
               </Tooltip>}
               {fromAssistant && <Tooltip disableInteractive arrow placement='top' title='Cut Text'>
-                <IconButton disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
+                <IconButton aria-label="Cut text" disabled={!handleHighlightSelText} onClick={!handleHighlightSelText ? undefined : () => {
                   handleHighlightSelText('cut');
                   closeBubble();
                 }}>
@@ -1201,17 +1269,17 @@ export function ChatMessage(props: {
 
               {/* Intelligent functions */}
               {!!props.onTextDiagram && <Tooltip disableInteractive arrow placement='top' title={couldDiagram ? 'Auto-Diagram...' : 'Too short to Auto-Diagram'}>
-                <IconButton color='success' onClick={couldDiagram ? handleOpsDiagram : undefined}>
+                <IconButton aria-label={couldDiagram ? 'Auto-diagram' : 'Auto-diagram (selection too short)'} color='success' onClick={couldDiagram ? handleOpsDiagram : undefined}>
                   <PhTreeStructure sx={{ color: couldDiagram ? 'primary' : 'neutral.plainDisabledColor' }} />
                 </IconButton>
               </Tooltip>}
               {!!props.onTextImagine && <Tooltip disableInteractive arrow placement='top' title='Auto-Draw'>
-                <IconButton color='success' onClick={handleOpsImagine} disabled={!couldImagine || props.isImagining}>
+                <IconButton aria-label="Auto-draw" color='success' onClick={handleOpsImagine} disabled={!couldImagine || props.isImagining}>
                   {!props.isImagining ? <FormatPaintOutlinedIcon /> : <CircularProgress sx={{ '--CircularProgress-size': '16px' }} />}
                 </IconButton>
               </Tooltip>}
               {!!props.onTextSpeak && <Tooltip disableInteractive arrow placement='top' title='Speak'>
-                <IconButton color='success' onClick={handleOpsSpeak} disabled={!couldSpeak || props.isSpeaking}>
+                <IconButton aria-label="Speak" color='success' onClick={handleOpsSpeak} disabled={!couldSpeak || props.isSpeaking}>
                   {!props.isSpeaking ? <PhVoice /> : <CircularProgress sx={{ '--CircularProgress-size': '16px' }} />}
                 </IconButton>
               </Tooltip>}
@@ -1219,7 +1287,7 @@ export function ChatMessage(props: {
 
               {/* Bubble Copy */}
               <Tooltip disableInteractive arrow placement='top' title='Copy Selection'>
-                <IconButton onClick={handleBubbleCopyDOM}>
+                <IconButton aria-label="Copy selection" onClick={handleBubbleCopyDOM}>
                   <ContentCopyIcon />
                 </IconButton>
               </Tooltip>
@@ -1279,3 +1347,6 @@ export function ChatMessage(props: {
     </Box>
   );
 }
+
+
+

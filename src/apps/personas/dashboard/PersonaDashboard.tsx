@@ -1,4 +1,5 @@
 import * as React from 'react';
+import Image from 'next/image';
 import { Box, Button, Card, CardContent, Grid, IconButton, Switch, Typography, Modal, ModalDialog, List, ListItemButton, Input } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -80,7 +81,7 @@ export const PersonaDashboard: React.FC<{ onCreateNew: () => void; onSoulGrab: (
                 <DeleteOutlineIcon />
               </IconButton>
             )}
-            <Box sx={{ fontSize: 'lg' }}>{imageUrl ? <img src={imageUrl} alt='' width={24} height={24} style={{ borderRadius: 6 }} /> : (symbol ?? '')}</Box>
+            <Box sx={{ fontSize: 'lg' }}>{imageUrl ? <Image src={imageUrl} alt="" width={24} height={24} style={{ borderRadius: 6 }} unoptimized /> : (symbol ?? '')}</Box>
           </Box>
         </Box>
         {!!subtitle && <Typography level='body-sm' sx={{ opacity: 0.8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{subtitle}</Typography>}

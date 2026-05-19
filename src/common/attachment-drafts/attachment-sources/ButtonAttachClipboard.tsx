@@ -18,7 +18,7 @@ function ButtonAttachClipboard(props: {
   onAttachClipboard: () => void,
 }) {
   return props.isMobile ? (
-    <IconButton color={props.color} disabled={props.disabled} onClick={props.onAttachClipboard}>
+    <IconButton aria-label="Attach from clipboard" color={props.color} disabled={props.disabled} onClick={props.onAttachClipboard}>
       <ContentPasteGoIcon />
     </IconButton>
   ) : (

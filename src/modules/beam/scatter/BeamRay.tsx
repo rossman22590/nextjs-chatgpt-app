@@ -125,13 +125,13 @@ function RayControls(props: {
 
     {!props.isScattering ? (
       <GoodTooltip title='Generate'>
-        <IconButton size='sm' variant='plain' color='success' onClick={props.onToggleGenerate}>
+        <IconButton aria-label={props.isEmpty ? 'Generate' : 'Regenerate'} size='sm' variant='plain' color='success' onClick={props.onToggleGenerate}>
           {props.isEmpty ? <PlayArrowRoundedIcon sx={{ fontSize: 'xl2' }} /> : <ReplayRoundedIcon />}
         </IconButton>
       </GoodTooltip>
     ) : (
       <GoodTooltip title='Stop'>
-        <IconButton size='sm' variant='plain' color='danger' onClick={props.onToggleGenerate}>
+        <IconButton aria-label="Stop" size='sm' variant='plain' color='danger' onClick={props.onToggleGenerate}>
           <StopRoundedIcon />
         </IconButton>
       </GoodTooltip>
@@ -139,7 +139,7 @@ function RayControls(props: {
 
     {props.isRemovable && (
       <GoodTooltip title='Remove'>
-        <IconButton disabled={!props.isRemovable} size='sm' variant='plain' color='neutral' onClick={props.onRemove}>
+        <IconButton aria-label="Remove ray" disabled={!props.isRemovable} size='sm' variant='plain' color='neutral' onClick={props.onRemove}>
           <RemoveCircleOutlineRoundedIcon />
         </IconButton>
       </GoodTooltip>

@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 
-import type { SystemPurposeId } from '../../../data';
-
 import type { DLLMId } from '~/common/stores/llms/llms.types';
 import { findLLMOrThrow, getChatLLMId } from '~/common/stores/llms/store-llms';
 
@@ -16,6 +14,7 @@ import { workspaceForConversationIdentity } from '~/common/stores/workspace/work
 import { DMessage, DMessageId, DMessageMetadata, MESSAGE_FLAG_AIX_SKIP, messageHasUserFlag } from './chat.message';
 import { DMessageFragment, DMessageFragmentId, isVoidThinkingFragment } from './chat.fragments';
 import { V3StoreDataToHead, V4ToHeadConverters } from './chats.converters';
+import type { ConversationPurposeId } from './chat.conversation';
 import { conversationTitle, createDConversation, DConversation, DConversationId, duplicateDConversation } from './chat.conversation';
 import { estimateTokensForFragments } from './chat.tokens';
 import { gcChatImageAssets } from '~/common/stores/chat/chat.gc';
@@ -30,10 +29,10 @@ interface ChatState {
 export interface ChatActions {
 
   // CRUD conversations
-  prependNewConversation: (personaId: SystemPurposeId | undefined, isIncognito: boolean) => DConversationId;
+  prependNewConversation: (personaId: ConversationPurposeId | undefined, isIncognito: boolean) => DConversationId;
   importConversation: (c: DConversation, preventClash: boolean) => DConversationId;
   branchConversation: (cId: DConversationId, mId: DMessageId | null) => DConversationId | null;
-  deleteConversations: (cIds: DConversationId[], newConversationPersonaId?: SystemPurposeId) => DConversationId;
+  deleteConversations: (cIds: DConversationId[], newConversationPersonaId?: ConversationPurposeId) => DConversationId;
 
   // within a conversation
   isIncognito: (cId: DConversationId) => boolean | undefined;
@@ -50,7 +49,7 @@ export interface ChatActions {
   deleteMessageFragment: (cId: DConversationId, mId: DMessageId, fId: DMessageFragmentId, removePendingState: boolean, touchUpdated: boolean) => void;
   replaceMessageFragment: (cId: DConversationId, mId: DMessageId, fId: DMessageFragmentId, newFragment: DMessageFragment, removePendingState: boolean, touchUpdated: boolean) => void;
   updateMetadata: (cId: DConversationId, mId: DMessageId, metadataDelta: Partial<DMessageMetadata>, touchUpdated?: boolean) => void;
-  setSystemPurposeId: (cId: DConversationId, personaId: SystemPurposeId) => void;
+  setSystemPurposeId: (cId: DConversationId, personaId: ConversationPurposeId) => void;
   setAutoTitle: (cId: DConversationId, autoTitle: string) => void;
   setUserTitle: (cId: DConversationId, userTitle: string) => void;
   setUserSymbol: (cId: DConversationId, userSymbol: string | null) => void;
@@ -71,7 +70,7 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
       // default state
       conversations: [], // we used to have a default conversation here for zero-state, but we moved it to the merge function
 
-      prependNewConversation: (personaId: SystemPurposeId | undefined, isIncognito: boolean): DConversationId => {
+      prependNewConversation: (personaId: ConversationPurposeId | undefined, isIncognito: boolean): DConversationId => {
         const newConversation = createDConversation(personaId);
         if (isIncognito) newConversation._isIncognito = true;
 
@@ -137,7 +136,7 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
         return branched.id;
       },
 
-      deleteConversations: (conversationIds: DConversationId[], newConversationPersonaId?: SystemPurposeId): DConversationId => {
+      deleteConversations: (conversationIds: DConversationId[], newConversationPersonaId?: ConversationPurposeId): DConversationId => {
         const { conversations } = _get();
 
         // find the index of first conversation to delete
@@ -409,7 +408,7 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
         });
       },
 
-      setSystemPurposeId: (conversationId: DConversationId, personaId: SystemPurposeId) =>
+      setSystemPurposeId: (conversationId: DConversationId, personaId: ConversationPurposeId) =>
         _get()._editConversation(conversationId,
           {
             systemPurposeId: personaId,
@@ -584,7 +583,7 @@ export function getConversation(conversationId: DConversationId | null): DConver
   return conversationId ? useChatStore.getState().conversations.find(_c => _c.id === conversationId) ?? null : null;
 }
 
-export function getConversationSystemPurposeId(conversationId: DConversationId | null): SystemPurposeId | null {
+export function getConversationSystemPurposeId(conversationId: DConversationId | null): ConversationPurposeId | null {
   return getConversation(conversationId)?.systemPurposeId || null;
 }
 

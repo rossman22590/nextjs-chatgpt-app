@@ -1,11 +1,11 @@
 import * as React from 'react';
+import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { Box, Button, Card, CardContent, FormControl, FormLabel, Input, Stack, Typography, Alert, Link, Divider, CircularProgress } from '@mui/joy';
-import LoginIcon from '@mui/icons-material/Login';
 import GoogleIcon from '@mui/icons-material/Google';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import IconButton from '@mui/joy/IconButton';
 
 import { Brand } from '~/common/app.config';
@@ -145,7 +145,7 @@ export default function SignIn() {
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: '100vh',
-          background: 'linear-gradient(to bottom, #1e1e2f, #2d2d44)',
+          bgcolor: 'background.body',
         }}
       >
         <CircularProgress size="lg" />
@@ -166,7 +166,7 @@ export default function SignIn() {
         minHeight: '100vh',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        bgcolor: 'background.body',
         p: 2,
       }}
     >
@@ -174,27 +174,13 @@ export default function SignIn() {
         <Card
           sx={{
             width: '100%',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            backdropFilter: 'blur(16px)',
-            background: 'rgba(255, 255, 255, 0.95)',
+            boxShadow: 'sm',
+            bgcolor: 'background.popup',
           }}
         >
         <CardContent sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 64,
-                height: 64,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                mb: 2,
-              }}
-            >
-              <LoginIcon sx={{ fontSize: 32, color: 'white' }} />
-            </Box>
+            <Image src="/apple-touch-icon.png" alt={Brand.Title.Base} width={56} height={56} style={{ marginBottom: 8 }} />
 
             <Typography level="h2" component="h1" fontWeight="bold">
               Welcome back
@@ -286,11 +272,8 @@ export default function SignIn() {
                   loading={isLoading}
                   size="lg"
                   variant="solid"
-                  sx={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    borderRadius: 'md',
-                    py: 1.5,
-                  }}
+                  color="primary"
+                  sx={{ borderRadius: 'md', py: 1.5 }}
                 >
                   {isLoading ? 'Signing in...' : 'Sign In'}
                 </Button>

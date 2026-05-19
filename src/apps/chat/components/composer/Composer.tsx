@@ -629,12 +629,12 @@ export function Composer(props: {
       //   composerShortcuts.push({ key: 's', ctrl: true, shift: true, action: openScreenCaptureDialog, description: 'Attach Screen Capture' });
     }
     if (recognitionState.isActive) {
-      composerShortcuts.push({ key: 'm', ctrl: true, action: handleFinishMicAndSend, description: 'Mic · Send', disabled: !recognitionState.hasSpeech || sendStarted, endDecoratorIcon: TelegramIcon as any, level: 4 });
+      composerShortcuts.push({ key: 'm', ctrl: true, action: handleFinishMicAndSend, description: 'Mic - Send', disabled: !recognitionState.hasSpeech || sendStarted, endDecoratorIcon: TelegramIcon as any, level: 4 });
       composerShortcuts.push({
         key: ShortcutKey.Esc, action: () => {
           setMicContinuation(false);
           toggleRecognition(false);
-        }, description: 'Mic · Stop', level: 4,
+        }, description: 'Mic - Stop', level: 4,
       });
     } else if (browserSpeechRecognitionCapability().mayWork)
       composerShortcuts.push({
@@ -695,23 +695,43 @@ export function Composer(props: {
       : isReAct ? 'Ask a multi-step reasoning question...'
         : isTextBeam ? 'Combine insights from multiple AI models...'
           : showChatInReferenceTo ? 'Chat about this...'
-            : 'Type'
-            + (props.isDeveloperMode ? ' · attach code' : '')
-            + (isDesktop ? ` · drop ${props.isDeveloperMode ? 'source' : 'files'}` : '')
-            + ` · ${placeholderAction}`
-            + (recognitionState.isAvailable ? ' · ramble' : '')
-            + '...';
+            : (props.isDeveloperMode || (isDesktop && timeToShowTips))
+              ? 'Type' + (props.isDeveloperMode ? ' - attach code' : '') + (isDesktop ? ` - drop ${props.isDeveloperMode ? 'source' : 'files'}` : '') + ` - ${placeholderAction}` + (recognitionState.isAvailable ? ' - ramble' : '') + '...'
+              : 'Type your message here...';
 
   if (isDesktop && timeToShowTips && !isDraw) {
     if (explainShiftEnter)
-      textPlaceholder += !enterIsNewline ? '\n\n⏎ Shift + Enter to add a new line' : '\n\n➤ Shift + Enter to send';
+      textPlaceholder += !enterIsNewline ? '\n\nTip: Shift + Enter adds a new line' : '\n\nTip: Shift + Enter sends';
   }
 
   const stableGridSx: SxProps = React.useMemo(() => ({
-    // basically a position:relative to enable the inner drop area
     ...dragContainerSx,
-    // This used to be in the outer box, but we put it here instead
-    // p: { xs: 1, md: 2 },
+    position: 'relative',
+    p: { xs: 0.875, md: 1 },
+    borderRadius: { xs: '16px', md: '18px' },
+    background: 'var(--agi-shell-elevated)',
+    border: '1px solid var(--agi-shell-border)',
+    boxShadow: 'var(--joy-shadow-sm)',
+    backdropFilter: 'blur(24px) saturate(160%)',
+    overflow: 'hidden',
+    transition: 'box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+    '&:focus-within': {
+      borderColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.35)',
+      boxShadow: '0 0 0 3px rgba(var(--joy-palette-primary-mainChannel) / 0.12), var(--joy-shadow-lg)',
+      transform: 'translateY(-1px)',
+    },
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      inset: 0,
+      background: 'var(--agi-shell-glow)',
+      opacity: 0.25,
+      pointerEvents: 'none',
+    },
+    '& > *': {
+      position: 'relative',
+      zIndex: 1,
+    },
   }), [dragContainerSx]);
 
   return (
@@ -851,8 +871,13 @@ export function Composer(props: {
                     }}
                     sx={{
                       height: '100%',
-                      backgroundColor: showTint ? undefined : 'background.level1',
-                      '&:focus-within': { backgroundColor: 'background.popup', '.within-composer-focus': { backgroundColor: 'background.popup' } },
+                      borderRadius: '22px',
+                      backgroundColor: showTint ? 'rgba(var(--joy-palette-warning-mainChannel) / 0.08)' : 'transparent',
+                      boxShadow: 'inset 0 1px 0 rgba(255 255 255 / 0.04)',
+                      '&:focus-within': {
+                        backgroundColor: showTint ? 'rgba(var(--joy-palette-warning-mainChannel) / 0.12)' : 'rgba(var(--joy-palette-primary-mainChannel) / 0.04)',
+                        '.within-composer-focus': { backgroundColor: 'transparent' },
+                      },
                       lineHeight: lineHeightTextareaMd,
                     }} />
 
@@ -897,7 +922,7 @@ export function Composer(props: {
                       // alignItems: 'center', justifyContent: 'center',
                       border: '1px solid',
                       borderColor: 'primary.solidBg',
-                      borderRadius: 'sm',
+                      borderRadius: '22px',
                       boxShadow: 'inset 1px 1px 4px -3px var(--joy-palette-primary-solidHoverBg)',
                       zIndex: zIndexComposerOverlayMic,
                       pl: 1.5,
@@ -957,7 +982,7 @@ export function Composer(props: {
 
           {/* [Mobile: bottom, Desktop: right] */}
           <Grid xs={12} md={3}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, height: '100%' } as const}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1, md: 1.5 }, height: '100%', minWidth: 0, justifyContent: 'flex-start' } as const}>
 
               {/* [mobile] This row is here only for the [mobile] bottom-start corner item */}
               {/* [desktop] This column arrangement will have the [desktop] beam button right under call */}
@@ -970,7 +995,7 @@ export function Composer(props: {
                       : <ButtonBeamMemo isMobile disabled={noConversation /*|| noLLM*/} color={beamButtonColor} hasContent={!!composeText} onClick={handleSendTextBeamClicked} />)
                     : isDraw
                       ? <ButtonOptionsDraw isMobile onClick={handleDrawOptionsClicked} sx={{ mr: { xs: 1, md: 2 } }} />
-                      : <IconButton disabled sx={{ mr: { xs: 1, md: 2 } }} />
+                      : <Box sx={{ mr: { xs: 1, md: 2 }, width: 40, flexShrink: 0 }} />
                 )}
 
                 {/* Responsive Send/Stop buttons */}
@@ -979,8 +1004,21 @@ export function Composer(props: {
                   color={sendButtonColor}
                   sx={{
                     flexGrow: 1,
+                    gap: { xs: 1, md: 1.5 },
                     backgroundColor: (isMobile && sendButtonVariant === 'outlined') ? 'background.popup' : undefined,
                     boxShadow: (isMobile && sendButtonVariant !== 'outlined') ? 'none' : `0 8px 24px -4px rgb(var(--joy-palette-${sendButtonColor}-mainChannel) / 20%)`,
+                    /* Theme-based hover: solidColor so text stays visible (e.g. white on black in Minimal) */
+                    '& .MuiButton-root, & .MuiIconButton-root': {
+                      transition: 'background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease',
+                    },
+                    '& .MuiButton-root:hover:not(:disabled), & .MuiIconButton-root:hover:not(:disabled)': {
+                      backgroundColor: 'var(--joy-palette-primary-softActiveBg)',
+                      color: 'var(--joy-palette-primary-solidColor) !important',
+                      boxShadow: '0 2px 8px -2px rgb(var(--joy-palette-primary-mainChannel) / 25%)',
+                    },
+                    '& .MuiButton-root:hover:not(:disabled) svg, & .MuiIconButton-root:hover:not(:disabled) svg': {
+                      color: 'var(--joy-palette-primary-solidColor) !important',
+                    },
                   }}
                 >
                   {!assistantAbortible ? (
@@ -992,7 +1030,7 @@ export function Composer(props: {
                       loadingPosition='end'
                       onClick={handleSendClicked}
                       endDecorator={sendButtonIcon}
-                      sx={{ '--Button-gap': '1rem' }}
+                      sx={{ '--Button-gap': '1rem', minHeight: 40, px: 1.5 }}
                     >
                       {micContinuation && 'Voice '}{sendButtonLabel}
                     </Button>
@@ -1001,10 +1039,18 @@ export function Composer(props: {
                       key='composer-stop'
                       fullWidth
                       variant='soft'
+                      color={sendButtonColor}
                       disabled={noConversation}
                       onClick={handleStopClicked}
                       endDecorator={<StopOutlinedIcon sx={{ fontSize: 18 }} />}
-                      sx={{ animation: `${animationEnterBelow} 0.1s ease-out` }}
+                      sx={{
+                        animation: `${animationEnterBelow} 0.1s ease-out`,
+                        minHeight: 40,
+                        /* Theme-aware: match composer primary so Stop is readable in all themes (e.g. neutral) */
+                        backgroundColor: 'var(--joy-palette-primary-softBg)',
+                        color: 'var(--joy-palette-primary-softColor)',
+                        '& svg': { color: 'var(--joy-palette-primary-softColor)' },
+                      }}
                     >
                       Stop
                     </Button>
@@ -1025,11 +1071,14 @@ export function Composer(props: {
                   {/*  </IconButton>*/}
                   {/*</Tooltip>}*/}
 
-                  {/* Mode expander */}
+                  {/* Mode expander: soft variant so it reads as secondary, not a second primary */}
                   <IconButton
-                    variant={chatExecuteMenuShown ? 'outlined' : assistantAbortible ? 'soft' : isDraw ? undefined : undefined}
+                    aria-label="Choose send mode (Chat, Beam, or Call)"
+                    variant={chatExecuteMenuShown ? 'outlined' : 'soft'}
+                    color={sendButtonColor}
                     disabled={noConversation /*|| chatExecuteMenuShown*/}
                     onClick={showChatExecuteMenu}
+                    sx={{ ml: { xs: 1, md: 1.5 }, flexShrink: 0, minWidth: 40, minHeight: 40 }}
                   >
                     <ExpandLessIcon />
                   </IconButton>

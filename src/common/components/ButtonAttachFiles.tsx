@@ -56,7 +56,7 @@ function ButtonAttachFiles(props: {
   }, [onAttachFiles, props.multiple]);
 
   return props.isMobile ? (
-    <IconButton color={props.color} disabled={props.disabled} onClick={handleAttachFilePicker}>
+    <IconButton aria-label="Attach files" color={props.color} disabled={props.disabled} onClick={handleAttachFilePicker}>
       <AttachFileRoundedIcon />
     </IconButton>
   ) : (

@@ -5,6 +5,21 @@ import { agiUuid } from '~/common/util/idUtils';
 import { DMessage, DMessageId, duplicateDMessage } from './chat.message';
 
 
+/// Purpose ID: built-in SystemPurposeId or custom persona (persona:uuid)
+
+export type ConversationPurposeId = SystemPurposeId | `persona:${string}`;
+
+export const CUSTOM_PERSONA_PREFIX = 'persona:' as const;
+
+export function isCustomPersonaPurposeId(id: string): id is `persona:${string}` {
+  return id.startsWith(CUSTOM_PERSONA_PREFIX);
+}
+
+export function getPersonaIdFromPurposeId(purposeId: string): string | null {
+  return isCustomPersonaPurposeId(purposeId) ? purposeId.slice(CUSTOM_PERSONA_PREFIX.length) : null;
+}
+
+
 /// Conversation
 
 export interface DConversation {
@@ -24,7 +39,7 @@ export interface DConversation {
 
   // TODO: [x Head] - this should be the system purpose of current head of the conversation
   // there should be the concept of the audience of the current head
-  systemPurposeId: SystemPurposeId;   // system purpose of this conversation
+  systemPurposeId: ConversationPurposeId;   // system purpose or custom persona (persona:uuid)
 
   // when updated is null, we don't have messages yet (timestamps as Date.now())
   created: number;                    // creation timestamp
@@ -48,7 +63,7 @@ export type DConversationId = string;
 
 // helpers - creation
 
-export function createDConversation(systemPurposeId?: SystemPurposeId): DConversation {
+export function createDConversation(systemPurposeId?: ConversationPurposeId): DConversation {
   return {
     id: agiUuid('chat-dconversation'),
 
@@ -61,7 +76,7 @@ export function createDConversation(systemPurposeId?: SystemPurposeId): DConvers
     // isArchived: undefined,
 
     // @deprecated
-    systemPurposeId: systemPurposeId || defaultSystemPurposeId,
+    systemPurposeId: systemPurposeId ?? defaultSystemPurposeId,
     // @deprecated
     tokenCount: 0,
 

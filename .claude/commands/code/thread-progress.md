@@ -23,7 +23,7 @@ A tree, where every rabbithole that was taken adds a level.
 
   [ ] Missing, back to the main goal
   [ ] ...
-  
+
 ### What do we rewind the rabbithole to (once the current level is complete)?
 ...
 

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { 
@@ -16,7 +17,6 @@ import {
   Divider,
   CircularProgress
 } from '@mui/joy';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import IconButton from '@mui/joy/IconButton';
@@ -108,7 +108,7 @@ export default function SignUp() {
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: '100vh',
-          background: 'linear-gradient(to bottom, #1e1e2f, #2d2d44)',
+          bgcolor: 'background.body',
         }}
       >
         <CircularProgress size="lg" />
@@ -129,7 +129,7 @@ export default function SignUp() {
         minHeight: '100vh',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        bgcolor: 'background.body',
         p: 2,
       }}
     >
@@ -137,27 +137,13 @@ export default function SignUp() {
         <Card
           sx={{
             width: '100%',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            backdropFilter: 'blur(16px)',
-            background: 'rgba(255, 255, 255, 0.95)',
+            boxShadow: 'sm',
+            bgcolor: 'background.popup',
           }}
         >
         <CardContent sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 64,
-                height: 64,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                mb: 2,
-              }}
-            >
-              <PersonAddIcon sx={{ fontSize: 32, color: 'white' }} />
-            </Box>
+            <Image src="/apple-touch-icon.png" alt={Brand.Title.Base} width={56} height={56} style={{ marginBottom: 8 }} />
 
             <Typography level="h2" component="h1" fontWeight="bold">
               Create your account
@@ -250,11 +236,8 @@ export default function SignUp() {
                 loading={isLoading}
                 size="lg"
                 variant="solid"
-                sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  borderRadius: 'md',
-                  py: 1.5,
-                }}
+                color="primary"
+                sx={{ borderRadius: 'md', py: 1.5 }}
               >
                 {isLoading ? 'Creating account...' : 'Create Account'}
               </Button>

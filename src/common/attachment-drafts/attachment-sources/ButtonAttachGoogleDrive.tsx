@@ -19,7 +19,7 @@ function ButtonAttachGoogleDrive(props: {
 }) {
 
   const button = props.isMobile ? (
-    <IconButton color={props.color} disabled={props.disabled} onClick={props.onOpenGoogleDrivePicker}>
+    <IconButton aria-label="Attach from Google Drive" color={props.color} disabled={props.disabled} onClick={props.onOpenGoogleDrivePicker}>
       <AddToDriveRoundedIcon />
     </IconButton>
   ) : (

@@ -87,41 +87,13 @@ export default function ResetPassword() {
 
   if (success) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: '100vh',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          p: 2,
-        }}
-      >
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.body', p: 2 }}>
         <AuthLightSurface sx={{ width: '90%', maxWidth: '420px' }}>
-          <Card
-            sx={{
-              width: '100%',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              backdropFilter: 'blur(16px)',
-              background: 'rgba(255, 255, 255, 0.95)',
-            }}
-          >
+          <Card variant="outlined" sx={{ width: '100%', boxShadow: 'sm', bgcolor: 'background.popup', borderRadius: 'lg', borderColor: 'divider' }}>
           <CardContent sx={{ p: 4, textAlign: 'center' }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 64,
-                  height: 64,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #10ac84 0%, #1dd1a1 100%)',
-                  mb: 2,
-                }}
-              >
-                <LockResetIcon sx={{ fontSize: 32, color: 'white' }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 64, height: 64, borderRadius: '50%', bgcolor: 'success.solidBg', color: 'success.solidColor', mb: 2 }}>
+                <LockResetIcon sx={{ fontSize: 32 }} />
               </Box>
 
               <Typography level="h2" component="h1" fontWeight="bold" color="success">
@@ -139,41 +111,13 @@ export default function ResetPassword() {
   }
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        p: 2,
-      }}
-    >
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.body', p: 2 }}>
       <AuthLightSurface sx={{ width: '90%', maxWidth: '420px' }}>
-        <Card
-          sx={{
-            width: '100%',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            backdropFilter: 'blur(16px)',
-            background: 'rgba(255, 255, 255, 0.95)',
-          }}
-        >
+        <Card variant="outlined" sx={{ width: '100%', boxShadow: 'sm', bgcolor: 'background.popup', borderRadius: 'lg', borderColor: 'divider' }}>
         <CardContent sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 64,
-                height: 64,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                mb: 2,
-              }}
-            >
-              <LockResetIcon sx={{ fontSize: 32, color: 'white' }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 64, height: 64, borderRadius: '50%', bgcolor: 'primary.solidBg', color: 'primary.solidColor', mb: 2 }}>
+              <LockResetIcon sx={{ fontSize: 32 }} />
             </Box>
 
             <Typography level="h2" component="h1" fontWeight="bold">
@@ -203,11 +147,7 @@ export default function ResetPassword() {
                   size="lg"
                   sx={{ borderRadius: 'md' }}
                   endDecorator={
-                    <IconButton
-                      variant="plain"
-                      color="neutral"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
+                    <IconButton aria-label={showPassword ? 'Hide password' : 'Show password'} variant="plain" color="neutral" onClick={() => setShowPassword(!showPassword)}>
                       {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                     </IconButton>
                   }
@@ -225,29 +165,14 @@ export default function ResetPassword() {
                   size="lg"
                   sx={{ borderRadius: 'md' }}
                   endDecorator={
-                    <IconButton
-                      variant="plain"
-                      color="neutral"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    >
+                    <IconButton aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'} variant="plain" color="neutral" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                       {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                     </IconButton>
                   }
                 />
               </FormControl>
 
-              <Button
-                type="submit"
-                disabled={isLoading || !token}
-                loading={isLoading}
-                size="lg"
-                variant="solid"
-                sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  borderRadius: 'md',
-                  py: 1.5,
-                }}
-              >
+              <Button type="submit" disabled={isLoading || !token} loading={isLoading} size="lg" variant="solid" color="primary" sx={{ borderRadius: 'md', py: 1.5 }}>
                 {isLoading ? 'Updating Password...' : 'Update Password'}
               </Button>
             </Stack>

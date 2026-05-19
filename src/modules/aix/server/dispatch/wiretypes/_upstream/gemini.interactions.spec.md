@@ -18,7 +18,7 @@ post https://generativelanguage.googleapis.com/v1beta/interactions Creates a new
 ### Request body
 
 The request body contains data with the following structure:
-model ModelOption (optional) The name of the \`Model\` used for generating the interaction.   
+model ModelOption (optional) The name of the \`Model\` used for generating the interaction.
 **Required if \`agent\` is not provided.**
 
 Possible
@@ -83,7 +83,7 @@ values:
   Our advanced, full-song generative model with deep compositional understanding, optimized for precise structural control and complex transitions across diverse musical styles.
 
 The model that will complete your prompt.\\n\\nSee \[models\](https://ai.google.dev/gemini-api/docs/models) for additional details.
-agent AgentOption (optional) The name of the \`Agent\` used for generating the interaction.   
+agent AgentOption (optional) The name of the \`Agent\` used for generating the interaction.
 **Required if \`model\` is not provided.**
 
 Possible
@@ -109,8 +109,8 @@ response_mime_type string (optional) The mime type of the response. This is requ
 stream boolean (optional) Input only. Whether the interaction will be streamed.
 store boolean (optional) Input only. Whether to store the response and request for later retrieval.
 background boolean (optional) Input only. Whether to run the model interaction in the background.
-generation_config GenerationConfig (optional) **Model Configuration**   
-Configuration parameters for the model interaction.   
+generation_config GenerationConfig (optional) **Model Configuration**
+Configuration parameters for the model interaction.
 *Alternative to \`agent_config\`. Only applicable when \`model\` is set.*
 Configuration parameters for model interactions.
 
@@ -185,8 +185,8 @@ values:
 - `4K`
 - `512`
 tool_choice [ToolChoiceConfig](https://ai.google.dev/api/interactions-api#Resource:ToolChoiceConfig) or [ToolChoiceType](https://ai.google.dev/api/interactions-api#Resource:ToolChoiceType) (optional) The tool choice configuration.
-agent_config object (optional) **Agent Configuration**   
-Configuration for the agent.   
+agent_config object (optional) **Agent Configuration**
+Configuration for the agent.
 *Alternative to \`generation_config\`. Only applicable when \`agent\` is set.*
 
 #### Possible Types

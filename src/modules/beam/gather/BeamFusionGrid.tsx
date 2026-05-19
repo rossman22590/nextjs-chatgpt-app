@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import type { SxProps, VariantProp } from '@mui/joy/styles/types';
-import { Alert, Box, Button, Typography, useTheme } from '@mui/joy';
+import { Alert, Box, Button, Typography } from '@mui/joy';
 import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
 import LanguageRoundedIcon from '@mui/icons-material/LanguageRounded';
 
@@ -81,9 +81,6 @@ export function BeamFusionGrid(props: {
   } = useBeamStore(props.beamStore, useShallow(state => ({
     currentFactory: findFusionFactory(state.currentFactoryId),
   })));
-  const isDarkMode = useTheme().palette.mode === 'dark';
-
-
   // derived state
   const isEmpty = props.fusionIds.length === 0;
   const isNoFactorySelected = currentFactory === null;
@@ -98,12 +95,7 @@ export function BeamFusionGrid(props: {
   return (
     <Box sx={{
       ...(props.isMobile ? fusionGridMobileSx : fusionGridDesktopSx),
-      ...(isEmpty ? {
-        backgroundColor: isDarkMode ? 'neutral.900' : 'neutral.solidBg',
-      } : {
-        backgroundColor: isDarkMode ? 'success.900' : '#F2FFFA', // f8fff8 was good, too close to the gree hue
-        pt: 'var(--Pad)',
-      }),
+      ...(!isEmpty && { pt: 'var(--Pad)' }),
     }}>
 
       {/* Fusions */}
@@ -119,10 +111,9 @@ export function BeamFusionGrid(props: {
       {/* Add Fusion (Card) */}
       {(isEmpty || !isNoFactorySelected) && (
         <BeamCard
-          className={isEmpty ? beamCardClasses.smashTop : undefined}
+          className={isEmpty ? beamCardClasses.smashTop : beamCardClasses.fusionIdle}
           sx={{
-            backgroundColor: props.canGather ? `${GATHER_COLOR}.softBg` : isDarkMode ? 'neutral.700' : undefined,
-            // boxShadow: `0px 6px 16px -12px rgb(var(--joy-palette-${props.canGather ? GATHER_COLOR : 'neutral'}-darkChannel) / 40%)`,
+            ...(props.canGather && { backgroundColor: `${GATHER_COLOR}.softBg`, borderColor: `${GATHER_COLOR}.outlinedBorder` }),
             mb: 'auto',
           }}
         >
@@ -136,21 +127,18 @@ export function BeamFusionGrid(props: {
               onAddFusion={props.onAddFusion}
               sx={{
                 minHeight: props.isMobile ? 'calc(2 * var(--Card-padding) + 2rem - 0.5rem)' : undefined,
-                // marginBottom: 'calc(-1 * var(--Card-padding) + 0.25rem)',
-                // marginInline: 'calc(-1 * var(--Card-padding) + 0.375rem)',
                 whiteSpace: 'nowrap',
+                color: 'text.primary',
               }}
             />
 
-            <Typography level='body-sm' variant='soft' color={GATHER_COLOR}>
+            <Typography level='body-sm' color='neutral'>
               {currentFactory.description}
             </Typography>
 
           </Box> : (
-            <Typography level='body-sm' sx={{ opacity: 0.8 }}>
-              {/*You need two or more replies for a {currentFactory?.shortLabel?.toLocaleLowerCase() ?? ''} merge.*/}
-              {/*Waiting for multiple responses.*/}
-              Merge needs 2+ replies. Beam some first.
+            <Typography level='body-sm' color='neutral' sx={{ opacity: 0.8 }}>
+              Waiting for responses from the beams above. Add a merge once two or more are ready.
             </Typography>
           )}
         </BeamCard>

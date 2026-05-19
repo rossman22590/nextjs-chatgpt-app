@@ -68,7 +68,7 @@ export function DarkModeToggleButton(props: { hasText?: boolean }) {
           {_themeModeLabel[mode]}
         </Button>
       ) : (
-        <IconButton size='sm' variant='soft' onClick={handleToggleDarkMode} sx={{ ml: 'auto', /*mr: '2px',*/ my: '-0.25rem' /* absorb the menuItem padding */ }}>
+        <IconButton aria-label={title} size='sm' variant='soft' onClick={handleToggleDarkMode} sx={{ ml: 'auto', /*mr: '2px',*/ my: '-0.25rem' /* absorb the menuItem padding */ }}>
           {_themeModeIcon(mode)}
         </IconButton>
       )}

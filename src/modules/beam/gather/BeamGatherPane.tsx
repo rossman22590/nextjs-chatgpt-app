@@ -24,17 +24,14 @@ const gatherPaneClasses = {
 
 const gatherPaneSx: SxProps = {
   ...beamPaneSx,
-  borderTop: '1px solid',
-  borderTopColor: 'neutral.outlinedBorder',
-
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: 'lg',
   backgroundColor: 'background.surface',
-  boxShadow: `0px 6px 20px -8px rgb(var(--joy-palette-neutral-darkChannel) / 30%)`,
+  boxShadow: '0 4px 18px rgba(0 0 0 / 0.06), 0 1px 4px rgba(0 0 0 / 0.04)',
   [`&.${gatherPaneClasses.ready}`]: {
-    backgroundColor: 'background.popup',
-    // boxShadow: `0px 6px 16px -8px rgb(var(--joy-palette-success-darkChannel) / 40%)`,
-  },
-  [`&.${gatherPaneClasses.busy}`]: {
-    // animation: `${animationShadowRingLimey} 2s linear infinite`,
+    backgroundColor: 'background.surface',
+    borderColor: 'divider',
   },
 };
 
@@ -113,29 +110,22 @@ export function BeamGatherPane(props: {
       {/* Title */}
       <Box>
         <Typography
-          level='h4' component='h3'
-          // endDecorator={<ScrollToBottomButton inline />}
-          // sx={{ my: 0.25 }}
-          sx={(props.canGather || hasFusions || isGatheringAny) ? undefined : { color: 'primary.solidDisabledColor', ['& > svg']: { color: 'primary.solidDisabledColor' } }}
+          level='h4'
+          component='h3'
+          fontWeight='lg'
+          sx={(props.canGather || hasFusions || isGatheringAny) ? undefined : { color: 'text.tertiary', ['& > svg']: { color: 'text.tertiary' } }}
         >
           <MainLlmIcon sx={{ fontSize: '1rem', mr: 0.625, animation: isGatheringAny ? `${animationColorBeamGather} 2s linear infinite` : undefined }} />
           Merge
         </Typography>
-        <Typography level='body-sm' sx={{ whiteSpace: 'nowrap' }}>
-          {/* may merge or not (hasInputs) N replies.. put this in pretty messages */}
-          {props.canGather ? `Combine the ${props.raysReady} replies` : /*'Fuse all replies'*/ ''}
+        <Typography level='body-sm' color='neutral' sx={{ whiteSpace: 'nowrap', mt: 0.25 }}>
+          {props.canGather ? `Combine the ${props.raysReady} replies` : ''}
         </Typography>
       </Box>
 
       {/* Method */}
       <FormControl sx={{ my: '-0.25rem' }}>
-        {/*{!props.isMobile && <FormLabelStart title='Method' />}*/}
-        <ButtonGroup
-          variant='outlined'
-          size='md'
-          disabled={disableUnlessAutoStart}
-          // sx={{ boxShadow: isNoFactorySelected ? 'xs' : undefined }}
-        >
+        <ButtonGroup variant='outlined' size='sm' disabled={disableUnlessAutoStart} sx={{ borderRadius: 'md' }}>
           {FUSION_FACTORIES.map(factory => {
             const { factoryId, shortLabel } = factory;
             const isActive = factoryId === currentFactoryId;
@@ -145,11 +135,10 @@ export function BeamGatherPane(props: {
                 key={'factory-' + factoryId}
                 color={buttonColor}
                 onClick={event => handleFactoryActivate(factoryId, !!event?.shiftKey)}
-                // startDecorator={(isActive && Icon) ? <Icon /> : null}
                 sx={{
-                  backgroundColor: isActive ? `${buttonColor}.softBg` : 'background.popup',
-                  // fontWeight: isActive ? 'lg' : 'md', /* reset, from 600 */
-                  // minHeight: '2.25rem',
+                  backgroundColor: isActive ? `${buttonColor}.softBg` : 'background.level1',
+                  borderRadius: 'md',
+                  fontWeight: isActive ? 600 : 400,
                 }}
               >
                 {shortLabel}

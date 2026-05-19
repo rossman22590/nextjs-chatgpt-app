@@ -1,11 +1,11 @@
 import * as React from 'react';
-import { 
-  Box, 
+import {
+  Box,
   Button,
-  Card, 
-  CardContent, 
-  Typography, 
-  Grid, 
+  Card,
+  CardContent,
+  Typography,
+  Grid,
   Chip,
   LinearProgress,
   List,
@@ -14,7 +14,8 @@ import {
   Stack,
   Tooltip,
   CircularProgress,
-  Alert
+  Alert,
+  useTheme,
 } from '@mui/joy';
 import ChatIcon from '@mui/icons-material/Chat';
 import TokenIcon from '@mui/icons-material/Token';
@@ -435,6 +436,7 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
       } finally {
         setLoading(false);
       }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- userId is used inside fetchAnalytics
   }, [userId]);
 
   React.useEffect(() => {
@@ -445,6 +447,8 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
     setError(null);
     fetchAnalytics();
   }, [fetchAnalytics]);
+
+  const theme = useTheme();
 
   const formatCost = (cost: number) => {
     if (cost === 0) return '$0.00';
@@ -486,6 +490,17 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
     );
   }
 
+  const p = theme.palette as { primary?: { [k: string]: string }; success?: { [k: string]: string }; danger?: { [k: string]: string } };
+  const chartPrimary = p.primary?.[500] ?? p.primary?.solidBg ?? '#a020f0';
+  const chartSuccess = p.success?.[500] ?? (p.success as { solidBg?: string })?.solidBg ?? '#22c55e';
+  const chartDanger = p.danger?.[500] ?? (p.danger as { solidBg?: string })?.solidBg ?? '#ef4444';
+  const toRgba = (hex: string, alpha: number) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
   // Chart.js configurations
   const lineChartOptions = {
     responsive: true,
@@ -513,7 +528,7 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
         position: 'left' as const,
         beginAtZero: true,
         grid: {
-          color: 'rgba(0, 0, 0, 0.1)',
+          color: toRgba(chartPrimary, 0.12),
         },
         title: {
           display: true,
@@ -564,7 +579,7 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
         display: true,
         beginAtZero: true,
         grid: {
-          color: 'rgba(0, 0, 0, 0.1)',
+          color: toRgba(chartPrimary, 0.12),
         },
       },
     },
@@ -580,46 +595,40 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
     },
   };
 
-  // Chart data
+  // Chart data (theme-aligned)
   const activityChartData = {
     labels: analytics.activity.recent.map(day => day.date),
     datasets: [
       {
         label: 'Conversations',
         data: analytics.activity.recent.map(day => day.conversations),
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        borderColor: chartPrimary,
+        backgroundColor: toRgba(chartPrimary, 0.2),
         fill: true,
       },
       {
         label: 'Cost ($)',
         data: analytics.activity.recent.map(day => day.cost),
-        borderColor: 'rgb(255, 99, 132)',
-        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        borderColor: chartDanger,
+        backgroundColor: toRgba(chartDanger, 0.2),
         yAxisID: 'y1',
       },
     ],
   };
 
+  const modelUsagePalette = [
+    '#a020f0', '#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#84cc16',
+    '#eab308', '#f97316', '#ef4444', '#ec4899', '#8b5cf6', '#0ea5e9',
+    '#14b8a6', '#22c55e', '#a3e635', '#f59e0b',
+  ];
+  const modelUsageColors = analytics.insights.modelUsage.map((_, i) => modelUsagePalette[i % modelUsagePalette.length]);
   const modelUsageChartData = {
     labels: analytics.insights.modelUsage.map(model => model.prettyName),
     datasets: [
       {
         data: analytics.insights.modelUsage.map(model => model.cost),
-        backgroundColor: [
-          'rgba(255, 99, 132, 0.8)',
-          'rgba(54, 162, 235, 0.8)',
-          'rgba(255, 205, 86, 0.8)',
-          'rgba(75, 192, 192, 0.8)',
-          'rgba(153, 102, 255, 0.8)',
-        ],
-        borderColor: [
-          'rgba(255, 99, 132, 1)',
-          'rgba(54, 162, 235, 1)',
-          'rgba(255, 205, 86, 1)',
-          'rgba(75, 192, 192, 1)',
-          'rgba(153, 102, 255, 1)',
-        ],
+        backgroundColor: modelUsageColors.map(c => toRgba(c, 0.85)),
+        borderColor: modelUsageColors,
         borderWidth: 1,
       },
     ],
@@ -631,8 +640,8 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
       {
         label: 'Conversations',
         data: analytics.insights.weeklyActivity.map(day => day.conversations),
-        backgroundColor: 'rgba(54, 162, 235, 0.8)',
-        borderColor: 'rgba(54, 162, 235, 1)',
+        backgroundColor: toRgba(chartPrimary, 0.8),
+        borderColor: chartPrimary,
         borderWidth: 1,
       },
     ],
@@ -950,17 +959,17 @@ export const UserAnalytics: React.FC<UserAnalyticsProps> = ({ userId }) => {
               return (
                 <Grid key={index} xs={1}>
                   <Tooltip title={`${hour.hour}:00 - ${hour.conversations} conversations, ${formatCost(hour.cost)}`}>
-                    <Box sx={{ 
+                    <Box sx={{
                       height: 40,
-                      backgroundColor: intensity > 0 ? `rgba(25, 118, 210, ${0.2 + intensity * 0.8})` : 'background.level2',
+                      backgroundColor: intensity > 0 ? toRgba(chartPrimary, 0.2 + intensity * 0.8) : 'background.level2',
                       borderRadius: 0.5,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
                       '&:hover': {
-                        backgroundColor: intensity > 0 ? `rgba(25, 118, 210, ${0.4 + intensity * 0.6})` : 'background.level3',
-                      }
+                        backgroundColor: intensity > 0 ? toRgba(chartPrimary, 0.4 + intensity * 0.6) : 'background.level3',
+                      },
                     }}>
                       <Typography 
                         level="body-xs" 

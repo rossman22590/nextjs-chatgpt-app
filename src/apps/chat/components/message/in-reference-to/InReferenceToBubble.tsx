@@ -100,7 +100,7 @@ export function InReferenceToBubble(props: {
       </Typography>
 
       {!!props.onRemove && (
-        <IconButton size='sm' onClick={handleRemoveClicked} sx={{ my: -0.5, background: 'none' }}>
+        <IconButton aria-label="Remove reference" size='sm' onClick={handleRemoveClicked} sx={{ my: -0.5, background: 'none' }}>
           <CloseRoundedIcon />
         </IconButton>
       )}

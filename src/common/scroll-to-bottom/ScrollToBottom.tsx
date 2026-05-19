@@ -9,8 +9,8 @@
  * Example usage:
  *   <ScrollToBottom bootToBottom stickToBottom sx={{ overflowY: 'auto', height: '100%' }}>
  *     <LongMessagesList />
- *     <ScrollToBottomButton />
  *   </ScrollToBottom>
+ * The scroll-to-bottom button is rendered inside the thread view (fixed at bottom-right).
  *
  * Within the Context (children components), functions are made available by using:
  *  const { notifyBooting, setStickToBottom } = useScrollToBottom();
@@ -23,6 +23,7 @@ import { Box } from '@mui/joy';
 
 import { isBrowser } from '~/common/util/pwaUtils';
 
+import { ScrollToBottomButton } from './ScrollToBottomButton';
 import { ScrollToBottomState, UseScrollToBottomProvider } from './useScrollToBottom';
 
 
@@ -291,6 +292,28 @@ export function ScrollToBottom(props: {
   }, []);
 
 
+  const scrollableSx = !props.sx ? scrollableBoxSx : { ...scrollableBoxSx, ...props.sx } as SxProps;
+  const threadWrapperSx: SxProps = {
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    minHeight: 0,
+    // bottom fade: content flows smoothly into the composer below
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: '88px',
+      background: 'linear-gradient(to top, var(--agi-thread-fade) 0%, transparent 100%)',
+      pointerEvents: 'none',
+      zIndex: 2,
+    },
+  };
+  const scrollableOuterSx: SxProps = { ...scrollableSx, flex: 1, minHeight: 0 };
+
   return (
     <UseScrollToBottomProvider value={{
       ...state,
@@ -298,14 +321,13 @@ export function ScrollToBottom(props: {
       setStickToBottom,
       skipNextAutoScroll,
     }}>
-      {/* Scrollable v-maxed */}
-      <Box ref={scrollableElementRef} role={'scrollable' /* hardcoded, important */} sx={!props.sx ? scrollableBoxSx : ({
-        ...scrollableBoxSx,
-        ...props.sx,
-      } as SxProps)}>
-        {props.children}
-        {DEBUG_SCROLL_TO_BOTTOM && <DebugBorderBox heightPx={USER_STICKY_MARGIN} color='red' />}
-        {DEBUG_SCROLL_TO_BOTTOM && <DebugBorderBox heightPx={100} color='blue' />}
+      <Box sx={threadWrapperSx}>
+        <Box ref={scrollableElementRef} role="scrollable" sx={scrollableOuterSx}>
+          {props.children}
+          {DEBUG_SCROLL_TO_BOTTOM && <DebugBorderBox heightPx={USER_STICKY_MARGIN} color="red" />}
+          {DEBUG_SCROLL_TO_BOTTOM && <DebugBorderBox heightPx={100} color="blue" />}
+        </Box>
+        <ScrollToBottomButton />
       </Box>
     </UseScrollToBottomProvider>
   );

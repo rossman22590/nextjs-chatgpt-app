@@ -315,7 +315,7 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
       // Reuse or create a container for the skills
       payload.container = {
         ...(containerId ? { id: containerId } : {}),
-        skills: skillIds.map((skillId: string) => ({ 
+        skills: skillIds.map((skillId: string) => ({
           type: 'anthropic',
           skill_id: skillId,
           version: 'latest',

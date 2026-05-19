@@ -71,7 +71,7 @@ function ChatDrawer(props: {
   focusedChatBeamOpen: boolean,
   onConversationActivate: (conversationId: DConversationId) => void,
   onConversationBranch: (conversationId: DConversationId, messageId: string | null, addSplitPane: boolean) => void,
-  onConversationNew: (forceNoRecycle: boolean, isIncognito: boolean) => void,
+  onConversationNew: (forceNoRecycle: boolean, isIncognito: boolean, initialPurposeId?: import('~/common/stores/chat/chat.conversation').ConversationPurposeId) => void,
   onConversationsDelete: (conversationIds: DConversationId[], bypassConfirmation: boolean) => void,
   onConversationsExportDialog: (conversationId: DConversationId | null, exportAll: boolean) => void,
   onConversationsImportDialog: () => void,
@@ -328,7 +328,7 @@ function ChatDrawer(props: {
     {/* Drawer Header */}
     <OptimaDrawerHeader title='Chats' onClose={optimaCloseDrawer}>
       <Tooltip title={enableFolders ? 'Hide Folders' : 'Use Folders'}>
-        <IconButton size='sm' onClick={toggleEnableFolders}>
+        <IconButton aria-label={enableFolders ? 'Hide folders' : 'Show folders'} size='sm' onClick={toggleEnableFolders}>
           {enableFolders ? <FoldersToggleOn /> : <FoldersToggleOff />}
         </IconButton>
       </Tooltip>
@@ -371,7 +371,7 @@ function ChatDrawer(props: {
       {/* Search / New Chat */}
       <Box sx={{ display: 'flex', flexDirection: 'column', m: 2, gap: 2 }}>
 
-        {/* Search Input Field */}
+        {/* Search Input Field - use primary color so placeholder/icons are not grey */}
         <DebouncedInputMemo
           minChars={2}
           onDebounce={setDebouncedSearchQuery}
@@ -379,30 +379,37 @@ function ChatDrawer(props: {
           placeholder='Search...'
           aria-label='Search'
           endDecorator={groupingComponent}
+          sx={{
+            color: 'primary.softColor',
+            '& .MuiInput-startDecorator': { color: 'primary.softColor' },
+            '& .MuiInput-endDecorator': { color: 'primary.softColor' },
+            '& .MuiInput-endDecorator button': { color: 'primary.softColor' },
+            '& input::placeholder': { color: 'primary.softColor', opacity: 0.85 },
+            '& input': { color: 'primary.softColor' },
+          }}
         />
 
-        {/* New Chat Button */}
+        {/* + New chat - prominent rounded primary button (reference layout); solidColor ensures readable text on light gradients */}
         <Button
-          // variant='outlined'
-          variant={disableNewButton ? undefined : 'soft'}
+          color='primary'
+          variant={disableNewButton ? 'soft' : 'solid'}
           disabled={disableNewButton}
           onClick={handleButtonNew}
+          startDecorator={<AddIcon />}
           sx={{
-            // ...PageDrawerTallItemSx,
-            justifyContent: 'flex-start',
-            padding: '0px 0.75rem',
-
-            // style
-            border: '1px solid',
-            borderColor: 'neutral.outlinedBorder',
-            borderRadius: 'sm',
-            '--ListItemDecorator-size': 'calc(2.5rem - 1px)', // compensate for the border
-            // backgroundColor: 'background.popup',
-            // boxShadow: (disableNewButton || props.isMobile) ? 'none' : 'xs',
-            // transition: 'box-shadow 0.2s',
+            justifyContent: 'center',
+            py: 0.75,
+            borderRadius: 'md',
+            '--Button-gap': '0.5rem',
+            boxShadow: 'none',
+            color: 'primary.solidColor',
+            '&:hover': { boxShadow: 'none' },
+            ...(disableNewButton && {
+              '--variant-softDisabledBg': 'var(--joy-palette-primary-softBg)',
+              '--variant-softDisabledColor': 'var(--joy-palette-primary-solidColor)',
+            }),
           }}
         >
-          <ListItemDecorator><AddIcon sx={{ fontSize: '' }} /></ListItemDecorator>
           New chat
         </Button>
 
@@ -443,7 +450,7 @@ function ChatDrawer(props: {
               </Typography>
               {(filterHasBeamOpen || filterHasStars || filterHasImageAssets || filterHasDocFragments || filterIsArchived) && (
                 <Tooltip title='Clear Filters'>
-                  <IconButton size='sm' color='primary' onClick={clearFilters}>
+                  <IconButton aria-label="Clear filters" size='sm' color='primary' onClick={clearFilters}>
                     <ClearIcon />
                   </IconButton>
                 </Tooltip>
@@ -477,30 +484,23 @@ function ChatDrawer(props: {
 
       <ListDivider sx={{ my: 0 }} />
 
-      {/* Bottom commands */}
-      <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-        <ListItemButton onClick={props.onConversationsImportDialog} sx={{ flex: 1 }}>
-          <ListItemDecorator>
-            <FileDownloadOutlinedIcon />
-          </ListItemDecorator>
-          Import
-          {/*<OpenAIIcon sx={{  ml: 'auto' }} />*/}
-        </ListItemButton>
-
-        <ListItemButton disabled={filteredChatsAreEmpty || props.focusedChatBeamOpen} onClick={handleConversationsExport} sx={{ flex: 1 }}>
-          <ListItemDecorator>
-            <FileUploadOutlinedIcon />
-          </ListItemDecorator>
-          Export
+      {/* Bottom: Import | Export, then Delete all (reference layout) */}
+      <Box sx={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0, px: 1, pb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+          <ListItemButton onClick={props.onConversationsImportDialog} sx={{ flex: 1, borderRadius: 'sm' }}>
+            <ListItemDecorator><FileDownloadOutlinedIcon /></ListItemDecorator>
+            Import
+          </ListItemButton>
+          <ListItemButton disabled={filteredChatsAreEmpty || props.focusedChatBeamOpen} onClick={handleConversationsExport} sx={{ flex: 1, borderRadius: 'sm' }}>
+            <ListItemDecorator><FileUploadOutlinedIcon /></ListItemDecorator>
+            Export
+          </ListItemButton>
+        </Box>
+        <ListItemButton disabled={filteredChatsAreEmpty} onClick={handleConversationsDeleteFiltered} sx={{ borderRadius: 'sm' }}>
+          <ListItemDecorator><DeleteOutlineIcon /></ListItemDecorator>
+          Delete {filteredChatsCount >= 2 ? `all ${filteredChatsCount} chats` : 'chat'}
         </ListItemButton>
       </Box>
-
-      <ListItemButton disabled={filteredChatsAreEmpty} onClick={handleConversationsDeleteFiltered}>
-        <ListItemDecorator>
-          <DeleteOutlineIcon />
-        </ListItemDecorator>
-        Delete {filteredChatsCount >= 2 ? `all ${filteredChatsCount} chats` : 'chat'}
-      </ListItemButton>
 
     </OptimaDrawerList>
 

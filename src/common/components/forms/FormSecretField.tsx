@@ -55,7 +55,7 @@ export function FormSecretField(props: {
   const ghost = props.autoCompleteId.replace(/-key$/, '').replace(/-/g, ' ');
 
   const endDecorator = React.useMemo(() => !!props.value && (
-    <IconButton size='sm' onClick={() => setIsVisible(on => !on)}>
+    <IconButton aria-label={isVisible ? 'Hide' : 'Show'} size='sm' onClick={() => setIsVisible(on => !on)}>
       {isVisible ? <VisibilityIcon sx={{ fontSize: 'md' }} /> : <VisibilityOffIcon sx={{ fontSize: 'md' }} />}
     </IconButton>
   ), [props.value, isVisible]);
