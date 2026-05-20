@@ -634,17 +634,13 @@ export function ChatMessage(props: {
   const backgroundColor = messageBackground(messageRole, userCommandApprox, messageHasBeenEdited, false /*isAssistantError && !errorMessage*/);
 
   const listItemSx: SxProps = React.useMemo(() => {
-    // In dark mode skip white gradient overlay so bubbles stay dark and text stays readable
-    const background = isDark
-      ? backgroundColor
-      : fromUser
-        ? `linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 36%, transparent 52%), ${backgroundColor}`
-        : fromAssistant
-          ? `linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.15) 30%, transparent 50%), ${backgroundColor}`
-          : backgroundColor;
+    // Single-layer fills; optional subtle gloss on assistant in extra mode only (light)
+    const background =
+      !isDark && fromAssistant && uiComplexityMode === 'extra'
+        ? `linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.08) 28%, transparent 45%), ${backgroundColor}`
+        : backgroundColor;
 
     return {
-    // multi-layer background: top-shine gloss + CSS variable base (or plain in dark mode)
     background,
 
     // generous padding - content needs room
@@ -674,14 +670,13 @@ export function ChatMessage(props: {
         ? { xs: '6px 20px 20px 20px', md: '6px 22px 22px 22px' }
         : { xs: '16px', md: '18px' },
 
-    // depth - user: theme glow ring + lift; assistant: neutral card elevation
     boxShadow: fromUser
-      ? '0 0 0 3px rgba(var(--joy-palette-primary-mainChannel) / 0.09), 0 8px 40px rgba(var(--joy-palette-primary-mainChannel) / 0.2), 0 2px 10px rgba(var(--joy-palette-primary-mainChannel) / 0.1)'
+      ? '0 0 0 1px rgba(var(--joy-palette-primary-mainChannel) / 0.12), 0 4px 20px rgba(var(--joy-palette-primary-mainChannel) / 0.12)'
       : fromAssistant
-        ? '0 2px 24px rgba(0, 0, 0, 0.06), 0 1px 6px rgba(0, 0, 0, 0.04)'
-        : '0 1px 8px rgba(var(--joy-palette-primary-mainChannel) / 0.05)',
+        ? '0 1px 12px rgba(0, 0, 0, 0.05)'
+        : '0 1px 6px rgba(var(--joy-palette-primary-mainChannel) / 0.04)',
 
-    backdropFilter: 'blur(24px) saturate(180%)',
+    backdropFilter: fromUser ? 'blur(10px) saturate(130%)' : fromAssistant ? 'none' : 'blur(8px) saturate(120%)',
     overflow: 'hidden',
 
     // entrance animation - different trajectory per role
@@ -694,16 +689,16 @@ export function ChatMessage(props: {
     // hover - lift with amplified shadow (theme primary)
     '&:hover': {
       boxShadow: fromUser
-        ? '0 0 0 3px rgba(var(--joy-palette-primary-mainChannel) / 0.17), 0 14px 52px rgba(var(--joy-palette-primary-mainChannel) / 0.28), 0 4px 16px rgba(var(--joy-palette-primary-mainChannel) / 0.13)'
+        ? '0 0 0 1px rgba(var(--joy-palette-primary-mainChannel) / 0.2), 0 6px 24px rgba(var(--joy-palette-primary-mainChannel) / 0.16)'
         : fromAssistant
-          ? '0 6px 36px rgba(0, 0, 0, 0.10), 0 2px 10px rgba(0, 0, 0, 0.06)'
-          : '0 4px 18px rgba(var(--joy-palette-primary-mainChannel) / 0.08)',
+          ? '0 4px 20px rgba(0, 0, 0, 0.08)'
+          : '0 2px 12px rgba(var(--joy-palette-primary-mainChannel) / 0.06)',
       borderColor: fromUser
-        ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.44)'
+        ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.32)'
         : fromAssistant
-          ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.12)'
-          : 'rgba(var(--joy-palette-primary-mainChannel) / 0.15)',
-      transform: 'translateY(-2px)',
+          ? 'rgba(var(--joy-palette-primary-mainChannel) / 0.1)'
+          : 'rgba(var(--joy-palette-primary-mainChannel) / 0.12)',
+      transform: fromUser ? 'translateY(-1px)' : undefined,
     },
 
     // alignment + user bubble text (neutral theme sets --agi-message-user-color for white on black)

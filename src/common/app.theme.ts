@@ -94,6 +94,25 @@ export const THEME_GRADIENTS: Record<ThemeGradientId, ThemeGradientCombo> = {
   'neutral': { start: '#1a1a1a', end: '#1a1a1a', hoverStart: '#0a0a0a', hoverEnd: '#0a0a0a', label: 'Minimal' },
 };
 
+/** Shown first in theme settings (calm, professional palettes). */
+export const THEME_GRADIENT_RECOMMENDED: ThemeGradientId[] = [
+  'neutral',
+  'purple-pink',
+  'blue-cyan',
+  'emerald-teal',
+  'indigo-violet',
+  'slate-cyan',
+  'amber-orange',
+  'ice-blue',
+  'sky-blue',
+  'rose-coral',
+];
+
+/** Expressive palettes (collapsed behind "More" in theme settings). */
+export const THEME_GRADIENT_MORE: ThemeGradientId[] = (
+  Object.keys(THEME_GRADIENTS) as ThemeGradientId[]
+).filter((id) => !THEME_GRADIENT_RECOMMENDED.includes(id));
+
 // ---- Gradient-derived full theme (primary, neutral, background, divider, shadow) ----
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {

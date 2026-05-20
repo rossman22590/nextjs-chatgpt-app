@@ -101,7 +101,7 @@ const composerOpenSx: SxProps = {
   transition: 'background-color 0.4s ease-out',
   borderTop: '1px solid',
   borderTopColor: 'rgba(var(--joy-palette-primary-mainChannel) / 0.08)',
-  backdropFilter: 'blur(20px) saturate(150%)',
+  backdropFilter: 'blur(16px) saturate(130%)',
   background: 'var(--agi-shell-bg)',
 } as const;
 

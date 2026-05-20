@@ -22,7 +22,7 @@
     --agi-page-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.92), #fafafa 40%, #f5f5f5 100%);
     --agi-thread-fade: #fafafa;
     --agi-thread-bg: transparent;
-    --agi-message-user: linear-gradient(135deg, rgba(139, 56, 234, 0.26) 0%, rgba(164, 60, 228, 0.22) 42%, rgba(200, 66, 206, 0.17) 74%, rgba(228, 74, 178, 0.14) 100%);
+    --agi-message-user: color-mix(in srgb, #a020f0 14%, #f5f5f5);
     --agi-message-assistant: rgba(255, 255, 255, 1);
     --agi-message-system: rgba(248, 242, 255, 0.94);
 }
@@ -42,8 +42,8 @@
         radial-gradient(circle at 80% 0%, var(--joy-palette-primary-softBg), transparent 36%);
     /* Page/core background (main chat area) uses theme background, no hardcoded pink */
     --agi-page-gradient: linear-gradient(180deg, var(--joy-palette-background-body) 0%, var(--joy-palette-background-surface) 45%, var(--joy-palette-background-level2) 100%);
-    /* User chat bubbles use theme primary */
-    --agi-message-user: linear-gradient(135deg, rgba(var(--joy-palette-primary-mainChannel) / 0.26) 0%, rgba(var(--joy-palette-primary-mainChannel) / 0.22) 42%, rgba(var(--joy-palette-primary-mainChannel) / 0.17) 74%, rgba(var(--joy-palette-primary-mainChannel) / 0.14) 100%);
+    /* User chat bubbles: soft primary tint (single layer; ChatMessage adds border/shadow) */
+    --agi-message-user: color-mix(in srgb, var(--joy-palette-primary-solidBg) 14%, var(--joy-palette-background-level1, #fff));
 }
 
 [data-joy-color-scheme="light"] ::selection,

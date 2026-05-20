@@ -14,10 +14,10 @@ import { apiAsyncNode } from '~/common/util/trpc.client';
 
 
 const _suggestions = [
-  { label: 'Write copy', Icon: EditNoteIcon, gradient: 'linear-gradient(135deg, rgba(224 64 160 / 0.12), rgba(160 32 240 / 0.06))', iconGradient: 'linear-gradient(135deg, #e040a0, #c840d8)', fg: '#fff' },
-  { label: 'Create images', Icon: BrushIcon, gradient: 'linear-gradient(135deg, rgba(160 32 240 / 0.12), rgba(120 20 200 / 0.06))', iconGradient: 'linear-gradient(135deg, #a020f0, #7112b5)', fg: '#fff' },
-  { label: 'Write code', Icon: CodeIcon, gradient: 'linear-gradient(135deg, rgba(120 40 220 / 0.12), rgba(80 20 180 / 0.06))', iconGradient: 'linear-gradient(135deg, #8040dc, #5020b4)', fg: '#fff' },
-  { label: 'Brainstorm', Icon: AutoAwesomeIcon, gradient: 'linear-gradient(135deg, rgba(200 64 216 / 0.12), rgba(160 32 240 / 0.06))', iconGradient: 'linear-gradient(135deg, #c840d8, #a020f0)', fg: '#fff' },
+  { label: 'Write copy', Icon: EditNoteIcon },
+  { label: 'Create images', Icon: BrushIcon },
+  { label: 'Write code', Icon: CodeIcon },
+  { label: 'Brainstorm', Icon: AutoAwesomeIcon },
 ];
 
 const _iconSx = { fontSize: '1.25rem' } as const;
@@ -55,7 +55,7 @@ const _styles = {
     left: '30%',
     width: '400px',
     height: '300px',
-    background: 'radial-gradient(ellipse, rgba(224 64 160 / 0.08), transparent 60%)',
+    background: 'radial-gradient(ellipse, var(--joy-palette-primary-softBg), transparent 60%)',
     pointerEvents: 'none',
     filter: 'blur(100px)',
   } as const,
@@ -109,14 +109,15 @@ const _styles = {
     px: 2.5,
     width: { xs: '130px', md: '148px' },
     borderRadius: '14px',
-    border: '1px solid rgba(160 32 240 / 0.1)',
+    border: '1px solid var(--agi-shell-border, var(--joy-palette-primary-outlinedBorder))',
+    background: 'linear-gradient(135deg, var(--joy-palette-primary-softBg), var(--joy-palette-background-level1))',
     cursor: 'pointer',
-    backdropFilter: 'blur(16px) saturate(140%)',
+    backdropFilter: 'blur(12px) saturate(130%)',
     transition: 'transform 0.24s cubic-bezier(.4,0,.2,1), box-shadow 0.24s ease, border-color 0.24s ease',
     '&:hover': {
-      transform: 'translateY(-6px)',
-      boxShadow: '0 20px 48px rgba(160 32 240 / 0.18), 0 4px 12px rgba(224 64 160 / 0.1)',
-      borderColor: 'rgba(160 32 240 / 0.2)',
+      transform: 'translateY(-4px)',
+      boxShadow: 'var(--agi-shell-shadow, var(--joy-shadow-md))',
+      borderColor: 'var(--agi-shell-border-strong, var(--joy-palette-primary-softActiveBg))',
     },
   },
 
@@ -127,7 +128,9 @@ const _styles = {
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '12px',
-    boxShadow: '0 4px 16px rgba(160 32 240 / 0.2)',
+    background: 'linear-gradient(135deg, var(--joy-palette-primary-solidBg), var(--joy-palette-primary-solidHoverBg))',
+    color: 'var(--joy-palette-primary-solidColor, #fff)',
+    boxShadow: '0 4px 14px rgba(var(--joy-palette-primary-mainChannel) / 0.22)',
   } as const,
 
   cardLabel: {
@@ -180,11 +183,9 @@ export function CMLZeroConversation(props: {
   return (
     <Box sx={_styles.root}>
 
-      {/* Decorative ambient glows */}
       <Box sx={_styles.ambientGlow} />
       <Box sx={_styles.ambientGlow2} />
 
-      {/* Hero content */}
       <Box sx={_styles.heroBox}>
         <Typography sx={_styles.heading}>
           What would you like to create?
@@ -194,7 +195,6 @@ export function CMLZeroConversation(props: {
         </Typography>
       </Box>
 
-      {/* My Personas (custom) - when authenticated and have personas */}
       {isAuthenticated && customPersonas.length > 0 && (
         <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
           <Typography level='body-sm' sx={{ color: 'text.secondary', fontWeight: 600 }}>
@@ -209,12 +209,9 @@ export function CMLZeroConversation(props: {
                 aria-label={p.name || 'Persona'}
                 onClick={() => handlePersonaClick(p.id)}
                 onKeyDown={(e) => e.key === 'Enter' && handlePersonaClick(p.id)}
-                sx={{
-                  ..._styles.cardBase,
-                  background: 'linear-gradient(135deg, var(--joy-palette-primary-softBg), var(--joy-palette-primary-softHoverBg))',
-                }}
+                sx={_styles.cardBase}
               >
-                <Box sx={_styles.cardIconBox}>
+                <Box sx={{ ..._styles.cardIconBox, background: 'var(--joy-palette-background-level2)', color: 'text.primary', boxShadow: 'sm' }}>
                   <Avatar
                     src={p.pictureUrl || undefined}
                     sx={{ '--Avatar-size': '40px', fontSize: '1.25rem' }}
@@ -231,9 +228,8 @@ export function CMLZeroConversation(props: {
         </Box>
       )}
 
-      {/* Suggestion cards */}
       <Box sx={_styles.cardsRow}>
-        {_suggestions.map(({ label, Icon, gradient, iconGradient, fg }) => (
+        {_suggestions.map(({ label, Icon }) => (
           <Box
             key={label}
             role='button'
@@ -241,9 +237,9 @@ export function CMLZeroConversation(props: {
             aria-label={label}
             onClick={() => props.onConversationNew(true, false)}
             onKeyDown={(e) => e.key === 'Enter' && props.onConversationNew(true, false)}
-            sx={{ ..._styles.cardBase, background: gradient }}
+            sx={_styles.cardBase}
           >
-            <Box sx={{ ..._styles.cardIconBox, background: iconGradient, color: fg }}>
+            <Box sx={_styles.cardIconBox}>
               <Icon sx={_iconSx} />
             </Box>
             <Typography sx={_styles.cardLabel}>
@@ -253,7 +249,6 @@ export function CMLZeroConversation(props: {
         ))}
       </Box>
 
-      {/* CTA button */}
       <Button
         variant='solid'
         onClick={() => props.onConversationNew(true, false)}
