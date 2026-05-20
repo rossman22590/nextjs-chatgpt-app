@@ -24,7 +24,7 @@
 [//]: # ([![Follow on X]&#40;https://img.shields.io/twitter/follow/enricoros?style=flat-square&logo=X&logoColor=white&labelColor=000&color=000&#41;]&#40;https://x.com/enricoros&#41;)
 
 </div>
-
+ 
 <br/>
 
 # Big-AGI Open 🧠
