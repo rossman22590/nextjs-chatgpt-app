@@ -9,8 +9,8 @@
     "moduleDetection": "force",
     "isolatedModules": true,
 
-    /* TS 5.x (Next build) - use "6.0" when project runs on TypeScript 6+ */
-    "ignoreDeprecations": "5.0",
+    /* TypeScript 6.0 transition (baseUrl/paths deprecations until migrated) */
+    "ignoreDeprecations": "6.0",
     "noUncheckedSideEffectImports": false,
 
     /* Strictness */
