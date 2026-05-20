@@ -9,8 +9,8 @@
     "moduleDetection": "force",
     "isolatedModules": true,
 
-    /* Typescript 6.0 transition: side effects imports are denied by default */
-    "ignoreDeprecations": "6.0",
+    /* TS 5.x (Next build) - use "6.0" when project runs on TypeScript 6+ */
+    "ignoreDeprecations": "5.0",
     "noUncheckedSideEffectImports": false,
 
     /* Strictness */

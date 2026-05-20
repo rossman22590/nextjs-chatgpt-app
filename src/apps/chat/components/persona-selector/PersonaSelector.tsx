@@ -32,7 +32,7 @@ import { SystemPurposeData, SystemPurposeExample, SystemPurposeId, SystemPurpose
 import { YouTubeURLInput } from '~/modules/youtube/YouTubeURLInput';
 import { bareBonesPromptMixer } from '~/modules/persona/pmix/pmix';
 
-import type { DConversationId } from '~/common/stores/chat/chat.conversation';
+import type { ConversationPurposeId, DConversationId } from '~/common/stores/chat/chat.conversation';
 import { ExpanderControlledBox } from '~/common/components/ExpanderControlledBox';
 import { createDMessageTextContent } from '~/common/stores/chat/chat.message';
 import { lineHeightTextareaMd } from '~/common/app.theme';
@@ -224,7 +224,7 @@ export function PersonaSelector(props: { conversationId: DConversationId; isMobi
   const handlePurposeChanged = React.useCallback(
     (purposeId: string | null) => {
       if (purposeId && setSystemPurposeId) {
-        setSystemPurposeId(props.conversationId, purposeId as SystemPurposeId);
+        setSystemPurposeId(props.conversationId, purposeId as ConversationPurposeId);
         // Clear custom symbol so built-in symbol shows in titles
         useChatStore.getState().setUserSymbol(props.conversationId, null);
       }

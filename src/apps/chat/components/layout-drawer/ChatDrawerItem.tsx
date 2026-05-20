@@ -13,12 +13,16 @@ import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
-import { SystemPurposeId } from '../../../../data';
-
 import { autoConversationTitle } from '~/modules/aifn/autotitle/autoTitle';
 import { getSystemPurpose } from '~/modules/persona/system-personas.catalog';
 
-import type { DConversationId } from '~/common/stores/chat/chat.conversation';
+import {
+  type ConversationPurposeId,
+  type DConversationId,
+  getPersonaIdFromPurposeId,
+  isCustomPersonaPurposeId,
+} from '~/common/stores/chat/chat.conversation';
+import { usePersonaCacheStore } from '~/common/stores/chat/store-persona-cache';
 import type { DFolder } from '~/common/stores/folders/store-chat-folders';
 import { ANIM_BUSY_TYPING } from '~/common/util/dMessageUtils';
 import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
@@ -69,7 +73,7 @@ export interface ChatNavigationItemData {
   hasBeamOpen: boolean;
   messageCount: number;
   beingGenerated: boolean;
-  systemPurposeId: SystemPurposeId;
+  systemPurposeId: ConversationPurposeId;
   searchFrequency: number;
 }
 
@@ -212,8 +216,11 @@ function ChatDrawerItem(props: {
     [conversationId, deleteArmed, onConversationDeleteNoConfirmation],
   );
 
-  const systemPurpose = getSystemPurpose(systemPurposeId);
-  const personaSymbol = userSymbol || systemPurpose?.symbol || '❓';
+  const cachedPersona = isCustomPersonaPurposeId(systemPurposeId)
+    ? usePersonaCacheStore.getState().getPersona(getPersonaIdFromPurposeId(systemPurposeId) ?? '')
+    : undefined;
+  const systemPurpose = !isCustomPersonaPurposeId(systemPurposeId) ? getSystemPurpose(systemPurposeId) : null;
+  const personaSymbol = userSymbol || cachedPersona?.symbol || systemPurpose?.symbol || '❓';
   const personaImageURI = systemPurpose?.imageUri ?? undefined;
 
   const progress = props.bottomBarBasis ? (100 * (searchFrequency || messageCount)) / props.bottomBarBasis : 0;
