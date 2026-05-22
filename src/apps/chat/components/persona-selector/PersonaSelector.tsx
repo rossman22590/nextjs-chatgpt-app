@@ -2,7 +2,6 @@ import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useShallow } from 'zustand/react/shallow';
 
-import type { SxProps } from '@mui/joy/styles/types';
 import {
   Alert,
   Box,
@@ -62,7 +61,12 @@ const tileSize = 8.25; // rem - larger for readable label
 const tileGap = 0.5; // rem
 
 /** Glass shell + specular highlight for persona tiles (uses --agi-shell-* tokens). */
-function personaTileGlassSx(isSelected: boolean, isHighlighted: boolean): SxProps {
+// NOTE: returns a widened Record<string, any> rather than `SxProps`. Two reasons:
+//   1) SxProps includes a ReadonlyArray variant, which TS thinks could leak numeric keys
+//      when spread into another `sx={{...}}` literal (breaks all Button sx overloads).
+//   2) The widened type also avoids TS2783 "specified more than once" warnings for
+//      `&::before` / `&::after` keys that are intentionally overridden by spread order.
+function personaTileGlassSx(isSelected: boolean, isHighlighted: boolean): Record<string, any> {
   if (isSelected) {
     return {
       color: 'primary.solidColor',
@@ -155,7 +159,9 @@ function Tile(props: {
   isHidden?: boolean;
   isHighlighted?: boolean;
   onClick: () => void;
-  sx?: SxProps;
+  // Plain CSS-in-JS object (not full SxProps) so it can be spread into an inline `sx={{...}}` literal.
+  // Callers only ever pass plain object literals here.
+  sx?: Record<string, any>;
 }) {
   const isSelected = !props.isEditMode && props.isActive;
 
