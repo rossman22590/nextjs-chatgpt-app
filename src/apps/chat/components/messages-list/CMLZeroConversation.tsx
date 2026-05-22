@@ -1,13 +1,14 @@
 import * as React from 'react';
 import { useSession } from 'next-auth/react';
 
-import { Avatar, Box, Button, Typography } from '@mui/joy';
+import { Box, Button, Typography } from '@mui/joy';
 import AddIcon from '@mui/icons-material/Add';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BrushIcon from '@mui/icons-material/Brush';
 import CodeIcon from '@mui/icons-material/Code';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 
+import { primaryCtaButtonSx } from '~/common/app.theme';
 import { CUSTOM_PERSONA_PREFIX } from '~/common/stores/chat/chat.conversation';
 import { usePersonaCacheStore } from '~/common/stores/chat/store-persona-cache';
 import { apiAsyncNode } from '~/common/util/trpc.client';
@@ -145,11 +146,11 @@ const _styles = {
     px: 4,
     py: 1.5,
     fontSize: 'sm',
-    fontWeight: 700,
-    letterSpacing: '-0.01em',
     mt: 1,
     position: 'relative',
     zIndex: 1,
+    borderRadius: 'md',
+    ...primaryCtaButtonSx,
   } as const,
 
 };
@@ -211,13 +212,19 @@ export function CMLZeroConversation(props: {
                 onKeyDown={(e) => e.key === 'Enter' && handlePersonaClick(p.id)}
                 sx={_styles.cardBase}
               >
-                <Box sx={{ ..._styles.cardIconBox, background: 'var(--joy-palette-background-level2)', color: 'text.primary', boxShadow: 'sm' }}>
-                  <Avatar
-                    src={p.pictureUrl || undefined}
-                    sx={{ '--Avatar-size': '40px', fontSize: '1.25rem' }}
-                  >
-                    {p.symbol || '🎭'}
-                  </Avatar>
+                <Box sx={{ ..._styles.cardIconBox, overflow: 'hidden' }}>
+                  {p.pictureUrl ? (
+                    <Box
+                      component="img"
+                      src={p.pictureUrl}
+                      alt=""
+                      sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <Typography sx={{ fontSize: '1.35rem', lineHeight: 1 }}>
+                      {p.symbol || '🎭'}
+                    </Typography>
+                  )}
                 </Box>
                 <Typography sx={{ ..._styles.cardLabel, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.name || 'Persona'}

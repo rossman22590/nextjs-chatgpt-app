@@ -28,7 +28,7 @@ import { OptimaDrawerList } from '~/common/layout/optima/drawer/OptimaDrawerList
 import { capitalizeFirstLetter } from '~/common/util/textUtils';
 import { getIsMobile } from '~/common/components/useMatchMedia';
 import { optimaCloseDrawer } from '~/common/layout/optima/useOptima';
-import { themeScalingMap, themeZIndexOverMobileDrawer } from '~/common/app.theme';
+import { primaryCtaButtonDisabledSx, primaryCtaButtonSx, themeScalingMap, themeZIndexOverMobileDrawer } from '~/common/app.theme';
 import { useUIPreferencesStore } from '~/common/stores/store-ui';
 import { CloudSyncStatus } from '~/modules/trade/sync/CloudSyncStatus';
 
@@ -389,7 +389,6 @@ function ChatDrawer(props: {
           }}
         />
 
-        {/* + New chat - prominent rounded primary button (reference layout); solidColor ensures readable text on light gradients */}
         <Button
           color='primary'
           variant={disableNewButton ? 'soft' : 'solid'}
@@ -398,16 +397,11 @@ function ChatDrawer(props: {
           startDecorator={<AddIcon />}
           sx={{
             justifyContent: 'center',
-            py: 0.75,
+            py: 0.875,
             borderRadius: 'md',
+            fontSize: 'sm',
             '--Button-gap': '0.5rem',
-            boxShadow: 'none',
-            color: 'primary.solidColor',
-            '&:hover': { boxShadow: 'none' },
-            ...(disableNewButton && {
-              '--variant-softDisabledBg': 'var(--joy-palette-primary-softBg)',
-              '--variant-softDisabledColor': 'var(--joy-palette-primary-solidColor)',
-            }),
+            ...(disableNewButton ? primaryCtaButtonDisabledSx : primaryCtaButtonSx),
           }}
         >
           New chat

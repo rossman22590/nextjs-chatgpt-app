@@ -66,24 +66,24 @@
 }
 
 [data-joy-color-scheme="dark"] {
-    /* Fallbacks; ThemeBodySync overwrites body from theme */
-    --agi-body-bg: #0c0c0e;
-    --agi-body-ambient: linear-gradient(180deg, #0c0c0e 0%, #101012 50%, #141416 100%);
-    --agi-thread-fade: #0c0c0e;
+    /* Fallbacks; ThemeBodySync overwrites body from theme. Warm near-black (zinc) base. */
+    --agi-body-bg: #18181b;
+    --agi-body-ambient: linear-gradient(180deg, #18181b 0%, #1f1f23 50%, #27272a 100%);
+    --agi-thread-fade: #18181b;
     --agi-thread-bg: transparent;
-    /* Global default: light text so nothing is dark-on-dark (user/assistant bubbles, thread, etc.) */
-    color: var(--joy-palette-text-primary, #e8e4f4);
+    /* Global default: warm off-white text so nothing is dark-on-dark (user/assistant bubbles, thread, etc.) */
+    color: var(--joy-palette-text-primary, #ededec);
     /* Assistant/system message bubbles: dark surface in dark mode (no bright white) */
     --agi-message-assistant: var(--joy-palette-background-level1);
     --agi-message-system: var(--joy-palette-background-level2);
     /* Input/textarea - high-contrast fallbacks so composer is always readable */
-    --agi-input-color: var(--joy-palette-text-primary, #e8e4f4);
-    --agi-input-placeholder: var(--joy-palette-text-tertiary, #b8b0d8);
+    --agi-input-color: var(--joy-palette-text-primary, #ededec);
+    --agi-input-placeholder: var(--joy-palette-text-tertiary, #a1a1aa);
 }
 
-/* User message bubbles: force bright text in dark mode (overrides any theme/child that sets dark) */
+/* User message bubbles: force warm off-white text in dark mode (overrides any theme/child that sets dark) */
 [data-joy-color-scheme="dark"] [data-message-role="user"] {
-    color: #e8e4f4 !important;
+    color: #ededec !important;
 }
 
 [data-joy-color-scheme="dark"] [data-message-role="user"] p,

@@ -32,9 +32,9 @@ const ThemeBodySync = () => {
   return null;
 };
 
-/** Neutral (Minimal) theme: plain white/dark bg, no gradients; user bubbles black with white text. */
+/** Neutral (Minimal) theme: plain white/warm-dark bg, no gradients; user bubbles black with white text. */
 const NEUTRAL_LIGHT_BG = '#ffffff';
-const NEUTRAL_DARK_BG = '#0a0a0a';
+const NEUTRAL_DARK_BG = '#18181b';
 const NEUTRAL_USER_BUBBLE_LIGHT = '#1a1a1a';
 const NEUTRAL_USER_BUBBLE_DARK = 'rgba(255,255,255,0.06)';
 const NEUTRAL_USER_TEXT_LIGHT = '#ffffff';

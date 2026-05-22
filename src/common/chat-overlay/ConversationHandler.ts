@@ -10,6 +10,8 @@ import { useModuleBeamStore } from '~/modules/beam/store-module-beam';
 import type { DConversationId } from '~/common/stores/chat/chat.conversation';
 import type { DLLMId } from '~/common/stores/llms/llms.types';
 import { ChatActions, getConversationSystemPurposeId, isValidConversation, useChatStore } from '~/common/stores/chat/store-chats';
+import { getPersonaIdFromPurposeId, isCustomPersonaPurposeId } from '~/common/stores/chat/chat.conversation';
+import { usePersonaCacheStore } from '~/common/stores/chat/store-persona-cache';
 import {
   createDMessageEmpty,
   createDMessageFromFragments,
@@ -68,14 +70,28 @@ export class ConversationHandler {
 
     // TODO: move this to a proper persona identity management
     // Update the system message with the current persona's message, if formerly unset
-    const systemPurpose = getSystemPurpose(purposeId);
-    if (!systemMessage.updated && purposeId && systemPurpose?.systemMessage) {
-      systemMessage.purposeId = purposeId;
-      const systemMessageText = bareBonesPromptMixer(systemPurpose.systemMessage, assistantLlmId);
-      systemMessage.fragments = [createTextContentFragment(systemMessageText)];
+    // - Built-in personas: resolved from the system-persona catalog (templates may be mixed via {{...}}).
+    // - User-created personas (`persona:<uuid>`): resolved from the in-memory persona cache; we freeze
+    //   the system message after first use (like 'Custom') so subsequent edits in Persona Manager don't
+    //   silently rewrite an in-progress conversation's instructions.
+    let resolvedSystemMessageText: string | null = null;
+    if (purposeId) {
+      if (isCustomPersonaPurposeId(purposeId)) {
+        const personaId = getPersonaIdFromPurposeId(purposeId);
+        const cached = personaId ? usePersonaCacheStore.getState().getPersona(personaId) : undefined;
+        if (cached?.systemPrompt) resolvedSystemMessageText = bareBonesPromptMixer(cached.systemPrompt, assistantLlmId);
+      } else {
+        const systemPurpose = getSystemPurpose(purposeId);
+        if (systemPurpose?.systemMessage) resolvedSystemMessageText = bareBonesPromptMixer(systemPurpose.systemMessage, assistantLlmId);
+      }
+    }
 
-      // HACK: this is a special case for the 'Custom' persona, to set the message in stone (so it doesn't get updated when switching to another persona)
-      if (purposeId === 'Custom') systemMessage.updated = Date.now();
+    if (!systemMessage.updated && purposeId && resolvedSystemMessageText) {
+      systemMessage.purposeId = purposeId;
+      systemMessage.fragments = [createTextContentFragment(resolvedSystemMessageText)];
+
+      // HACK: pin the system message for 'Custom' and user-created personas so it isn't rewritten on persona switch / persona edit
+      if (purposeId === 'Custom' || isCustomPersonaPurposeId(purposeId)) systemMessage.updated = Date.now();
 
       // HACK: refresh the object to trigger a re-render of this message
       systemMessage = { ...systemMessage };

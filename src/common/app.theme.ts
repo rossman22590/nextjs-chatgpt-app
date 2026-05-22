@@ -1,6 +1,7 @@
 import createCache, { StylisElement, StylisPlugin } from '@emotion/cache';
 
 import { JetBrains_Mono, Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
+import type { SxProps } from '@mui/joy/styles/types';
 import { extendTheme } from '@mui/joy';
 
 import { animationEnterBelow, animationOpacityFadeIn } from '~/common/util/animUtils';
@@ -208,7 +209,7 @@ function buildNeutralPalette(mainHex: string, mode: 'light' | 'dark') {
 function buildTextPalette(mainHex: string, mode: 'light' | 'dark') {
   if (mode === 'light')
     return { primary: '#1a1528', secondary: mixHex('#4a3d64', mainHex, 0.3), tertiary: mixHex('#7a6d94', mainHex, 0.2), icon: mixHex('#5e4f78', mainHex, 0.4) };
-  return { primary: '#f2ecfc', secondary: mixHex('#c8bce0', mainHex, 0.5), tertiary: mixHex('#a094b8', mainHex, 0.4), icon: mixHex('#c0b4d8', mainHex, 0.5) };
+  return { primary: '#ededec', secondary: mixHex('#d4d4d8', mainHex, 0.35), tertiary: mixHex('#a1a1aa', mainHex, 0.3), icon: mixHex('#d4d4d8', mainHex, 0.4) };
 }
 
 function buildBackgroundPalette(mainHex: string, mode: 'light' | 'dark') {
@@ -223,11 +224,11 @@ function buildBackgroundPalette(mainHex: string, mode: 'light' | 'dark') {
       level2,
     };
   }
-  const body = mixHex('#0c0c0e', mainHex, 0.06);
-  const popup = mixHex('#141416', mainHex, 0.08);
-  const surface = mixHex('#101012', mainHex, 0.05);
-  const level1 = mixHex('#0e0e10', mainHex, 0.05);
-  const level2 = mixHex('#161618', mainHex, 0.08);
+  const body = mixHex('#18181b', mainHex, 0.04);
+  const popup = mixHex('#27272a', mainHex, 0.06);
+  const surface = mixHex('#1f1f23', mainHex, 0.04);
+  const level1 = mixHex('#1f1f23', mainHex, 0.04);
+  const level2 = mixHex('#27272a', mainHex, 0.06);
   return {
     body,
     popup,
@@ -283,11 +284,11 @@ const jetBrainsMono = JetBrains_Mono({
 export const themeCodeFontFamilyCss = jetBrainsMono.style.fontFamily;
 
 
-/** Minimal theme: black accent only, no gradient. Light mode = black on light bg; dark = jet black. */
+/** Minimal theme: black accent only, no gradient. Light mode = black on light bg; dark = warm near-black. */
 const NEUTRAL_LIGHT_BLACK = '#1a1a1a';
 const NEUTRAL_LIGHT_BLACK_END = '#2d2d2d';
-const NEUTRAL_DARK_JET_BLACK = '#0a0a0a';
-const NEUTRAL_DARK_JET_BLACK_END = '#141414';
+const NEUTRAL_DARK_JET_BLACK = '#18181b';
+const NEUTRAL_DARK_JET_BLACK_END = '#27272a';
 
 export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGradientId = 'neutral') => {
   const gradient = THEME_GRADIENTS[gradientId] ?? THEME_GRADIENTS['neutral'];
@@ -366,7 +367,8 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
           letterSpacing: '-0.01em',
           transition: 'box-shadow 0.15s ease, background 0.15s ease',
           ...(ownerState.variant === 'solid' && {
-            background: `linear-gradient(135deg, ${g.start} 0%, ${g.end} 100%)`,
+            background: `linear-gradient(135deg, ${g.hoverStart} 0%, ${g.start} 48%, ${g.hoverEnd} 100%)`,
+            color: Math.max(hexLuminance(g.start), hexLuminance(g.end)) > 0.5 ? '#1a1a1a' : '#fff',
             boxShadow: `0 2px 8px ${g.start}33`,
             '&:hover': {
               background: `linear-gradient(135deg, ${g.hoverStart} 0%, ${g.hoverEnd} 100%)`,
@@ -551,6 +553,42 @@ export const themeBgAppChatComposer = 'background.level1';
 
 export const lineHeightChatTextMd = 1.75;
 export const lineHeightTextareaMd = 1.75;
+
+/** Disabled primary CTA (e.g. New chat while already on an empty chat) - softColor stays readable in dark mode. */
+export const primaryCtaButtonDisabledSx: SxProps = {
+  fontWeight: 600,
+  opacity: 1,
+  color: 'var(--joy-palette-primary-softColor) !important',
+  '--variant-softDisabledBg': 'var(--joy-palette-primary-softBg)',
+  '--variant-softDisabledColor': 'var(--joy-palette-primary-softColor)',
+  '& .MuiButton-startDecorator, & .MuiButton-endDecorator': {
+    color: 'inherit !important',
+    opacity: 1,
+  },
+};
+
+/** High-contrast primary CTA (e.g. New chat) - readable on glass shells and light theme gradients. */
+export const primaryCtaButtonSx: SxProps = {
+  fontWeight: 700,
+  letterSpacing: '-0.01em',
+  color: '#fff !important',
+  textShadow: '0 1px 3px rgba(0 0 0 / 0.42)',
+  border: '1px solid rgba(255 255 255 / 0.24)',
+  background:
+    'linear-gradient(135deg, color-mix(in srgb, var(--joy-palette-primary-700) 74%, #0a0a0a) 0%, color-mix(in srgb, var(--joy-palette-primary-500) 80%, #0a0a0a) 100%)',
+  boxShadow:
+    '0 8px 26px rgba(0 0 0 / 0.28), 0 4px 16px rgba(var(--joy-palette-primary-mainChannel) / 0.42), inset 0 1px 0 rgba(255 255 255 / 0.22)',
+  '&:hover': {
+    background:
+      'linear-gradient(135deg, color-mix(in srgb, var(--joy-palette-primary-800) 78%, #000) 0%, color-mix(in srgb, var(--joy-palette-primary-600) 82%, #000) 100%)',
+    boxShadow:
+      '0 12px 34px rgba(0 0 0 / 0.32), 0 6px 20px rgba(var(--joy-palette-primary-mainChannel) / 0.48), inset 0 1px 0 rgba(255 255 255 / 0.28)',
+  },
+  '& .MuiButton-startDecorator, & .MuiButton-endDecorator': {
+    color: 'inherit !important',
+    opacity: 1,
+  },
+};
 
 export const themeZIndexBeamView = 10;
 export const themeZIndexPageBar = 25;
