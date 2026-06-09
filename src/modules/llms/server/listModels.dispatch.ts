@@ -48,7 +48,6 @@ import { lmStudioFetchModels, lmStudioModelsToModelDescriptions } from './openai
 import { localAIModelSortFn, localAIModelToModelDescription } from './openai/models/localai.models';
 import { mistralModels } from './openai/models/mistral.models';
 import { moonshotModelFilter, moonshotModelSortFn, moonshotModelToModelDescription } from './openai/models/moonshot.models';
-import { openPipeModelDescriptions, openPipeModelSort, openPipeModelToModelDescriptions } from './openai/models/openpipe.models';
 import { openRouterInjectVariants, openRouterModelFamilySortFn, openRouterModelToModelDescription } from './openai/models/openrouter.models';
 import { openAIInjectVariants, openAIModelFilter, openAIModelToModelDescription, openAISortModels, openaiValidateModelDefs_DEV } from './openai/models/openai.models';
 import { perplexityHardcodedModelDescriptions, perplexityInjectVariants } from './openai/models/perplexity.models';
@@ -62,7 +61,7 @@ import { zaiCuratedModelDescriptions, zaiDiscoverModels, zaiModelSort } from './
 
 export type ListModelsDispatch<TWireModels = any> = {
   fetchModels: () => Promise<TWireModels>;
-  convertToDescriptions: (wireModels: TWireModels) => ModelDescriptionSchema[];
+  convertToDescriptions: (wireModels: TWireModels) => ReadonlyArray<ModelDescriptionSchema>;
 };
 
 /**
@@ -131,7 +130,7 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
             const m = id.match(/-(\d)(?:-(\d)(?!\d))?/);
             return m ? +m[1] + (m[2] ? +m[2] / 10 : 0) : 0;
           };
-          const classPrecedence = ['-opus-', '-sonnet-', '-haiku-'];
+          const classPrecedence = ['-fable-', '-mythos-', '-opus-', '-sonnet-', '-haiku-'];
           const getClassIdx = (id: string) => classPrecedence.findIndex(c => id.includes(c));
 
           return availableModels
@@ -377,7 +376,6 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
     case 'mistral':
     case 'moonshot':
     case 'openai':
-    case 'openpipe':
     case 'openrouter':
     case 'togetherai':
 
@@ -520,12 +518,6 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
               // [DEV] check for stale/unknown model definitions
               openaiValidateModelDefs_DEV(maybeModels, models);
               return models;
-
-            case 'openpipe':
-              return [
-                ...maybeModels.map(openPipeModelToModelDescriptions),
-                ...openPipeModelDescriptions().sort(openPipeModelSort),
-              ];
 
             case 'openrouter':
               // openRouterStatTokenizers(maybeModels);

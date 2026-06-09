@@ -13,6 +13,7 @@
  * @module llms
  */
 
+import type { Immutable } from '~/common/types/immutable.types';
 
 /**
  * Implicit common parameters always supported by all models, not listed in parameterSpecs.
@@ -193,9 +194,11 @@ export const DModelParameterRegistry = {
   llmVndAntInfSpeed: _enumDef({
     label: 'Fast Mode',
     type: 'enum',
-    description: 'Accelerated inference (~2.5x faster output) at 6x pricing. Preview access required.',
-    values: ['fast'],
-    enumPriceMultiplier: { fast: 6 },
+    description: 'Accelerated inference (~2.5x faster output) at premium pricing. Preview access required.',
+    // The wire always sends speed:'fast'; the value encodes the per-model PRICE TIER (the cost multiplier differs by model).
+    // Each model exposes exactly one tier via its parameterSpec `enumValues`. 'fast' is the legacy alias (=6x) for params stored before tiers existed.
+    values: ['fast_2x', 'fast_6x', 'fast'],
+    enumPriceMultiplier: { fast_2x: 2, fast_6x: 6, fast: 6 },
     // undefined means standard speed (omitted from request)
   }),
 
@@ -571,6 +574,11 @@ export interface DModelParameterSpec<T extends DModelParameterId> {
 
 
 /// Utility Functions
+
+export function duplicateDModelParameterValues(values: Immutable<DModelParameterValues>): DModelParameterValues {
+  // shallow clone is sufficient since values are primitives
+  return { ...values };
+}
 
 export function applyModelParameterSpecsInitialValues(destValues: DModelParameterValues, modelParameterSpecs: DModelParameterSpecAny[], overwriteExisting: boolean): void {
   for (const parameterSpec of modelParameterSpecs) {

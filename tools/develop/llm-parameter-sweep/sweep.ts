@@ -119,6 +119,11 @@ const SWEEP_DEFINITIONS = [
     }),
     values: [1024, 8192, 16384, 32768, 65536],
     mode: 'enumerate',
+    // [2026-06-09] The adapter coerces thinking to 'adaptive' on adaptive-only models (Fable/Mythos 5):
+    // the coerced request would 200 and record a false pass for a budget the raw API rejects (and ignores).
+    // Only the mode is checked, not the value: budget clamping to max_tokens-1 is accepted adapter behavior.
+    preflightFail: (body) => body?.thinking?.type === 'enabled' ? null
+      : `coerced on wire: thinking.type=${body?.thinking?.type ?? '(unset)'} (expected 'enabled')`,
   }),
 
 
@@ -152,12 +157,14 @@ const SWEEP_DEFINITIONS = [
 
 
   // xAI: reasoning effort (Responses API)
+  // grok-4.3: none/low/medium/high (default 'low')
+  // grok-4.20-multi-agent: low/medium/high/xhigh (4 vs 16 agents)
   defineSweep({
     name: 'xai-reasoning-effort',
     description: 'xAI reasoning.effort values',
     applicability: { type: 'dialects', dialects: ['xai'] },
     applyToModel: (value) => ({ reasoningEffort: value }),
-    values: ['low', 'medium', 'high'] satisfies AixAPI_Model['reasoningEffort'][],
+    values: ['none', 'low', 'medium', 'high', 'xhigh'] satisfies AixAPI_Model['reasoningEffort'][],
     mode: 'enumerate',
   }),
 
@@ -213,6 +220,12 @@ interface ToolProbeDefinition {
     /** At least one of these substrings must appear (case-insensitive) in turn 2's text. */
     signalTokens: string[];
   };
+  /**
+   * Wire-fidelity check: return an error string when the built request body does NOT carry the probed
+   * semantics - adapter hotfixes may silently coerce (e.g. Fable/Mythos 5: tool_choice 'any' -> 'auto' + hint).
+   * Probes record raw API capability, not adapter-compatibility behavior. Return null when faithful or not applicable.
+   */
+  preflightFail?: (body: any, dialect: AixAPI_Access['dialect']) => string | null;
 }
 
 const _getWeatherTool: AixTools_ToolDefinition = {
@@ -252,6 +265,11 @@ const TOOL_PROBE_DEFINITIONS: ToolProbeDefinition[] = [
     expectedFunctionName: 'get_current_weather',
     passValue: 'required',
     validateArgs: (args) => typeof args?.location === 'string' && args.location.length > 0,
+    // [2026-06-09] 'required' must reflect raw API support for forced tool use: on adaptive-only Anthropic
+    // models (Fable/Mythos 5) the adapter downgrades 'any' -> 'auto' + system hint, which would pass here.
+    preflightFail: (body, dialect) => dialect !== 'anthropic' ? null
+      : body?.tool_choice?.type === 'any' ? null
+        : `coerced on wire: tool_choice=${JSON.stringify(body?.tool_choice ?? null)} (expected type 'any')`,
   },
   {
     name: 'fn',
@@ -285,6 +303,12 @@ interface SweepDefinition<TValue> {
   bisectPrecision?: number;
   /** If ALL passing values are in this set, the parameter is considered neutered (default-only, not truly supported) */
   neuteredValues?: TValue[];
+  /**
+   * Wire-fidelity check: return an error string when the built request body does NOT faithfully carry
+   * the swept value - adapter hotfixes may silently coerce parameters (recorded as 'fail', no API call made).
+   * Return null when faithful.
+   */
+  preflightFail?: (body: any, value: TValue) => string | null;
 }
 
 type SweepValue = string | number | boolean | null;
@@ -557,8 +581,8 @@ async function testParameterValue(
   // Build vendor-specific HTTP request via the AIX dispatch system
   let dispatch: ChatGenerateDispatch | undefined;
 
-  // Capture request body for --debug output
-  const debugRequestBody = dispatch && 'body' in dispatch.request ? JSON.stringify(dispatch.request.body) /*, null, 2)*/ : undefined;
+  // Captured request body for --debug output - only known after dispatch creation
+  let debugRequestBody: string | undefined;
 
   // Helper to build result with common fields
   const makeResult = (fields: Omit<TestResult, 'sweepName' | 'paramValue' | 'debugRequestBody'>): TestResult => ({
@@ -588,6 +612,17 @@ async function testParameterValue(
       verboseLogs: [`Exception creating request: ${error?.message || String(error)}`],
       durationMs: Date.now() - startTime,
     });
+  }
+
+  const requestBody = 'body' in dispatch.request ? dispatch.request.body : undefined;
+  debugRequestBody = requestBody !== undefined ? JSON.stringify(requestBody) : undefined;
+
+  // Wire-fidelity check: classify as fail (without spending an API call) when an adapter hotfix
+  // silently coerced the swept parameter - a coerced request would otherwise record a false pass
+  if (sweepDef.preflightFail) {
+    const failReason = sweepDef.preflightFail(requestBody, value);
+    if (failReason)
+      return makeResult({ outcome: 'fail', errorCategory: 'dialect', errorMessage: failReason, verboseLogs: [failReason], durationMs: Date.now() - startTime });
   }
 
 
@@ -731,6 +766,7 @@ async function _dispatchAndCollect(
   model: AixAPI_Model,
   chatGenerate: AixAPIChatGenerate_Request,
   probeLabel: string,
+  preflightFail?: (body: any) => string | null,
 ): Promise<_DispatchResult> {
   const collector = new SweepCollectorTransmitter();
   const verboseLogs: string[] = [];
@@ -750,7 +786,18 @@ async function _dispatchAndCollect(
     };
   }
 
-  const debugRequestBody = 'body' in dispatch.request ? JSON.stringify(dispatch.request.body) : undefined;
+  const requestBody = 'body' in dispatch.request ? dispatch.request.body : undefined;
+  const debugRequestBody = requestBody !== undefined ? JSON.stringify(requestBody) : undefined;
+
+  // Wire-fidelity check: fail (without spending an API call) when an adapter hotfix coerced the probed semantics
+  if (preflightFail) {
+    const failReason = preflightFail(requestBody);
+    if (failReason)
+      return {
+        collector, verboseLogs, debugRequestBody,
+        fatalResult: { outcome: 'fail', errorCategory: 'dialect', errorMessage: failReason, verboseLogs: [failReason] },
+      };
+  }
 
   try {
     const response = await fetchResponseOrTRPCThrow({
@@ -874,7 +921,8 @@ async function testToolProbe(
     toolsPolicy: probe.toolsPolicy,
   };
 
-  const turn1 = await _dispatchAndCollect(access, model, turn1Request, `ToolProbe-${probe.name}-${probe.passValue}-t1`);
+  const turn1 = await _dispatchAndCollect(access, model, turn1Request, `ToolProbe-${probe.name}-${probe.passValue}-t1`,
+    probe.preflightFail ? (body) => probe.preflightFail!(body, access.dialect) : undefined);
 
   const makeResult = (fields: Omit<TestResult, 'sweepName' | 'paramValue' | 'debugRequestAixModel' | 'debugRequestBody'>, debugBody?: string): TestResult => ({
     sweepName: probe.name,
@@ -1342,7 +1390,6 @@ function createSingleVendorConfig(dialect: string, key: string, host?: string): 
     case 'localai':
     case 'mistral':
     case 'moonshot':
-    case 'openpipe':
     case 'openrouter':
     case 'perplexity':
     case 'togetherai':

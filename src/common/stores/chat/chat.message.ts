@@ -125,11 +125,22 @@ export type DMessageGenerator = ({
 }) & {
   metrics?: DMetricsChatGenerate_Md;   // medium-sized metrics stored in the message
   providerInfraLabel?: string;         // upstream provider that served the request (e.g., OpenRouter provider routing)
-  upstreamContainer?: {
-    uct: 'vnd.ant.container',
-    containerId: string,
-    expiresAt: string,                // ISO 8601 UTC timestamp (e.g., "2026-04-07T05:59:32Z")
-  },
+  upstreamContainer?:
+    | {
+      uct: 'vnd.ant.container',
+      containerId: string,
+      expiresAt: string,                // ISO 8601 UTC timestamp (e.g., "2026-04-07T05:59:32Z")
+    }
+    | {
+      uct: 'vnd.oai.container',         // OpenAI Responses code-interpreter sandbox (auto or explicit), from code_interpreter_call.container_id
+      containerId: string,
+      expiresAt: string,                // server doesn't expose retention; parser stamps now+20min (OpenAI's inactivity TTL, refreshed on any container op)
+    }
+    | {
+      uct: 'vnd.gem.interactions',      // today: Antigravity sandbox via `interaction.start.environment_id`
+      envId: string,
+      expiresAt: string | null,         // server doesn't expose retention; parser stamps now+7d per docs (env retained 7d from last-active)
+    },
   upstreamHandle?:
     // unified `runId` across variants - vendor-specific id lives behind it; `uht` is consulted only for dispatch routing
     // createdAt/expiresAt: server-clock (ms) at the FIRST observation for this runId - preserved across reattaches
