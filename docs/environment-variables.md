@@ -39,6 +39,8 @@ GEMINI_API_KEY=
 GROQ_API_KEY=
 LOCALAI_API_HOST=
 LOCALAI_API_KEY=
+MINIMAX_API_HOST=
+MINIMAX_API_KEY=
 MISTRAL_API_KEY=
 MOONSHOT_API_KEY=
 OLLAMA_API_HOST=
@@ -115,6 +117,8 @@ requiring the user to enter an API key
 | `GROQ_API_KEY`              | The API key for Groq Cloud                                                                                     | Optional                                                          |
 | `LOCALAI_API_HOST`          | Sets the URL of the LocalAI server, or defaults to http://127.0.0.1:8080                                       | Optional                                                          |
 | `LOCALAI_API_KEY`           | The (Optional) API key for LocalAI                                                                             | Optional                                                          |
+| `MINIMAX_API_HOST`          | Changes the backend host for MiniMax, e.g. https://api.minimaxi.com for mainland China; defaults to api.minimax.io | Optional                                                          |
+| `MINIMAX_API_KEY`           | The API key for MiniMax                                                                                        | Optional                                                          |
 | `MISTRAL_API_KEY`           | The API key for Mistral                                                                                        | Optional                                                          |
 | `MOONSHOT_API_KEY`          | The API key for Moonshot AI                                                                                    | Optional                                                          |
 | `OLLAMA_API_HOST`           | Changes the backend host for the Ollama vendor. See [config-local-ollama.md](config-local-ollama.md)           |                                                                   |

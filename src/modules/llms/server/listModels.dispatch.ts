@@ -373,6 +373,7 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
     case 'deepseek':
     case 'groq':
     case 'localai':
+    case 'minimax':
     case 'mistral':
     case 'moonshot':
     case 'openai':
@@ -388,7 +389,7 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
         fetchModels: async () => {
 
           // Bypass fetch for providers that do NOT have the /v1/models API yet - works in conjunction with the hardcoded models below
-          const bypassFetch = (dialect === 'openai' && minimaxHeuristic(oaiUrl)); // [MiniMax]
+          const bypassFetch = dialect === 'minimax' || (dialect === 'openai' && minimaxHeuristic(oaiUrl)); // [MiniMax] no /v1/models API yet
           if (bypassFetch) return { data: [] }; // dummy response
 
           _wire?.logRequest('GET', oaiUrl, oaiHeaders);
@@ -463,6 +464,10 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
               return maybeModels
                 .map(({ id }) => localAIModelToModelDescription(id))
                 .sort(localAIModelSortFn);
+
+            case 'minimax':
+              // [MiniMax] hardcoded models (no /v1/models API yet, fetch was bypassed)
+              return minimaxHardcodedModelDescriptions();
 
             case 'mistral':
               return mistralModels(maybeModels);

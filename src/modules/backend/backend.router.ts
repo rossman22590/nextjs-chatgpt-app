@@ -62,6 +62,7 @@ export const backendRouter = createTRPCRouterEdge({
         hasLlmGroq: !!env.GROQ_API_KEY,
         hasLlmLocalAIHost: !!env.LOCALAI_API_HOST,
         hasLlmLocalAIKey: !!env.LOCALAI_API_KEY,
+        hasLlmMiniMax: !!env.MINIMAX_API_KEY || !!env.MINIMAX_API_HOST,
         hasLlmMistral: !!env.MISTRAL_API_KEY,
         hasLlmMoonshot: !!env.MOONSHOT_API_KEY,
         hasLlmOllama: !!env.OLLAMA_API_HOST,

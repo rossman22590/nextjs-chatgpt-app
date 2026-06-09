@@ -40,6 +40,7 @@
 //                                        BIGAGI_TEST_LMSTUDIO_HOST)
 //   openai-compatible   localai         (opt-in via             localhost:8080
 //                                        BIGAGI_TEST_LOCALAI_HOST)
+//   openai-compatible   minimax         MINIMAX_API_KEY         api.minimax.io (no listing API; hardcoded)
 //   openai-compatible   mistral         MISTRAL_API_KEY         api.mistral.ai
 //   openai-compatible   moonshot        MOONSHOT_API_KEY        api.moonshot.ai
 //   openai-compatible   openai          OPENAI_API_KEY *        api.openai.com
@@ -253,6 +254,15 @@ describe('listModels enumeration', () => {
       { dialect: 'mistral', ...openAIShape({ oaiKey: E.MISTRAL_API_KEY || '' }) } as AixAPI_Access,
       1, 'mistral/live',
     );
+  });
+
+  test('openai-compat/minimax: hardcoded list (no /v1/models API)', async () => {
+    // Official MiniMax dialect: fetch is bypassed, hardcoded catalog returned; dummy key satisfies access validation.
+    const models = await expectOk(
+      { dialect: 'minimax', ...openAIShape({ oaiKey: 'dummy' }) } as AixAPI_Access,
+      1, 'minimax',
+    );
+    ok(models.some(m => /minimax/i.test(m.id)), 'minimax: MiniMax-* present');
   });
 
   test('openai-compat/moonshot: live listing', { skip: skipIfMissing('MOONSHOT_API_KEY') }, async () => {

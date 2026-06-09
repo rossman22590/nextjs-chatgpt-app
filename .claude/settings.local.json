@@ -39,7 +39,10 @@
       "WebSearch",
       "mcp__chrome-devtools",
       "mcp__github",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(git name-rev *)",
+      "Bash(awk '{print $4}')",
+      "Bash(perl -i -pe 's{^\\(MINIMAX_API_HOST=.*?\\)/v1\\([\"\\\\x27]?\\\\s*\\)$}{$1$2}' .env)"
     ],
     "deny": [
       "Read(node_modules)",
