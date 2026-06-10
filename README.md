@@ -1,5 +1,5 @@
 <div align="center">
-
+ 
 <img width="256" height="256" alt="Big-AGI Logo" src="https://big-agi.com/assets/logo-bright-github.svg" />
 
 <h1><a href="https://big-agi.com">Big-AGI</a></h1>
