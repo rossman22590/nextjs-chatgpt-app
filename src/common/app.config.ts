@@ -24,7 +24,11 @@ export const Brand = {
     OpenRepo: 'https://myapps.ai',
     OpenProject: 'https://docs.myapps.ai',
     SupportInvite: 'https://discord.gg/D3r3HrHHeG',
-    // Twitter: 'https://www.twitter.com/enricoros',
+    // Twitter: 'https://x.com/enricoros',
     PrivacyPolicy: 'https://myapps.ai',
+    TermsOfService: 'https://myapps.ai',
   },
+  Docs: {
+    Public: (docPage: string) => `https://docs.myapps.ai/${docPage}`,
+  }
 } as const;

@@ -17,9 +17,9 @@ const beamSteps: ExplainerPage[] = [
     // titleSuffix: ' azing',
     // titleSquircle: true,
     mdContent: `
-**Beam** is a chat modality in AI Tutor to engage multiple AI models. 
- 
-Beam is a new AI Tutor chat modality that allows you to engage multiple AI models in parallel. 
+**Beam** is a chat modality in AI Tutor to engage multiple AI models.
+
+Beam is a new AI Tutor chat modality that allows you to engage multiple AI models in parallel.
  
 It's like having a brainstorm session with several smart people,
 only they are AI models. And as with people,

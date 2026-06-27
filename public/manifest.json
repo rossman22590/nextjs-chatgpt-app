@@ -4,24 +4,44 @@
   "theme_color": "#32383E",
   "background_color": "#9FA6AD",
   "description": "Personal AGI App",
+  "categories": [
+    "productivity",
+    "AI",
+    "tool",
+    "utilities"
+  ],
   "display": "standalone",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
-      "sizes": "192x192",
+      "src": "/icons/icon-1024x1024.png",
+      "sizes": "1024x1024",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-1024x1024.png",
-      "sizes": "1024x1024",
-      "type": "image/png"
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/link/share_target",
+      "accept": {
+        "application/big-agi": [
+          ".agi",
+          ".agi.json"
+        ]
+      }
     }
   ],
   "share_target": {
@@ -33,5 +53,31 @@
       "text": "text",
       "url": "url"
     }
-  }
+  },
+  "shortcuts": [
+    {
+      "name": "Call",
+      "url": "/call",
+      "description": "Call a Persona",
+      "icons": [
+        {
+          "src": "/icons/icon-call-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "New Voice Chat",
+      "url": "/?newChat=voiceInput",
+      "description": "Start a new chat with voice input",
+      "icons": [
+        {
+          "src": "/icons/icon-voicechat-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
 }

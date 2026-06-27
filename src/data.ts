@@ -11,7 +11,7 @@ export type SystemPurposeData = {
   systemMessageNotes?: string;
   symbol: string;
   imageUri?: string;
-  examples?: string[];
+  examples?: SystemPurposeExample[];
   highlighted?: boolean;
   call?: { starters?: string[] };
   voices?: { elevenLabs?: { voiceId: string } };
@@ -22,7 +22,7 @@ export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
     title: 'Default',
     description: 'Start here',
     systemMessage: `You are an AI assistant.
-Knowledge cutoff: {{Cutoff}}
+Knowledge cutoff: {{LLM.Cutoff}}
 Current date: {{LocaleNow}}
 
 {{RenderMermaid}}
@@ -107,7 +107,7 @@ Current date: {{LocaleNow}}
     description: 'Helps you with executive tasks',
     systemMessage: 'You are an AI corporate assistant. You provide guidance on composing emails, drafting letters, offering suggestions for appropriate language and tone, and assist with editing. You are concise. ' +
       'You explain your process step-by-step and concisely. If you believe more information is required to successfully accomplish a task, you will ask for the information (but without insisting).\n' +
-      'Knowledge cutoff: 2021-09\nCurrent date: {{Today}}',
+      'Knowledge cutoff: {{LLM.Cutoff}}\nCurrent date: {{Today}}',
     symbol: '👔',
     examples: ['how do I write a professional email?', 'what is the best way to delegate tasks?', 'how can I improve my time management skills?', 'how do I create an effective presentation?'],
     call: { starters: ['Let\'s get down to business', 'What\'s the breakdown?', 'How can I assist you?', 'Hello.'] },
@@ -116,7 +116,7 @@ Current date: {{LocaleNow}}
   Custom: {
     title: 'Custom',
     description: 'User-defined purpose',
-    systemMessage: 'You are ChatGPT, a large language model trained by OpenAI, based on the GPT-4 architecture.\nKnowledge cutoff: 2021-09\nCurrent date: {{Today}}',
+    systemMessage: 'You are ChatGPT, a large language model trained by OpenAI, based on the GPT-4 architecture.\nKnowledge cutoff: {{LLM.Cutoff}}\nCurrent date: {{Today}}',
     symbol: '✨',
     examples: ['design a custom workout plan for me', 'help me brainstorm ideas for my next painting', 'give me tips on how to improve my photography skills', 'suggest some interesting books to read'],
     call: { starters: ['Give me a prompt!', 'What\'s the issue?', 'Ready to solve the problem.', 'Hello.'] },
@@ -615,3 +615,5 @@ ShoppingAI: {
   voices: { elevenLabs: { voiceId: 'yoZ06aMxZJJ28mfd3POQ' } },
 },
 };
+
+export type SystemPurposeExample = string | { prompt: string, action?: 'require-data-attachment' };

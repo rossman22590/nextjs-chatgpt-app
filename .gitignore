@@ -3,6 +3,10 @@
 # Frontend Build: ignore API files disabled for this build
 /app/**/*.backup
 
+# Supabase - ignored for now
+/supabase/
+/*.sql
+
 # dependencies
 /node_modules
 /.pnp
@@ -42,3 +46,13 @@ next-env.d.ts
 
 # other
 .idea/
+
+# Ingore k8s/env-secret.yaml
+./k8s/env-secret.yaml
+/certificates
+.env*.local
+/.run/dev (ENV).run.xml
+/src/modules/3rdparty/aider/scratch*
+
+# Ignore temporary CC files
+/tmpclaude*

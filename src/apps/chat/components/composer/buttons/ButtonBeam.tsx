@@ -1,17 +1,17 @@
 import * as React from 'react';
-import Link from 'next/link';
-import type { SxProps } from '@mui/joy/styles/types';
+
+import type { ColorPaletteProp, SxProps } from '@mui/joy/styles/types';
 import { Box, Button, IconButton, Tooltip } from '@mui/joy';
 
 import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
-import { KeyStroke } from '~/common/components/KeyStroke';
 import { animationEnterBelow } from '~/common/util/animUtils';
 
+
+const beamPricingHref = 'https://account.myapps.ai/#pricing';
 
 const desktopLegend =
   <Box sx={{ px: 1, py: 0.75, lineHeight: '1.5rem' }}>
     Combine the answers from multiple models<br />
-    {/* <KeyStroke combo='Ctrl + Enter' sx={{ mt: 0.5, mb: 0.25 }} /> */}
   </Box>;
 
 const desktopLegendNoContent =
@@ -35,18 +35,22 @@ const desktopSx: SxProps = {
 
 export const ButtonBeamMemo = React.memo(ButtonBeam);
 
-function ButtonBeam(props: { isMobile?: boolean, disabled?: boolean, hasContent?: boolean, onClick: () => void }) {
+function ButtonBeam(props: {
+  isMobile?: boolean,
+  color?: ColorPaletteProp,
+  disabled?: boolean,
+  hasContent?: boolean,
+  onClick: () => void,
+}) {
   return props.isMobile ? (
-    <IconButton variant='soft' color='primary' disabled={props.disabled} onClick={props.onClick} sx={mobileSx}>
+    <IconButton component='a' href={beamPricingHref} variant='outlined' color={props.color ?? 'primary'} disabled={props.disabled} sx={mobileSx}>
       <ChatBeamIcon />
     </IconButton>
   ) : (
-    <Link href="https://account.myapps.ai/#pricing">
     <Tooltip disableInteractive variant='solid' arrow placement='right' title={props.hasContent ? desktopLegend : desktopLegendNoContent}>
-      <Button variant='soft' color='primary' disabled={props.disabled} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
-        Get Beam Now 💫
+      <Button component='a' href={beamPricingHref} variant='soft' color={props.color ?? 'primary'} disabled={props.disabled} endDecorator={<ChatBeamIcon />} sx={desktopSx}>
+        Get Beam Now
       </Button>
     </Tooltip>
-  </Link>
   );
 }

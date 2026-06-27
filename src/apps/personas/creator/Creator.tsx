@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { v4 as uuidv4 } from 'uuid';
 
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Divider, FormLabel, Grid, IconButton, LinearProgress, Tab, tabClasses, TabList, TabPanel, Tabs, Typography } from '@mui/joy';
 import AddIcon from '@mui/icons-material/Add';
@@ -7,13 +6,17 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import SettingsAccessibilityIcon from '@mui/icons-material/SettingsAccessibility';
 
 import { LLMChainStep, useLLMChain } from '~/modules/aifn/useLLMChain';
-import { RenderMarkdownMemo } from '~/modules/blocks/markdown/RenderMarkdown';
+import { ScaledTextBlockRenderer } from '~/modules/blocks/ScaledTextBlockRenderer';
 
+import type { ContentScaling } from '~/common/app.theme';
 import { GoodTooltip } from '~/common/components/GoodTooltip';
+import { agiUuid } from '~/common/util/idUtils';
 import { copyToClipboard } from '~/common/util/clipboardUtils';
+import { getLLMLabel } from '~/common/stores/llms/llms.types';
 import { useFormEditTextArray } from '~/common/components/forms/useFormEditTextArray';
 import { useLLMSelect, useLLMSelectLocalState } from '~/common/components/forms/useLLMSelect';
-import { useToggleableBoolean } from '~/common/util/useToggleableBoolean';
+import { useToggleableBoolean } from '~/common/util/hooks/useToggleableBoolean';
+import { useUIContentScaling } from '~/common/stores/store-ui';
 
 import { FromText } from './FromText';
 import { FromYouTube } from './FromYouTube';
@@ -31,12 +34,15 @@ const Prompts: string[] = [
   'Compare the draft character sheet with the original transcript, validating its content and ensuring it captures both the speaker’s overt characteristics and the subtler undertones. Omit unknown information, fine-tune any areas that require clarity, have been overlooked, or require more authenticity. Use clear and illustrative examples from the transcript to refine your sheet and offer meaningful, tangible reference points. Your output is a coherent, comprehensive, and nuanced instruction that begins with \'You are a...\' and  serves as a go-to guide for an actor recreating the persona.',
 ];
 
-const PromptTitles: string[] = [
-  'Common: Creator System Prompt',
-  'Analyze the transcript',
-  'Define the character',
-  'Cross the t\'s',
-];
+const getTitlesForTab = (selectedTab: number): string[] => {
+  const analyzeSubject: string = selectedTab ? 'text' : 'transcript';
+  return [
+    'Common: Creator System Prompt',
+    `Analyze the ${analyzeSubject}`,
+    'Define the character',
+    'Cross the t\'s',
+  ];
+};
 
 // chain to convert a text input string (e.g. youtube transcript) into a persona prompt
 function createChain(instructions: string[], titles: string[]): LLMChainStep[] {
@@ -44,24 +50,27 @@ function createChain(instructions: string[], titles: string[]): LLMChainStep[] {
     {
       name: titles[1],
       setSystem: instructions[0],
-      addUserInput: true,
-      addUser: instructions[1],
+      addUserChainInput: true,
+      addUserText: instructions[1],
     },
     {
       name: titles[2],
-      addPrevAssistant: true,
-      addUser: instructions[2],
+      addModelPrevOutput: true,
+      addUserText: instructions[2],
     },
     {
       name: titles[3],
-      addPrevAssistant: true,
-      addUser: instructions[3],
+      addModelPrevOutput: true,
+      addUserText: instructions[3],
     },
   ];
 }
 
 
-export const PersonaPromptCard = (props: { content: string }) =>
+export const PersonaPromptCard = (props: {
+  content: string,
+  contentScaling: ContentScaling,
+}) =>
   <Card sx={{ boxShadow: 'md', mt: 3 }}>
 
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -79,7 +88,11 @@ export const PersonaPromptCard = (props: { content: string }) =>
       <Alert variant='soft' color='success' sx={{ mb: 1 }}>
         You may now copy the text below and use it as Custom prompt!
       </Alert>
-      <RenderMarkdownMemo textBlock={{ type: 'text', content: props.content }} />
+      <ScaledTextBlockRenderer
+        text={props.content}
+        contentScaling={props.contentScaling}
+        textRenderVariant='markdown'
+      />
     </CardContent>
   </Card>;
 
@@ -94,21 +107,24 @@ export function Creator(props: { display: boolean }) {
   const [showIntermediates, setShowIntermediates] = React.useState(false);
 
   // external state
+  const contentScaling = useUIContentScaling();
   const [personaLlmId, setPersonaLlmId] = useLLMSelectLocalState(true);
-  const [personaLlm, llmComponent] = useLLMSelect(personaLlmId, setPersonaLlmId, 'Persona Creation Model');
+  const [personaLlm, llmComponent] = useLLMSelect(personaLlmId, setPersonaLlmId, { label: 'Persona Creation Model', larger: true });
 
 
   // editable prompts
+  const promptTitles = React.useMemo(() => getTitlesForTab(selectedTab), [selectedTab]);
+
   const {
     strings: editedInstructions, stringEditors: instructionEditors,
-  } = useFormEditTextArray(Prompts, PromptTitles);
+  } = useFormEditTextArray(Prompts, promptTitles);
 
   const { steps: creationChainSteps, id: chainId } = React.useMemo(() => {
     return {
-      steps: createChain(editedInstructions, PromptTitles),
-      id: uuidv4(),
+      steps: createChain(editedInstructions, promptTitles),
+      id: agiUuid('persona-creator-chain'),
     };
-  }, [editedInstructions]);
+  }, [editedInstructions, promptTitles]);
 
   const llmLabel = personaLlm?.label || undefined;
   const savePersona = React.useCallback((personaPrompt: string, inputText: string) => {
@@ -122,11 +138,18 @@ export function Creator(props: { display: boolean }) {
     chainIntermediates,
     chainStepName,
     chainStepInterimChars,
-    chainOutput,
-    chainError,
+    chainOutputText,
+    chainErrorMessage,
     userCancelChain,
     restartChain,
-  } = useLLMChain(creationChainSteps, personaLlm?.id, chainInputText ?? undefined, savePersona, 'persona-extract', chainId);
+  } = useLLMChain(
+    creationChainSteps,
+    personaLlm?.id,
+    chainInputText ?? undefined,
+    'persona-extract',
+    chainId,
+    savePersona,
+  );
 
 
   // Reset the relevant state when the selected tab changes
@@ -136,7 +159,7 @@ export function Creator(props: { display: boolean }) {
 
 
   // [debug] Restart the chain when complete after a delay
-  const debugRestart = !!CONTINUE_DELAY && !isTransforming && (chainProgress === 1 || !!chainError);
+  const debugRestart = !!CONTINUE_DELAY && !isTransforming && (chainProgress === 1 || !!chainErrorMessage);
   React.useEffect(() => {
     if (debugRestart) {
       const timeout = setTimeout(restartChain, CONTINUE_DELAY);
@@ -233,7 +256,7 @@ export function Creator(props: { display: boolean }) {
           Embodying Persona ...
         </Typography>
         <Typography level='title-sm' sx={{ mt: 1 }}>
-          Using: {personaLlm?.label}
+          Using: {personaLlm ? getLLMLabel(personaLlm) : 'Loading model...'}
         </Typography>
       </Box>
       <Box>
@@ -258,15 +281,18 @@ export function Creator(props: { display: boolean }) {
 
 
     {/* Errors */}
-    {!!chainError && (
+    {!!chainErrorMessage && (
       <Alert color='warning' sx={{ mt: 1 }}>
-        <Typography component='div'>{chainError}</Typography>
+        <Typography component='div'>{chainErrorMessage}</Typography>
       </Alert>
     )}
 
     {/* The Persona (Output) */}
-    {chainOutput && <>
-      <PersonaPromptCard content={chainOutput} />
+    {chainOutputText && <>
+      <PersonaPromptCard
+        content={chainOutputText}
+        contentScaling={contentScaling}
+      />
     </>}
 
 

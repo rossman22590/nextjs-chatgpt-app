@@ -31,6 +31,12 @@ file.
 
 ### Official Images: [ghcr.io/enricoros/big-agi](https://github.com/enricoros/big-agi/pkgs/container/big-agi)
 
+#### Available Tags
+
+- **`:latest`** / **`:stable`** - Latest stable release (recommended)
+- **`:development`** - Main branch (bleeding edge)
+- **`:v2.0.0`** - Specific versions
+
 #### Run using *docker* 🚀
 
 ```bash
@@ -56,6 +62,17 @@ To make local services running on your host machine accessible to a Docker conta
 |:------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Windows and macOS | Use the special DNS name `host.docker.internal` to refer to the host machine from within the Docker container. No additional network configuration is required. Access local services using `host.docker.internal:<PORT>`.                                                                                                                                                                   |
 | Linux             | Two options: *A*. Use <ins>--network="host"</ins> (`docker run --network="host" -d big-agi`) when running the Docker container to merge the container within the host network stack; however, this reduces container isolation. Alternatively: *B*. Connect to local services <ins>using the host's IP address</ins> directly, as host.docker.internal is not available by default on Linux. |
+
+<br/>
+
+### Reverse Proxy Configuration
+
+A reverse proxy is a server that sits in front of big-AGI's container and can forwards web
+requests to it. Often used to run multiple web applications, expose them to the internet,
+increase security.
+
+If you're deploying big-AGI behind a reverse proxy, you may want to see
+our [Reverse Proxy Deployment Guide](deploy-reverse-proxy.md) for more information.
 
 <br/>
 

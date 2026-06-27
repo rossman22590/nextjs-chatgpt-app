@@ -7,7 +7,7 @@ process for your own instance of big-AGI and related products.
 
 **Try big-AGI** - You don't need to install anything if you want to play with big-AGI
 and have your API keys to various model services. You can access our free instance on [big-AGI.com](https://big-agi.com).
-The free instance runs the latest `main-stable` branch from this repository.
+The free instance runs the latest `main` branch from this repository.
 
 ## 🧩 Build-your-own
 
@@ -72,9 +72,8 @@ Create your GitHub fork, create a Vercel project over that fork, and deploy it. 
 
 ### Deploy on Cloudflare
 
-Deploy on Cloudflare's global network by installing big-AGI on
-Cloudflare Pages. Check out the [Cloudflare Installation Guide](deploy-cloudflare.md)
-for step-by-step instructions.
+> Note: Cloudflare Pages deployment has limitations due to Edge Runtime constraints.
+> See the [Cloudflare guide](deploy-cloudflare.md) for details and known issues.
 
 ### Docker Deployments
 
@@ -99,10 +98,42 @@ or follow the steps below for a quick start.
    ```
    Access your big-AGI instance at `http://localhost:3000`.
 
-### Midori AI Subsystem for Docker Deployment
+If you deploy big-AGI behind a reverse proxy, you may want to check out the [Reverse Proxy Configuration Guide](deploy-reverse-proxy.md).
 
-Follow the instructions found on [Midori AI Subsystem Site](https://io.midori-ai.xyz/subsystem/manager/)
-for your host OS. After completing the setup process, install the Big-AGI docker backend to the Midori AI Subsystem.
+### Kubernetes Deployment
+
+Deploy big-AGI on a Kubernetes cluster for enhanced scalability and management. Follow these steps for a Kubernetes deployment:
+
+1. Clone the big-AGI repository:
+   ```bash
+   git clone https://github.com/enricoros/big-AGI.git
+   cd big-AGI
+   ```
+
+2. Configure the environment variables:
+   ```bash
+   cp docs/k8s/env-secret.yaml env-secret.yaml
+   vim env-secret.yaml  # Edit the file to set your environment variables
+   ```
+
+3. Apply the Kubernetes configurations:
+   ```bash
+   kubectl create namespace ns-big-agi
+   kubectl apply -f docs/k8s/big-agi-deployment.yaml -f env-secret.yaml
+   ```
+
+4. Verify the deployment:
+   ```bash
+   kubectl -n ns-big-agi get svc,pod,deployment
+   ```
+
+5. Access the big-AGI application:
+   ```bash
+   kubectl -n ns-big-agi port-forward service/svc-big-agi 3000:3000
+   ```
+   Your big-AGI instance is now accessible at `http://localhost:3000`.
+
+For more detailed instructions on Kubernetes deployment, including updating and troubleshooting, refer to our [Kubernetes Deployment Guide](deploy-k8s.md).
 
 ## Enterprise-Grade Installation
 
@@ -114,6 +145,6 @@ Enjoy all the features of big-AGI without the hassle of infrastructure managemen
 Join our vibrant community of developers, researchers, and AI enthusiasts. Share your projects, get help, and collaborate with others.
 
 - [Discord Community](https://discord.gg/MkH4qj2Jp9)
-- [Twitter](https://twitter.com/yourusername)
+- [X (Twitter)](https://x.com/enricoros)
 
 For any questions or inquiries, please don't hesitate to [reach out to our team](mailto:hello@big-agi.com).

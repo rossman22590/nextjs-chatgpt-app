@@ -7,59 +7,77 @@ import { useShallow } from 'zustand/react/shallow';
  */
 
 export interface BackendCapabilities {
-  hasDB: boolean;
-  hasBrowsing: boolean;
-  hasGoogleCustomSearch: boolean;
-  hasImagingProdia: boolean;
+  // llms
+  hasLlmAlibaba: boolean;
   hasLlmAnthropic: boolean;
   hasLlmAzureOpenAI: boolean;
+  hasLlmBedrock: boolean;
+  hasLlmDeepseek: boolean;
   hasLlmGemini: boolean;
   hasLlmGroq: boolean;
   hasLlmLocalAIHost: boolean;
   hasLlmLocalAIKey: boolean;
   hasLlmMistral: boolean;
+  hasLlmMoonshot: boolean;
   hasLlmOllama: boolean;
   hasLlmOpenAI: boolean;
   hasLlmOpenRouter: boolean;
   hasLlmPerplexity: boolean;
   hasLlmTogetherAI: boolean;
+  hasLlmXAI: boolean;
+  // others
+  hasDB: boolean;
+  hasBrowsing: boolean;
+  hasGoogleCustomSearch: boolean;
   hasVoiceElevenLabs: boolean;
-  llmConfigHash: string;
+  // hashes
+  hashLlmReconfig: string;
+  // build data
+  build?: {
+    gitSha?: string;
+    pkgVersion?: string;
+    timestamp?: string;
+  };
 }
 
 interface BackendStore extends BackendCapabilities {
-  loadedCapabilities: boolean;
+  _loadedCapabilities: boolean;
   setCapabilities: (capabilities: Partial<BackendCapabilities>) => void;
 }
 
 const useBackendCapabilitiesStore = create<BackendStore>()(
   (set) => ({
 
-    // capabilities
-    hasDB: false,
-    hasBrowsing: false,
-    hasGoogleCustomSearch: false,
-    hasImagingProdia: false,
+    // initial values
+    hasLlmAlibaba: false,
     hasLlmAnthropic: false,
+    hasLlmBedrock: false,
     hasLlmAzureOpenAI: false,
+    hasLlmDeepseek: false,
     hasLlmGemini: false,
     hasLlmGroq: false,
     hasLlmLocalAIHost: false,
     hasLlmLocalAIKey: false,
     hasLlmMistral: false,
+    hasLlmMoonshot: false,
     hasLlmOllama: false,
     hasLlmOpenAI: false,
     hasLlmOpenRouter: false,
     hasLlmPerplexity: false,
     hasLlmTogetherAI: false,
+    hasLlmXAI: false,
+    hasDB: false,
+    hasBrowsing: false,
+    hasGoogleCustomSearch: false,
     hasVoiceElevenLabs: false,
-    llmConfigHash: '',
+    hashLlmReconfig: '',
+    build: undefined,
+    _loadedCapabilities: false,
 
-    loadedCapabilities: false,
     setCapabilities: (capabilities: Partial<BackendCapabilities>) =>
       set({
-        loadedCapabilities: true,
         ...capabilities,
+        _loadedCapabilities: true,
       }),
 
   }),
@@ -67,7 +85,7 @@ const useBackendCapabilitiesStore = create<BackendStore>()(
 
 
 export function useKnowledgeOfBackendCaps(): [boolean, (capabilities: Partial<BackendCapabilities>) => void] {
-  return useBackendCapabilitiesStore(useShallow(state => [state.loadedCapabilities, state.setCapabilities]));
+  return useBackendCapabilitiesStore(useShallow(state => [state._loadedCapabilities, state.setCapabilities]));
 }
 
 export function getBackendCapabilities(): BackendCapabilities {
