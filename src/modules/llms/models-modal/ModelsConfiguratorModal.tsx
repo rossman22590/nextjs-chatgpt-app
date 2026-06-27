@@ -28,7 +28,6 @@ import { useOverlayComponents } from '~/common/layout/overlays/useOverlayCompone
 import { useUICounter, useUIPreferencesStore } from '~/common/stores/store-ui';
 
 import { LLMVendorSetup } from '../components/LLMVendorSetup';
-import { ModelsList } from './ModelsList';
 import { ModelsServiceSelector } from './ModelsServiceSelector';
 import { ModelsWizard } from './ModelsWizard';
 import { useLlmUpdateModels } from '../llm.client.hooks';
@@ -56,7 +55,6 @@ export function ModelsConfiguratorModal(props: {
   // const [showAllServices, setShowAllServices] = React.useState<boolean>(false);
   const [tab, setTab] = React.useState<TabValue>(MODELS_WIZARD_ENABLE_INITIALLY && !modelsServices.length ? 'wizard' : 'setup');
   const [unsavedWizardProviders, setUnsavedWizardProviders] = React.useState<Set<string>>(new Set());
-  const showAllServices = false;
 
   // state - menus
   const [mainMenuOpen, setMainMenuOpen] = React.useState(false);
@@ -468,7 +466,7 @@ export function ModelsConfiguratorModal(props: {
       closeText={isTabWizard ? 'Done' : undefined}
       animateEnter={!hasLLMs}
       unfilterBackdrop
-      autoOverflow={true /* forces some shrinkage of the contents (ModelsList) */}
+      autoOverflow
       fullscreen={isMobile ? 'button' : undefined} // NOTE: was disabled because on mobile there's one screen with a stretch issue - but can't reproduce
     >
 
@@ -491,42 +489,6 @@ export function ModelsConfiguratorModal(props: {
             : <Box sx={{ minHeight: '7.375rem' }} />
           }
         </Box>
-      )}
-
-      {isTabSetup && hasLLMs && (
-        <ModelsList
-          filterServiceId={showAllServices ? null : activeServiceId}
-          showHiddenModels={showModelsHidden}
-          onOpenLLMOptions={optimaActions().openModelOptions}
-          sx={{
-            // works in tandem with the parent (GoodModal > Dialog) overflow: 'auto'
-            minHeight: '10rem',
-            overflowY: 'auto',
-
-            // bottom border
-            borderTop: '1px solid',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-
-            // style: edge-to-edge band (negative margin pattern, like ModelsWizard)
-            // '--ListItem-paddingY': '0rem', // items are smaller
-            backgroundColor: 'rgb(var(--joy-palette-neutral-lightChannel) / 20%)',
-            // borderRadius: 'md',
-            // boxShadow: 'inset 0px 2px 2px -2px rgba(0, 0, 0, 0.2)',
-
-            // absorb the card pad
-            mx: 'calc(-1 * var(--Card-padding, 1rem))',
-            // py: 1,
-            '--ListItem-paddingLeft': '1.25rem',
-            '--ListItem-paddingRight': '1rem',
-
-            // [mobile] a bit less padding
-            // '@media (max-width: 900px)': {
-            //   '--ListItem-paddingLeft': '0.5rem',
-            //   '--ListItem-paddingRight': '0.25rem',
-            // },
-          }}
-        />
       )}
 
     </GoodModal>

@@ -48,7 +48,7 @@ import { lmStudioFetchModels, lmStudioModelsToModelDescriptions } from './openai
 import { localAIModelSortFn, localAIModelToModelDescription } from './openai/models/localai.models';
 import { mistralModels } from './openai/models/mistral.models';
 import { moonshotModelFilter, moonshotModelSortFn, moonshotModelToModelDescription } from './openai/models/moonshot.models';
-import { openRouterInjectVariants, openRouterModelFamilySortFn, openRouterModelToModelDescription } from './openai/models/openrouter.models';
+import { OPENROUTER_MODELS_SORT_QUERY, openRouterInjectVariants, openRouterLimitVisibleModels, openRouterModelToModelDescription } from './openai/models/openrouter.models';
 import { openAIInjectVariants, openAIModelFilter, openAIModelToModelDescription, openAISortModels, openaiValidateModelDefs_DEV } from './openai/models/openai.models';
 import { perplexityHardcodedModelDescriptions, perplexityInjectVariants } from './openai/models/perplexity.models';
 import { tlusApiHeuristic, tlusApiTryParse } from './openai/models/tlusapi.models';
@@ -380,7 +380,11 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
     case 'togetherai':
  
       // Effective URL and headers - respects OPENAI_API_HOST server env and default hosts
-      const { headers: oaiHeaders, url: oaiUrl } = openAIAccess(access, null, OPENAI_API_PATHS.models);
+      const modelsApiPath = dialect === 'openrouter'
+        ? `${OPENAI_API_PATHS.models}?${OPENROUTER_MODELS_SORT_QUERY}`
+        : OPENAI_API_PATHS.models;
+
+      const { headers: oaiHeaders, url: oaiUrl } = openAIAccess(access, null, modelsApiPath);
 
       return createListModelsDispatch({
 
@@ -426,8 +430,9 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
           if (preCount !== maybeModels.length && dialect !== 'mistral' /* [Mistral, 2025-11-17] Mistral has 2 duplicate models */)
             console.warn(`openai.router.listModels: removed ${preCount - maybeModels.length} duplicate models for dialect ${dialect}`);
 
-          // sort by id
-          maybeModels.sort((a, b) => a.id.localeCompare(b.id));
+          // sort by id, except OpenRouter where the API response order carries the requested top-weekly ranking
+          if (dialect !== 'openrouter')
+            maybeModels.sort((a, b) => a.id.localeCompare(b.id));
 
           // every dialect has a different way to enumerate models - we execute the mapping on the server side
           switch (dialect) {
@@ -521,11 +526,10 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
 
             case 'openrouter':
               // openRouterStatTokenizers(maybeModels);
-              return maybeModels
-                .sort(openRouterModelFamilySortFn)
+              return openRouterLimitVisibleModels(maybeModels
                 .map(openRouterModelToModelDescription)
                 .filter(desc => !!desc)
-                .reduce(openRouterInjectVariants, []);
+                .reduce(openRouterInjectVariants, []));
 
             default:
               const _exhaustiveCheck: never = dialect;

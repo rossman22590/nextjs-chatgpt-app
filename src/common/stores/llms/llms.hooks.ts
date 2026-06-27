@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import type { DModelsServiceId } from './llms.service.types';
 import { DLLM, DLLMId, isLLMVisible } from './llms.types';
+import { isOpenRouterCuratedModelRef, OPENROUTER_VISIBLE_MODELS_LIMIT, openRouterCuratedModelRank } from './llms.model-limits';
 import { isLLMChatFree_cached } from './llms.pricing';
 import { useModelsStore } from './store-llms';
 
@@ -32,6 +33,35 @@ export function useLLMsByService(serviceId: false | DModelsServiceId): DLLM[] {
   ));
 }
 
+function _limitOpenRouterVisibleLLMs<T extends DLLM>(llms: ReadonlyArray<T>): T[] {
+  const visibleOpenRouterLlms = llms
+    .map((llm, index) => ({ llm, index }))
+    .filter(({ llm }) => llm.vId === 'openrouter' && isOpenRouterCuratedModelRef(llm.initialParameters?.llmRef))
+    .sort((a, b) =>
+      openRouterCuratedModelRank(a.llm.initialParameters?.llmRef) - openRouterCuratedModelRank(b.llm.initialParameters?.llmRef)
+      || a.index - b.index,
+    )
+    .slice(0, OPENROUTER_VISIBLE_MODELS_LIMIT)
+    .map(({ llm }) => llm);
+
+  const output: T[] = [];
+  let injectedOpenRouterLlms = false;
+
+  for (const llm of llms) {
+    if (llm.vId !== 'openrouter') {
+      output.push(llm);
+      continue;
+    }
+
+    if (!injectedOpenRouterLlms) {
+      output.push(...visibleOpenRouterLlms);
+      injectedOpenRouterLlms = true;
+    }
+  }
+
+  return output;
+}
+
 export function useVisibleLLMs(includeLlmId: undefined | DLLMId | null, starredOnly: boolean, starredFirst: boolean): { llms: ReadonlyArray<DLLM>; hasStarred: boolean } {
   // for performance, we don't include this in the memo selector, as they'll change in tandem anyway
   let hasStarred = false;
@@ -45,12 +75,17 @@ export function useVisibleLLMs(includeLlmId: undefined | DLLMId | null, starredO
       // always include the specified LLM ID if provided
       if (includeLlmId && llm.id === includeLlmId) return true;
 
+      // OpenRouter is curated after this filter; keep factory-hidden models eligible so old persisted caps do not shrink it.
+      if (llm.vId === 'openrouter') return llm.userHidden !== true && (!starredOnly || llm.userStarred);
+
       // visibility filter
       return isLLMVisible(llm) && (!starredOnly || llm.userStarred);
     });
 
+    const capped = _limitOpenRouterVisibleLLMs(filtered);
+
     // sort starred first if requested
-    return !starredFirst ? filtered : filtered.sort(_sortStarredFirstComparator);
+    return !starredFirst ? capped : capped.sort(_sortStarredFirstComparator);
   }));
 
   return { llms, hasStarred };

@@ -1,6 +1,7 @@
 import * as z from 'zod/v4';
 
 import { LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision, LLM_IF_Outputs_Audio, LLM_IF_Outputs_Image } from '~/common/stores/llms/llms.types';
+import { isOpenRouterCuratedModelRef, OPENROUTER_VISIBLE_MODELS_LIMIT, openRouterCuratedModelRank } from '~/common/stores/llms/llms.model-limits';
 import { Release } from '~/common/app.release';
 
 import type { ModelDescriptionSchema, OrtVendorLookupResult } from '../../llm.server.types';
@@ -14,6 +15,7 @@ import { wireOpenrouterModelsListOutputSchema } from '../wiretypes/openrouter.wi
 // configuration
 const DEV_DEBUG_OPENROUTER_MODELS = (Release.TenantSlug as any) === 'staging' /* ALSO IN STAGING! */ || Release.IsNodeDevBuild;
 const FIXUP_MAX_OUTPUT = true;
+export const OPENROUTER_MODELS_SORT_QUERY = 'sort=top-weekly';
 
 
 // [OpenRouter] - enough API info to auto-detect models, we only decide what to show here
@@ -325,6 +327,26 @@ export function openRouterInjectVariants(models: ModelDescriptionSchema[], model
   // default
   models.push(model);
   return models;
+}
+
+export function openRouterLimitVisibleModels(models: ModelDescriptionSchema[]): ModelDescriptionSchema[] {
+  let visibleCount = 0;
+
+  return models
+    .map((model, index) => ({ model, index }))
+    .sort((a, b) =>
+      openRouterCuratedModelRank(a.model.id) - openRouterCuratedModelRank(b.model.id)
+      || a.index - b.index,
+    )
+    .map(({ model }) => {
+      const isCurated = isOpenRouterCuratedModelRef(model.id);
+      const hidden = model.hidden || !isCurated || visibleCount >= OPENROUTER_VISIBLE_MODELS_LIMIT;
+      if (isCurated && !hidden) visibleCount++;
+      return {
+        ...model,
+        hidden,
+      };
+    });
 }
 
 /*

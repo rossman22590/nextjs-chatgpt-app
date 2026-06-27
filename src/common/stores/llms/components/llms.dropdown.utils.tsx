@@ -4,11 +4,45 @@ import type { DLLM, DLLMId } from '../llms.types';
 import type { DModelsServiceId } from '../llms.service.types';
 import { findModelsServiceOrNull } from '../store-llms';
 import { getLLMLabel, isLLMVisible } from '../llms.types';
+import { isOpenRouterCuratedModelRef, OPENROUTER_VISIBLE_MODELS_LIMIT, openRouterCuratedModelRank } from '../llms.model-limits';
+
+
+export function limitOpenRouterDropdownLLMs<T extends DLLM>(
+  llms: ReadonlyArray<T>,
+  _currentModelId?: DLLMId | null,
+): T[] {
+  const visibleOpenRouterLlms = llms
+    .map((llm, index) => ({ llm, index }))
+    .filter(({ llm }) => llm.vId === 'openrouter' && isOpenRouterCuratedModelRef(llm.initialParameters?.llmRef))
+    .sort((a, b) =>
+      openRouterCuratedModelRank(a.llm.initialParameters?.llmRef) - openRouterCuratedModelRank(b.llm.initialParameters?.llmRef)
+      || a.index - b.index,
+    )
+    .slice(0, OPENROUTER_VISIBLE_MODELS_LIMIT)
+    .map(({ llm }) => llm);
+
+  const output: T[] = [];
+  let injectedOpenRouterLlms = false;
+
+  for (const llm of llms) {
+    if (llm.vId !== 'openrouter') {
+      output.push(llm);
+      continue;
+    }
+
+    if (!injectedOpenRouterLlms) {
+      output.push(...visibleOpenRouterLlms);
+      injectedOpenRouterLlms = true;
+    }
+  }
+
+  return output;
+}
 
 
 /**
  * Filter LLMs for dropdown display.
- * Always includes the current model, respects starred/search/visibility filters.
+ * Respects starred/search/visibility filters, then applies provider-specific dropdown caps.
  */
 export function filterLLMsForDropdown(
   llms: ReadonlyArray<DLLM>,
@@ -19,7 +53,7 @@ export function filterLLMsForDropdown(
   },
 ): DLLM[] {
   const lcSearch = options.searchString?.toLowerCase();
-  return llms.filter(llm => {
+  const filtered = llms.filter(llm => {
     // Always include the currently selected model
     if (options.currentModelId && llm.id === options.currentModelId) return true;
 
@@ -29,9 +63,14 @@ export function filterLLMsForDropdown(
     // Filter by search string
     if (lcSearch && !getLLMLabel(llm).toLowerCase().includes(lcSearch)) return false;
 
+    // OpenRouter is curated below; keep its factory-hidden models eligible so persisted old caps do not shrink the list.
+    if (llm.vId === 'openrouter') return llm.userHidden !== true;
+
     // Show visible models, or all if actively searching
     return lcSearch ? true : isLLMVisible(llm);
   });
+
+  return limitOpenRouterDropdownLLMs(filtered, options.currentModelId);
 }
 
 
