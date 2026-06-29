@@ -1,7 +1,7 @@
 <div align="center">
 
 <img width="256" height="256" alt="Big-AGI Logo" src="https://big-agi.com/assets/logo-bright-github.svg" />
-
+ 
 <h1><a href="https://big-agi.com">Big-AGI</a></h1>
 
 [![Use Free ⋅ Go Pro](https://img.shields.io/badge/Use_Free-Get_Pro-d5ec31?style=for-the-badge&logo=rocket&logoColor=white&labelColor=000)](https://big-agi.com)
