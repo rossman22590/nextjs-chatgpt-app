@@ -7,7 +7,7 @@ import { DLLM, DLLMId, LLM_IF_GEM_Interactions, LLM_IF_HOTFIX_NoTemperature, LLM
 import { DMessage, DMessageGenerator, createGeneratorAIX_AutoLabel } from '~/common/stores/chat/chat.message';
 import { DMetricsChatGenerate_Lg, DMetricsChatGenerate_Md, metricsChatGenerateLgToMd, metricsComputeChatGenerateCostsMd, } from '~/common/stores/metrics/metrics.chatgenerate';
 import { DModelParameterValues, getAllModelParameterValues } from '~/common/stores/llms/llms.parameters';
-import { apiAsync, apiStream } from '~/common/util/trpc.client';
+import { apiAsync, apiAsyncNode, apiStream } from '~/common/util/trpc.client';
 import { createErrorContentFragment, DMessageContentFragment, DMessageErrorPart, DMessageVoidFragment, isContentFragment, isErrorPart } from '~/common/stores/chat/chat.fragments';
 import { findLLMOrThrow } from '~/common/stores/llms/store-llms';
 import { getAixInspectorEnabled } from '~/common/stores/store-ui';
@@ -670,24 +670,58 @@ function _finalizeLlmMetricsWithCosts(cgMetricsLg: undefined | DMetricsChatGener
   // Compute the Md metrics from Lg
   let metricsMd = cgMetricsLg ? metricsChatGenerateLgToMd(cgMetricsLg) : undefined;
 
+  // Token totals - computed up-front so usage is recorded even for models without pricing
+  const inputTokens = (metricsMd?.TIn || 0) + (metricsMd?.TCacheRead || 0) + (metricsMd?.TCacheWrite || 0);
+  const outputTokens = (metricsMd?.TOut || 0) /* + (m?.TOutR || 0) THIS IS A BREAKDOWN, IT'S ALREADY IN */;
+
   // Compute costs
   const logLlmRefId = getAllModelParameterValues(llm.initialParameters, llm.userParameters).llmRef || llm.id;
   const adjChatPricing = llmChatPricing_adjusted(llm);
   const costs = metricsComputeChatGenerateCostsMd(metricsMd, adjChatPricing, logLlmRefId);
   if (!costs) {
     // FIXME: we shall warn that the costs are missing, as the only way to get pricing is through surfacing missing prices
+    // [Usage] still record token consumption for per-user limit accounting, even when pricing is unknown
+    _reportServerUsage(llm, inputTokens, outputTokens, 0, debugCostSource);
     return metricsMd;
   }
   metricsMd = { ...metricsMd /* TIn, TOut, ... */, ...costs /* $c, ... $code */ };
 
   // Run aggregations
-  const m = metricsMd;
-  const inputTokens = (m?.TIn || 0) + (m?.TCacheRead || 0) + (m?.TCacheWrite || 0);
-  const outputTokens = (m?.TOut || 0) /* + (m?.TOutR || 0) THIS IS A BREAKDOWN, IT'S ALREADY IN */;
   metricsStoreAddChatGenerate(costs, inputTokens, outputTokens, llm, debugCostSource);
+
+  // [Usage] report token/cost consumption to the server for per-user limit accounting & billing
+  _reportServerUsage(llm, inputTokens, outputTokens, costs.$c || 0, debugCostSource);
 
   // Merge costs into a new generator
   return metricsMd;
+}
+
+/**
+ * Reports usage of a single completion to the server (UsageLog), for per-user token-limit
+ * accounting and billing. This is the single chokepoint that ALL AIX completions flow through
+ * (main chat, Beam, Call, auto-title, follow-ups, diagrams, ReAct, image-caption, code-fixup, ...),
+ * so every completion surface is charged here - no per-call-site wiring required.
+ *
+ * Fire-and-forget: swallows all errors so a usage-logging failure can never break generation.
+ */
+function _reportServerUsage(llm: DLLM, inputTokens: number, outputTokens: number, costCents: number, debugCostSource: string): void {
+  // nothing consumed (e.g. pre-LL error, or empty result) -> nothing to charge
+  if (inputTokens <= 0 && outputTokens <= 0) return;
+
+  // derive a coarse operation label from the debug source, e.g. 'aix_chatgenerate_content-conversation' -> 'conversation'
+  const operation = debugCostSource.includes('-') ? debugCostSource.substring(debugCostSource.indexOf('-') + 1) : 'chat';
+
+  apiAsyncNode.usage.logUsage.mutate({
+    modelId: llm.id,
+    vendorId: llm.vId,
+    inputTokens,
+    outputTokens,
+    costCents,
+    operation,
+  }).catch((error) => {
+    // best-effort: never surface usage-logging failures to the generation flow
+    console.warn('[DEV] usage logging failed:', error);
+  });
 }
 
 
