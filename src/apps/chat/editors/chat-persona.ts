@@ -6,7 +6,8 @@ import { DConversationId, splitSystemMessageFromHistory } from '~/common/stores/
 import type { DLLMId } from '~/common/stores/llms/llms.types';
 import { AudioGenerator } from '~/common/util/audio/AudioGenerator';
 import { ConversationsManager } from '~/common/chat-overlay/ConversationsManager';
-import { DMessage, MESSAGE_FLAG_NOTIFY_COMPLETE, messageWasInterruptedAtStart } from '~/common/stores/chat/chat.message';
+import { DMessage, DMessageGenerator, MESSAGE_FLAG_NOTIFY_COMPLETE, messageWasInterruptedAtStart } from '~/common/stores/chat/chat.message';
+import { apiAsyncNode } from '~/common/util/trpc.client';
 import { getLabsHighPerformance } from '~/common/stores/store-ux-labs';
 
 import { PersonaChatMessageSpeak } from './persona/PersonaChatMessageSpeak';
@@ -120,6 +121,11 @@ export async function runPersonaOnConversationHead(
   // FIXME: race condition? (for sure!)
   cHandler.clearAbortController('chat-persona');
 
+  // [Usage] report token usage to the server for per-user limit accounting & billing.
+  // Fire-and-forget: never block or fail the chat on a usage-logging error. Note that a
+  // partially-generated (aborted) response still consumed tokens, so we report those too.
+  void _reportChatUsage(lastDMessage.generator, 'chat');
+
   if (autoTitleChat) {
     // await auto-title generation to ensure it completes before sync
     await autoConversationTitle(conversationId, false);
@@ -136,4 +142,42 @@ export async function runPersonaOnConversationHead(
 
   // return true if this succeeded
   return messageStatus.outcome === 'completed';
+}
+
+
+/**
+ * Reports the token usage of a completed (or partially-generated) assistant message to the
+ * server, so that per-user token limits and usage analytics are updated.
+ *
+ * This is the single write-path that persists a `UsageLog` row per response. Without it, the
+ * admin usage dashboards and per-user `tokenLimit` enforcement have nothing to read from, and
+ * users are effectively never charged.
+ *
+ * Fire-and-forget: it swallows all errors so a logging failure can never break the chat.
+ */
+async function _reportChatUsage(generator: DMessageGenerator | undefined, operation: string): Promise<void> {
+  try {
+    const metrics = generator?.metrics;
+    if (!metrics) return;
+
+    // Total input tokens = new input + cached-read + cached-write (all count toward a user's allowance)
+    const inputTokens = (metrics.TIn || 0) + (metrics.TCacheRead || 0) + (metrics.TCacheWrite || 0);
+    const outputTokens = metrics.TOut || 0;
+
+    // Nothing to charge for (e.g. pre-LL error before any token was consumed)
+    if (inputTokens <= 0 && outputTokens <= 0) return;
+
+    await apiAsyncNode.usage.logUsage.mutate({
+      modelId: generator?.mgt === 'aix' ? generator.aix.mId : (generator?.name || 'unknown'),
+      vendorId: generator?.mgt === 'aix' ? generator.aix.vId : undefined,
+      serviceName: generator?.providerInfraLabel,
+      inputTokens,
+      outputTokens,
+      costCents: metrics.$c || 0,
+      operation,
+    });
+  } catch (error) {
+    // Best-effort: never surface usage-logging failures to the chat flow
+    console.warn('[DEV] usage logging failed:', error);
+  }
 }
