@@ -393,6 +393,9 @@ export async function aixChatGenerateText_Simple(
   onTextStreamUpdate?: (text: string, isDone: boolean, generator: DMessageGenerator) => MaybePromise<void>,
 ): Promise<string> {
 
+  // [Usage] pre-flight credit check - blocks the request (no LLM call) when out of credits / inactive
+  await _assertUsageWithinLimitOrThrow();
+
   // Aix Access
   const llm = findLLMOrThrow(llmId);
   const { transportAccess: aixAccess, vendor: llmVendor, serviceSettings: llmServiceSettings } = findServiceAccessOrThrow<object, AixAPI_Access>(llm.sId);
@@ -585,6 +588,9 @@ export async function aixChatGenerateContent_DMessage_orThrow<TServiceSettings e
   onStreamingUpdate?: (update: AixChatGenerateContent_DMessageGuts, isDone: boolean) => MaybePromise<void>,
 ): Promise<_AixChatGenerateContent_DMessageGuts_WithOutcome> {
 
+  // [Usage] pre-flight credit check - blocks the request (no LLM call) when out of credits / inactive
+  await _assertUsageWithinLimitOrThrow();
+
   // Aix Access
   const llm = findLLMOrThrow(llmId);
   const { transportAccess: aixAccess, vendor: llmVendor, serviceSettings: llmServiceSettings } = findServiceAccessOrThrow<TServiceSettings, TAccess>(llm.sId);
@@ -694,6 +700,62 @@ function _finalizeLlmMetricsWithCosts(cgMetricsLg: undefined | DMetricsChatGener
 
   // Merge costs into a new generator
   return metricsMd;
+}
+
+/**
+ * Thrown when a user is out of credits / inactive. Carries a user-facing message that the chat
+ * flow surfaces as an error fragment (via aixChatGenerateContent_DMessage_FromConversation).
+ */
+export class AixUsageLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AixUsageLimitError';
+  }
+}
+
+// Short-lived client cache for the limit pre-check, to avoid a network round-trip before every
+// single generation (incl. background ops like auto-title). Monthly limits change slowly, so a
+// few seconds of staleness is acceptable.
+let _usageLimitCache: { allowed: boolean; message?: string; at: number } | null = null;
+const USAGE_LIMIT_CACHE_MS = 10_000;
+
+/**
+ * Pre-flight credit check: called before ANY AIX completion is dispatched. Blocks the request
+ * (throws AixUsageLimitError) when the user has no credits left or the account is inactive, so
+ * no LLM call is ever made. Admins and unlimited accounts always pass (server decides via
+ * checkLimit -> reason 'admin' / 'unlimited'). Fails OPEN on a check error, so a transient
+ * network/DB issue never bricks chat for everyone.
+ */
+async function _assertUsageWithinLimitOrThrow(): Promise<void> {
+  const now = Date.now();
+
+  // serve from the short-lived cache
+  if (_usageLimitCache && (now - _usageLimitCache.at) < USAGE_LIMIT_CACHE_MS) {
+    if (!_usageLimitCache.allowed) throw new AixUsageLimitError(_usageLimitCache.message!);
+    return;
+  }
+
+  let result: Awaited<ReturnType<typeof apiAsyncNode.usage.checkLimit.query>>;
+  try {
+    result = await apiAsyncNode.usage.checkLimit.query();
+  } catch (error) {
+    // fail-open: never block paying users due to a transient check failure
+    console.warn('[DEV] usage limit check failed, allowing request:', error);
+    return;
+  }
+
+  if (result.allowed) {
+    _usageLimitCache = { allowed: true, at: now };
+    return;
+  }
+
+  // build a user-facing message based on why they were blocked
+  const message = result.reason === 'inactive'
+    ? 'Your account is inactive. Please contact your admin to activate access. If you have an active AI Tutor Ultra account, reach out to support to get activated.'
+    : `You've used all your monthly token credits (${(result.used ?? 0).toLocaleString()} / ${(result.limit ?? 0).toLocaleString()} tokens). Please contact your admin to add more credits. Your allowance resets on the 1st of each month.`;
+
+  _usageLimitCache = { allowed: false, message, at: now };
+  throw new AixUsageLimitError(message);
 }
 
 /**
