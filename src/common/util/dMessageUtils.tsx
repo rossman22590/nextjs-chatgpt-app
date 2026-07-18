@@ -518,6 +518,8 @@ export function prettyShortChatModelName(model: string | undefined): string {
         .replace('xai-', '')
         .replace('-beta', '')
         .replace('-non-reasoning', '')
+        .replace('-multi-agent', '') // variant noise: keep the short label compact (full id stays in the tooltip)
+        .replace(/-\d{4}$/, '') // build/date suffix, e.g. '-0309'
         .split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
     }
     if (model.includes('grok-beta')) return 'Grok Beta';

@@ -393,11 +393,12 @@ export async function aixChatGenerateText_Simple(
   onTextStreamUpdate?: (text: string, isDone: boolean, generator: DMessageGenerator) => MaybePromise<void>,
 ): Promise<string> {
 
-  // [Usage] pre-flight credit check - blocks the request (no LLM call) when out of credits / inactive
-  await _assertUsageWithinLimitOrThrow();
-
   // Aix Access
   const llm = findLLMOrThrow(llmId);
+
+  // [Usage] pre-flight credit check - blocks the request (no LLM call) when out of credits / inactive / over the model-family cap
+  await _assertUsageWithinLimitOrThrow(llm.id);
+
   const { transportAccess: aixAccess, vendor: llmVendor, serviceSettings: llmServiceSettings } = findServiceAccessOrThrow<object, AixAPI_Access>(llm.sId);
 
   // Aix Model
@@ -588,11 +589,12 @@ export async function aixChatGenerateContent_DMessage_orThrow<TServiceSettings e
   onStreamingUpdate?: (update: AixChatGenerateContent_DMessageGuts, isDone: boolean) => MaybePromise<void>,
 ): Promise<_AixChatGenerateContent_DMessageGuts_WithOutcome> {
 
-  // [Usage] pre-flight credit check - blocks the request (no LLM call) when out of credits / inactive
-  await _assertUsageWithinLimitOrThrow();
-
   // Aix Access
   const llm = findLLMOrThrow(llmId);
+
+  // [Usage] pre-flight credit check - blocks the request (no LLM call) when out of credits / inactive / over the model-family cap
+  await _assertUsageWithinLimitOrThrow(llm.id);
+
   const { transportAccess: aixAccess, vendor: llmVendor, serviceSettings: llmServiceSettings } = findServiceAccessOrThrow<TServiceSettings, TAccess>(llm.sId);
 
   // Aix Model
@@ -714,30 +716,30 @@ export class AixUsageLimitError extends Error {
 }
 
 // Short-lived client cache for the limit pre-check, to avoid a network round-trip before every
-// single generation (incl. background ops like auto-title). Monthly limits change slowly, so a
-// few seconds of staleness is acceptable.
-let _usageLimitCache: { allowed: boolean; message?: string; at: number } | null = null;
+// single generation (incl. background ops like auto-title). Weekly limits change slowly, so a
+// few seconds of staleness is acceptable. Keyed by model: per-model-family caps differ.
+let _usageLimitCache: { modelId: string; allowed: boolean; message?: string; at: number } | null = null;
 const USAGE_LIMIT_CACHE_MS = 10_000;
 
 /**
  * Pre-flight credit check: called before ANY AIX completion is dispatched. Blocks the request
  * (throws AixUsageLimitError) when the user has no credits left or the account is inactive, so
  * no LLM call is ever made. Admins and unlimited accounts always pass (server decides via
- * checkLimit -> reason 'admin' / 'unlimited'). Fails OPEN on a check error, so a transient
+ * checkLimit -> reason 'admin'). Fails OPEN on a check error, so a transient
  * network/DB issue never bricks chat for everyone.
  */
-async function _assertUsageWithinLimitOrThrow(): Promise<void> {
+async function _assertUsageWithinLimitOrThrow(modelId: string): Promise<void> {
   const now = Date.now();
 
-  // serve from the short-lived cache
-  if (_usageLimitCache && (now - _usageLimitCache.at) < USAGE_LIMIT_CACHE_MS) {
+  // serve from the short-lived cache (per-model: family caps differ across models)
+  if (_usageLimitCache && _usageLimitCache.modelId === modelId && (now - _usageLimitCache.at) < USAGE_LIMIT_CACHE_MS) {
     if (!_usageLimitCache.allowed) throw new AixUsageLimitError(_usageLimitCache.message!);
     return;
   }
 
   let result: Awaited<ReturnType<typeof apiAsyncNode.usage.checkLimit.query>>;
   try {
-    result = await apiAsyncNode.usage.checkLimit.query();
+    result = await apiAsyncNode.usage.checkLimit.query({ modelId });
   } catch (error) {
     // fail-open: never block paying users due to a transient check failure
     console.warn('[DEV] usage limit check failed, allowing request:', error);
@@ -745,16 +747,23 @@ async function _assertUsageWithinLimitOrThrow(): Promise<void> {
   }
 
   if (result.allowed) {
-    _usageLimitCache = { allowed: true, at: now };
+    _usageLimitCache = { modelId, allowed: true, at: now };
     return;
   }
 
   // build a user-facing message based on why they were blocked
+  const sessionFreesInMin = result.session?.freesAt ? Math.max(1, Math.ceil((result.session.freesAt - Date.now()) / 60_000)) : null;
   const message = result.reason === 'inactive'
     ? 'Your account is inactive. Please contact your admin to activate access. If you have an active AI Tutor Ultra account, reach out to support to get activated.'
-    : `You've used all your monthly token credits (${(result.used ?? 0).toLocaleString()} / ${(result.limit ?? 0).toLocaleString()} tokens). Please contact your admin to add more credits. Your allowance resets on the 1st of each month.`;
+    : result.reason === 'no_credits'
+      ? 'Your account has no credits yet. Please contact your admin to enable your plan allowance.'
+      : result.reason === 'session_limit_reached'
+        ? `You've hit the 5-hour session limit (${(result.session?.limit ?? 0).toLocaleString()} tokens). Usage starts freeing up${sessionFreesInMin ? ` in about ${sessionFreesInMin >= 60 ? `${Math.floor(sessionFreesInMin / 60)} hr ${sessionFreesInMin % 60} min` : `${sessionFreesInMin} min`}` : ' soon'} as it ages past 5 hours.`
+        : result.reason === 'model_limit_reached'
+          ? `You've used your weekly ${result.planLabel ?? ''} allowance, so ${result.blockedGroupLabel ?? 'premium'} models are unavailable. Standard models remain available, and usage frees up as it ages past 7 days. Note: premium models (Fable, GPT Pro / Sol) consume your allowance 3x faster.`
+          : `You've used your weekly ${result.planLabel ?? ''} allowance (${(result.used ?? 0).toLocaleString()} / ${(result.limit ?? 0).toLocaleString()} tokens in the last 7 days). Usage frees up as it ages past 7 days, or contact your admin to upgrade your plan.`;
 
-  _usageLimitCache = { allowed: false, message, at: now };
+  _usageLimitCache = { modelId, allowed: false, message, at: now };
   throw new AixUsageLimitError(message);
 }
 

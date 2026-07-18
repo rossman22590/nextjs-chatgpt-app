@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, accordionSummaryClasses, Avatar, Box, Button, ListItemContent, styled, Tab, TabList, TabPanel, Tabs, Typography } from '@mui/joy';
 import AddIcon from '@mui/icons-material/Add';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
 import KeyboardCommandKeyOutlinedIcon from '@mui/icons-material/KeyboardCommandKeyOutlined';
 import LanguageRoundedIcon from '@mui/icons-material/LanguageRounded';
 import MicIcon from '@mui/icons-material/Mic';
@@ -25,6 +26,7 @@ import { useIsMobile } from '~/common/components/useMatchMedia';
 
 import { AppChatSettingsAI } from './AppChatSettingsAI';
 import { AppChatSettingsUI } from './settings-ui/AppChatSettingsUI';
+import { UsageLimitsSettings } from './UsageLimitsSettings';
 import { UxLabsSettings } from './UxLabsSettings';
 import { VoiceInSettings } from './VoiceInSettings';
 import { VoiceOutSettings } from './VoiceOutSettings';
@@ -263,6 +265,9 @@ export function SettingsModal(props: {
               // <>Chat AI <WarningRoundedIcon sx={{ ml: 1, color: 'orangered' }} /></>
             } startCollapsed>
               <AppChatSettingsAI />
+            </Topic>
+            <Topic icon={<DataUsageIcon />} title='Usage Limits' startCollapsed>
+              <UsageLimitsSettings />
             </Topic>
             <Topic icon={<ScienceIcon />} title='Labs' startCollapsed>
               <UxLabsSettings />

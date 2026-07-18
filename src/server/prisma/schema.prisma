@@ -50,6 +50,12 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Subscription plans - limits are defined server-side in src/server/usage/usage.plans.ts
+enum UserPlan {
+  PREMIUM
+  ULTRA
+}
+
 model User {
   id            String    @id @default(uuid())
   name          String?
@@ -57,7 +63,8 @@ model User {
   emailVerified DateTime?
   image         String?
   isActive      Boolean?  @default(false) // false = blocked, null = legacy active user, true = active
-  tokenLimit    Int?      @default(0) // 0 = no credits, null = unlimited (admin override)
+  plan          UserPlan  @default(PREMIUM) // subscription tier - drives the weekly token limit
+  tokenLimit    Int?      @default(0) // per-user WEEKLY token override: > 0 = custom weekly limit, 0 = blocked (no credits), null = use plan default
   accounts      Account[]
   sessions      Session[]
   links         LinkStorage[]

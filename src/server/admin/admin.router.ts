@@ -5,8 +5,20 @@ import { Prisma } from '@prisma/client';
 import { ADMIN_EMAILS, isAdminEmail } from '~/common/auth/adminEmails';
 import { createTRPCRouter, protectedProcedure, publicProcedure } from '~/server/trpc/trpc.server';
 import { prisma } from '~/server/prisma/prisma-client';
+import { planLabel, planWeeklyTokens, USER_PLAN_IDS, WEEKLY_WINDOW_MS } from '~/server/usage/usage.plans';
 import { adminBannerInputSchema, isAllowedBannerUrl, readAdminBanner, readPublicAdminBanner, writeAdminBanner } from './admin.banner';
 import { getSystemPersonaSeedRows } from './system-personas.seed';
+
+/**
+ * Effective WEEKLY limit for display: mirrors checkUserAllowance (usage.allowance.ts).
+ * tokenLimit: 0 = blocked (no credits), null = plan default, > 0 = custom override. Admin = null (unlimited).
+ */
+function effectiveWeeklyLimit(user: { email: string | null; plan: string; tokenLimit: number | null }): number | null {
+  if (isAdminEmail(user.email)) return null;
+  if (user.tokenLimit === 0) return 0;
+  if (user.tokenLimit != null && user.tokenLimit > 0) return user.tokenLimit;
+  return planWeeklyTokens(user.plan);
+}
 
 // Middleware: ensure the caller is the admin
 const isAdmin = protectedProcedure.use(async ({ ctx, next }) => {
@@ -143,12 +155,13 @@ export const adminRouter = createTRPCRouter({
     return writeAdminBanner(input, ctx.session.user.id);
   }),
 
-  // List all users with usage stats and this month's token usage
+  // List all users with usage stats: this month's, rolling 7-day (the enforced window), and all-time
   listUsers: isAdmin.query(async () => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const weekStart = new Date(Date.now() - WEEKLY_WINDOW_MS);
 
-    const [users, monthlyUsage, allTimeUsage] = await Promise.all([
+    const [users, monthlyUsage, weeklyUsage, allTimeUsage] = await Promise.all([
       prisma.user.findMany({
         orderBy: { name: 'asc' },
         select: {
@@ -157,6 +170,7 @@ export const adminRouter = createTRPCRouter({
           email: true,
           image: true,
           isActive: true,
+          plan: true,
           tokenLimit: true,
           _count: { select: { conversations: true, messages: true, usageLogs: true } },
         },
@@ -169,6 +183,12 @@ export const adminRouter = createTRPCRouter({
       }),
       prisma.usageLog.groupBy({
         by: ['userId'],
+        where: { createdAt: { gte: weekStart } },
+        _sum: { totalTokens: true, inputTokens: true, outputTokens: true, costCents: true },
+        _count: true,
+      }),
+      prisma.usageLog.groupBy({
+        by: ['userId'],
         _sum: { totalTokens: true, inputTokens: true, outputTokens: true, costCents: true },
         _count: true,
         _max: { createdAt: true },
@@ -176,21 +196,26 @@ export const adminRouter = createTRPCRouter({
     ]);
 
     const usageMap = new Map(monthlyUsage.map((u) => [u.userId, u]));
+    const weekMap = new Map(weeklyUsage.map((u) => [u.userId, u]));
     const allTimeUsageMap = new Map(allTimeUsage.map((u) => [u.userId, u]));
 
     return users.map((user) => ({
       ...user,
+      planLabel: planLabel(user.plan),
+      effectiveWeeklyLimit: effectiveWeeklyLimit(user),
       monthUsage: usageMap.get(user.id) ?? null,
+      weekUsage: weekMap.get(user.id) ?? null,
       allTimeUsage: allTimeUsageMap.get(user.id) ?? null,
     }));
   }),
 
-  // Get usage summary for a specific user (current month + all time)
+  // Get usage summary for a specific user (rolling week + current month + all time)
   getUserUsage: isAdmin.input(z.object({ userId: z.string() })).query(async ({ input }) => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const weekStart = new Date(Date.now() - WEEKLY_WINDOW_MS);
 
-    const [allTime, thisMonth, user] = await Promise.all([
+    const [allTime, thisMonth, thisWeek, user] = await Promise.all([
       prisma.usageLog.aggregate({
         where: { userId: input.userId },
         _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
@@ -201,13 +226,23 @@ export const adminRouter = createTRPCRouter({
         _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
         _count: true,
       }),
+      prisma.usageLog.aggregate({
+        where: { userId: input.userId, createdAt: { gte: weekStart } },
+        _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
+        _count: true,
+      }),
       prisma.user.findUnique({
         where: { id: input.userId },
-        select: { id: true, name: true, email: true, image: true, isActive: true, tokenLimit: true },
+        select: { id: true, name: true, email: true, image: true, isActive: true, plan: true, tokenLimit: true },
       }),
     ]);
 
-    return { user, allTime, thisMonth };
+    return {
+      user: user ? { ...user, planLabel: planLabel(user.plan), effectiveWeeklyLimit: effectiveWeeklyLimit(user) } : null,
+      allTime,
+      thisMonth,
+      thisWeek,
+    };
   }),
 
   // Get recent usage logs for a user
@@ -226,7 +261,23 @@ export const adminRouter = createTRPCRouter({
       });
     }),
 
-  // Set token limit for a user (null = unlimited)
+  // Set the subscription plan for a user (drives the weekly token limit when tokenLimit is null)
+  setUserPlan: isAdmin
+    .input(
+      z.object({
+        userId: z.string(),
+        plan: z.enum(USER_PLAN_IDS),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return prisma.user.update({
+        where: { id: input.userId },
+        data: { plan: input.plan },
+        select: { id: true, email: true, plan: true },
+      });
+    }),
+
+  // Set the weekly token limit for a user (0 = blocked, null = plan default, > 0 = custom override)
   setTokenLimit: isAdmin
     .input(
       z.object({
@@ -293,11 +344,13 @@ export const adminRouter = createTRPCRouter({
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const [userCount, inactiveUserCount, zeroCreditUsersCount, unlimitedUsersCount, allTime, thisMonth, today] = await Promise.all([
+    const [userCount, inactiveUserCount, zeroCreditUsersCount, planDefaultUsersCount, premiumUsersCount, ultraUsersCount, allTime, thisMonth, today] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { isActive: false } }),
       prisma.user.count({ where: { tokenLimit: 0 } }),
       prisma.user.count({ where: { tokenLimit: null } }),
+      prisma.user.count({ where: { plan: 'PREMIUM' } }),
+      prisma.user.count({ where: { plan: 'ULTRA' } }),
       prisma.usageLog.aggregate({
         _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
         _count: true,
@@ -320,8 +373,12 @@ export const adminRouter = createTRPCRouter({
         active: userCount - inactiveUserCount,
         inactive: inactiveUserCount,
         zeroCredit: zeroCreditUsersCount,
-        unlimited: unlimitedUsersCount,
-        limited: userCount - zeroCreditUsersCount - unlimitedUsersCount,
+        planDefault: planDefaultUsersCount, // tokenLimit null: weekly allowance comes from their plan
+        overridden: userCount - zeroCreditUsersCount - planDefaultUsersCount, // custom weekly override (> 0)
+      },
+      plans: {
+        premium: premiumUsersCount,
+        ultra: ultraUsersCount,
       },
       allTime,
       thisMonth,
@@ -420,7 +477,7 @@ export const adminRouter = createTRPCRouter({
     const userIds = topUsers.map((u) => u.userId);
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true, image: true, isActive: true, tokenLimit: true },
+      select: { id: true, name: true, email: true, image: true, isActive: true, plan: true, tokenLimit: true },
     });
     const userMap = new Map(users.map((u) => [u.id, u]));
 

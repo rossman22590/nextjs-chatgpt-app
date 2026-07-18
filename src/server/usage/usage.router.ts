@@ -1,9 +1,10 @@
 import * as z from 'zod/v4';
-import { TRPCError } from '@trpc/server';
 
-import { isAdminEmail } from '~/common/auth/adminEmails';
 import { createTRPCRouter, protectedProcedure } from '~/server/trpc/trpc.server';
 import { prisma } from '~/server/prisma/prisma-client';
+
+import { checkUserAllowance } from './usage.allowance';
+import { planWeeklyTokens, WEEKLY_WINDOW_MS } from './usage.plans';
 
 export const usageRouter = createTRPCRouter({
   // Log token usage after an AI response completes
@@ -40,44 +41,10 @@ export const usageRouter = createTRPCRouter({
       return { ok: true };
     }),
 
-  // Check if user is within token limit (call before AI request)
-  checkLimit: protectedProcedure.query(async ({ ctx }) => {
-    const userId = ctx.session.user.id;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { tokenLimit: true, email: true, isActive: true },
-    });
-
-    // Admin is always unlimited
-    if (isAdminEmail(user?.email)) return { allowed: true, reason: 'admin' as const, limit: null, used: 0, remaining: null, isActive: true };
-
-    // Only an explicit false blocks legacy accounts that predate activation.
-    if (user?.isActive === false) return { allowed: false, reason: 'inactive' as const, limit: user.tokenLimit ?? 0, used: 0, remaining: 0, isActive: false };
-
-    // No limit set = unlimited
-    if (user?.tokenLimit == null) return { allowed: true, reason: 'unlimited' as const, limit: null, used: 0, remaining: null, isActive: true };
-
-    // Aggregate this month's usage
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const usage = await prisma.usageLog.aggregate({
-      where: { userId, createdAt: { gte: monthStart } },
-      _sum: { totalTokens: true },
-    });
-
-    const used = usage._sum.totalTokens ?? 0;
-    const remaining = Math.max(0, user.tokenLimit - used);
-
-    return {
-      allowed: used < user.tokenLimit,
-      reason: used < user.tokenLimit ? ('within_limit' as const) : ('limit_reached' as const),
-      limit: user.tokenLimit,
-      used,
-      remaining,
-      isActive: true,
-    };
+  // Check if user is within the weekly (rolling 7-day) plan limit - call before AI request
+  // Pass modelId to also validate the per-model-family cap (Fable / GPT Sol / GPT Pro)
+  checkLimit: protectedProcedure.input(z.object({ modelId: z.string().optional() }).optional()).query(async ({ ctx, input }) => {
+    return checkUserAllowance(ctx.session.user.id, input?.modelId);
   }),
 
   // Get own usage summary (for non-admin users to see their own stats)
@@ -85,23 +52,38 @@ export const usageRouter = createTRPCRouter({
     const userId = ctx.session.user.id;
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const weekStart = new Date(Date.now() - WEEKLY_WINDOW_MS);
 
-    const [thisMonth, user] = await Promise.all([
+    const [thisWeek, thisMonth, allowance] = await Promise.all([
+      prisma.usageLog.aggregate({
+        where: { userId, createdAt: { gte: weekStart } },
+        _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
+        _count: true,
+      }),
       prisma.usageLog.aggregate({
         where: { userId, createdAt: { gte: monthStart } },
         _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
         _count: true,
       }),
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: { tokenLimit: true, isActive: true },
-      }),
+      checkUserAllowance(userId),
     ]);
 
     return {
+      thisWeek,
       thisMonth,
-      tokenLimit: user?.tokenLimit ?? null,
-      isActive: user?.isActive === false ? false : true,
+      plan: allowance.plan,
+      planLabel: allowance.planLabel,
+      weeklyLimit: allowance.limit,
+      weeklyUsed: allowance.used,
+      weeklyRemaining: allowance.remaining,
+      // per-model-family weekly usage/limits (Fable / GPT Pro / Sol)
+      modelGroups: allowance.modelGroups,
+      // rolling 5-hour session window (burst protection)
+      session: allowance.session,
+      // reference for unlimited (admin) accounts: lets the UI draw a meaningful bar
+      planWeeklyDefault: planWeeklyTokens(allowance.plan),
+      reason: allowance.reason,
+      isActive: allowance.isActive,
     };
   }),
 

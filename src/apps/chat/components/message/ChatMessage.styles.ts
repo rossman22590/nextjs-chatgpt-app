@@ -39,8 +39,14 @@ export const messageAvatarLabelSx: SxProps = {
   fontWeight: 600,
   textAlign: 'center',
   opacity: 0.7,
+  // clamp long model names to 3 lines - the full name is in the hover tooltip
+  display: '-webkit-box',
+  WebkitLineClamp: 3,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
 };
 
 export const messageAvatarLabelAnimatedSx: SxProps = {
+  ...messageAvatarLabelSx,
   animation: `${animationColorRainbow} 5s linear infinite`,
 };

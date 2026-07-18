@@ -174,9 +174,16 @@ export default function Profile() {
                   <Typography level="body-sm" color="neutral" noWrap>
                     {session?.user?.email}
                   </Typography>
-                  <Chip variant="soft" color={limitInfo?.isActive === false ? 'danger' : 'success'} size="sm" sx={{ mt: 1 }}>
-                    {limitInfo?.isActive === false ? 'Inactive Account' : 'Active Account'}
-                  </Chip>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Chip variant="soft" color={limitInfo?.isActive === false ? 'danger' : 'success'} size="sm">
+                      {limitInfo?.isActive === false ? 'Inactive Account' : 'Active Account'}
+                    </Chip>
+                    {!!limitInfo?.planLabel && (
+                      <Chip variant="soft" color={limitInfo.plan === 'ULTRA' ? 'warning' : 'primary'} size="sm">
+                        {limitInfo.planLabel} Plan
+                      </Chip>
+                    )}
+                  </Box>
                 </Box>
               </Box>
             </Box>
@@ -241,51 +248,60 @@ export default function Profile() {
                 <Divider sx={{ my: 3 }} />
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography level="title-md" fontWeight="lg">Token Credits</Typography>
+                  <Typography level="title-md" fontWeight="lg">Weekly Usage</Typography>
                   <Button variant="plain" color="neutral" size="sm" startDecorator={<RefreshIcon />} loading={refreshing} onClick={refreshUsageData}>
                     Refresh
                   </Button>
                 </Box>
                 {myUsage ? (
                   (() => {
-                    const limit = myUsage.tokenLimit;
-                    const used = myUsage.thisMonth._sum.totalTokens ?? 0;
+                    const isUnlimited = myUsage.weeklyLimit == null;
+                    // unlimited (admin) accounts: draw the bar against the plan default, purely as a reference
+                    const limit = myUsage.weeklyLimit ?? myUsage.planWeeklyDefault;
+                    const used = myUsage.weeklyUsed;
                     const isActive = myUsage.isActive;
-                    const remaining = limit == null ? null : Math.max(0, limit - used);
+                    const remaining = myUsage.weeklyRemaining;
+                    const noCredits = myUsage.reason === 'no_credits';
                     const pct = limit != null && limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
-                    const cardColor = !isActive ? 'danger' : limit === 0 ? 'warning' : pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success';
+                    const cardColor = !isActive ? 'danger' : noCredits ? 'warning' : isUnlimited ? 'neutral' : pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success';
                     return (
                       <Card variant="soft" color={cardColor} sx={{ borderRadius: 'md', mb: 2 }}>
                         <CardContent>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                             <DataUsageIcon sx={{ fontSize: '1.1rem' }} />
                             <Typography level="title-sm">
-                              {!isActive ? 'Account inactive' : remaining == null ? 'Unlimited tokens' : remaining.toLocaleString() + ' tokens remaining'}
+                              {!isActive ? 'Account inactive' : noCredits ? 'No credits yet' : isUnlimited ? used.toLocaleString() + ' tokens used this week - Unlimited' : (remaining ?? 0).toLocaleString() + ' tokens remaining this week'}
                             </Typography>
+                            <Chip variant="outlined" color={myUsage.plan === 'ULTRA' ? 'warning' : 'primary'} size="sm" sx={{ ml: 'auto' }}>
+                              {myUsage.planLabel}
+                            </Chip>
+                            {isUnlimited && (
+                              <Chip variant="outlined" color="neutral" size="sm">
+                                Unlimited
+                              </Chip>
+                            )}
                           </Box>
                           {!isActive ? (
                             <Typography level="body-sm" color="neutral">Your account is inactive. Contact your admin to activate access. If you have an active AI Tutor Ultra account, please reach out to support to get activated.</Typography>
-                          ) : limit == null ? (
-                            <Typography level="body-sm" color="neutral">No monthly token limit is set on your account.</Typography>
-                          ) : limit > 0 ? (
+                          ) : noCredits ? (
+                            <Typography level="body-sm" color="neutral">Your account has no credits yet. Contact your admin to enable your plan allowance.</Typography>
+                          ) : limit != null && limit > 0 ? (
                             <>
                               <LinearProgress
                                 determinate
                                 value={pct}
-                                color={pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'}
+                                color={isUnlimited ? 'neutral' : pct > 90 ? 'danger' : pct > 70 ? 'warning' : 'success'}
                                 size="sm"
                                 sx={{ borderRadius: 'xl', my: 1 }}
                               />
                               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <Typography level="body-xs" color="neutral">{used.toLocaleString()} used</Typography>
-                                <Typography level="body-xs" color="neutral">{limit.toLocaleString()} limit / month</Typography>
+                                <Typography level="body-xs" color="neutral">{isUnlimited ? limit.toLocaleString() + ' plan reference - no cap' : limit.toLocaleString() + ' limit / week'}</Typography>
                               </Box>
                             </>
-                          ) : (
-                            <Typography level="body-sm" color="neutral">You currently have 0 monthly credits. Contact your admin to add credits.</Typography>
-                          )}
+                          ) : null}
                           <Typography level="body-xs" color="neutral" sx={{ mt: 1 }}>
-                            {myUsage.thisMonth._count} requests this month - resets on the 1st of each month
+                            {myUsage.thisWeek._count} requests in the last 7 days - usage frees up as it ages past 7 days
                           </Typography>
                         </CardContent>
                       </Card>

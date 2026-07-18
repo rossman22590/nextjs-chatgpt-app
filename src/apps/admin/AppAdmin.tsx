@@ -78,7 +78,7 @@ type UserLog = Awaited<ReturnType<typeof apiAsyncNode.admin.getUserLogs.query>>[
 type AdminSystemPersona = Awaited<ReturnType<typeof apiAsyncNode.admin.listSystemPersonas.query>>[number];
 
 type ActiveView = 'overview' | 'people' | 'credits' | 'personas' | 'broadcast';
-type UserFilter = 'all' | 'attention' | 'active' | 'inactive' | 'zero' | 'near' | 'unlimited';
+type UserFilter = 'all' | 'attention' | 'active' | 'inactive' | 'zero' | 'near' | 'unlimited' | 'premium' | 'ultra';
 type SortField = 'name' | 'status' | 'monthTokens' | 'remaining' | 'limit' | 'lastSeen' | 'conversations';
 type SortDir = 'asc' | 'desc';
 type BannerTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
@@ -137,6 +137,15 @@ const creditPresets = [
   { label: '5M', value: 5_000_000 },
 ];
 
+const planMeta = {
+  PREMIUM: { label: 'Premium', color: 'primary' as JoyColor },
+  ULTRA: { label: 'Ultra', color: 'warning' as JoyColor },
+} as const;
+
+function planChip(plan: string | null | undefined): { label: string; color: JoyColor } {
+  return plan === 'ULTRA' ? planMeta.ULTRA : planMeta.PREMIUM;
+}
+
 function fmtNum(n: number | null | undefined): string {
   if (n == null) return '0';
   if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + 'B';
@@ -173,6 +182,11 @@ function getMonthTokens(user: AdminUser): number {
   return user.monthUsage?._sum?.totalTokens ?? 0;
 }
 
+// Weekly (rolling 7-day) tokens: this is the window limits are enforced on
+function getWeekTokens(user: AdminUser): number {
+  return user.weekUsage?._sum?.totalTokens ?? 0;
+}
+
 function getLastSeen(user: AdminUser): Date | null {
   return user.allTimeUsage?._max?.createdAt ?? null;
 }
@@ -184,8 +198,8 @@ function tokenLimitPct(tokenLimit: number | null | undefined, usedTokens: number
 
 function tokenLimitLabel(tokenLimit: number | null | undefined): string {
   if (tokenLimit == null) return 'Unlimited';
-  if (tokenLimit === 0) return '0 /mo';
-  return fmtNum(tokenLimit) + ' /mo';
+  if (tokenLimit === 0) return 'Blocked';
+  return fmtNum(tokenLimit) + ' /wk';
 }
 
 function tokenRemainingValue(tokenLimit: number | null | undefined, usedTokens: number): number | null {
@@ -198,28 +212,32 @@ function tokenRemainingLabel(tokenLimit: number | null | undefined, usedTokens: 
   return remaining == null ? 'Unlimited' : fmtNum(remaining);
 }
 
+// NOTE: health/attention are computed on the ENFORCED window: weekly usage vs the effective
+// weekly limit (per-user override, or the plan default - see usage.plans.ts)
 function attentionScore(user: AdminUser): number {
-  const used = getMonthTokens(user);
-  const pct = tokenLimitPct(user.tokenLimit, used);
+  const used = getWeekTokens(user);
+  const limit = user.effectiveWeeklyLimit;
+  const pct = tokenLimitPct(limit, used);
   if (!isUserActive(user.isActive)) return 100;
-  if (user.tokenLimit === 0) return 92;
-  if (user.tokenLimit != null && user.tokenLimit > 0 && used >= user.tokenLimit) return 88;
+  if (limit === 0) return 92;
+  if (limit != null && limit > 0 && used >= limit) return 88;
   if (pct >= 90) return 72;
   if (pct >= 75) return 54;
   return 0;
 }
 
 function userHealth(user: AdminUser): { label: string; color: JoyColor; icon: React.ReactNode; detail: string } {
-  const used = getMonthTokens(user);
-  const pct = tokenLimitPct(user.tokenLimit, used);
+  const used = getWeekTokens(user);
+  const limit = user.effectiveWeeklyLimit;
+  const pct = tokenLimitPct(limit, used);
 
   if (!isUserActive(user.isActive)) return { label: 'Inactive', color: 'danger', icon: <PersonOffIcon sx={{ fontSize: 14 }} />, detail: 'Account blocked' };
-  if (user.tokenLimit === 0) return { label: 'No credits', color: 'danger', icon: <BlockIcon sx={{ fontSize: 14 }} />, detail: 'Cannot chat' };
-  if (user.tokenLimit != null && user.tokenLimit > 0 && used >= user.tokenLimit)
-    return { label: 'Exhausted', color: 'danger', icon: <WarningIcon sx={{ fontSize: 14 }} />, detail: 'Limit reached' };
-  if (pct >= 90) return { label: 'Critical', color: 'danger', icon: <WarningIcon sx={{ fontSize: 14 }} />, detail: `${pct.toFixed(0)}% used` };
-  if (pct >= 75) return { label: 'Near cap', color: 'warning', icon: <WarningIcon sx={{ fontSize: 14 }} />, detail: `${pct.toFixed(0)}% used` };
-  if (user.tokenLimit == null) return { label: 'Unlimited', color: 'neutral', icon: <AllInclusiveIcon sx={{ fontSize: 14 }} />, detail: 'No monthly cap' };
+  if (limit === 0) return { label: 'No credits', color: 'danger', icon: <BlockIcon sx={{ fontSize: 14 }} />, detail: 'Cannot chat' };
+  if (limit != null && limit > 0 && used >= limit)
+    return { label: 'Exhausted', color: 'danger', icon: <WarningIcon sx={{ fontSize: 14 }} />, detail: 'Weekly limit reached' };
+  if (pct >= 90) return { label: 'Critical', color: 'danger', icon: <WarningIcon sx={{ fontSize: 14 }} />, detail: `${pct.toFixed(0)}% of week` };
+  if (pct >= 75) return { label: 'Near cap', color: 'warning', icon: <WarningIcon sx={{ fontSize: 14 }} />, detail: `${pct.toFixed(0)}% of week` };
+  if (limit == null) return { label: 'Unlimited', color: 'neutral', icon: <AllInclusiveIcon sx={{ fontSize: 14 }} />, detail: 'Admin account' };
   return { label: 'Healthy', color: 'success', icon: <CheckCircleIcon sx={{ fontSize: 14 }} />, detail: 'Within budget' };
 }
 
@@ -632,6 +650,7 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
   const [limitValue, setLimitValue] = React.useState('');
   const [saving, setSaving] = React.useState(false);
   const [statusSaving, setStatusSaving] = React.useState(false);
+  const [planSaving, setPlanSaving] = React.useState(false);
 
   const loadData = React.useCallback(() => {
     setIsLoading(true);
@@ -653,7 +672,7 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
     const parsed = nextLimit !== undefined ? nextLimit : limitValue.trim() === '' ? null : Number.parseInt(limitValue.trim(), 10);
 
     if (parsed !== null && (!Number.isFinite(parsed) || parsed < 0)) {
-      alert('Enter 0 or a positive number. Leave blank for unlimited.');
+      alert('Enter 0 or a positive number. Leave blank to use the plan default.');
       return;
     }
 
@@ -681,14 +700,30 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
       .finally(() => setStatusSaving(false));
   };
 
+  const handleSetPlan = (plan: 'PREMIUM' | 'ULTRA') => {
+    if (usage?.user?.plan === plan) return;
+    setPlanSaving(true);
+    apiAsyncNode.admin.setUserPlan
+      .mutate({ userId: props.userId, plan })
+      .then(() => {
+        loadData();
+        props.onRefresh();
+      })
+      .catch((error) => alert(error?.message || 'Failed to update plan'))
+      .finally(() => setPlanSaving(false));
+  };
+
   const user = usage?.user;
+  const weekTokens = usage?.thisWeek?._sum?.totalTokens ?? 0;
   const monthTokens = usage?.thisMonth?._sum?.totalTokens ?? 0;
   const allTimeTokens = usage?.allTime?._sum?.totalTokens ?? 0;
   const userActive = isUserActive(user?.isActive);
-  const pct = tokenLimitPct(user?.tokenLimit, monthTokens);
+  const effectiveLimit = user?.effectiveWeeklyLimit;
+  const pct = tokenLimitPct(effectiveLimit, weekTokens);
   const health = user
-    ? userHealth({ ...user, monthUsage: usage?.thisMonth as any, allTimeUsage: null, _count: { conversations: 0, messages: 0, usageLogs: 0 } } as AdminUser)
+    ? userHealth({ ...user, monthUsage: usage?.thisMonth as any, weekUsage: usage?.thisWeek as any, allTimeUsage: null, _count: { conversations: 0, messages: 0, usageLogs: 0 } } as AdminUser)
     : null;
+  const plan = planChip(user?.plan);
 
   return (
     <Modal open onClose={props.onClose}>
@@ -741,6 +776,18 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
                     {health.label}
                   </Chip>
                 )}
+                <Chip color={plan.color} variant="solid" startDecorator={<CreditScoreIcon sx={{ fontSize: 14 }} />}>
+                  {plan.label}
+                </Chip>
+                <Button
+                  color={user.plan === 'ULTRA' ? 'primary' : 'warning'}
+                  variant="soft"
+                  loading={planSaving}
+                  onClick={() => handleSetPlan(user.plan === 'ULTRA' ? 'PREMIUM' : 'ULTRA')}
+                  sx={{ borderRadius: 8 }}
+                >
+                  {user.plan === 'ULTRA' ? 'Switch to Premium' : 'Upgrade to Ultra'}
+                </Button>
                 <Button
                   color={userActive ? 'danger' : 'success'}
                   variant={userActive ? 'outlined' : 'solid'}
@@ -758,16 +805,21 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
                 <Surface>
                   <SectionHeader
                     icon={<CreditScoreIcon sx={{ fontSize: 18 }} />}
-                    title="Credits"
+                    title="Weekly Allowance"
                     right={
-                      <Chip
-                        variant="soft"
-                        color={
-                          user.tokenLimit === 0 ? 'danger' : user.tokenLimit == null ? 'neutral' : pct >= 90 ? 'danger' : pct >= 75 ? 'warning' : 'success'
-                        }
-                      >
-                        {tokenLimitLabel(user.tokenLimit)}
-                      </Chip>
+                      <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+                        {(user.tokenLimit == null || user.tokenLimit <= 0) && effectiveLimit !== 0 && (
+                          <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                            {plan.label} default
+                          </Typography>
+                        )}
+                        <Chip
+                          variant="soft"
+                          color={effectiveLimit === 0 ? 'danger' : effectiveLimit == null ? 'neutral' : pct >= 90 ? 'danger' : pct >= 75 ? 'warning' : 'success'}
+                        >
+                          {tokenLimitLabel(effectiveLimit)}
+                        </Chip>
+                      </Box>
                     }
                   />
                   <Box sx={{ p: 2.5 }}>
@@ -775,26 +827,26 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
                       <MetricTile
                         color="primary"
                         icon={<TokenIcon />}
-                        label="Used This Month"
-                        value={fmtNum(monthTokens)}
-                        sub={`${fmtNum(usage?.thisMonth?._count ?? 0)} requests`}
+                        label="Used, Last 7 Days"
+                        value={fmtNum(weekTokens)}
+                        sub={`${fmtNum(usage?.thisWeek?._count ?? 0)} requests`}
                       />
                       <MetricTile
                         color="success"
                         icon={<AllInclusiveIcon />}
                         label="Remaining"
-                        value={tokenRemainingLabel(user.tokenLimit, monthTokens)}
-                        sub={user.tokenLimit == null ? 'Unlimited account' : `${pct.toFixed(0)}% used`}
+                        value={tokenRemainingLabel(effectiveLimit, weekTokens)}
+                        sub={effectiveLimit == null ? 'Unlimited account' : `${pct.toFixed(0)}% of weekly limit`}
                       />
                       <MetricTile
                         color="warning"
                         icon={<AttachMoneyIcon />}
                         label="Month Cost"
                         value={fmtCost(usage?.thisMonth?._sum?.costCents)}
-                        sub="Estimated spend"
+                        sub={`${fmtNum(monthTokens)} tokens this month`}
                       />
                     </Box>
-                    {user.tokenLimit != null && user.tokenLimit > 0 && (
+                    {effectiveLimit != null && effectiveLimit > 0 && (
                       <LinearProgress
                         determinate
                         value={pct}
@@ -805,7 +857,7 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ alignItems: { xs: 'stretch', md: 'center' } }}>
                       <Input
                         size="sm"
-                        placeholder="Blank = unlimited, 0 = no credits"
+                        placeholder="Blank = plan default, 0 = no credits"
                         value={limitValue}
                         onChange={(event) => setLimitValue(event.target.value)}
                         sx={{ minWidth: 220, borderRadius: 8 }}
@@ -825,11 +877,11 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
                             onClick={() => handleSetLimit(preset.value)}
                             sx={{ borderRadius: 8 }}
                           >
-                            {preset.label}
+                            {preset.label} /wk
                           </Button>
                         ))}
                         <Button size="sm" variant="soft" color="neutral" disabled={saving} onClick={() => handleSetLimit(null)} sx={{ borderRadius: 8 }}>
-                          Unlimited
+                          Plan default
                         </Button>
                         <Button size="sm" variant="soft" color="danger" disabled={saving} onClick={() => handleSetLimit(0)} sx={{ borderRadius: 8 }}>
                           No credits
@@ -1141,23 +1193,28 @@ export function AppAdmin() {
     const active = users.filter((user) => isUserActive(user.isActive)).length;
     const inactive = users.length - active;
     const zeroCredit = users.filter((user) => user.tokenLimit === 0).length;
-    const unlimited = users.filter((user) => user.tokenLimit == null).length;
+    const planDefault = users.filter((user) => user.tokenLimit == null && user.effectiveWeeklyLimit != null).length;
+    const premium = users.filter((user) => user.plan !== 'ULTRA').length;
+    const ultra = users.filter((user) => user.plan === 'ULTRA').length;
     const nearCap = users.filter((user) => {
-      const pct = tokenLimitPct(user.tokenLimit, getMonthTokens(user));
-      return user.tokenLimit != null && user.tokenLimit > 0 && pct >= 75;
+      const limit = user.effectiveWeeklyLimit;
+      const pct = tokenLimitPct(limit, getWeekTokens(user));
+      return limit != null && limit > 0 && pct >= 75;
     }).length;
     const attention = users.filter((user) => attentionScore(user) > 0).length;
-    return { active, inactive, zeroCredit, unlimited, nearCap, attention };
+    return { active, inactive, zeroCredit, planDefault, premium, ultra, nearCap, attention };
   }, [users]);
 
+  // Weekly capacity vs weekly consumption, over the effective (plan or override) limits
   const creditStats = React.useMemo(() => {
     let allocated = 0;
     let usedAgainstAllocated = 0;
     let finiteUsers = 0;
     for (const user of users) {
-      if (user.tokenLimit != null && user.tokenLimit > 0) {
-        allocated += user.tokenLimit;
-        usedAgainstAllocated += getMonthTokens(user);
+      const limit = user.effectiveWeeklyLimit;
+      if (limit != null && limit > 0) {
+        allocated += limit;
+        usedAgainstAllocated += getWeekTokens(user);
         finiteUsers += 1;
       }
     }
@@ -1194,8 +1251,12 @@ export function AppAdmin() {
           return user.tokenLimit === 0;
         case 'near':
           return health.label === 'Near cap' || health.label === 'Critical' || health.label === 'Exhausted';
-        case 'unlimited':
+        case 'unlimited': // 'Plan default' filter: weekly allowance comes from the plan
           return user.tokenLimit == null;
+        case 'premium':
+          return user.plan !== 'ULTRA';
+        case 'ultra':
+          return user.plan === 'ULTRA';
         default:
           return true;
       }
@@ -1216,17 +1277,17 @@ export function AppAdmin() {
           av = attentionScore(a);
           bv = attentionScore(b);
           break;
-        case 'monthTokens':
-          av = getMonthTokens(a);
-          bv = getMonthTokens(b);
+        case 'monthTokens': // weekly usage (the enforced window)
+          av = getWeekTokens(a);
+          bv = getWeekTokens(b);
           break;
         case 'remaining':
-          av = tokenRemainingValue(a.tokenLimit, getMonthTokens(a)) ?? Number.POSITIVE_INFINITY;
-          bv = tokenRemainingValue(b.tokenLimit, getMonthTokens(b)) ?? Number.POSITIVE_INFINITY;
+          av = tokenRemainingValue(a.effectiveWeeklyLimit, getWeekTokens(a)) ?? Number.POSITIVE_INFINITY;
+          bv = tokenRemainingValue(b.effectiveWeeklyLimit, getWeekTokens(b)) ?? Number.POSITIVE_INFINITY;
           break;
         case 'limit':
-          av = a.tokenLimit ?? Number.POSITIVE_INFINITY;
-          bv = b.tokenLimit ?? Number.POSITIVE_INFINITY;
+          av = a.effectiveWeeklyLimit ?? Number.POSITIVE_INFINITY;
+          bv = b.effectiveWeeklyLimit ?? Number.POSITIVE_INFINITY;
           break;
         case 'lastSeen':
           av = getLastSeen(a)?.getTime() ?? 0;
@@ -1592,7 +1653,7 @@ export function AppAdmin() {
                   <Surface>
                     <SectionHeader
                       icon={<InsightsIcon sx={{ fontSize: 18 }} />}
-                      title="Credit Pressure"
+                      title="Weekly Credit Pressure"
                       right={
                         <Chip color={creditStats.pct >= 90 ? 'danger' : creditStats.pct >= 75 ? 'warning' : 'success'} variant="soft">
                           {creditStats.pct.toFixed(0)}%
@@ -1747,7 +1808,9 @@ export function AppAdmin() {
                       <Option value="inactive">Inactive</Option>
                       <Option value="zero">Zero credits</Option>
                       <Option value="near">Near cap</Option>
-                      <Option value="unlimited">Unlimited</Option>
+                      <Option value="unlimited">Plan default</Option>
+                      <Option value="premium">Premium plan</Option>
+                      <Option value="ultra">Ultra plan</Option>
                     </Select>
                     <Chip variant="soft" color="neutral">
                       {sortedUsers.length === users.length ? `${users.length} users` : `${sortedUsers.length} of ${users.length}`}
@@ -1761,6 +1824,12 @@ export function AppAdmin() {
                       </Chip>
                       <Chip size="sm" color="warning" variant="soft">
                         {accountCounts.zeroCredit} zero credit
+                      </Chip>
+                      <Chip size="sm" color={planMeta.PREMIUM.color} variant="soft">
+                        {accountCounts.premium} Premium
+                      </Chip>
+                      <Chip size="sm" color={planMeta.ULTRA.color} variant="soft">
+                        {accountCounts.ultra} Ultra
                       </Chip>
                     </Box>
                   </Box>
@@ -1785,13 +1854,13 @@ export function AppAdmin() {
                             Health <SortArrow field="status" sortField={sortField} sortDir={sortDir} />
                           </th>
                           <th onClick={() => handleSort('monthTokens')}>
-                            Monthly Usage <SortArrow field="monthTokens" sortField={sortField} sortDir={sortDir} />
+                            Weekly Usage <SortArrow field="monthTokens" sortField={sortField} sortDir={sortDir} />
                           </th>
                           <th onClick={() => handleSort('remaining')} style={{ textAlign: 'right' }}>
                             Remaining <SortArrow field="remaining" sortField={sortField} sortDir={sortDir} />
                           </th>
                           <th onClick={() => handleSort('limit')}>
-                            Limit <SortArrow field="limit" sortField={sortField} sortDir={sortDir} />
+                            Plan / Limit <SortArrow field="limit" sortField={sortField} sortDir={sortDir} />
                           </th>
                           <th onClick={() => handleSort('conversations')} style={{ textAlign: 'right' }}>
                             Convos <SortArrow field="conversations" sortField={sortField} sortDir={sortDir} />
@@ -1804,9 +1873,11 @@ export function AppAdmin() {
                       </thead>
                       <tbody>
                         {sortedUsers.map((user) => {
-                          const used = getMonthTokens(user);
+                          const used = getWeekTokens(user);
+                          const limit = user.effectiveWeeklyLimit;
                           const health = userHealth(user);
                           const active = isUserActive(user.isActive);
+                          const plan = planChip(user.plan);
                           return (
                             <tr key={user.id} onClick={() => setSelectedUserId(user.id)}>
                               <td>
@@ -1818,13 +1889,18 @@ export function AppAdmin() {
                                 </Chip>
                               </td>
                               <td>
-                                <UsageProgress used={used} limit={user.tokenLimit} />
+                                <UsageProgress used={used} limit={limit} />
                               </td>
-                              <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{tokenRemainingLabel(user.tokenLimit, used)}</td>
+                              <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{tokenRemainingLabel(limit, used)}</td>
                               <td>
-                                <Chip size="sm" variant="outlined" color={user.tokenLimit === 0 ? 'danger' : user.tokenLimit == null ? 'neutral' : 'primary'}>
-                                  {tokenLimitLabel(user.tokenLimit)}
-                                </Chip>
+                                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <Chip size="sm" variant="solid" color={plan.color}>
+                                    {plan.label}
+                                  </Chip>
+                                  <Chip size="sm" variant="outlined" color={limit === 0 ? 'danger' : limit == null ? 'neutral' : 'primary'}>
+                                    {tokenLimitLabel(limit)}
+                                  </Chip>
+                                </Box>
                               </td>
                               <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{user._count.conversations}</td>
                               <td>{fmtDateTime(getLastSeen(user))}</td>
@@ -1869,19 +1945,20 @@ export function AppAdmin() {
                   <MetricTile
                     color="primary"
                     icon={<CreditScoreIcon />}
-                    label="Allocated Credits"
+                    label="Weekly Capacity"
                     value={fmtNum(creditStats.allocated)}
                     sub={`${creditStats.finiteUsers} limited users`}
                   />
                   <MetricTile
                     color="success"
                     icon={<TokenIcon />}
-                    label="Used Against Caps"
+                    label="Used, Last 7 Days"
                     value={fmtNum(creditStats.usedAgainstAllocated)}
-                    sub={`${creditStats.pct.toFixed(0)}% of allocated`}
+                    sub={`${creditStats.pct.toFixed(0)}% of capacity`}
                   />
                   <MetricTile color="danger" icon={<BlockIcon />} label="Zero Credit Users" value={accountCounts.zeroCredit} sub="Cannot chat until funded" />
-                  <MetricTile color="neutral" icon={<AllInclusiveIcon />} label="Unlimited Users" value={accountCounts.unlimited} sub="No monthly cap" />
+                  <MetricTile color={planMeta.PREMIUM.color} icon={<CreditScoreIcon />} label="Premium Plan" value={accountCounts.premium} sub="Default weekly allowance" />
+                  <MetricTile color={planMeta.ULTRA.color} icon={<BoltIcon />} label="Ultra Plan" value={accountCounts.ultra} sub="Highest weekly allowance" />
                 </Box>
 
                 <Surface>
@@ -1905,11 +1982,11 @@ export function AppAdmin() {
                             loading={bulkSaving}
                             startDecorator={<TokenIcon />}
                             onClick={() => {
-                              if (confirm('Set ' + preset.value.toLocaleString() + ' tokens/month for every non-admin user?')) handleSetAllLimits(preset.value);
+                              if (confirm('Set a custom ' + preset.value.toLocaleString() + ' tokens/week override for every non-admin user?')) handleSetAllLimits(preset.value);
                             }}
                             sx={{ borderRadius: 8 }}
                           >
-                            {preset.label} /mo
+                            {preset.label} /wk
                           </Button>
                         ))}
                         <Button
@@ -1918,7 +1995,7 @@ export function AppAdmin() {
                           loading={bulkSaving}
                           startDecorator={<BlockIcon />}
                           onClick={() => {
-                            if (confirm('Set every non-admin user to 0 monthly credits?')) handleSetAllLimits(0);
+                            if (confirm('Set every non-admin user to 0 credits (blocked)?')) handleSetAllLimits(0);
                           }}
                           sx={{ borderRadius: 8 }}
                         >
@@ -1930,11 +2007,11 @@ export function AppAdmin() {
                           loading={bulkSaving}
                           startDecorator={<AllInclusiveIcon />}
                           onClick={() => {
-                            if (confirm('Remove monthly token limits for every non-admin user?')) handleSetAllLimits(null);
+                            if (confirm('Reset every non-admin user to their plan\'s weekly default (Premium/Ultra)?')) handleSetAllLimits(null);
                           }}
                           sx={{ borderRadius: 8 }}
                         >
-                          Unlimited everyone
+                          Plan default everyone
                         </Button>
                       </Box>
                       <Divider />
@@ -1953,7 +2030,7 @@ export function AppAdmin() {
                           onClick={() => {
                             const value = Number.parseInt(bulkLimit, 10);
                             if (Number.isNaN(value) || value < 0) return alert('Enter 0 or a positive number');
-                            if (confirm('Set ' + value.toLocaleString() + ' tokens/month for every non-admin user?')) handleSetAllLimits(value);
+                            if (confirm('Set a custom ' + value.toLocaleString() + ' tokens/week override for every non-admin user?')) handleSetAllLimits(value);
                           }}
                           sx={{ borderRadius: 8 }}
                         >
@@ -1978,11 +2055,11 @@ export function AppAdmin() {
                     {[
                       { title: 'No credits', users: users.filter((user) => user.tokenLimit === 0), color: 'danger' as JoyColor },
                       {
-                        title: 'Near cap',
-                        users: users.filter((user) => tokenLimitPct(user.tokenLimit, getMonthTokens(user)) >= 75),
+                        title: 'Near weekly cap',
+                        users: users.filter((user) => tokenLimitPct(user.effectiveWeeklyLimit, getWeekTokens(user)) >= 75),
                         color: 'warning' as JoyColor,
                       },
-                      { title: 'Unlimited', users: users.filter((user) => user.tokenLimit == null), color: 'neutral' as JoyColor },
+                      { title: 'Custom override', users: users.filter((user) => user.tokenLimit != null && user.tokenLimit > 0), color: 'neutral' as JoyColor },
                     ].map((group) => (
                       <Box key={group.title} sx={{ p: 2.5 }}>
                         <Chip color={group.color} variant="soft" sx={{ mb: 1.5 }}>
@@ -1999,7 +2076,7 @@ export function AppAdmin() {
                                 {user.name || user.email}
                               </Typography>
                               <Typography level="body-xs" sx={{ color: 'text.tertiary', fontVariantNumeric: 'tabular-nums' }}>
-                                {fmtNum(getMonthTokens(user))}
+                                {fmtNum(getWeekTokens(user))}
                               </Typography>
                             </Box>
                           ))}

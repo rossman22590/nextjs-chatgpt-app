@@ -7,6 +7,41 @@ import { createChatGenerateDispatch, createChatGenerateResumeDispatch, executeCh
 import { executeChatGenerateWithContinuation } from '../dispatch/chatGenerate/chatGenerate.continuation';
 
 import { AixWire_API, AixWire_API_ChatContentGenerate } from './aix.wiretypes';
+import type { AixWire_Particles } from './aix.wiretypes';
+
+
+// --- Usage Guard (server-side enforcement) ---
+
+/**
+ * Server-side usage enforcement: the Edge runtime has no session or database access,
+ * so it forwards the caller's session cookie to the Node guard endpoint, which checks
+ * the user's weekly plan allowance (see src/server/usage/).
+ *
+ * Returns null when generation may proceed, or a user-facing block message.
+ * Fails open only on infrastructure errors - an explicit denial always blocks.
+ */
+async function _checkUsageGuard(req: Request, modelId?: string): Promise<string | null> {
+  try {
+    const guardUrl = new URL('/api/usage/guard', req.url);
+    if (modelId) guardUrl.searchParams.set('modelId', modelId);
+    const response = await fetch(guardUrl, {
+      headers: { cookie: req.headers.get('cookie') ?? '' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null; // guard unavailable: fail open
+    const guard: { allowed: boolean; reason?: string; message?: string } = await response.json();
+    if (guard.allowed) return null;
+    return guard.message || 'Your account cannot generate right now. Please contact your admin.';
+  } catch {
+    return null; // network/timeout: fail open, the client pre-flight is the fallback
+  }
+}
+
+/** Terminates the generation stream with a user-facing issue, mirroring the dispatch-prepare error shape. */
+function* _yieldGuardDenial(message: string): Generator<AixWire_Particles.ChatGenerateOp> {
+  yield { cg: 'issue', issueId: 'dispatch-prepare', issueText: ` 🚫 **[Usage]:** ${message}` };
+  yield { cg: 'end', terminationReason: 'issue-dispatch-rpc', tokenStopReason: 'cg-issue' };
+}
 
 
 // --- AIX tRPC Router ---
@@ -27,6 +62,12 @@ export const aixRouter = createTRPCRouterEdge({
       connectionOptions: AixWire_API.ConnectionOptionsChatGenerate_schema.optional(), // debugDispatchRequest, debugProfilePerformance, enableResumability
     }))
     .mutation(async function* ({ input, ctx }) {
+
+      // server-side usage enforcement (weekly plan + per-model-family limits) - blocks before any provider dispatch
+      const guardDenial = await _checkUsageGuard(ctx.req, input.model.id);
+      if (guardDenial !== null)
+        return yield* _yieldGuardDenial(guardDenial);
+
       const _d = _createDebugConfig(input.access, input.connectionOptions, input.context.name);
       const dispatchCreator = () => createChatGenerateDispatch(input.access, input.model, input.chatGenerate, input.streaming, !!input.connectionOptions?.enableResumability);
 
@@ -46,6 +87,13 @@ export const aixRouter = createTRPCRouterEdge({
       connectionOptions: AixWire_API.ConnectionOptionsChatGenerate_schema.pick({ debugDispatchRequest: true }).optional(), // debugDispatchRequest
     }))
     .mutation(async function* ({ input, ctx }) {
+
+      // server-side usage enforcement: reattach continues real token generation, so it is gated too
+      // (no modelId: only the account-level gates apply - inactive / no-credits / session limit)
+      const guardDenial = await _checkUsageGuard(ctx.req);
+      if (guardDenial !== null)
+        return yield* _yieldGuardDenial(guardDenial);
+
       const _d = _createDebugConfig(input.access, input.connectionOptions, input.context.name);
       const dispatchCreator = () => createChatGenerateResumeDispatch(input.access, input.upstreamHandle, input.streaming);
 
