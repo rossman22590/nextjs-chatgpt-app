@@ -10,7 +10,7 @@ import { OPTIMA_OPEN_DEBOUNCE, OPTIMA_PEEK_HOVER_ENTER_DELAY, OPTIMA_PEEK_HOVER_
 
 export type PreferencesTabId =
   | 'chat' | 'voice' | 'draw' | 'tools' // legacy aliases (still valid; resolved to nav nodes inside SettingsModal)
-  | 'appearance' | 'ai' | 'labs' // new top-level leaves
+  | 'appearance' | 'ai' | 'usage' | 'labs' // new top-level leaves
   | 'voice-in' | 'voice-out' // Voice sub-items
   | 'tools-browse' | 'tools-search' // Tools sub-items
   | undefined;

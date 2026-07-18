@@ -16,6 +16,7 @@ import { T2IConfigureEngines } from '~/modules/t2i/components/T2IConfigureEngine
 import type { SettingsNavId } from './settings.nav';
 import { AppChatSettingsAI } from './AppChatSettingsAI';
 import { AppChatSettingsUI } from './settings-ui/AppChatSettingsUI';
+import { UsageLimitsSettings } from './UsageLimitsSettings';
 import { UxLabsSettings } from './UxLabsSettings';
 import { VoiceInSettings } from './VoiceInSettings';
 import { VoiceOutSettings } from './VoiceOutSettings';
@@ -180,6 +181,9 @@ function renderSection(nodeId: SettingsNavId, isMobile: boolean, onSelect: (id: 
 
     case 'ai':
       return <Box sx={_styles.block}><AppChatSettingsAI /></Box>;
+
+    case 'usage':
+      return <Box sx={_styles.block}><UsageLimitsSettings /></Box>;
 
     // Voice parent (hub): no common settings - just links into Input / Output
     case 'voice':

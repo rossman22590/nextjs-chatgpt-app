@@ -2,6 +2,7 @@ import * as React from 'react';
 
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ConstructionIcon from '@mui/icons-material/Construction';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
 import FormatPaintTwoToneIcon from '@mui/icons-material/FormatPaintTwoTone';
 import LanguageRoundedIcon from '@mui/icons-material/LanguageRounded';
 import MicIcon from '@mui/icons-material/Mic';
@@ -20,7 +21,7 @@ import { PhVoice } from '~/common/components/icons/phosphor/PhVoice';
  * Every id here is a real, selectable nav node (top-level or sub-item).
  */
 export type SettingsNavId =
-  | 'appearance' | 'ai'
+  | 'appearance' | 'ai' | 'usage'
   | 'voice' | 'voice-in' | 'voice-out'
   | 'draw'
   | 'tools' | 'tools-browse' | 'tools-search'
@@ -41,6 +42,7 @@ export interface SettingsNavNode {
  */
 export const SETTINGS_NAV: SettingsNavNode[] = [
   { id: 'ai', label: 'AI', icon: <AutoAwesomeIcon /> },
+  { id: 'usage', label: 'Usage Limits', icon: <DataUsageIcon /> },
   { id: 'appearance', label: 'Appearance', icon: <TuneIcon /> },
   {
     id: 'voice', label: 'Voice', icon: <RecordVoiceOverRoundedIcon />,

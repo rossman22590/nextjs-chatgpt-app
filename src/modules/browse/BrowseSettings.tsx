@@ -41,7 +41,7 @@ export function BrowseSettings() {
   return <>
 
     <Typography level='body-sm'>
-      Download and process web pages for analysis. <ExternalLink href='https://big-agi.com/docs/config-feature-browse'>Learn more</ExternalLink>.
+      Download and process web pages for analysis. <ExternalLink href='https://support.myapps.ai'>Learn more</ExternalLink>.
     </Typography>
 
     <FormInputKey
