@@ -9,6 +9,7 @@ import { findModelVendor } from '~/modules/llms/vendors/vendors.registry';
 
 import type { DModelsServiceId } from '~/common/stores/llms/llms.service.types';
 import { DLLM, DLLMId, getLLMLabel, isLLMVisible } from '~/common/stores/llms/llms.types';
+import { useAdminModelsStore } from '~/common/stores/store-admin-models';
 import { DebouncedInputMemo } from '~/common/components/DebouncedInput';
 import { GoodTooltip } from '~/common/components/GoodTooltip';
 import { KeyStroke } from '~/common/components/KeyStroke';
@@ -36,11 +37,12 @@ function LLMDropdown(props: {
   // external state
   const uiComplexityMode = useUIComplexityMode();
   const showSymbols = uiComplexityMode !== 'minimal';
+  const adminDisabledIds = useAdminModelsStore((state) => state.disabledIds); // re-render when admin toggles models
 
   // derived state
   const { chatLlmId, llms, setChatLlmId } = props;
 
-  const llmsCount = llms.filter(isLLMVisible).length;
+  const llmsCount = llms.filter(llm => isLLMVisible(llm) && !adminDisabledIds.has(llm.id)).length;
   const showFilter = llmsCount >= 50;
 
   const handleChatLLMChange = React.useCallback((value: DLLMId | null) => {
@@ -62,6 +64,10 @@ function LLMDropdown(props: {
 
     const lcFilterString = filterString?.toLowerCase();
     const filteredLLMs = llms.filter(llm => {
+      // admin-disabled models are removed entirely - even the currently-selected one, even when searching
+      if (adminDisabledIds.has(llm.id))
+        return false;
+
       if (chatLlmId && llm.id === chatLlmId)
         return true;
 
@@ -115,7 +121,7 @@ function LLMDropdown(props: {
 
     // otherwise update the cache and return the new items
     return stabilizeLlmOptions.current = llmItems;
-  }, [chatLlmId, llms, filterString]);
+  }, [adminDisabledIds, chatLlmId, llms, filterString]);
 
 
   // "Model Options" button (only on the active item)

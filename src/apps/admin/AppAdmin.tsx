@@ -63,10 +63,27 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import SpeedIcon from '@mui/icons-material/Speed';
 import TokenIcon from '@mui/icons-material/Token';
 import TuneIcon from '@mui/icons-material/Tune';
+import LayersIcon from '@mui/icons-material/Layers';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import WarningIcon from '@mui/icons-material/Warning';
+
+import { useShallow } from 'zustand/react/shallow';
 
 import { isAdminEmail } from '~/common/auth/adminEmails';
 import { apiAsyncNode } from '~/common/util/trpc.client';
+import type { DLLM } from '~/common/stores/llms/llms.types';
+import { getLLMLabel } from '~/common/stores/llms/llms.types';
+import { getAllModelParameterValues } from '~/common/stores/llms/llms.parameters';
+import { groupLLMsByService } from '~/common/stores/llms/components/llms.dropdown.utils';
+import { useModelsStore } from '~/common/stores/llms/store-llms';
+import { adminModelsSetDisabledIds, useAdminModelsStore } from '~/common/stores/store-admin-models';
+
+// A disabled model is blocked in two id spaces: the DLLM id (client selector / pre-flight) and the
+// provider ref / llmRef (the id the AIX server guard sees). Store BOTH so enforcement matches everywhere.
+function modelBlockIds(llm: DLLM): string[] {
+  const llmRef = getAllModelParameterValues(llm.initialParameters, llm.userParameters).llmRef;
+  return Array.from(new Set([llm.id, ...(llmRef ? [llmRef] : [])]));
+}
 
 type AdminStats = Awaited<ReturnType<typeof apiAsyncNode.admin.globalStats.query>>;
 type AdminUser = Awaited<ReturnType<typeof apiAsyncNode.admin.listUsers.query>>[number];
@@ -77,7 +94,7 @@ type UserUsage = Awaited<ReturnType<typeof apiAsyncNode.admin.getUserUsage.query
 type UserLog = Awaited<ReturnType<typeof apiAsyncNode.admin.getUserLogs.query>>[number];
 type AdminSystemPersona = Awaited<ReturnType<typeof apiAsyncNode.admin.listSystemPersonas.query>>[number];
 
-type ActiveView = 'overview' | 'people' | 'credits' | 'personas' | 'broadcast';
+type ActiveView = 'overview' | 'people' | 'credits' | 'models' | 'personas' | 'broadcast';
 type UserFilter = 'all' | 'attention' | 'active' | 'inactive' | 'zero' | 'near' | 'unlimited' | 'premium' | 'ultra';
 type SortField = 'name' | 'status' | 'monthTokens' | 'remaining' | 'limit' | 'lastSeen' | 'conversations';
 type SortDir = 'asc' | 'desc';
@@ -1115,6 +1132,178 @@ function PersonaEditorModal(props: {
   );
 }
 
+// --- Models Manager (turn connected models on/off for everyone) ---
+
+function ModelsManager() {
+
+  // all connected models from THIS admin's client store (already loaded in the browser)
+  const llms = useModelsStore(useShallow((state) => state.llms));
+  const disabledIds = useAdminModelsStore((state) => state.disabledIds);
+
+  const [tab, setTab] = React.useState<'all' | 'active' | 'disabled'>('all');
+  const [search, setSearch] = React.useState('');
+  const [savingIds, setSavingIds] = React.useState<Set<string>>(new Set());
+
+  // sync the authoritative disabled list from the server on mount (admin view)
+  React.useEffect(() => {
+    apiAsyncNode.admin.getDisabledModelsAdmin.query()
+      .then((res) => adminModelsSetDisabledIds(res.disabledIds))
+      .catch(() => { /* keep last-known */ });
+  }, []);
+
+  const totalCount = llms.length;
+  const disabledCount = React.useMemo(() => llms.filter((llm) => disabledIds.has(llm.id)).length, [llms, disabledIds]);
+  const activeCount = totalCount - disabledCount;
+
+  const toggleModels = React.useCallback((models: DLLM[], disabled: boolean) => {
+    if (!models.length) return;
+    const uiIds = models.map((llm) => llm.id); // savingIds/spinners track the DLLM id
+    const blockIds = Array.from(new Set(models.flatMap(modelBlockIds))); // sent to server: DLLM id + llmRef
+    setSavingIds((prev) => { const next = new Set(prev); uiIds.forEach((id) => next.add(id)); return next; });
+    apiAsyncNode.admin.setModelsDisabled.mutate({ modelIds: blockIds, disabled })
+      .then((res) => adminModelsSetDisabledIds(res.disabledIds))
+      .catch((error) => alert(error?.message || 'Failed to update models'))
+      .finally(() => setSavingIds((prev) => { const next = new Set(prev); uiIds.forEach((id) => next.delete(id)); return next; }));
+  }, []);
+
+  // filter by tab + search, then group by service
+  const groups = React.useMemo(() => {
+    const lc = search.trim().toLowerCase();
+    const filtered = llms.filter((llm) => {
+      const isDisabled = disabledIds.has(llm.id);
+      if (tab === 'active' && isDisabled) return false;
+      if (tab === 'disabled' && !isDisabled) return false;
+      if (lc && !getLLMLabel(llm).toLowerCase().includes(lc) && !llm.id.toLowerCase().includes(lc)) return false;
+      return true;
+    });
+    return groupLLMsByService(filtered);
+  }, [llms, disabledIds, tab, search]);
+
+  const shownCount = groups.reduce((sum, g) => sum + g.models.length, 0);
+
+  if (!totalCount)
+    return (
+      <Stack spacing={2} sx={{ maxWidth: 1180, mx: 'auto' }}>
+        <Surface>
+          <Box sx={{ p: 4, textAlign: 'center', color: 'text.tertiary' }}>
+            <LayersIcon sx={{ fontSize: 40, opacity: 0.4, mb: 1 }} />
+            <Typography level="body-sm">
+              No models are loaded in this browser yet. Open the chat, connect your model services (e.g. OpenRouter), then come back - the list here mirrors the models you have connected.
+            </Typography>
+          </Box>
+        </Surface>
+      </Stack>
+    );
+
+  return (
+    <Stack spacing={2} sx={{ maxWidth: 1180, mx: 'auto' }}>
+
+      {/* Summary tiles */}
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+        <MetricTile color="primary" icon={<LayersIcon />} label="Connected Models" value={totalCount} sub="Across all services" />
+        <MetricTile color="success" icon={<CheckCircleIcon />} label="Active" value={activeCount} sub="Selectable in chat" />
+        <MetricTile color="danger" icon={<BlockIcon />} label="Turned Off" value={disabledCount} sub="Hidden from everyone" />
+      </Box>
+
+      <Surface>
+        {/* Toolbar */}
+        <Box sx={{ px: 2.5, py: 2, display: 'flex', gap: 1.25, alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)' }}>
+          <Input
+            size="sm"
+            placeholder="Search models by name or id"
+            startDecorator={<SearchIcon sx={{ fontSize: 18 }} />}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            sx={{ flex: '1 1 320px', maxWidth: 560, borderRadius: 8 }}
+          />
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            {(['all', 'active', 'disabled'] as const).map((value) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={tab === value ? 'solid' : 'soft'}
+                color={value === 'disabled' ? 'danger' : value === 'active' ? 'success' : 'neutral'}
+                onClick={() => setTab(value)}
+                sx={{ borderRadius: 8, textTransform: 'capitalize', minWidth: 84 }}
+              >
+                {value === 'all' ? `All ${totalCount}` : value === 'active' ? `Active ${activeCount}` : `Off ${disabledCount}`}
+              </Button>
+            ))}
+          </Box>
+        </Box>
+
+        {/* Grouped list */}
+        <Box sx={{ maxHeight: '62vh', overflow: 'auto' }}>
+          {groups.map((group) => {
+            const groupDisabledCount = group.models.filter((llm) => disabledIds.has(llm.id)).length;
+            const allDisabled = groupDisabledCount === group.models.length;
+            const groupSaving = group.models.some((llm) => savingIds.has(llm.id));
+            return (
+              <Box key={group.serviceId}>
+                {/* Service header */}
+                <Box sx={{ px: 2.5, py: 1.25, display: 'flex', alignItems: 'center', gap: 1.5, background: 'var(--joy-palette-background-level1)', position: 'sticky', top: 0, zIndex: 1, borderBottom: '1px solid var(--joy-palette-neutral-outlinedBorder)' }}>
+                  <Typography level="title-sm" sx={{ fontWeight: 800 }}>{group.serviceLabel}</Typography>
+                  <Chip size="sm" variant="soft" color="neutral">{group.models.length}</Chip>
+                  {groupDisabledCount > 0 && <Chip size="sm" variant="soft" color="danger">{groupDisabledCount} off</Chip>}
+                  <Button
+                    size="sm"
+                    variant="plain"
+                    color={allDisabled ? 'success' : 'danger'}
+                    loading={groupSaving}
+                    startDecorator={<PowerSettingsNewIcon sx={{ fontSize: 15 }} />}
+                    onClick={() => toggleModels(group.models, !allDisabled)}
+                    sx={{ ml: 'auto', borderRadius: 8 }}
+                  >
+                    {allDisabled ? 'Enable all' : 'Turn all off'}
+                  </Button>
+                </Box>
+                {/* Models */}
+                {group.models.map((llm) => {
+                  const isDisabled = disabledIds.has(llm.id);
+                  const saving = savingIds.has(llm.id);
+                  return (
+                    <Box
+                      key={llm.id}
+                      sx={{ px: 2.5, py: 1, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid var(--joy-palette-divider)', opacity: isDisabled ? 0.6 : 1 }}
+                    >
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>{getLLMLabel(llm)}</Typography>
+                        <Typography level="body-xs" noWrap sx={{ color: 'text.tertiary' }}>{llm.id}</Typography>
+                      </Box>
+                      <Chip size="sm" variant="soft" color={isDisabled ? 'danger' : 'success'} sx={{ minWidth: 62, justifyContent: 'center' }}>
+                        {isDisabled ? 'Off' : 'Active'}
+                      </Chip>
+                      {saving ? (
+                        <CircularProgress size="sm" sx={{ '--CircularProgress-size': '20px' }} />
+                      ) : (
+                        <Switch
+                          checked={!isDisabled}
+                          color={isDisabled ? 'danger' : 'success'}
+                          onChange={(event) => toggleModels([llm], !event.target.checked)}
+                        />
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
+            );
+          })}
+          {!shownCount && (
+            <Box sx={{ py: 6, textAlign: 'center', color: 'text.tertiary' }}>
+              <Typography level="body-sm">No models match this view</Typography>
+            </Box>
+          )}
+        </Box>
+      </Surface>
+
+      <Typography level="body-xs" sx={{ color: 'text.tertiary', px: 0.5 }}>
+        Turned-off models disappear from the model picker for every user and are rejected server-side. Changes apply within a few seconds. This list mirrors the models connected in your own browser.
+      </Typography>
+    </Stack>
+  );
+}
+
+
 export function AppAdmin() {
   const { data: session } = useSession();
 
@@ -1528,6 +1717,12 @@ export function AppAdmin() {
             badge={accountCounts.attention || undefined}
             active={activeView === 'credits'}
             onClick={() => setActiveView('credits')}
+          />
+          <NavButton
+            icon={<LayersIcon sx={{ fontSize: 17 }} />}
+            label="Models"
+            active={activeView === 'models'}
+            onClick={() => setActiveView('models')}
           />
           <NavButton
             icon={<PersonIcon sx={{ fontSize: 17 }} />}
@@ -2271,6 +2466,8 @@ export function AppAdmin() {
                 </Surface>
               </Stack>
             )}
+
+            {activeView === 'models' && <ModelsManager />}
 
             {activeView === 'broadcast' && (
               <Stack spacing={2.5} sx={{ maxWidth: 980, mx: 'auto' }}>

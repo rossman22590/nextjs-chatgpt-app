@@ -6,6 +6,7 @@ import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 
 import { Release } from '~/common/app.release';
+import { adminModelsSetDisabledIds } from '~/common/stores/store-admin-models';
 import { frontendHashString } from '~/common/util/textUtils';
 import { themeZIndexPageBar } from '~/common/app.theme';
 import { uiSetDismissed, useUIIsDismissed } from '~/common/stores/store-ui';
@@ -50,6 +51,13 @@ export function OptimaMOTD() {
         .catch(() => {
           if (!disposed) setLiveBanner(null);
         });
+      // piggyback: refresh the admin-disabled model list into its client store (used by the model selector)
+      apiAsyncNode.admin.getDisabledModels
+        .query()
+        .then(({ disabledIds }) => {
+          if (!disposed) adminModelsSetDisabledIds(disabledIds);
+        })
+        .catch(() => { /* leave the last-known list in place on transient errors */ });
     };
 
     loadBanner();

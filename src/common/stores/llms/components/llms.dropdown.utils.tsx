@@ -1,5 +1,7 @@
 import { findModelVendor } from '~/modules/llms/vendors/vendors.registry';
 
+import { isModelAdminDisabled } from '~/common/stores/store-admin-models';
+
 import type { DLLM, DLLMId } from '../llms.types';
 import type { DModelsServiceId } from '../llms.service.types';
 import { findModelsServiceOrNull } from '../store-llms';
@@ -20,6 +22,9 @@ export function filterLLMsForDropdown(
 ): DLLM[] {
   const lcSearch = options.searchString?.toLowerCase();
   return llms.filter(llm => {
+    // Admin-disabled models are hard-hidden - never shown, even when searching or currently selected
+    if (isModelAdminDisabled(llm.id)) return false;
+
     // Always include the currently selected model
     if (options.currentModelId && llm.id === options.currentModelId) return true;
 

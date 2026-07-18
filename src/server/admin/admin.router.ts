@@ -7,6 +7,7 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from '~/server/
 import { prisma } from '~/server/prisma/prisma-client';
 import { planLabel, planWeeklyTokens, USER_PLAN_IDS, WEEKLY_WINDOW_MS } from '~/server/usage/usage.plans';
 import { adminBannerInputSchema, isAllowedBannerUrl, readAdminBanner, readPublicAdminBanner, writeAdminBanner } from './admin.banner';
+import { readDisabledModels, writeDisabledModels } from './admin.models';
 import { getSystemPersonaSeedRows } from './system-personas.seed';
 
 /**
@@ -107,6 +108,32 @@ export const adminRouter = createTRPCRouter({
   getBanner: publicProcedure.query(async () => {
     return readPublicAdminBanner();
   }),
+
+  // Public: the list of admin-disabled model ids, read by every client to filter its model selector
+  getDisabledModels: publicProcedure.query(async () => {
+    const { disabledIds } = await readDisabledModels();
+    return { disabledIds };
+  }),
+
+  // Admin: full disabled-models record (with metadata) for the management panel
+  getDisabledModelsAdmin: isAdmin.query(async () => {
+    return readDisabledModels();
+  }),
+
+  // Admin: turn one or many models on/off. disabled=true adds them, false removes them.
+  setModelsDisabled: isAdmin
+    .input(z.object({
+      modelIds: z.array(z.string().min(1).max(200)).min(1).max(2000),
+      disabled: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const current = new Set((await readDisabledModels()).disabledIds);
+      for (const id of input.modelIds) {
+        if (input.disabled) current.add(id);
+        else current.delete(id);
+      }
+      return writeDisabledModels(Array.from(current), ctx.session.user.id);
+    }),
 
   listActiveSystemPersonas: publicProcedure.query(async () => {
     try {

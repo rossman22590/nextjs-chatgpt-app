@@ -1,5 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 
+import { useAdminModelsStore } from '~/common/stores/store-admin-models';
+
 import type { DModelsServiceId } from './llms.service.types';
 import { DLLM, DLLMId, isLLMVisible } from './llms.types';
 import { isLLMChatFree_cached } from './llms.pricing';
@@ -36,11 +38,17 @@ export function useVisibleLLMs(includeLlmId: undefined | DLLMId | null, starredO
   // for performance, we don't include this in the memo selector, as they'll change in tandem anyway
   let hasStarred = false;
 
+  // admin-disabled models are removed from every selector (re-renders when the admin toggles them)
+  const adminDisabledIds = useAdminModelsStore((state) => state.disabledIds);
+
   const llms = useModelsStore(useShallow(({ llms }) => {
     // filter by visibility and starred status
     const filtered = llms.filter((llm) => {
       // finds out if any starred LLM exists
       if (llm.userStarred) hasStarred = true;
+
+      // admin-disabled: never show, not even the includeLlmId (hard off)
+      if (adminDisabledIds.has(llm.id)) return false;
 
       // always include the specified LLM ID if provided
       if (includeLlmId && llm.id === includeLlmId) return true;

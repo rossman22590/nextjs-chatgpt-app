@@ -2,6 +2,7 @@ import { findServiceAccessOrThrow } from '~/modules/llms/vendors/vendor.helpers'
 
 import type { MaybePromise } from '~/common/types/useful.types';
 import { AIVndAntInlineFilesPolicy, getVndAntInlineFiles } from '~/common/stores/store-ai';
+import { isModelAdminDisabled } from '~/common/stores/store-admin-models';
 import { AudioPlayer } from '~/common/util/audio/AudioPlayer';
 import { DLLM, DLLMId, LLM_IF_GEM_Interactions, LLM_IF_HOTFIX_NoTemperature, LLM_IF_OAI_Responses, LLM_IF_Outputs_Audio, LLM_IF_Outputs_Image, LLM_IF_Outputs_NoText } from '~/common/stores/llms/llms.types';
 import { DMessage, DMessageGenerator, createGeneratorAIX_AutoLabel } from '~/common/stores/chat/chat.message';
@@ -730,6 +731,11 @@ const USAGE_LIMIT_CACHE_MS = 10_000;
  */
 async function _assertUsageWithinLimitOrThrow(modelId: string): Promise<void> {
   const now = Date.now();
+
+  // Admin-disabled model: block immediately (uses the DLLM id, which the disabled store is keyed by).
+  // This gates the already-selected model too (the dropdown only hides it from new selection).
+  if (isModelAdminDisabled(modelId))
+    throw new AixUsageLimitError('This model has been turned off by your administrator. Please pick a different model.');
 
   // serve from the short-lived cache (per-model: family caps differ across models)
   if (_usageLimitCache && _usageLimitCache.modelId === modelId && (now - _usageLimitCache.at) < USAGE_LIMIT_CACHE_MS) {

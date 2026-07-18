@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 
 import { checkUserAllowance } from '~/server/usage/usage.allowance';
+import { isModelDisabledCached } from '~/server/admin/admin.models';
 
 /**
  * Internal usage guard - called by the AIX Edge runtime before dispatching a generation.
@@ -31,6 +32,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
     const modelId = typeof req.query.modelId === 'string' ? req.query.modelId : undefined;
+
+    // Admin-disabled model: hard block regardless of usage/plan
+    if (modelId && await isModelDisabledCached(modelId))
+      return res.status(200).json({
+        allowed: false,
+        reason: 'model_disabled',
+        message: 'This model has been turned off by your administrator. Please pick a different model.',
+      });
+
     const allowance = await checkUserAllowance(userId, modelId);
 
     if (allowance.allowed)
