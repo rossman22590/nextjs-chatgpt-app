@@ -28,7 +28,7 @@ export const Release = {
 
   // this is here to trigger revalidation of data, e.g. models refresh
   Monotonics: {
-    Aix: 79,
+    Aix: 87,
     NewsVersion: 205,
   },
 

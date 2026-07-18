@@ -18,21 +18,27 @@ export function minimaxHeuristic(urlOrHost: string | undefined): boolean {
  * - Models: https://platform.minimax.io/docs/release-notes/models.md
  * - Pricing: https://platform.minimax.io/docs/guides/pricing-paygo.md
  * - Text generation: https://platform.minimax.io/docs/guides/text-generation.md
- * - Updated: 2026-06-01
+ * - Updated: 2026-06-26
  */
-const _knownMiniMaxModels = llmsDefineModels<ModelDescriptionSchema>()([
+type _MiniMaxModelDef = ModelDescriptionSchema & { pubDate: string };
 
-  // M3 - flagship, natively multimodal, 1M context (2026-05-31)
+const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
+
+  // M3 - flagship, natively multimodal, 1M context (2026-06-01)
   {
     id: 'MiniMax-M3',
     label: 'MiniMax M3',
-    pubDate: '20260531',
+    pubDate: '20260601',
     description: 'Flagship: frontier coding and agentic reasoning, natively multimodal (text, image, video input). 1M context, 131K max output.',
     contextWindow: 1000000,
     maxCompletionTokens: 131072,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision],
-    // standard PAYG pricing; 7-day launch promo (until ~2026-06-07) halves these to 0.30 / 1.20 / read 0.06
-    chatPrice: { input: 0.60, output: 2.40, cache: { cType: 'oai-ac', read: 0.12 } },
+    // tiered PAYG pricing: boundary at 512K input tokens, >512K tier doubles. Priority tier (1.5x) not modeled.
+    chatPrice: {
+      input: [{ upTo: 512000, price: 0.30 }, { upTo: null, price: 0.60 }],
+      output: [{ upTo: 512000, price: 1.20 }, { upTo: null, price: 2.40 }],
+      cache: { cType: 'oai-ac', read: [{ upTo: 512000, price: 0.06 }, { upTo: null, price: 0.12 }] },
+    },
   },
 
   // M2.7 series
@@ -95,7 +101,7 @@ const _knownMiniMaxModels = llmsDefineModels<ModelDescriptionSchema>()([
   {
     id: 'MiniMax-M2.1',
     label: 'MiniMax M2.1',
-    pubDate: '20251223',
+    pubDate: '20251222',
     description: '230B params (10B active), multilingual coding. 200K context, 65K max output.',
     contextWindow: 204800,
     maxCompletionTokens: 65536,
@@ -106,7 +112,7 @@ const _knownMiniMaxModels = llmsDefineModels<ModelDescriptionSchema>()([
   {
     id: 'MiniMax-M2.1-highspeed',
     label: 'MiniMax M2.1 (Highspeed)',
-    pubDate: '20251223',
+    pubDate: '20251222',
     description: 'Faster M2.1 variant. 200K context, 65K max output.',
     contextWindow: 204800,
     maxCompletionTokens: 65536,

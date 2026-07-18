@@ -1,7 +1,7 @@
 import * as React from 'react';
 import TimeAgo from 'react-timeago';
 
-import { Box, Button, ButtonGroup, Checkbox, Divider, Dropdown, FormControl, Grid, IconButton, Input, Link, ListDivider, ListItemDecorator, Menu, MenuButton, MenuItem, Switch, Tooltip, Typography } from '@mui/joy';
+import { Box, Button, ButtonGroup, Checkbox, Chip, Divider, Dropdown, FormControl, Grid, IconButton, Input, Link, ListDivider, ListItemDecorator, Menu, MenuButton, MenuItem, Switch, Tooltip, Typography } from '@mui/joy';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -263,15 +263,27 @@ export function LLMOptionsModal(props: { id: DLLMId, context?: ModelOptionsConte
 
   const hasUserParameters = llm.userParameters && Object.keys(llm.userParameters).length > 0;
   const resetButton = !hasUserParameters ? null : (
-    <Link
-      component='button'
-      color='neutral'
-      level='body-sm'
+    <Chip
+      variant='soft'
       onClick={handleResetParameters}
-      // sx={{ mt: 0.125 }}
+      sx={{
+        px: 1.5,
+        mr: 0.5, // desktop outline not cropped
+        ml: 'auto', // mobile to the right
+        my: 0.5, // mobile some more spacing (desktop not influenced)
+    }}
     >
       Reset to defaults...
-    </Link>
+    </Chip>
+    // <Link
+    //   component='button'
+    //   color='neutral'
+    //   level='body-sm'
+    //   onClick={handleResetParameters}
+    //   // sx={{ mt: 0.125 }}
+    // >
+    //   Reset to defaults...
+    // </Link>
   );
 
 
@@ -303,7 +315,7 @@ export function LLMOptionsModal(props: { id: DLLMId, context?: ModelOptionsConte
                 {visible ? <VisibilityIcon sx={{ fontSize: 'xl' }} /> : <VisibilityOffIcon />}
               </IconButton>
             </TooltipOutlined>}
-            <div>{getLLMLabel(llm)} <span style={{ opacity: 0.5 }}>options</span></div>
+            <div>{getLLMLabel(llm)}{/*<span style={{ opacity: 0.5 }}>options</span>*/}</div>
           </Box>
 
           {/* [Desktop] Reset to default - show only when user has customized parameters */}

@@ -32,9 +32,9 @@ export function aixAnthropicHostedFeatures(model: AixAPI_Model, chatGenerate: Ai
 
   // Allow/deny auto-adding hosted tools when custom tools are present with a restrictive policy
   const _hasAixCustomTools = chatGenerate.tools?.some(t => t.type === 'function_call');
-  const _hasAixToolRestrictivePolicy = chatGenerate.toolsPolicy?.type === 'any' || chatGenerate.toolsPolicy?.type === 'function_call';
+  const _hasAixToolRestrictivePolicy = chatGenerate.toolsPolicy?.type === 'any' /* || chatGenerate.toolsPolicy?.type === 'function_call' - DISABLED 2026-07-17, see ToolsPolicy_schema */;
 
-  // Dynamic web tools (20260209) require code execution for programmatic tool calling
+  // Dynamic web tools (20260318, was 20260209) require code execution for programmatic tool calling
   // const hasDynamicWebTools = model.vndAntWebDynamic === true && (model.vndAntWebSearch === 'auto' || model.vndAntWebFetch === 'auto');
 
   // Programmatic Tool Calling - tools with allowed_callers or input_examples
@@ -45,17 +45,24 @@ export function aixAnthropicHostedFeatures(model: AixAPI_Model, chatGenerate: Ai
     ),
   ) ?? false;
 
-  // [Anthropic, issue #1087] Dynamic web tools (20260209) have INTERNAL code execution. We do not
-  // explicitly add the code_execution tool nor the beta header for them: Anthropic enables what is
-  // needed implicitly behind the scenes.
+  // [Anthropic] Code execution (the explicit code_execution_20260120 tool + container) is triggered
+  // three ways, all converging on ONE explicit container: the standalone Code Sandbox toggle (a
+  // general-purpose hosted-container sandbox), Skills (which run inside the container), and Programmatic Tool Calling
+  // (which uses the container as its script executor).
+  // Dynamic web tools (_20260318, was _20260209) have their OWN internal code execution. We never AUTO-enable the
+  // standalone tool from them (#1087: a 2nd implicit environment is parasitic), nor from container
+  // continuity alone. We DO honor an explicit user toggle even alongside dynamic web: Anthropic's
+  // docs note this can create two execution environments that may confuse the model (mitigable via
+  // system prompt) - https://platform.claude.com/docs/en/agents-and-tools/tool-use/server-tools#dynamic-filtering-with-code-execution
   return {
     disableAllHostedTools: !!(_hasAixCustomTools && _hasAixToolRestrictivePolicy),
     enable1MContext: model.vndAnt1MContext === true,
     enableCodeExecution:
-      !!model.vndAntSkills ||
-      // || hasDynamicWebTools // https://platform.claude.com/docs/en/agents-and-tools/tool-use/server-tools#dynamic-filtering-with-code-execution
-      // || !!model.vndAntContainerId // do not re-enable code execution jsut for continuity - would have parasitic effects: https://github.com/enricoros/big-AGI/issues/1087#issuecomment-4340352958
-      programmaticToolCalling,
+      model.vndAntCodeSandbox === 'auto' || // standalone user toggle (general-purpose hosted-container sandbox)
+      !!model.vndAntSkills || // Skills execute inside the code execution container
+      // || hasDynamicWebTools // NOT auto-enabled - dynamic web executes code internally; see note above
+      // || !!model.vndAntContainerId // NOT re-enabled just for continuity - parasitic: https://github.com/enricoros/big-AGI/issues/1087#issuecomment-4340352958
+      programmaticToolCalling, // PTC uses the container as its script executor
     enableFastMode: model.vndAntInfSpeed === 'fast',
     enableSkills: !!model.vndAntSkills,
     enableStrictOutputs: !!model.strictJsonOutput || !!model.strictToolInvocations,
@@ -155,6 +162,11 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
   }
   if (currentMessage)
     chatMessages.push(currentMessage);
+
+  // [Anthropic, 2026-07-10] The API rejects >4 cache_control blocks ("A maximum of 4 blocks with
+  // cache_control may be provided.") - manual 'Cache up to here' flags can stack beyond the auto
+  // policy's 3. Keep the trailing 4: breakpoints cache prefixes, so earlier ones are redundant.
+  _capTrailingCacheBreakpoints(systemMessage, chatMessages, 4);
 
   // If the first (user) message is missing, copy the first line of the system message
   // [Anthropic] October 8th, 2024 release notes: "...we no longer require the first input message to be a user message."
@@ -278,10 +290,11 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
   if (!disableAllHostedTools) {
     const hostedTools: NonNullable<TRequest['tools']> = [];
 
-    // Web Search Tool - dynamic filtering (20260209) uses internal code execution for better results
+    // Web Search Tool - dynamic filtering (20260318, supersedes 20260209) uses internal code execution for better results.
+    // response_inclusion intentionally left unset (defaults to 'full') - unchanged behavior, see _WebSearchTool_20260318_schema.
     if (model.vndAntWebSearch === 'auto') {
       hostedTools.push({
-        type: model.vndAntWebDynamic ? 'web_search_20260209' : 'web_search_20250305',
+        type: model.vndAntWebDynamic ? 'web_search_20260318' : 'web_search_20250305',
         name: 'web_search',
         ...(model.vndAntWebSearchMaxUses !== undefined ? { max_uses: model.vndAntWebSearchMaxUses } : {}),
         ...(model.userGeolocation ? {
@@ -290,10 +303,11 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
       });
     }
 
-    // Web Fetch Tool - dynamic filtering (20260209) uses internal code execution for better results
+    // Web Fetch Tool - dynamic filtering (20260318, supersedes 20260209/20260309) uses internal code execution for better results.
+    // response_inclusion intentionally left unset (defaults to 'full') - unchanged behavior, see _WebFetchTool_20260318_schema.
     if (model.vndAntWebFetch === 'auto') {
       hostedTools.push({
-        type: model.vndAntWebDynamic ? 'web_fetch_20260209' : 'web_fetch_20250910',
+        type: model.vndAntWebDynamic ? 'web_fetch_20260318' : 'web_fetch_20250910',
         name: 'web_fetch',
         ...(model.vndAntWebFetchMaxUses !== undefined ? { max_uses: model.vndAntWebFetchMaxUses } : {}),
         citations: { enabled: true },
@@ -312,9 +326,12 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
         name: 'tool_search_tool_bm25',
       });
 
-    // Code Execution tool - for Skills, container reuse, and Programmatic Tool Calling.
-    // Note: NOT added for dynamic web tools (_20260209) - they execute code internally and adding
-    // a standalone environment confuses the model (issue #1087).
+    // Code execution tool (Anthropic's) - added for the Code Sandbox toggle, Skills, container reuse, and Programmatic Tool Calling.
+    // Not AUTO-added for dynamic web tools (_20260318, was _20260209) which execute code internally; an explicit user
+    // toggle may still coexist with them by design (see aixAnthropicHostedFeatures note re #1087).
+    // Keep _20260120: it matches the code execution version dynamic web auto-injects, so coexisting
+    // merges into ONE environment (re-verified empirically on _20260318: caller.type is still 'code_execution_20260120').
+    // An older version (e.g. _20250825) 400s: 'tool names must be unique'.
     if (enableCodeExecution)
       hostedTools.push({ type: 'code_execution_20260120', name: 'code_execution' });
 
@@ -324,9 +341,20 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
     }
   }
 
-  // --- Container - for code execution (Skills, dynamic filtering, etc.) continuity between calls ---
+  // --- Container continuity between calls ---
+  // Re-attaching the container is DECOUPLED from enableCodeExecution: dynamic web tools (_20260318, was _20260209)
+  // use a container internally, and the API accepts a `container` alongside them WITHOUT the standalone
+  // code_execution tool (empirically verified). So we keep ONE sandbox across mixed search/skills/code
+  // turns - a file written by code execution survives an intervening search turn (verified: ls /tmp). This
+  // does NOT add code_execution to dynamic-web turns (so #1087 stays fixed). When nothing container-using
+  // is active (no code exec, no skills, no PTC, no dynamic web), no container is sent. Plain (non-dynamic)
+  // web search creates no container, so it is intentionally excluded.
+  // Retention: a reused container is server-retained ~30 days (same profile as the Skills/code-exec
+  // containers we already reuse) - dynamic-web conversations now share one retained sandbox per
+  // conversation instead of a fresh one each turn.
+  const hasDynamicWeb = model.vndAntWebDynamic === true && (model.vndAntWebSearch === 'auto' || model.vndAntWebFetch === 'auto');
 
-  if (enableCodeExecution) {
+  if (enableCodeExecution || hasDynamicWeb) {
 
     // Container ID from a previous turn (expiry already checked client-side)
     const containerId = model.vndAntContainerId;
@@ -357,6 +385,20 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
   return validated.data;
 }
 
+
+/** Enforce the Anthropic 4-breakpoint API limit by un-stamping the earliest (prefix-redundant) breakpoints. */
+function _capTrailingCacheBreakpoints(systemMessage: TRequest['system'], chatMessages: TRequest['messages'], maxBreakpoints: number): void {
+  const stampedBlocks: { cache_control?: unknown }[] = [];
+  for (const block of systemMessage || [])
+    if (block.cache_control)
+      stampedBlocks.push(block);
+  for (const message of chatMessages)
+    for (const block of message.content)
+      if ('cache_control' in block && block.cache_control)
+        stampedBlocks.push(block);
+  for (let i = 0; i < stampedBlocks.length - maxBreakpoints; i++)
+    delete stampedBlocks[i].cache_control;
+}
 
 function* _generateAnthropicMessagesContentBlocks({ parts, role }: AixMessages_ChatMessage): Generator<{
   role: 'user' | 'assistant',
@@ -543,7 +585,9 @@ function _toAnthropicToolChoice(itp: AixTools_ToolsPolicy): NonNullable<TRequest
       return { type: 'auto' as const };
     case 'any':
       return { type: 'any' as const };
-    case 'function_call':
-      return { type: 'tool' as const, name: itp.function_call.name };
+    // DISABLED 2026-07-17 - forced named tool, see ToolsPolicy_schema (the 'tool' branch of the forced-use
+    // hotfix above stays: it guards the Anthropic wire type, which still admits 'tool')
+    // case 'function_call':
+    //   return { type: 'tool' as const, name: itp.function_call.name };
   }
 }

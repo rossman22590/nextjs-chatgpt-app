@@ -7,6 +7,7 @@ import { themeBgApp, themeZIndexPageBar } from '~/common/app.theme';
 import type { NavItemApp } from '~/common/app.nav';
 import { ExpanderControlledBox } from '~/common/components/ExpanderControlledBox';
 
+import { FromV1ImportBanner } from '~/common/from-v1/FromV1ImportBanner';
 import { OptimaBar } from '~/common/layout/optima/bar/OptimaBar';
 import { optimaHasMOTD, OptimaMOTD } from '~/common/layout/optima/OptimaMOTD';
 import { ChromelessFloatingButtons } from './ChromelessFloatingButtons';
@@ -79,6 +80,11 @@ export const PageCore = (props: {
 
     {optimaHasMOTD && <OptimaMOTD />}
 
+    {/* Guided V1 backup import for users arriving from the EOL v1 (utm_campaign=eol-v1) */}
+    {/* REMOVE past 2026-09-16 */}
+    <FromV1ImportBanner />
+
+    {/* Responsive page bar (pluggable App Center Items and App Menu) - collapsible for chromeless mode */}
     <ExpanderControlledBox expanded={!isChromeless}>
       <OptimaBar
         component='header'

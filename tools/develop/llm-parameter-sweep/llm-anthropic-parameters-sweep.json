@@ -6,6 +6,11 @@
     "fn": ["auto","roundtrip"],
     "temperature": [1]
   },
+  "claude-sonnet-5": {
+    "ant-effort": ["low","medium","high","xhigh","max"],
+    "fn": ["auto","required","roundtrip"],
+    "temperature": [1]
+  },
   "claude-opus-4-8": {
     "ant-effort": ["low","medium","high","xhigh","max"],
     "fn": ["auto","required","roundtrip"],
@@ -45,16 +50,6 @@
     "temperature-range": [0,1]
   },
   "claude-opus-4-1-20250805": {
-    "ant-thinking-budget-range": [1024,65536],
-    "fn": ["auto","required","roundtrip"],
-    "temperature-range": [0,1]
-  },
-  "claude-opus-4-20250514": {
-    "ant-thinking-budget-range": [1024,65536],
-    "fn": ["auto","required","roundtrip"],
-    "temperature-range": [0,1]
-  },
-  "claude-sonnet-4-20250514": {
     "ant-thinking-budget-range": [1024,65536],
     "fn": ["auto","required","roundtrip"],
     "temperature-range": [0,1]

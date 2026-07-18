@@ -56,6 +56,12 @@ export function aixToGeminiInteractionsCreate(model: AixAPI_Model, chatGenerateR
   const isAntigravity = agent.includes('antigravity-');
   const isDeepResearch = agent.includes('deep-research');
 
+  // Gemini Omni (video generation) rides the same Interactions dispatch (routed via LLM_IF_GEM_Interactions)
+  // but is the MODEL path, not an agent: send `model` instead of `agent`, no agent_config/system_instruction,
+  // background=false (sync SSE), and store:true + response_format delivery:uri so the mp4 comes back as a 48h
+  // Files-API URI we can persist/re-fetch (download + re-play). See the return block below. Verified 2026-07-05.
+  const isModelOmni = agent.includes('omni');
+
   // Extract flattened system text (consumed below - DR: prepend to first user turn; else: native field)
   const systemText = _collectSystemText(chatGenerate.systemMessage);
 
@@ -93,12 +99,27 @@ export function aixToGeminiInteractionsCreate(model: AixAPI_Model, chatGenerateR
     : steps;
 
   return {
-    agent,
+    // Omni: MODEL path with an explicit ephemeral choice. Agents: `agent` path (retained). store/background
+    // are a forced true/false choice (see wiretypes matrix note): the only invalid pair is store:false+background:true.
+    ...(isModelOmni ? {
+      model: agent,
+      // URI delivery (below) REQUIRES store:true - store:false + delivery:uri 400s ('store=true is required when
+      // response format has video delivery set to URI', verified 2026-07-05). Retains the interaction (1d free /
+      // 55d paid) plus a Files-API video file with a 48h TTL - the tradeoff for a downloadable/re-playable artifact.
+      store: true,
+      background: false, // sync: stream the video step inline over SSE (verified 2026-07-01)
+      // Deliver the mp4 as a 48h Files-API URI (`.../files/{id}:download?alt=media`) instead of ephemeral inline
+      // b64, so we can persist a re-fetchable hosted_resource (download + re-play). URI is size-independent (even a
+      // sub-4MB clip comes as a URI once this is set). Undocumented for video but accepted. Verified 2026-07-05.
+      response_format: { type: 'video', delivery: 'uri' },
+    } : {
+      agent,
+      store: true, // keep the interaction alive so clients can reattach via SSE replay within Gemini's retention window (1d free / 55d paid). Required by both DR and Antigravity agents.
+      background: isDeepResearch, // DR REQUIRES true ('Agents are required to use background=true'); Antigravity REJECTS true ('does not support using background=True'); future agents default false.
+    }),
     input,
-    stream: true, // SSE streaming - upstream returns event-stream (interaction.created, step.start/delta/stop, interaction.completed). Required for live thought_summary deltas.
+    stream: true, // SSE streaming - upstream returns event-stream (interaction.created, step.start/delta/stop, interaction.completed). Required for live thought_summary deltas AND for Omni's inline video step.delta.
     // FIXME: we only support SSE streaming parsing - we used to support parsing of the final answer (with the GET) but not anymore
-    store: true, // keep the interaction alive so clients can reattach via SSE replay within Gemini's retention window (1d free / 55d paid). Required by both DR and Antigravity agents.
-    background: isDeepResearch, // DR REQUIRES true ('Agents are required to use background=true'); Antigravity REJECTS true ('does not support using background=True'); future agents default false.
     ...(isDeepResearch && {
       agent_config: {
         type: 'deep-research',
@@ -117,8 +138,12 @@ export function aixToGeminiInteractionsCreate(model: AixAPI_Model, chatGenerateR
       // set is enabled implicitly by omitting `tools` (code_execution, google_search, url_context, fs).
       environment: model.vndGeminiEnvironmentId || 'remote',
     }),
-    // non-DR agents: use native system_instruction field (matches gemini.generateContent.ts convention)
-    ...(!isDeepResearch && systemText && { system_instruction: systemText }),
+    // non-DR agents: use native system_instruction field (matches gemini.generateContent.ts convention).
+    // Omni: OMITTED. It ACCEPTS system_instruction (HTTP 200) but IGNORES it - verified 2026-07-01 with an
+    // A/B/C test: input="a cat" + system="render ONLY a bus, no animals" still produced a cat; the model
+    // steers only from `input`. We also do NOT fold system text into `input` (a chat/persona prompt is not a
+    // video directive and would just pollute the scene). If style steering is wanted, it belongs in `input`.
+    ...(!isDeepResearch && !isModelOmni && systemText && { system_instruction: systemText }),
   };
 }
 

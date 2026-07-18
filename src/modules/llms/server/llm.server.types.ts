@@ -83,6 +83,7 @@ const ModelParameterSpec_schema = z.object({
     'llmVndMiscEffort',
     // Anthropic
     'llmVndAnt1MContext',
+    'llmVndAntCodeSandbox',
     'llmVndAntInfSpeed',
     'llmVndAntSkills',
     'llmVndAntThinkingBudget',
@@ -106,6 +107,7 @@ const ModelParameterSpec_schema = z.object({
     // Moonshot
     'llmVndMoonshotWebSearch',
     // OpenAI
+    'llmVndOaiReasoningMode',
     'llmVndOaiRestoreMarkdown',
     'llmVndOaiVerbosity',
     'llmVndOaiWebSearchContext',

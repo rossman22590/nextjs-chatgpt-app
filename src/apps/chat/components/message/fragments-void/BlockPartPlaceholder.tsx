@@ -4,7 +4,7 @@ import type { SxProps } from '@mui/joy/styles/types';
 import { Box, Chip, ColorPaletteProp, Divider, Tooltip } from '@mui/joy';
 import BrushRoundedIcon from '@mui/icons-material/BrushRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
-import ClearAllRoundedIcon from '@mui/icons-material/ClearAllRounded';
+import ClearAllIcon from '@mui/icons-material/ClearAll';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CodeIcon from '@mui/icons-material/Code';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
@@ -19,6 +19,7 @@ import type { DMessageFragmentId, DVoidPlaceholderMOp, DVoidPlaceholderPart } fr
 import { DataStreamViz } from '~/common/components/DataStreamViz';
 import { adjustContentScaling, ContentScaling, themeScalingMap } from '~/common/app.theme';
 import { animationSpinHalfPause } from '~/common/util/animUtils';
+import { prettyDuration } from '~/common/util/timeUtils';
 
 
 // configuration
@@ -31,17 +32,6 @@ const modelOperationConfig: Record<DVoidPlaceholderMOp['mot'], { Icon: React.Ele
   'gen-image': { Icon: BrushRoundedIcon, color: 'success' },
   'code-exec': { Icon: CodeIcon, color: 'primary' },
 } as const;
-
-function _formatElapsed(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  if (m < 60) return s ? `${m}m ${s}s` : `${m}m`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  return rm ? `${h}h ${rm}m` : `${h}h`;
-}
-
 
 const _styles = {
   followUpChip: {
@@ -311,7 +301,7 @@ function ModelOperationChip(props: {
         {text}
         {elapsedSeconds >= MODELOP_TIMEOUT_DELAY && (
           <span style={{ opacity: 0.6 }}>
-            {' · '}<span style={{ display: 'inline-block', minWidth: elapsedSeconds >= 60 ? '6ch' : '3ch' }}>{_formatElapsed(elapsedSeconds)}</span>
+            {' · '}<span style={{ display: 'inline-block', minWidth: elapsedSeconds >= 60 ? '6ch' : '3ch' }}>{prettyDuration(elapsedSeconds * 1000)}</span>
           </span>
         )}
       </span>
@@ -375,7 +365,7 @@ function OperationsHarakiriChip(props: {
       size='sm'
       variant='plain'
       onClick={handleDeleteSelf}
-      startDecorator={<ClearAllRoundedIcon /* sx={{ opacity: 0 }} */ />}
+      startDecorator={<ClearAllIcon /* sx={{ opacity: 0 }} */ />}
       sx={chipSx}
     >
       {props.label}

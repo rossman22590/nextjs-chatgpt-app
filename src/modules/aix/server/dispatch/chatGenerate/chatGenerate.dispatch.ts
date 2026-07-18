@@ -26,6 +26,7 @@ import { createAnthropicMessageParser, createAnthropicMessageParserNS } from './
 import { createBedrockConverseParserNS, createBedrockConverseStreamParser } from './parsers/bedrock-converse.parser';
 import { createGeminiGenerateContentResponseParser } from './parsers/gemini.parser';
 import { createGeminiInteractionsParserNS, createGeminiInteractionsParserSSE } from './parsers/gemini.interactions.parser';
+import { createGeminiInteractionsUsageBackfillTransform } from './parsers/gemini.interactions.transform-usageBackfill';
 import { createOpenAIChatCompletionsChunkParser, createOpenAIChatCompletionsParserNS } from './parsers/openai.parser';
 import { createOpenAIResponseParserNS, createOpenAIResponsesEventParser } from './parsers/openai.responses.parser';
 
@@ -70,7 +71,7 @@ export type ChatGenerateParticleTransformFunction = ((particle: AixWire_Particle
 /**
  * Specializes to the correct vendor a request for chat generation
  */
-export async function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request, streaming: boolean, enableResumability: boolean): Promise<ChatGenerateDispatch> {
+export async function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request, streaming: boolean, sessionAffinityId: string | undefined, enableResumability: boolean): Promise<ChatGenerateDispatch> {
 
   const { dialect } = access;
   switch (dialect) {
@@ -195,6 +196,10 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
           /** Upstream hardcodes stream=true + background=true (required by deep-research agents) and has no non-streaming alternative. */
           demuxerFormat: 'fast-sse',
           chatGenerateParse: createGeminiInteractionsParserSSE(requestedModelName),
+          // [2026-06-26, Interactions BUG] Interations Deep Research only: the live `interaction.completed` event omits `usage`,
+          // so backfill token counts via a one-shot GET of the stored interaction. POST path ONLY - reattach/resume/recover
+          // read the stored resource directly (usage already present), so they need no backfill.
+          particleTransform: createGeminiInteractionsUsageBackfillTransform(access),
         };
       }
 
@@ -236,6 +241,8 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
     // fallthrough
     case 'alibaba':
     case 'azure':
+    case 'cerebras':
+    case 'cohere':
     case 'deepseek':
     case 'groq':
     case 'lmstudio':
@@ -246,13 +253,15 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
     case 'openai':
     case 'openrouter':
     case 'perplexity':
+    case 'sakanaai':
     case 'togetherai':
     case 'xai':
     case 'zai':
 
-      // newer: OpenAI Responses API, for models that support it and all XAI models
+      // newer: OpenAI Responses API, for models that support it and all XAI/Sakana models
+      const isSakanaModel = dialect === 'sakanaai'; // All Sakana Fugu models use the Responses API (tools, multimodal, reasoning)
       const isXAIModel = dialect === 'xai'; // All XAI models are accessed via Responses now
-      const isResponsesAPI = !!model.vndOaiResponsesAPI || isXAIModel;
+      const isResponsesAPI = !!model.vndOaiResponsesAPI || isSakanaModel || isXAIModel;
       if (isResponsesAPI) {
         return {
           request: {
@@ -283,7 +292,7 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
       }
 
       // default: industry-standard OpenAI ChatCompletions API with per-dialect extensions
-      const chatCompletionsBody = aixToOpenAIChatCompletions(dialect, model, chatGenerate, streaming);
+      const chatCompletionsBody = aixToOpenAIChatCompletions(dialect, model, chatGenerate, streaming, sessionAffinityId);
 
       // [OpenRouter] Service-level provider routing parameter
       if (dialect === 'openrouter' && access.orRequireParameters)
@@ -353,6 +362,8 @@ export async function createChatGenerateResumeDispatch(access: AixAPI_Access, re
     case 'alibaba':
     case 'anthropic':
     case 'bedrock':
+    case 'cerebras':
+    case 'cohere':
     case 'deepseek':
     case 'groq':
     case 'lmstudio':
@@ -362,6 +373,7 @@ export async function createChatGenerateResumeDispatch(access: AixAPI_Access, re
     case 'moonshot':
     case 'ollama':
     case 'perplexity':
+    case 'sakanaai':
     case 'togetherai':
     case 'xai':
     case 'zai':

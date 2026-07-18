@@ -96,6 +96,7 @@ export class ContentReassembler {
     private readonly particleTransforms: ReassemblerParticleTransforms[],
     private readonly skipImageCompression?: boolean,
     private readonly onInlineAudio?: (audio: { blob: Blob; mimeType: string; label: string; durationMs?: number }) => void,
+    private readonly onInlineVideo?: (video: { blob: Blob; mimeType: string; label: string }) => void,
     private readonly wireAbortSignal?: AbortSignal,
   ) {
     this.initialState = {
@@ -279,7 +280,8 @@ export class ContentReassembler {
     } catch (error) {
 
       //
-      // Classify and display processing errors (particle/async work failures)
+      // [Error Channel 2] Classify/display particle-PROCESSING errors (see channel map in aix.client.errors.ts;
+      // [Error Channel 1] transport/connection errors are handled by the stream-loop catch in aix.client.ts).
       //
       // NOTE: we cannot throw here as we are part of a detached promise chain
       // READ the `aixClassifyReassemblyError` that explains this in detail
@@ -369,6 +371,9 @@ export class ContentReassembler {
             break;
           case 'ii':
             await this.onAppendInlineImage(op);
+            break;
+          case 'iv':
+            await this.onAppendInlineVideo(op);
             break;
           case 'vp':
             this.onSetOperationState(op);
@@ -624,6 +629,33 @@ export class ContentReassembler {
     }
   }
 
+  private async onAppendInlineVideo(particle: Extract<AixWire_Particles.PartParticleOp, { p: 'iv' }>): Promise<void> {
+
+    // Break text accumulation, as we have a full video part in the middle
+    this.S._textFragmentIndex = null;
+
+    const { mimeType, v_b64: base64Data, label } = particle;
+    const safeLabel = label || 'Generated Video';
+
+    try {
+
+      // create blob from base64 - this will throw on malformed data
+      const videoBlob = await convert_Base64WithMimeType_To_Blob(base64Data, mimeType, 'ContentReassembler.onAppendInlineVideo');
+
+      // EXPERIMENTAL: generated video is NOT persisted (would be a large blob + object-URLs die on reload).
+      // We save only a breadcrumb; the actual video is handed to the caller for ephemeral in-memory playback.
+      const sizeMB = Math.round(videoBlob.size / 1024 / 102.4) / 10;
+      this._pushFragment(createTextContentFragment(`Generated video ▶ \`${safeLabel}\` (${sizeMB} MB, in-memory only - not saved)`));
+
+      // notify caller for ephemeral playback (object URL created + revoked by the caller)
+      this.onInlineVideo?.({ blob: videoBlob, mimeType, label: safeLabel });
+
+    } catch (error: any) {
+      console.warn('[DEV] Failed to process inline video:', { label: safeLabel, error, mimeType, size: base64Data.length });
+      this._appendErrorFragment(`Failed to process video: ${error?.message || 'Unknown error'}`, 'aix-video-processing');
+    }
+  }
+
   private async onAppendInlineImage(particle: Extract<AixWire_Particles.PartParticleOp, { p: 'ii' }>): Promise<void> {
 
     // Break text accumulation, as we have a full image part in the middle
@@ -708,6 +740,18 @@ export class ContentReassembler {
           fileId: op.fileId,
           containerId: op.containerId,
           ...(op.filename ? { filename: op.filename } : {}),
+        }));
+        break;
+
+      case 'vnd.gem.file':
+        // [Gemini Omni] Files-API artifact (delivery:uri video): persist a re-fetchable hosted_resource. Unlike
+        // 'inline-download', this survives reload for ~48h - the chip re-fetches bytes on demand (key-proxied) to
+        // download or re-play. Nothing is inlined into the conversation; only the `files/{id}` handle is stored.
+        this._pushFragment(createHostedResourceContentFragment({
+          via: 'gemini-file',
+          fileName: op.fileName,
+          mimeType: op.mimeType,
+          ...(op.isVideo ? { isVideo: true } : {}),
         }));
         break;
 
@@ -1120,7 +1164,9 @@ export class ContentReassembler {
     }
 
     // -> ph: show retry status
-    const retryMessage = `Retrying [${attempt}/${maxAttempts}] in ${Math.round(delayMs / 100) / 10}s - ${reason}`;
+    const retryMessage =  delayMs > 0
+      ? `${reason ? `${reason} - ` : ''}Retrying in ${Math.round(delayMs / 100) / 10}s - ${attempt}/${maxAttempts}`
+      : `Connection failed (${attempt} retries)`;
     this._pushFragment(createPlaceholderVoidFragment(retryMessage, undefined, {
       ctl: 'ec-retry',
       rScope: rScope,

@@ -101,7 +101,7 @@ const minimizedSx: SxProps = {
 export function Composer(props: {
   isMobile: boolean;
   chatLLM: DLLM | null;
-  composerTextAreaRef: React.RefObject<HTMLTextAreaElement | null>;
+  composerTextAreaRef: React.RefObject<HTMLTextAreaElement>;
   targetConversationId: DConversationId | null;
   capabilityHasT2I: boolean;
   capabilityHasT2IEdit: boolean;
@@ -823,7 +823,7 @@ export function Composer(props: {
               display: 'flex',
               flexDirection: 'column',
               gap: 1,
-              minWidth: 200, // flex: enable X-scrolling (resetting any possible minWidth due to the attachment drafts)
+              minWidth: 120, // flex: enable X-scrolling (resetting any possible minWidth due to the attachment drafts)
             }}>
 
               {/* Text Edit + Mic buttons + MicOverlay */}

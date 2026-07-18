@@ -111,11 +111,11 @@ export function ExpanderSection(props: {
       {props.startDecorator}
 
       <Box sx={_styles.headerTextWrapper}>
-        <Typography level='title-sm'>{title}</Typography>
+        <Typography level='body-sm'>{title}</Typography>
         {!!description && <FormHelperText>{description}</FormHelperText>}
       </Box>
 
-      {isCollapsible && (!isExpanded || props.persistentDivider) && <Box sx={_styles.aeDivider} />}
+      {(isCollapsible ? (!isExpanded || props.persistentDivider) : props.persistentDivider) && <Box sx={_styles.aeDivider} />}
 
       {isCollapsible && (isExpanded
           ? <UnfoldMoreIcon sx={_styles.aeHeaderIcon} />

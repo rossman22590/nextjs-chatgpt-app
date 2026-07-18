@@ -12,9 +12,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import TerminalOutlinedIcon from '@mui/icons-material/TerminalOutlined';
 
 import { BrowseSettings } from '~/modules/browse/BrowseSettings';
-import { DallESettings } from '~/modules/t2i/dalle/DallESettings';
 import { GoogleSearchSettings } from '~/modules/google/GoogleSearchSettings';
-import { T2ISettings } from '~/modules/t2i/T2ISettings';
+import { T2IConfigureEngines } from '~/modules/t2i/components/T2IConfigureEngines';
 
 import type { PreferencesTabId } from '~/common/layout/optima/store-layout-optima';
 import { AppBreadcrumbs } from '~/common/components/AppBreadcrumbs';
@@ -289,10 +288,7 @@ export function SettingsModal(props: {
         <TabPanel value='draw' color='primary' variant='outlined' sx={_styles.tabPanel}>
           <Topics>
             <Topic>
-              <T2ISettings />
-            </Topic>
-            <Topic icon='🖍️️' title='OpenAI'>
-              <DallESettings />
+              <T2IConfigureEngines isMobile={isMobile} />
             </Topic>
           </Topics>
         </TabPanel>

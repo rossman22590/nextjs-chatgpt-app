@@ -87,7 +87,7 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
       /** Used by:
        * - openAndLoadConversations (via DataAtRestV1.recreateConversation),
        * - LinkChatViewer(from RestV1),
-       * - ImportChats.handleChatGptLoad(H)
+       * - ImportChats (JSON/backup file import)
        */
       importConversation: (conversation: DConversation, preventClash: boolean): DConversationId => {
         const { conversations } = _get();
@@ -299,7 +299,7 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
 
           return {
             messages,
-            tokenCount: messages.reduce((sum, message) => sum + 4 + message.tokenCount || 0, 3),
+            tokenCount: _sumMessagesTokenCounts(messages),
             updated: Date.now(),
           };
         }),
@@ -314,7 +314,7 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
 
           return {
             messages,
-            tokenCount: messages.reduce((sum, message) => sum + 4 + message.tokenCount || 0, 3),
+            tokenCount: _sumMessagesTokenCounts(messages),
             updated: Date.now(),
           };
         }),
@@ -346,7 +346,7 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
 
           return {
             messages,
-            tokenCount: messages.reduce((sum, message) => sum + 4 + message.tokenCount || 0, 3),
+            tokenCount: _sumMessagesTokenCounts(messages),
             updated: touchUpdated ? Date.now() : conversation.updated,
           };
         }),
@@ -541,10 +541,20 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
 
 // Convenience function to update a set of messages, using the current chatLLM
 function updateMessagesTokenCounts(messages: DMessage[], forceUpdate: boolean, debugFrom: string): number {
+
+  // no messages: 0, not the base overhead (0 = not yet calculated; keeps empty chats free of a phantom count)
+  if (!messages.length)
+    return 0;
+
   const chatLLMId = getChatLLMId();
   return 3 + messages.reduce((sum, message) => {
     return 4 + updateMessageTokenCount(message, chatLLMId, forceUpdate, debugFrom) + sum;
   }, 0);
+}
+
+// Convenience function to sum already-computed message token counts, same formula as above
+function _sumMessagesTokenCounts(messages: DMessage[]): number {
+  return !messages.length ? 0 : messages.reduce((sum, { tokenCount }) => sum + 4 + (tokenCount || 0), 3);
 }
 
 // Convenience function to count the tokens in a DMessage object

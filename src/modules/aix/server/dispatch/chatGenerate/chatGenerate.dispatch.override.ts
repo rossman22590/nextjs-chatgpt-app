@@ -6,10 +6,11 @@ import { openAIAccess } from '~/modules/llms/server/openai/openai.access';
 
 // Override the createChatGenerateDispatch function
 export async function createChatGenerateDispatch(
-  access: AixAPI_Access, 
-  model: AixAPI_Model, 
-  chatGenerate: AixAPIChatGenerate_Request, 
+  access: AixAPI_Access,
+  model: AixAPI_Model,
+  chatGenerate: AixAPIChatGenerate_Request,
   streaming: boolean,
+  sessionAffinityId: string | undefined,
   enableResumability: boolean
 ): Promise<ChatGenerateDispatch> {
   // Check if we should use the Responses API
@@ -43,5 +44,5 @@ export async function createChatGenerateDispatch(
   }
   
   // For all other cases, use the original function
-  return originalCreateChatGenerateDispatch(access, model, chatGenerate, streaming, enableResumability);
+  return originalCreateChatGenerateDispatch(access, model, chatGenerate, streaming, sessionAffinityId, enableResumability);
 } 

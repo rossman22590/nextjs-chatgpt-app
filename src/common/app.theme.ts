@@ -283,6 +283,13 @@ const jetBrainsMono = JetBrains_Mono({
 });
 export const themeCodeFontFamilyCss = jetBrainsMono.style.fontFamily;
 
+/**
+ * Hotter lime for 'New'/'Beta' badges - intentionally brighter than the 400 brand anchor
+ * so tiny chips pop; pairs with black text and bold weight. Mirrors the website's
+ * RankingsSection chipNew - keep the two in sync.
+ */
+export const brandLimeExtraBadge = '#d4ff3a';
+
 
 /** Minimal theme: black accent only, no gradient. Light mode = black on light bg; dark = warm near-black. */
 const NEUTRAL_LIGHT_BLACK = '#1a1a1a';
@@ -324,6 +331,8 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
     xl: '24px',
   },
   shadow,
+  // NOTE: the standalone /dev/inspect/*.html dev tools hand-mirror these neutral/background hex tokens
+  // (they intentionally have zero app imports). If you change the palette below, update those pages' CSS to match.
   colorSchemes: {
     light: {
       palette: {

@@ -155,7 +155,7 @@ export function llmsHeuristicGetTopFastLlmIds(count: number): DLLMId[] {
   // For each vendor, sort by cost (lowest first, excluding free/0-cost)
   const vendorsByCost = groupedLlms.map(vendor => ({
     vendorId: vendor.vendorId,
-    llmsByCost: vendor.llmsByElo.toSorted((a, b) => {
+    llmsByCost: [...vendor.llmsByElo].sort((a, b) => {
       if (!a.costRank && !b.costRank) return 0;
       if (!a.costRank) return 1; // push 0-cost to end
       if (!b.costRank) return -1;
@@ -251,7 +251,7 @@ export function llmsAssignmentsAutoModelId(domainId: DModelDomainId, universe: R
   const vendors = _groupLlmsByVendorRankedByElo(allowedLlms);
 
   // Editorial layer: prefer hand-curated favorites first (precedence is editorial-defined, see model.domains.editorial.ts)
-  const editorialPick = llmsEditorialPickForDomain(domainId, allowedLlms);
+  const editorialPick = llmsEditorialPickForDomain(domainId, allowedLlms, domainSpec?.editorialFallbackDomain);
   if (editorialPick) return editorialPick;
 
   // Apply the domain selection strategy
@@ -288,7 +288,7 @@ function _strategyTopVendorLowestCost(vendors: PreferredRankedVendors, requireEl
   for (const vendor of vendors) {
 
     // sort by increasing cost, with 0 ('free' at the end, to exclude experimental models)
-    const sorted = vendor.llmsByElo.toSorted((a, b) => {
+    const sorted = [...vendor.llmsByElo].sort((a, b) => {
       if (!a.costRank && !b.costRank)
         return 0;
       if (!a.costRank)

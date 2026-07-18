@@ -15,7 +15,7 @@ For the forward-looking pipeline (extraction script, snapshot, website consumpti
 
 ### Where `pubDate` is guaranteed (always emitted)
 
-- **Editorial entries** in 12 hybrid/editorial vendors (282 models). Hand-curated, externally corroborated. Future entries in these arrays are expected to include `pubDate`.
+- **Editorial entries** in 12 hybrid/editorial vendors. Hand-curated, externally corroborated. Future entries in these arrays are expected to include `pubDate` - and Anthropic, Gemini, and Z.AI now **type-require** it (the model-def type intersects `& { pubDate: string }`).
 - **Anthropic 0-day placeholder** (`llmsAntCreatePlaceholderModel`): when the API surfaces an Anthropic model not in the editorial list, the placeholder uses the API's `created_at` ISO date, falling back to today via `formatPubDate()`.
 - **Gemini 0-day fallback** (`geminiModelToModelDescription`): when the API returns a Gemini model not in `_knownGeminiModels`, the converter falls back to today via `formatPubDate()` (Gemini API does not expose a creation timestamp).
 
@@ -23,7 +23,8 @@ For the forward-looking pipeline (extraction script, snapshot, website consumpti
 
 - **Symlink entries** (`KnownLink`) - inherit the target's `pubDate` via the merge logic in `fromManualMapping`.
 - **Unknown variants resolved through `super`/`fallback`** in `fromManualMapping` for non-Anthropic/non-Gemini vendors - the field is left undefined rather than fabricated.
-- **Dynamic-only vendors** (OpenRouter, TogetherAI, Novita, ChutesAI, FireworksAI, TLUS, Azure, LM Studio, LocalAI, FastAPI, ArceeAI, LLMAPI) - no editorial knob; pubDate flows in only when the underlying lookup or upstream API populates it.
+- **Dynamic-only vendors** (OpenRouter, Novita, ChutesAI, FireworksAI, TLUS, Azure, LM Studio, LocalAI, FastAPI, ArceeAI, LLMAPI) - no editorial knob; pubDate flows in only when the underlying lookup or upstream API populates it.
+- **TogetherAI** graduated to an id-keyed editorial patch map (`_togetherEditorialPubDates`, 2026-07-12) after its `created` proved to be endpoint churn (re-stamped on redeploys: DeepSeek-V4-Pro, released 2026-04-24, carried created=2026-07-12; 28/269 endpoints report 0, including the newest arrivals). `created` never feeds pubDate there; it only drives list order, with the editorial date as placement fallback.
 
 The rationale: today's date is a defensible 0-day proxy only when we know we're seeing a brand-new model the vendor just announced (Anthropic and Gemini's "discovery via official model list" paths). For arbitrary dynamic vendors, fabricating today would mark old/well-known models as new - misleading. Better to omit.
 
@@ -77,14 +78,14 @@ Three categories:
 | MiniMax | Editorial | `openai/models/minimax.models.ts` | `_knownMiniMaxModels` | 10 | 10/10 HIGH |
 | DeepSeek | Hybrid | `openai/models/deepseek.models.ts` | `_knownDeepseekChatModels` | 4 | 4/4 HIGH |
 | Groq | Hybrid (host) | `openai/models/groq.models.ts` | `_knownGroqModels` | 11 | 11/11 HIGH (underlying-model date) |
-| Z.AI / GLM | Hybrid | `openai/models/zai.models.ts` | `_knownZAIModels` | 17 | 16/17 (`glm-5-code` UNCONFIRMED) |
+| Z.AI / GLM | Hybrid | `openai/models/zai.models.ts` | `_knownZAIModels` | 21 | 21/21 HIGH (`pubDate` type-required, like Anthropic) |
 | Bedrock | Reuses Anthropic | `bedrock/bedrock.models.ts` | -> `hardcodedAnthropicModels` | (12) | inherited |
 | Ollama | Editorial (catalog) | `ollama/ollama.models.ts` | `OLLAMA_BASE_MODELS` | 209 | **deferred** - see notes |
 | Arcee AI | Dynamic | `openai/models/arceeai.models.ts` | `_arceeKnownModels` | 0 | n/a (empty) |
 | LLMAPI | Dynamic | `openai/models/llmapi.models.ts` | `_llmapiKnownModels` | 0 | n/a (empty) |
 | Alibaba | Dynamic | `openai/models/alibaba.models.ts` | `_knownAlibabaChatModels` | 0 | n/a (empty) |
 | OpenRouter | Dynamic + delegated lookup | `openai/models/openrouter.models.ts` | (parser) | -- | inherited via `llmOrt*Lookup` |
-| TogetherAI | Dynamic | `openai/models/together.models.ts` | (parser) | -- | no |
+| TogetherAI | Dynamic + patch map | `openai/models/together.models.ts` | `_togetherEditorialPubDates` | 4 | editorial-only; API `created` is endpoint churn (re-stamped on redeploys, 28/269 zeros - verified 2026-07-12), never used for pubDate |
 | FireworksAI | Dynamic | `openai/models/fireworksai.models.ts` | (parser) | -- | no |
 | Novita | Dynamic | `openai/models/novita.models.ts` | (parser) | -- | no |
 | ChutesAI | Dynamic | `openai/models/chutesai.models.ts` | (parser) | -- | no |
@@ -94,7 +95,7 @@ Three categories:
 | LocalAI | Dynamic | `openai/models/localai.models.ts` | (parser) | -- | no |
 | FastAPI | Dynamic | `openai/models/fastapi.models.ts` | (parser) | -- | no |
 
-**Totals**: 284 editorial entries across 12 vendors, of which **282** have corroborated `pubDate` and **2** are intentional gaps (`osb-120b` speculative, `glm-5-code` not yet announced). All 12 vendor files type-check clean.
+**Totals**: editorial entries across 12 vendors, with the sole remaining intentional gap being `osb-120b` (speculative). `glm-5-code` was removed 2026-06-16 (not API-accessible, deny-listed in `zai.models.ts`), and Z.AI now type-requires `pubDate` on every entry (mirrors `_AnthropicModelDef`). NOTE: the 2026-06 catalog refresh shifted several per-vendor counts (e.g. Z.AI 17->21; xAI trimmed retired models) - the numbers above are being re-verified. All vendor files type-check clean.
 
 ### Notes
 

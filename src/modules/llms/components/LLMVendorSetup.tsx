@@ -10,6 +10,8 @@ import { AlibabaServiceSetup } from '../vendors/alibaba/AlibabaServiceSetup';
 import { AnthropicServiceSetup } from '../vendors/anthropic/AnthropicServiceSetup';
 import { AzureServiceSetup } from '../vendors/azure/AzureServiceSetup';
 import { BedrockServiceSetup } from '../vendors/bedrock/BedrockServiceSetup';
+import { CerebrasServiceSetup } from '../vendors/cerebras/CerebrasServiceSetup';
+import { CohereServiceSetup } from '../vendors/cohere/CohereServiceSetup';
 import { DeepseekAIServiceSetup } from '../vendors/deepseek/DeepseekAIServiceSetup';
 import { GeminiServiceSetup } from '../vendors/gemini/GeminiServiceSetup';
 import { GroqServiceSetup } from '../vendors/groq/GroqServiceSetup';
@@ -22,6 +24,7 @@ import { OllamaServiceSetup } from '../vendors/ollama/OllamaServiceSetup';
 import { OpenAIServiceSetup } from '../vendors/openai/OpenAIServiceSetup';
 import { OpenRouterServiceSetup } from '../vendors/openrouter/OpenRouterServiceSetup';
 import { PerplexityServiceSetup } from '../vendors/perplexity/PerplexityServiceSetup';
+import { SakanaAIServiceSetup } from '../vendors/sakanaai/SakanaAIServiceSetup';
 import { TogetherAIServiceSetup } from '../vendors/togetherai/TogetherAIServiceSetup';
 import { XAIServiceSetup } from '../vendors/xai/XAIServiceSetup';
 import { ZAIServiceSetup } from '~/modules/llms/vendors/zai/ZAIServiceSetup';
@@ -37,6 +40,8 @@ const vendorSetupComponents: Record<ModelVendorId, React.ComponentType<{ service
   anthropic: AnthropicServiceSetup,
   azure: AzureServiceSetup,
   bedrock: BedrockServiceSetup,
+  cerebras: CerebrasServiceSetup,
+  cohere: CohereServiceSetup,
   deepseek: DeepseekAIServiceSetup,
   googleai: GeminiServiceSetup,
   groq: GroqServiceSetup,
@@ -49,6 +54,7 @@ const vendorSetupComponents: Record<ModelVendorId, React.ComponentType<{ service
   openai: OpenAIServiceSetup,
   openrouter: OpenRouterServiceSetup,
   perplexity: PerplexityServiceSetup,
+  sakanaai: SakanaAIServiceSetup,
   togetherai: TogetherAIServiceSetup,
   xai: XAIServiceSetup,
   zai: ZAIServiceSetup,

@@ -143,11 +143,11 @@ const isAuthed = t.middleware(async ({ ctx, next }) => {
   if (!ctx.session || !ctx.session.user) {
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Not authenticated' });
   }
-  
+
   // Since we've checked that ctx.session and ctx.session.user exist, TypeScript should know they're not null
   // But we'll help it with a type assertion
   const session = ctx.session as NonNullable<typeof ctx.session>;
-  
+
   return next({
     ctx: {
       // Now session is properly typed
@@ -157,6 +157,26 @@ const isAuthed = t.middleware(async ({ ctx, next }) => {
 });
 
 export const protectedProcedure = t.procedure.use(isAuthed);
+
+/**
+ * Authenticated users only. - FORWARD-LOOKING (upstream stub; our real auth is protectedProcedure above)
+ */
+export const authedProcedure = t.procedure;
+
+/**
+ * Premium procedure - FORWARD-LOOKING
+ */
+export const premiumProcedure = t.procedure;
+
+/**
+ * User-feature-gated procedure - FORWARD-LOOKING
+ */
+export const authGatedProcedure = t.procedure;
+
+/**
+ * Tenant Admin procedure - FORWARD-LOOKING
+ */
+export const tenantAdminProcedure = t.procedure;
 
 // /**
 //  * Create a server-side caller

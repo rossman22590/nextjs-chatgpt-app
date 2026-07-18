@@ -2,11 +2,9 @@
 
 !.nixpacks/
 !app/
-!kb/
 !pages/
 !public/
 !src/
-!tools/
 
 !*.mjs
 !middleware_BASIC_AUTH.ts

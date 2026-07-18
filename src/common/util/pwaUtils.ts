@@ -30,7 +30,12 @@ export const Is = {
   Deployment: {
     Localhost: clientHostName().includes('localhost:300'),
     VercelFromBackendOrSSR: !!process.env.VERCEL_ENV,
-    VercelFromFrontend: !!process.env.NEXT_PUBLIC_VERCEL_URL,
+    // NOTE: Vercel auto-exposes NEXT_PUBLIC_VERCEL_URL on hosted prod/preview builds (framework env vars), so keying off
+    // it would also work - but we use our own NEXT_PUBLIC_DEPLOYMENT_TYPE (set in next.config.ts from VERCEL_ENV): it's
+    // explicit, self-controlled, and already the canonical deploy signal (see app.release buildInfo). Resolves to
+    // 'vercel-<env>' on the hosted build, 'local'/custom on self-host. Used to avoid showing Vercel-specific copy (e.g.
+    // the 413 "edge network" limit) on self-hosted deployments sitting behind nginx/other reverse proxies.
+    VercelFromFrontend: (process.env.NEXT_PUBLIC_DEPLOYMENT_TYPE ?? '').startsWith('vercel'),
   },
 } as const;
 
@@ -104,6 +109,47 @@ export function generateDeviceName(): string {
   // Format the name based on platform and browser
   return `${platform} ${browser}${pwaIndicator}`;
 }
+
+
+/**
+ * Pure UA device classifier - works on ANY UA string (e.g. other devices' server-observed UAs);
+ * the module-level `Is` above covers only the local browser.
+ *
+ * Conservative by design ("no risk"): each axis is asserted only on unambiguous tokens, else
+ * 'unknown'. Accepted bounded ambiguity: desktop-mode iPads (the default since iPadOS 13) send a
+ * Macintosh UA and classify as macos/computer - by decision, we don't chase iPads. Desktop vs
+ * laptop is NOT derivable from any signal (UA, client hints, anything) - hence one 'computer'.
+ */
+export function classifyUA(userAgent: string | null | undefined): UADeviceClass {
+  const ua = (userAgent || '').toLowerCase();
+  if (!ua) return { os: 'unknown', form: 'unknown' };
+
+  const os: UADeviceOS =
+    /ip(hone|od|ad)/.test(ua) ? 'ios'
+      : ua.includes('android') ? 'android'
+        : ua.includes('windows') ? 'windows'
+          : /macintosh|mac os x/.test(ua) ? 'macos'
+            : (ua.includes('cros') || ua.includes('linux')) ? 'linux' // ChromeOS folded into linux
+              : 'unknown';
+
+  const form: UAFormFactor =
+    /ipad|tablet/.test(ua) ? 'tablet'
+      : os === 'android' ? (ua.includes('mobile') ? 'phone' : 'tablet') // Android convention: no 'mobile' token = tablet
+        : /iphone|ipod|mobile/.test(ua) ? 'phone'
+          : (os === 'windows' || os === 'macos' || os === 'linux') ? 'computer'
+            : 'unknown';
+
+  return { os, form };
+}
+
+export interface UADeviceClass {
+  os: UADeviceOS;
+  form: UAFormFactor;
+}
+
+export type UADeviceOS = 'windows' | 'macos' | 'ios' | 'android' | 'linux' | 'unknown';
+export type UAFormFactor = 'phone' | 'tablet' | 'computer' | 'unknown';
+
 
 /// Web Share ///
 

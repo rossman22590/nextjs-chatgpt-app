@@ -41,6 +41,7 @@ const _gemEffortOptions = [
 ] as const;
 
 const _oaiEffortOptions = [
+  { value: 'max', label: 'Max', description: 'Deepest reasoning (GPT-5.6+)' } as const,
   { value: 'xhigh', label: 'X-High', description: 'Hardest thinking, best quality' } as const,
   { value: 'high', label: 'High', description: 'Deep, thorough analysis' } as const,
   { value: 'medium', label: 'Medium', description: 'Balanced reasoning depth' } as const,
@@ -53,6 +54,7 @@ const _oaiEffortOptions = [
 const _miscEffortOptions = [
   { value: 'max', label: 'Max', description: 'Hardest thinking' } as const,
   { value: 'high', label: 'On', description: 'Multi-step reasoning' } as const,
+  { value: 'low', label: 'Low', description: 'Light thinking' } as const,
   { value: 'none', label: 'Off', description: 'Disable thinking mode' } as const,
   { value: _UNSPECIFIED, label: 'Default', description: 'Model Default' } as const,
 ] as const;
@@ -64,6 +66,12 @@ export function llmParametersFilterEffortOptions<T extends { value: string }>(op
   return options.filter(o => o.value === _UNSPECIFIED || allowedSet.has(o.value));
 }
 
+
+const _oaiReasoningModeOptions = [
+  { value: 'pro', label: 'Pro', description: 'Additional model work for the hardest problems' } as const,
+  { value: 'standard', label: 'Standard', description: 'Regular reasoning' } as const,
+  { value: _UNSPECIFIED, label: 'Default', description: 'Default (Standard)' } as const,
+] as const;
 
 const _verbosityOptions = [
   { value: 'high', label: 'Detailed', description: 'Thorough responses, great for audits' } as const,
@@ -224,13 +232,20 @@ export function LLMParametersEditor(props: {
     , [props.parameterSpecs]);
 
 
-  // effort options: one memo for all vendors, filtered to model's allowed values
-  const { antEffortOptions, gemEffortOptions, oaiEffortOptions, miscEffortOptions } = React.useMemo(() => ({
-    antEffortOptions: llmParametersFilterEffortOptions(_antEffortOptions, modelParamSpec['llmVndAntEffort'], 'llmVndAntEffort'),
-    gemEffortOptions: llmParametersFilterEffortOptions(_gemEffortOptions, modelParamSpec['llmVndGemEffort'], 'llmVndGemEffort'),
-    oaiEffortOptions: llmParametersFilterEffortOptions(_oaiEffortOptions, modelParamSpec['llmVndOaiEffort'], 'llmVndOaiEffort'),
-    miscEffortOptions: llmParametersFilterEffortOptions(_miscEffortOptions, modelParamSpec['llmVndMiscEffort'], 'llmVndMiscEffort'),
-  }), [modelParamSpec]);
+  // enum options: one memo for all vendors, filtered to each model's allowed values (via parameterSpec.enumValues)
+  const { antEffortOptions, gemEffortOptions, oaiEffortOptions, miscEffortOptions, oaiWebSearchOptions } = React.useMemo(() => {
+    // web search: filter to the model's allowed levels; when restricted to a single level (e.g. Sakana's
+    // bare on/off web_search), relabel that lone level as a plain "On" (the "Off" entry is kept as-is).
+    const ws = llmParametersFilterEffortOptions(_webSearchContextOptions, modelParamSpec['llmVndOaiWebSearchContext'], 'llmVndOaiWebSearchContext');
+    const wsOnOff = ws?.filter(o => o.value !== _UNSPECIFIED).length === 1;
+    return {
+      antEffortOptions: llmParametersFilterEffortOptions(_antEffortOptions, modelParamSpec['llmVndAntEffort'], 'llmVndAntEffort'),
+      gemEffortOptions: llmParametersFilterEffortOptions(_gemEffortOptions, modelParamSpec['llmVndGemEffort'], 'llmVndGemEffort'),
+      oaiEffortOptions: llmParametersFilterEffortOptions(_oaiEffortOptions, modelParamSpec['llmVndOaiEffort'], 'llmVndOaiEffort'),
+      miscEffortOptions: llmParametersFilterEffortOptions(_miscEffortOptions, modelParamSpec['llmVndMiscEffort'], 'llmVndMiscEffort'),
+      oaiWebSearchOptions: ws?.map(o => (wsOnOff && o.value !== _UNSPECIFIED) ? { ...o, label: 'On' } : o) ?? null,
+    };
+  }, [modelParamSpec]);
 
 
   // current values: { ...fallback, ...baseline, ...user }
@@ -240,6 +255,7 @@ export function LLMParametersEditor(props: {
     llmTemperature, // null: no temperature, number: temperature value, undefined: shall not happen, we treat is similarly to null
     llmForceNoStream,
     llmVndAnt1MContext,
+    llmVndAntCodeSandbox,
     llmVndAntEffort,
     llmVndAntInfSpeed,
     llmVndAntSkills,
@@ -260,6 +276,7 @@ export function LLMParametersEditor(props: {
     llmVndMiscEffort,
     // llmVndMoonshotWebSearch,
     llmVndOaiEffort,
+    llmVndOaiReasoningMode,
     llmVndOaiRestoreMarkdown,
     llmVndOaiWebSearchContext,
     llmVndOaiWebSearchGeolocation,
@@ -279,7 +296,10 @@ export function LLMParametersEditor(props: {
 
   // state (here because the initial state depends on props)
   const tempAboveOne = llmTemperature !== null && llmTemperature !== undefined && llmTemperature > 1;
-  const [overheat, setOverheat] = React.useState(tempAboveOne);
+  const [overheatToggle, setOverheat] = React.useState(tempAboveOne);
+  // derive overheat from both the local toggle and the live value, so a temperature > 1 set elsewhere
+  // (e.g. the Model Configuration dialog or the chat-side panel) reactively unlocks 0..2 in every editor instance
+  const overheat = overheatToggle || tempAboveOne;
   const showOverheatButton = overheat || llmTemperature === 1 || tempAboveOne;
 
 
@@ -292,8 +312,9 @@ export function LLMParametersEditor(props: {
     if (overheat && tempAboveOne)
       onChangeParameter({ llmTemperature: 1 });
 
-    // toggle overheating
-    setOverheat(on => !on);
+    // toggle overheating - flip the derived value (not the raw toggle), so disabling works
+    // even when overheat is on only because the live temperature > 1 was set elsewhere
+    setOverheat(!overheat);
   }, [onChangeParameter, overheat, tempAboveOne]);
 
 
@@ -322,26 +343,32 @@ export function LLMParametersEditor(props: {
   //             Now this seems to be still the case for llmVndOaiEffort === 'minimal' (gpt 5.0 and before), 5.1/5.2 work even with 'none'
   const oaiSkipSearchOnMinimalEffort = llmVndOaiEffort === 'minimal';
 
+  // [2026-07-09, OpenAI] reasoning models unlock temperature at effort 'none' (mirrors the hotfixOmitTemperature bypass in aix.client)
+  const oaiTempUnlockedByNoReasoning = !!props.parameterOmitTemperature && llmVndOaiEffort === 'none';
+
   return <>
 
     {!(props.simplified && props.parameterOmitTemperature) && <FormSliderControl
       title={<span style={{ minWidth: 100 }}>Temperature</span>} ariaLabel='Model Temperature'
       description={
         antThinkingEnabled_Adaptive ? 'Off (adaptive)' : antThinkingEnabled ? 'Off (thinking)'
-          : llmTemperature === null ? 'Unsupported'
+          : llmTemperature === null ? (oaiTempUnlockedByNoReasoning ? 'Default' : 'Unsupported')
             : llmTemperature === undefined ? 'Default'
               : llmTemperature < 0.33 ? 'More strict'
                 : llmTemperature > 1 ? 'Extra hot ♨️'
                   : llmTemperature > 0.67 ? 'Larger freedom' : 'Creativity'
       }
-      disabled={props.parameterOmitTemperature /* set when LLM_IF_HOTFIX_NoTemperature */ || antThinkingEnabled}
+      disabled={(props.parameterOmitTemperature && !oaiTempUnlockedByNoReasoning) /* set when LLM_IF_HOTFIX_NoTemperature, unless effort 'none' unlocks it */ || antThinkingEnabled}
       min={0}
       max={overheat ? 2 : 1}
       step={0.1}
       defaultValue={0.5 /* FIXME: this wasn't FALLBACK_LLM_PARAM_TEMPERATURE, but we shall not need this */}
       valueLabelDisplay={props.parameters?.llmTemperature === undefined || antThinkingEnabled ? 'auto' : 'on'} // detect user-overridden or not
-      value={llmTemperature ?? (overheat ? [1, 1] : [0.5, 0.5]) /* null and undefined both would become undefined (uncontrolled) in the slider */}
-      onChange={value => onChangeParameter({ llmTemperature: value })}
+      value={llmTemperature ?? ( // nullish: single thumb when interactive (unlocked), collapsed two-thumb 'empty' look only when disabled - an array on a live slider becomes a range control
+        oaiTempUnlockedByNoReasoning ? 0.5 // default when unlocked by OpenAI + effort 'none'
+          : overheat ? [1, 1] : [0.5, 0.5]
+      )}
+      onChange={value => onChangeParameter({ llmTemperature: Array.isArray(value) ? value[0] : value })}
       endAdornment={
         <Tooltip arrow disableInteractive title={overheat ? 'Disable LLM Overheating' : 'Increase Max LLM Temperature to 2'} sx={{ p: 1 }}>
           <IconButton
@@ -436,6 +463,19 @@ export function LLMParametersEditor(props: {
           else onChangeParameter({ llmVndOaiEffort: value });
         }}
         options={oaiEffortOptions}
+      />
+    )}
+    {/* OpenAI Reasoning Mode (GPT-5.6+) */}
+    {showParam('llmVndOaiReasoningMode') && (
+      <FormSelectControl
+        title='Reasoning Mode'
+        tooltip='Pro mode performs additional model work for difficult tasks; token usage is higher, billed at standard rates'
+        value={llmVndOaiReasoningMode ?? _UNSPECIFIED}
+        onChange={(value) => {
+          if (value === _UNSPECIFIED || !value) onRemoveParameter('llmVndOaiReasoningMode');
+          else onChangeParameter({ llmVndOaiReasoningMode: value });
+        }}
+        options={_oaiReasoningModeOptions}
       />
     )}
     {/* Moonshot/Z.ai Thinking */}
@@ -549,6 +589,24 @@ export function LLMParametersEditor(props: {
       />
     )}
 
+    {showParam('llmVndAntCodeSandbox') && (
+      <FormSwitchControl
+        title='Code Sandbox'
+        description={llmVndAntSkills ? 'On (via Skills)' : 'Hosted-container sandbox'}
+        tooltip='Run code in a server-side hosted-container sandbox for data analysis, file processing, and charts. Document Skills and programmatic tool calls enable this automatically. Can be combined with Web Search/Fetch (free when used together).'
+        disabled={!!llmVndAntSkills} // Skills require the container, so it is implied-on and locked
+        checked={!!llmVndAntCodeSandbox || !!llmVndAntSkills}
+        onChange={checked => {
+          if (!checked) onRemoveParameter('llmVndAntCodeSandbox');
+          else onChangeParameter({ llmVndAntCodeSandbox: 'auto' });
+        }}
+      />
+    )}
+
+    {showParam('llmVndAntSkills') && (
+      <AnthropicSkillsConfig llmVndAntSkills={llmVndAntSkills} onChangeParameter={onChangeParameter} onRemoveParameter={onRemoveParameter} />
+    )}
+
     {showParam('llmVndAnt1MContext') && (
       <FormSwitchControl
         title='1M Context Window (Beta)'
@@ -574,10 +632,6 @@ export function LLMParametersEditor(props: {
           else if (antInfSpeedTier) onChangeParameter({ llmVndAntInfSpeed: antInfSpeedTier });
         }}
       />
-    )}
-
-    {showParam('llmVndAntSkills') && (
-      <AnthropicSkillsConfig llmVndAntSkills={llmVndAntSkills} onChangeParameter={onChangeParameter} onRemoveParameter={onRemoveParameter} />
     )}
 
 
@@ -671,7 +725,7 @@ export function LLMParametersEditor(props: {
 
     {showParam('llmVndGeminiCodeExecution') && (
       <FormSelectControl
-        title='Code Execution'
+        title='Code Sandbox'
         tooltip='Enable automatic Python code generation and execution by the model'
         value={llmVndGeminiCodeExecution ?? _UNSPECIFIED}
         onChange={(value) => {
@@ -735,7 +789,7 @@ export function LLMParametersEditor(props: {
           else
             onChangeParameter({ llmVndOaiWebSearchContext: value });
         }}
-        options={_webSearchContextOptions}
+        options={oaiWebSearchOptions ?? _webSearchContextOptions}
       />
     )}
 
@@ -791,7 +845,7 @@ export function LLMParametersEditor(props: {
 
     {showParam('llmVndOaiCodeInterpreter') && (
       <FormSelectControl
-        title='Code Interpreter'
+        title='Code Sandbox'
         tooltip='Enable Python code execution in a sandboxed container. Costs $0.03 per container (expires after 20 minutes of inactivity).'
         value={llmVndOaiCodeInterpreter ?? _UNSPECIFIED}
         onChange={(value) => {
@@ -882,7 +936,7 @@ export function LLMParametersEditor(props: {
 
     {showParam('llmVndXaiCodeExecution') && (
       <FormSelectControl
-        title='Run Code'
+        title='Code Sandbox'
         value={llmVndXaiCodeExecution ?? _UNSPECIFIED}
         onChange={(value) => {
           if (value === _UNSPECIFIED || !value || value === 'off') onRemoveParameter('llmVndXaiCodeExecution');

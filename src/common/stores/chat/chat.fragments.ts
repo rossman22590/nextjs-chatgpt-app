@@ -248,6 +248,7 @@ export type DMessageHostedResourcePart = {
   pt: 'hosted_resource';
   resource:
     | { via: 'anthropic', fileId: string, containerId?: string }
+    | { via: 'gemini-file', fileName: string, mimeType: string, isVideo?: boolean /* NOTE: more metadata incl expiration time can be fetched by fileName */ } // [Gemini] Files-API artifact (e.g. Omni video via delivery:uri) - re-fetchable for ~48h via the key-proxied Gemini download route
     | { via: 'openai-container', fileId: string, containerId: string, filename?: string }; // OpenAI code-interpreter container file
 };
 
@@ -593,7 +594,7 @@ export function createDMessageZyncAssetReferencePart(zUuid: ZYNC_Entity.UUID, re
 }
 
 function _create_Doc_Part(vdt: DMessageDocMimeType, data: DMessageDataInline, ref: string, l1Title: string, version: number, meta?: DMessageDocMeta): DMessageDocPart {
-  return { pt: 'doc', vdt, data, ref, l1Title, version, meta };
+  return { pt: 'doc', vdt, data, ref, l1Title, version, ...(meta && { meta }) };
 }
 
 function _create_ImageRef_Part(dataRef: DMessageDataRef, altText?: string, width?: number, height?: number): DMessageImageRefPart {
