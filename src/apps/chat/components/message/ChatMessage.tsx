@@ -697,6 +697,11 @@ export function ChatMessage(props: {
     // alignment + user bubble text (neutral theme sets --agi-message-user-color for white on black)
     ...(fromAssistant && { mr: 0, ml: 0 }),
     ...(fromUser && { ml: { xs: 'auto', md: 'auto' }, mr: 0, color: 'var(--agi-message-user-color, var(--joy-palette-text-primary))' }),
+    // command messages use a soft tinted bubble (warning.softBg / success.softBg). Pair the text with the
+    // MATCHING soft color - Joy guarantees softColor contrasts on softBg in BOTH light and dark themes,
+    // avoiding the black-on-black / white-on-cream failures of using a generic text color.
+    ...(fromUser && userCommandApprox === 'draw' && { color: 'var(--joy-palette-warning-softColor)', '--agi-message-user-color': 'var(--joy-palette-warning-softColor)' }),
+    ...(fromUser && userCommandApprox === 'react' && { color: 'var(--joy-palette-success-softColor)', '--agi-message-user-color': 'var(--joy-palette-success-softColor)' }),
     ...(fromSystem && { ml: 0, mr: 0 }),
 
     ...(isUserStarred && {
@@ -729,7 +734,7 @@ export function ChatMessage(props: {
     display: 'block',
 
     ...props.sx,
-  }; }, [adjContentScaling, backgroundColor, fromAssistant, fromSystem, fromUser, isDark, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.sx, uiComplexityMode]);
+  }; }, [adjContentScaling, backgroundColor, fromAssistant, fromSystem, fromUser, isDark, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.sx, uiComplexityMode, userCommandApprox]);
   // avatar icon & label & tooltip
 
   const zenMode = uiComplexityMode === 'minimal';

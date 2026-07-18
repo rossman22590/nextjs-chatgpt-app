@@ -31,7 +31,20 @@ export const RenderPlainText = (props: { content: string; sx?: SxProps; }) => {
         <React.Fragment key={index}>
           {element.type === 'cmd'
             ? <>
-              <Chip component='span' size='md' variant='solid' color={element.isErrorNoArgs ? 'danger' : 'neutral'} sx={{ mr: 1 }}>
+              <Chip
+                component='span' size='md' variant='solid'
+                // use the user's theme color (primary) for the pill, red for a bad command
+                color={element.isErrorNoArgs ? 'danger' : 'primary'}
+                // Force the pill's own contrasting label color (solidColor) on BOTH root and the label span,
+                // so it never inherits the surrounding message text color (e.g. the /draw bubble's
+                // warning.softColor) and render dark-on-dark. Nested selector beats the inherited cascade.
+                sx={{
+                  mr: 1,
+                  '&, & .MuiChip-label': {
+                    color: element.isErrorNoArgs ? 'var(--joy-palette-danger-solidColor)' : 'var(--joy-palette-primary-solidColor)',
+                  },
+                }}
+              >
                 {element.command}
               </Chip>
               <span>{element.params}</span>

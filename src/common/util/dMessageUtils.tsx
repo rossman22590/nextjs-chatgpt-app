@@ -111,15 +111,22 @@ export const tooltipMetricsGridSx: SxProps = {
 
 /** Whole message background color, based on the message role and state */
 export function messageBackground(messageRole: DMessageRole | string, userCommand: 'draw' | 'react' | false, wasEdited: boolean, isAssistantIssue: boolean): string {
+  // Theme-aware state tints: Joy's *-softBg palette vars are purpose-built tinted surfaces, redefined
+  // per light/dark scheme - pale/warm in light (the cream look), muted-dark in dark. This replaces the
+  // old hardcoded light-only cream/green/red/amber that looked wrong in dark mode.
+  const drawTint = 'var(--joy-palette-warning-softBg)';   // warm cream in light, muted amber in dark
+  const reactTint = 'var(--joy-palette-success-softBg)';  // pale green / muted green
+  const issueTint = 'var(--joy-palette-danger-softBg)';   // pale red / muted red
+  const editedTint = 'var(--joy-palette-warning-softBg)'; // pale amber / muted amber
   switch (messageRole) {
     case 'user':
-      return userCommand === 'draw' ? 'rgba(255 247 237 / 0.88)'
-        : userCommand === 'react' ? 'rgba(236 253 245 / 0.88)'
+      return userCommand === 'draw' ? drawTint
+        : userCommand === 'react' ? reactTint
           : 'var(--agi-message-user)';
     case 'assistant':
-      return isAssistantIssue ? 'rgba(255 241 242 / 0.88)' : 'var(--agi-message-assistant)';
+      return isAssistantIssue ? issueTint : 'var(--agi-message-assistant)';
     case 'system':
-      return wasEdited ? 'rgba(255 251 235 / 0.88)' : 'var(--agi-message-system)';
+      return wasEdited ? editedTint : 'var(--agi-message-system)';
     default:
       return 'var(--agi-message-assistant)';
   }

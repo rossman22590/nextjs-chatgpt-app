@@ -31,17 +31,18 @@ export const messageAvatarLabelSx: SxProps = {
   overflowWrap: 'break-word',
   wordBreak: 'break-word',
   maxWidth: '100%',
-  fontSize: '0.65rem',
-  lineHeight: 1.3,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
+  fontSize: '0.6rem',
+  lineHeight: 1.2,
+  // NOTE: no uppercase / letter-spacing - both widen the text and force long model names (e.g. 'GPT-5.6 Terra Pro')
+  // to wrap into a ragged multi-line stack in the narrow avatar column. Mixed-case stays compact.
+  textTransform: 'none',
   color: 'text.tertiary',
   fontWeight: 600,
   textAlign: 'center',
   opacity: 0.7,
-  // clamp long model names to 3 lines - the full name is in the hover tooltip
+  // clamp to 2 tidy lines - the full name is in the hover tooltip
   display: '-webkit-box',
-  WebkitLineClamp: 3,
+  WebkitLineClamp: 2,
   WebkitBoxOrient: 'vertical',
   overflow: 'hidden',
 };
