@@ -66,7 +66,7 @@ export function AppNews() {
           level='h1'
           sx={{
             fontSize: '2.5rem',
-            color: 'primary.500',
+            color: 'primary.plainColor',
             fontWeight: 'bold',
           }}
         >
@@ -80,7 +80,7 @@ export function AppNews() {
           textAlign: 'left',
           width: '100%'
         }}>
-          <Typography level="h3" sx={{ color: 'primary.600', mb: 1 }}>
+          <Typography level="h3" sx={{ color: 'primary.softColor', mb: 1 }}>
             What&apos;s New in This Update:
           </Typography>
           
