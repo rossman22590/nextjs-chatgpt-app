@@ -10,7 +10,7 @@ const log = process.env.__AGI_CONFIG_PASS === '1' ? (...args: any[]) => console.
 
 
 // Require build hash: from CI env, git CLI, or .git metadata (let through in docker builds)
-let buildHash = process.env.NEXT_PUBLIC_BUILD_HASH || process.env.GITHUB_SHA || process.env.VERCEL_GIT_COMMIT_SHA; // Docker or custom, GitHub Actions, Vercel
+let buildHash = process.env.NEXT_PUBLIC_BUILD_HASH || process.env.GITHUB_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA; // Docker or custom, GitHub Actions, Vercel, Railway (nixpacks ships no .git)
 if (!buildHash) try { buildHash = execSync('git rev-parse --short HEAD').toString().trim(); } catch { /* no git binary or no repository - .git metadata read below */ }
 if (!buildHash) try { // git-less checkout read, e.g. `docker build`: the context admits only .git/{HEAD,refs,packed-refs} - see .dockerignore
   const readGit = (path: string) => readFileSync(new URL(`./.git/${path}`, import.meta.url), 'utf8').trim();
