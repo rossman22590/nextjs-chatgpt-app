@@ -123,7 +123,7 @@ export function CallWizard(props: { strict?: boolean, conversationId: string | n
         + (recognition.warnings.length ? ' ⚠️ ' + recognition.warnings.join(' · ') : '')
       }
       button={overriddenRecognition ? undefined : <>
-        <Button variant='outlined' component='a' href={BaseProduct.DocsBaseSite + '/feature-voice'} target='_blank' sx={{ ml: 1 }}>
+        <Button variant='outlined' component='a' href={BaseProduct.DocsBaseSite} target='_blank' sx={{ ml: 1 }}>
           How to fix
         </Button>
         <Button variant='outlined' onClick={handleOverrideRecognition} sx={{ mx: 1 }}>

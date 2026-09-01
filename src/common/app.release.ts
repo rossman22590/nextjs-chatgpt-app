@@ -64,12 +64,12 @@ export const Release = {
 
 
 export const BaseProduct = {
-  ProductName: 'Big-AGI',
-  ProductURL: 'https://big-agi.com',
-  PrivacyPolicy: 'https://big-agi.com/privacy',
-  TermsOfService: 'https://big-agi.com/terms',
+  ProductName: 'Beam',
+  ProductURL: 'https://myapps.ai',
+  PrivacyPolicy: 'https://account.myapps.ai/privacypolicy',
+  TermsOfService: 'https://account.myapps.ai/terms',
   // ecosystem
-  DocsBaseSite: 'https://big-agi.com/docs',
+  DocsBaseSite: 'https://support.myapps.ai/ultra/beam-ultra',
   NewsSite: 'https://big-agi.com/changes',
   OpenSupportDiscord: 'https://discord.gg/MkH4qj2Jp9',
   OpenSourceRepo: 'https://github.com/enricoros/big-agi',

@@ -92,7 +92,7 @@ export function ModelsConfiguratorModal(props: {
     if (!activeService?.vId) return null;
     const isCustomOpenAIHost = activeService.vId === 'openai' && !!(activeService.setup as { oaiHost?: string } | undefined)?.oaiHost;
     const docSlug = isCustomOpenAIHost ? 'connect-custom-endpoints' : VENDOR_DOCS[activeService.vId];
-    return !docSlug ? null : BaseProduct.DocsBaseSite + '/' + docSlug;
+    return !docSlug ? null : BaseProduct.DocsBaseSite;
   }, [activeService]);
 
   // menu enablement - boolean selectors (early-exit scans, primitive return: no re-render unless flipping)

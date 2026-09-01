@@ -149,7 +149,7 @@ export function OpenAIServiceSetup(props: { serviceId: DModelsServiceId }) {
     {showAdvanced && <FormTextField
       autoCompleteId='openai-org'
       title='Organization ID'
-      description={<Link level='body-sm' href={BaseProduct.OpenSourceRepo + '/issues/63'} target='_blank'>What is this</Link>}
+      description={<Link level='body-sm' href={BaseProduct.DocsBaseSite} target='_blank'>What is this</Link>}
       placeholder='Optional, for enterprise users'
       value={oaiOrg}
       onChange={text => updateSettings({ oaiOrg: text })}

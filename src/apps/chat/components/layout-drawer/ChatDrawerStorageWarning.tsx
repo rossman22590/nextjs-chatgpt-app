@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Box, Button, ColorPaletteProp, Divider, IconButton, Input, Link, ModalClose, Typography } from '@mui/joy';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 
+import { BaseProduct } from '~/common/app.release';
 import { GoodModal } from '~/common/components/modals/GoodModal';
 
 import { useChatStorageWarning } from '../../store-app-chat';
@@ -183,7 +184,7 @@ function StorageWarningConfirmationModal(props: {
       {/* Messages */}
       <Box sx={_styles.block}>
         <Box fontSize='sm'>
-          Big-AGI is a local-first app that saves your data and settings in this browser - private by default.
+          {BaseProduct.ProductName} is a local-first app that saves your data and settings in this browser - private by default.
         </Box>
         <Box fontSize='sm'>
           <b>Clearing the browser cache or data will erase chats and settings permanently.</b>
