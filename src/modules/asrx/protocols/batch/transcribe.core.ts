@@ -8,8 +8,9 @@
  */
 
 import type { ASRxAccess } from './batch.access';
-import type { DASRxProfileAny } from '../../asrx.types';
+import type { ASRxDetectedSentiment, ASRxDetectedTopic, DASRxProfileAny } from '../../asrx.types';
 import { transcribeDeepgram } from './transcribe-deepgram';
+import { asrxTranscribeGemini } from './transcribe-gemini';
 import { transcribeOpenAI } from './transcribe-openai';
 
 
@@ -21,6 +22,8 @@ export interface ASRxCoreTranscribeResult {
   language?: string;        // detected or confirmed language, when provided by the vendor
   confidence?: number;      // 0..1, when provided
   durationMs?: number;      // client-measured round-trip (or vendor-reported)
+  topics?: ASRxDetectedTopic[]; // vendor-detected topics (deduped, only when non-empty)
+  sentiment?: ASRxDetectedSentiment; // vendor-average sentiment, when analysis ran
 }
 
 
@@ -35,8 +38,7 @@ export interface TranscribeBackendFnParams<TAccess extends ASRxAccess> {
   signal?: AbortSignal;
 }
 
-export type TranscribeBackendFn<TAccess extends ASRxAccess> =
-  (params: TranscribeBackendFnParams<TAccess>) => Promise<ASRxCoreTranscribeResult>;
+export type TranscribeBackendFn<TAccess extends ASRxAccess> = (params: TranscribeBackendFnParams<TAccess>) => Promise<ASRxCoreTranscribeResult>;
 
 
 /**
@@ -58,6 +60,11 @@ export async function asrxBatchCoreTranscribe(params: {
       if (profile.dialect !== 'deepgram')
         throw new Error(`Profile dialect '${profile.dialect}' does not match access dialect 'deepgram'`);
       return await transcribeDeepgram({ access, profile, audio, mimeType, languageCode, signal });
+
+    case 'gemini':
+      if (profile.dialect !== 'gemini')
+        throw new Error(`Profile dialect '${profile.dialect}' does not match access dialect 'gemini'`);
+      return await asrxTranscribeGemini({ access, profile, audio, mimeType, languageCode, signal });
 
     case 'openai':
       if (profile.dialect !== 'openai')

@@ -5,7 +5,7 @@ import type { AnthropicHostedFeatures } from '~/modules/llms/server/anthropic/an
 import type { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_ChatMessage, AixTools_ToolDefinition, AixTools_ToolsPolicy } from '../../../api/aix.wiretypes';
 import { AnthropicWire_API_Message_Create, AnthropicWire_Blocks } from '../../wiretypes/anthropic.wiretypes';
 
-import { aixSpillShallFlush, aixSpillSystemToUser, approxDocPart_To_String, approxInReferenceTo_To_XMLString } from './adapters.common';
+import { AIX_MISSING_TOOL_RESULT_TEXT, aixSpillShallFlush, aixSpillSystemToUser, approxDocPart_To_String, approxInReferenceTo_To_XMLString, approxMediaUrlPart_To_String } from './adapters.common';
 
 
 // configuration
@@ -22,6 +22,15 @@ const hotFixAntSeparateContiguousThinkingBlocks = true; // Interleave continuous
 
 
 type TRequest = AnthropicWire_API_Message_Create.Request;
+
+
+/**
+ * Which endpoint the Messages payload is built for.
+ * Not merely an envelope difference: the AWS Bedrock `bedrock-2023-05-31` passthrough validates the
+ * body against its own schema and 400s on api.anthropic.com-only fields, so the adapter has to know
+ * where the request is going. Keep every target-conditional field in the one block at the bottom.
+ */
+export type AixAnthropicTarget = 'anthropic' | 'bedrock';
 
 
 /**
@@ -71,7 +80,7 @@ export function aixAnthropicHostedFeatures(model: AixAPI_Model, chatGenerate: Ai
   };
 }
 
-export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: AixAPIChatGenerate_Request, streaming: boolean, hostedFeatures: ReturnType<typeof aixAnthropicHostedFeatures>): TRequest {
+export function aixToAnthropicMessageCreate(target: AixAnthropicTarget, model: AixAPI_Model, _chatGenerate: AixAPIChatGenerate_Request, streaming: boolean, hostedFeatures: ReturnType<typeof aixAnthropicHostedFeatures>): TRequest {
 
   // Pre-process CGR - approximate spill of System to User message
   const chatGenerate = aixSpillSystemToUser(_chatGenerate);
@@ -163,6 +172,9 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
   if (currentMessage)
     chatMessages.push(currentMessage);
 
+  // [Anthropic] Pair every interior tool_use with a tool_result, or the request is rejected wholesale
+  _pairInteriorToolUseBlocks(chatMessages);
+
   // [Anthropic, 2026-07-10] The API rejects >4 cache_control blocks ("A maximum of 4 blocks with
   // cache_control may be provided.") - manual 'Cache up to here' flags can stack beyond the auto
   // policy's 3. Keep the trailing 4: breakpoints cache prefixes, so earlier ones are redundant.
@@ -204,12 +216,17 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
   }
 
   // [Anthropic, 2026-06-09] Fable 5 / Mythos 5: adaptive is the only thinking mode - 'enabled' (budget_tokens) and 'disabled' return 400
-  const hotFixAdaptiveThinkingOnlyModel = /claude-(fable|mythos)-5/.test(model.id);
+  // [2026-07-24] Opus 5 launch-verified: adaptive-only too ('enabled'/budget_tokens return 400), so 'opus' stays in this regex.
+  // (Opus 5 nuance: 'disabled' is legal at effort <= high, but we coerce to adaptive anyway - single always-thinking entry.)
+  const hotFixAdaptiveThinkingOnlyModel = /claude-(fable|mythos|opus)-5/.test(model.id);
 
-  // HOTFIX: Fable/Mythos 5 reject forced tool use: 400 'tool_choice forces tool use is not compatible with this model.'
+  // HOTFIX: Fable/Mythos 5 ONLY reject forced tool use: 400 'tool_choice forces tool use is not compatible with this model.'
   // (model-level, regardless of thinking config). Downgrade to 'auto' + a system hint - empirically the model
   // reliably calls the tool when instructed. Forced tool use is deprecated AIX-wide, see ToolsPolicy_schema.
-  if (hotFixAdaptiveThinkingOnlyModel && payload.tool_choice && (payload.tool_choice.type === 'any' || payload.tool_choice.type === 'tool')) {
+  // [2026-07-24] Opus 5 EXCLUDED (launch probes): tool_choice 'any'/'tool' return 200 with thinking left to its
+  // adaptive-on default, so requests pass through unchanged (thinking is skipped below when tools are forced).
+  const hotFixNoForcedToolUse = /claude-(fable|mythos)-5/.test(model.id);
+  if (hotFixNoForcedToolUse && payload.tool_choice && (payload.tool_choice.type === 'any' || payload.tool_choice.type === 'tool')) {
     const mustUseHint = payload.tool_choice.type === 'tool'
       ? `IMPORTANT: You MUST respond by calling the \`${payload.tool_choice.name}\` tool. Do not respond with text.`
       : 'IMPORTANT: You MUST respond by calling one of the provided tools. Do not respond with text.';
@@ -375,6 +392,39 @@ export function aixToAnthropicMessageCreate(model: AixAPI_Model, _chatGenerate: 
   }
 
 
+  // --- Target: remove api.anthropic.com-only fields ---
+  // Bedrock's `bedrock-2023-05-31` passthrough validates the body and rejects anything it does not
+  // know ("<field>: Extra inputs are not permitted", HTTP 400). Keep all such strips here, in one
+  // place - `model`/`stream` are NOT in this list, they are envelope translation (see the dispatch).
+  if (target === 'bedrock') {
+
+    /**
+     * Reasoning effort on Bedrock is a 4.5-GENERATION limitation, NOT Bedrock-wide (live-probed
+     * 2026-08-05): opus-4-5-20251101 / sonnet-4-5-20250929 / haiku-4-5-20251001 all 400 with
+     * 'output_config.effort: Extra inputs are not permitted' (also observed in prod 2026-08-03 on
+     * us.anthropic.claude-opus-4-5, invoke + streaming), while opus-4-6 and sonnet-4-6 ACCEPT effort
+     * (200) - so the strip is model-scoped to not penalize 4.6+. 4.7/4.8/5-family were not probeable
+     * (403 on the test account) and are assumed accepting, being newer than 4.6; if one 400s, extend
+     * the regex. There is no 4.5 fallback to map effort onto - `thinking.budget_tokens` is a different
+     * knob and is already sent when the user sets one - so on 4.5 effort is silently dropped and the
+     * model answers at its default depth. The Effort control is also filtered per-model out of Bedrock
+     * model definitions (`_BEDROCK_EFFORT_REJECTING_MODELS` in llms .../anthropic.models.ts - keep the
+     * two regexes in sync), but this strip is what actually fixes it: it covers values already
+     * persisted in a user's per-model parameters, the 'Max reasoning' exec override, and the
+     * forced-tool-use hotfix above (which sets effort itself).
+     * `output_config.format` (strict JSON) is deliberately kept: the 400 names the NESTED `effort` key,
+     * so Bedrock does know `output_config` - whether it also takes `format` is untested, don't guess.
+     */
+    if (payload.output_config?.effort && /claude-(opus|sonnet|haiku)-4-5-\d{8}/.test(model.id)) {
+      delete payload.output_config.effort;
+      if (!Object.keys(payload.output_config).length)
+        delete payload.output_config;
+    }
+
+    // Fast inference mode is not offered on partner clouds: 400 'speed: Extra inputs are not permitted'
+    delete payload.speed;
+  }
+
   // Preemptive error detection with server-side payload validation before sending it upstream
   const validated = AnthropicWire_API_Message_Create.Request_schema.safeParse(payload);
   if (!validated.success) {
@@ -398,6 +448,59 @@ function _capTrailingCacheBreakpoints(systemMessage: TRequest['system'], chatMes
         stampedBlocks.push(block);
   for (let i = 0; i < stampedBlocks.length - maxBreakpoints; i++)
     delete stampedBlocks[i].cache_control;
+}
+
+/**
+ * Anti-wedge: a `tool_use` block with no `tool_result` for its id in the immediately following user
+ * message is a 400 ("tool_use ids were found without tool_result blocks immediately after") that
+ * rejects the whole request. Since the orphan lives in stored history (a run that failed/aborted
+ * before the tool ran, or a tool no client processor claimed), every later turn replays it and gets
+ * the same 400: the conversation is bricked with no in-app way to tell which message is poisoned.
+ *
+ * This synthesizes the stub prescribed in kb/modules/AIX-stateless-roundtrip-retention.md (cat-1),
+ * which also retro-heals conversations already poisoned in users' stores. No-op when well-formed.
+ *
+ * The LAST assistant message is deliberately skipped: a trailing `tool_use` is the in-flight call of
+ * an agentic loop (and pause_turn continuation extends that same trailing message with its own blocks,
+ * after this adapter has run) - synthesizing there would fake the result of a call about to execute.
+ * `server_tool_use` is likewise untouched: hosted tools owe no tool_result.
+ */
+function _pairInteriorToolUseBlocks(chatMessages: TRequest['messages']): void {
+  for (let i = 0; i < chatMessages.length - 1; i++) {
+    const message = chatMessages[i];
+    if (message.role !== 'assistant') continue;
+
+    // client tool calls of this turn, in wire order
+    const toolUseIds: string[] = [];
+    for (const block of message.content)
+      if (block.type === 'tool_use')
+        toolUseIds.push(block.id);
+    if (!toolUseIds.length) continue;
+
+    // the results must be in the next message: if that isn't a user turn (role flip at a flush
+    // boundary), insert one to hold them - it will still sit immediately after the tool_use blocks
+    let resultsMessage = chatMessages[i + 1];
+    if (resultsMessage.role !== 'user') {
+      resultsMessage = { role: 'user', content: [] };
+      chatMessages.splice(i + 1, 0, resultsMessage);
+    }
+
+    const answeredIds = new Set<string>();
+    for (const block of resultsMessage.content)
+      if (block.type === 'tool_result')
+        answeredIds.add(block.tool_use_id);
+
+    const orphanIds = toolUseIds.filter(id => !answeredIds.has(id));
+    if (!orphanIds.length) continue;
+
+    // head-insert, in tool_use order: tool_result blocks lead the user turn, ahead of any user content
+    console.warn(`[Anthropic] Pairing ${orphanIds.length} orphan tool_use block(s) with a placeholder tool_result (messages.${i})`);
+    resultsMessage.content.unshift(...orphanIds.map(id => AnthropicWire_Blocks.ToolResultBlock(
+      id,
+      [AnthropicWire_Blocks.TextBlock(AIX_MISSING_TOOL_RESULT_TEXT, 'pairing.orphan-tool-use')],
+      undefined, // not is_error: the tool did not fail, its result is simply absent from history
+    )));
+  }
 }
 
 function* _generateAnthropicMessagesContentBlocks({ parts, role }: AixMessages_ChatMessage): Generator<{
@@ -432,6 +535,11 @@ function* _generateAnthropicMessagesContentBlocks({ parts, role }: AixMessages_C
 
           case 'doc':
             yield { role: 'user', content: AnthropicWire_Blocks.TextBlock(approxDocPart_To_String(part), 'user.doc') };
+            break;
+
+          case 'media_url':
+            // URL-referenced video: Anthropic cannot watch it - honest text degradation
+            yield { role: 'user', content: AnthropicWire_Blocks.TextBlock(approxMediaUrlPart_To_String(part), 'user.media_url') };
             break;
 
           case 'meta_in_reference_to':

@@ -138,9 +138,6 @@ const IFS_CHAT_CACHE: DModelInterfaceV1[] = [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision,
 const IFS_CHAT_CACHE_REASON: DModelInterfaceV1[] = [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_PromptCaching, LLM_IF_OAI_Reasoning] as const;
 // NOTE: LLM_IF_Tools_WebSearch and LLM_IF_Outputs_Image are auto-implied by llmsAutoImplyInterfaces() from parameterSpecs - no need to add them manually
 
-// per-type parameter specs
-const PS_DEEP_RESEARCH = [{ paramId: 'llmVndOaiWebSearchContext' as const, initialValue: 'medium', hidden: true } as const];
-
 
 // [OpenAI] Known Chat Models
 // https://platform.openai.com/docs/models
@@ -160,9 +157,15 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
   // - reasoning.mode: standard|pro (#1158) - 'pro' replaces the standalone '-pro' models (gpt-5.6-pro does not exist);
   //   orthogonal to effort (works with none..max), streams, takes summary=detailed; billed at standard token rates
   // - temperature/top_p only with effort=none; verbosity low|medium|high; web_search/code_interpreter/image_generation all work
-  // NOT yet adopted (shipped Jul 9 alongside 5.6, per API changelog): programmatic tool calling, explicit prompt-cache
-  // controls, persisted reasoning / reasoning.context (auto|current_turn|all_turns - also accepted by 5.5), assistant
-  // message 'phase' (commentary|final_answer), image detail 'original'.
+  // ADOPTED 2026-07-30: retained reasoning - the adapter hardwires reasoning.context 'all_turns' on gpt-5.4+
+  // (no user parameter; the lever is the chat 'Reasoning traces' policy). API-verified: 5.4+ incl. mini/nano/pro
+  // accept it, 5.3-codex and older 400 on it; only consumed reasoning items are billed, and old/foreign items
+  // are ignored for free, so replaying full reasoning history is always safe. Also adopted: assistant message
+  // 'phase' (commentary|final_answer), captured/replayed via _vnd.openai.phase on text fragments.
+  // NOT yet adopted (shipped Jul 9 alongside 5.6, per API changelog): programmatic tool calling, explicit
+  // prompt-cache controls, image detail 'original'.
+  // FIXME: PRICING NOTE: 5.6 bills prompt-cache WRITES at 1.25x the input rate - the 'oai-ac' chatPrice shape has no
+  //        write field (it assumes writes cost the same as input), so the cache-write surcharge is not modeled.
 
   // GPT-5.6 Sol - flagship
   {
@@ -182,8 +185,8 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
       { paramId: 'llmVndOaiCodeInterpreter' },
       { paramId: 'llmForceNoStream' },
     ],
-    chatPrice: { input: 5, cache: { cType: 'oai-ac', read: 0.5 }, output: 30 }, // cache read = 90% discount
-    // benchmark: TBD (not yet on leaderboards)
+    chatPrice: { input: 4, cache: { cType: 'oai-ac', read: 0.4 }, output: 20 }, // cache read = 90% discount; 2026-08-21: -20% input, -33% output (promo through at least 2026-11-21)
+    benchmark: { cbaElo: 1481 }, // gpt-5.6-sol-xhigh
   },
 
   // GPT-5.6 Terra - balanced
@@ -191,7 +194,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     idPrefix: 'gpt-5.6-terra',
     label: 'GPT-5.6 Terra',
     pubDate: '20260709', // API GA (Jun 26 was the limited partner preview)
-    description: 'Balanced model for efficient, high-volume everyday work. Competitive with GPT-5.5 while being 2x cheaper. 1M token context.',
+    description: 'Balanced model for efficient, high-volume everyday work. Competitive with GPT-5.5 at a fraction of the cost. 1M token context.',
     contextWindow: 1050000,
     maxCompletionTokens: 128000,
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
@@ -204,8 +207,8 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
       { paramId: 'llmVndOaiCodeInterpreter' },
       { paramId: 'llmForceNoStream' },
     ],
-    chatPrice: { input: 2.5, cache: { cType: 'oai-ac', read: 0.25 }, output: 15 }, // cache read = 90% discount
-    // benchmark: TBD (not yet on leaderboards)
+    chatPrice: { input: 2, cache: { cType: 'oai-ac', read: 0.2 }, output: 12 }, // cache read = 90% discount; 2026-07-30: -20%
+    benchmark: { cbaElo: 1464 }, // gpt-5.6-terra-xhigh
   },
 
   // GPT-5.6 Luna - fast & affordable
@@ -226,13 +229,35 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
       { paramId: 'llmVndOaiCodeInterpreter' },
       { paramId: 'llmForceNoStream' },
     ],
-    chatPrice: { input: 1, cache: { cType: 'oai-ac', read: 0.1 }, output: 6 }, // cache read = 90% discount
-    // benchmark: TBD (not yet on leaderboards)
+    chatPrice: { input: 0.2, cache: { cType: 'oai-ac', read: 0.02 }, output: 1.2 }, // cache read = 90% discount; 2026-07-30: -80%
+    benchmark: { cbaElo: 1450 }, // gpt-5.6-luna-xhigh
   },
   {
     idPrefix: 'gpt-5.6',
     label: 'GPT-5.6',
-    symLink: 'gpt-5.6-sol', // official alias: "gpt-5.6 routes requests to GPT-5.6 Sol" - not yet on /v1/models, dormant until listed
+    symLink: 'gpt-5.6-sol', // official alias: "gpt-5.6 routes requests to GPT-5.6 Sol" - generation works (probed 2026-08-17) but still absent from /v1/models, so this stays dormant
+  },
+
+
+  /// ChatGPT Instant - version-less rolling pointer to the Instant model currently served in ChatGPT.
+  // No snapshots: OpenAI re-points it in place without notice (last moved 2026-08-06). Replaces the per-generation
+  // 'gpt-5.x-chat-latest' ids, which are all shut down. Priced at $5 in / $30 out per 1M.
+  {
+    idPrefix: 'chat-latest',
+    label: 'ChatGPT Instant',
+    pubDate: '20260505', // API changelog 2026-05-05: "Released `chat-latest` snapshot which points to the latest Instant model currently used in ChatGPT"
+    description: 'Points to the Instant model currently used in ChatGPT. Updated in place without notice - OpenAI recommends GPT-5.6 Sol for production.',
+    contextWindow: 400000,
+    maxCompletionTokens: 128000,
+    interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE, LLM_IF_HOTFIX_NoTemperature],
+    parameterSpecs: [
+      // no effort/verbosity: both accept only 'medium', and responses carry 0 reasoning tokens (probed 2026-08-17)
+      { paramId: 'llmVndOaiWebSearchContext' },
+      { paramId: 'llmVndOaiImageGeneration' },
+      { paramId: 'llmVndOaiCodeInterpreter' },
+    ],
+    chatPrice: { input: 5, cache: { cType: 'oai-ac', read: 0.5 }, output: 30 },
+    // benchmark: not measurable - the pointer moves under a stable id
   },
 
 
@@ -256,7 +281,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
       { paramId: 'llmForceNoStream' },
     ],
     chatPrice: { input: 5, cache: { cType: 'oai-ac', read: 0.5 }, output: 30 },
-    // benchmark: TBD - no CBA ELO yet
+    benchmark: { cbaElo: 1482 }, // gpt-5.5-high
   },
   {
     idPrefix: 'gpt-5.5',
@@ -310,7 +335,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
       { paramId: 'llmForceNoStream' },
     ],
     chatPrice: { input: 2.5, cache: { cType: 'oai-ac', read: 0.25 }, output: 15 },
-    benchmark: { cbaElo: 1482 }, // gpt-5.4-high
+    benchmark: { cbaElo: 1476 }, // gpt-5.4-high
   },
   {
     idPrefix: 'gpt-5.4',
@@ -361,7 +386,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
       { paramId: 'llmForceNoStream' },
     ],
     chatPrice: { input: 0.75, cache: { cType: 'oai-ac', read: 0.075 }, output: 4.5 },
-    benchmark: { cbaElo: 1458 }, // gpt-5.4-mini-high
+    benchmark: { cbaElo: 1448 }, // gpt-5.4-mini-high
   },
   {
     idPrefix: 'gpt-5.4-mini',
@@ -387,7 +412,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
       { paramId: 'llmForceNoStream' },
     ],
     chatPrice: { input: 0.2, cache: { cType: 'oai-ac', read: 0.02 }, output: 1.25 },
-    benchmark: { cbaElo: 1404 }, // gpt-5.4-nano-high
+    benchmark: { cbaElo: 1402 }, // gpt-5.4-nano-high
   },
   {
     idPrefix: 'gpt-5.4-nano',
@@ -420,25 +445,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
 
   // GPT-5.3 Codex Spark: removed, no longer returned by API (was ChatGPT Pro / design-partner only)
 
-  // GPT-5.3 Chat Latest - Released March 3, 2026
-  {
-    hidden: true, // deprecated May 8, 2026, shutdown 2026-08-10
-    idPrefix: 'gpt-5.3-chat-latest',
-    label: 'GPT-5.3 Instant [Deprecated]',
-    pubDate: '20260303',
-    isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-08-10] GPT-5.3 Instant model, previously powering ChatGPT. Replaced by GPT-5.5 Instant.',
-    contextWindow: 128000,
-    maxCompletionTokens: 16384,
-    interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE, LLM_IF_HOTFIX_NoTemperature],
-    parameterSpecs: [
-      { paramId: 'llmVndOaiWebSearchContext' },
-      { paramId: 'llmVndOaiImageGeneration' },
-      { paramId: 'llmVndOaiCodeInterpreter' },
-    ],
-    chatPrice: { input: 1.75, cache: { cType: 'oai-ac', read: 0.175 }, output: 14 },
-    benchmark: { cbaElo: 1451 }, // gpt-5.3-chat-latest
-  },
+  // GPT-5.3 Chat Latest: removed, shut down August 10, 2026 (404 deprecated on OpenAI, 'No endpoints found' on OpenRouter - probed 2026-08-17)
 
 
   /// GPT-5.2 series - Released December 11, 2025
@@ -462,7 +469,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
       { paramId: 'llmForceNoStream' },
     ],
     chatPrice: { input: 1.75, cache: { cType: 'oai-ac', read: 0.175 }, output: 14 },
-    benchmark: { cbaElo: 1441 }, // gpt-5.2-high
+    benchmark: { cbaElo: 1437 }, // gpt-5.2-high
   },
   {
     hidden: true, // superseded by GPT-5.4/5.5
@@ -471,14 +478,15 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     symLink: 'gpt-5.2-2025-12-11',
   },
 
-  // GPT-5.2 Codex
+  // GPT-5.2 Codex - dead on OpenAI (shut down 2026-07-23, deny-listed below), but the def is kept:
+  // OpenRouter still serves it via Azure (llmOrtOaiLookup needs it) - probed alive 2026-08-06
   {
-    hidden: true, // superseded by GPT-5.3 Codex
+    hidden: true, // dead on OpenAI direct; reachable via OpenRouter (Azure)
     idPrefix: 'gpt-5.2-codex',
     label: 'GPT-5.2 Codex [Deprecated]',
     pubDate: '20251211',
     isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-07-23] GPT-5.2 optimized for long-horizon, agentic coding tasks in Codex or similar environments. Supports low, medium, high, and xhigh reasoning effort settings.',
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-07-23] GPT-5.2 optimized for long-horizon, agentic coding tasks in Codex or similar environments. Supports low, medium, high, and xhigh reasoning effort settings.',
     contextWindow: 400000,
     maxCompletionTokens: 128000,
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
@@ -492,26 +500,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     // benchmark: TBD
   },
 
-  // GPT-5.2 Chat Latest
-  {
-    hidden: true, // deprecated May 8, 2026, shutdown 2026-08-10
-    idPrefix: 'gpt-5.2-chat-latest',
-    label: 'GPT-5.2 Instant [Deprecated]',
-    pubDate: '20251211',
-    isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-08-10] GPT-5.2 Instant model, previously powering ChatGPT. Replaced by GPT-5.5 Instant.',
-    contextWindow: 128000,
-    maxCompletionTokens: 16384,
-    interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE, LLM_IF_HOTFIX_NoTemperature],
-    parameterSpecs: [
-      { paramId: 'llmVndOaiWebSearchContext' },
-      // { paramId: 'llmVndOaiVerbosity' }, // 2026-01-20: still unsupported
-      { paramId: 'llmVndOaiImageGeneration' },
-      { paramId: 'llmVndOaiCodeInterpreter' },
-    ],
-    chatPrice: { input: 1.75, cache: { cType: 'oai-ac', read: 0.175 }, output: 14 },
-    benchmark: { cbaElo: 1477 }, // gpt-5.2-chat-latest-20260210
-  },
+  // GPT-5.2 Chat Latest: removed, shut down August 10, 2026 (dead on OpenAI and OpenRouter - probed 2026-08-17)
 
   // GPT-5.2 Pro
   {
@@ -570,36 +559,17 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     symLink: 'gpt-5.1-2025-11-13',
   },
 
-  // GPT-5.1 Chat Latest
-  {
-    hidden: true, // superseded by GPT-5.3 Instant
-    idPrefix: 'gpt-5.1-chat-latest',
-    label: 'GPT-5.1 Instant [Deprecated]',
-    pubDate: '20251112',
-    isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-07-23] GPT-5.1 Instant with adaptive reasoning. More conversational with improved instruction following.',
-    contextWindow: 128000,
-    maxCompletionTokens: 16384,
-    // interfaces: [LLM_IF_OAI_Responses, LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_PromptCaching], // no function calling or reasoning
-    interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
-    parameterSpecs: [
-      { paramId: 'llmVndOaiWebSearchContext' },
-      // { paramId: 'llmVndOaiVerbosity' }, // 2026-01-20: still unsupported
-      { paramId: 'llmVndOaiImageGeneration' },
-      { paramId: 'llmVndOaiCodeInterpreter' },
-    ],
-    chatPrice: { input: 1.25, cache: { cType: 'oai-ac', read: 0.125 }, output: 10 },
-    // benchmark: TBD
-  },
+  // GPT-5.1 Chat Latest: removed, shut down July 23, 2026 (dead on OpenRouter too - 'No endpoints found', probed 2026-08-06)
 
-  // GPT-5.1 Codex Max
+  // GPT-5.1 Codex Max / Codex / Codex Mini - dead on OpenAI (shut down 2026-07-23, deny-listed below), but
+  // the defs are kept: OpenRouter still serves all three via Azure (llmOrtOaiLookup) - probed alive 2026-08-06
   {
-    hidden: true, // superseded by GPT-5.3 Codex
+    hidden: true, // dead on OpenAI direct; reachable via OpenRouter (Azure)
     idPrefix: 'gpt-5.1-codex-max',
     label: 'GPT-5.1 Codex Max [Deprecated]',
     pubDate: '20251119',
     isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-07-23] Our most intelligent coding model optimized for long-horizon, agentic coding tasks.',
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-07-23] Our most intelligent coding model optimized for long-horizon, agentic coding tasks.',
     contextWindow: 400000,
     maxCompletionTokens: 128000,
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
@@ -612,34 +582,13 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     chatPrice: { input: 1.25, cache: { cType: 'oai-ac', read: 0.125 }, output: 10 },
     // benchmark: TBD
   },
-  // GPT-5.1 Codex
   {
-    hidden: true, // superseded by GPT-5.3 Codex
-    idPrefix: 'gpt-5.1-codex',
-    label: 'GPT-5.1 Codex [Deprecated]',
-    pubDate: '20251113',
-    isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-07-23] A version of GPT-5.1 optimized for agentic coding tasks in Codex or similar environments.',
-    contextWindow: 400000,
-    maxCompletionTokens: 128000,
-    interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
-    parameterSpecs: [
-      { paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high'] }, // low, medium, high (no minimal)
-      { paramId: 'llmVndOaiWebSearchContext' },
-      { paramId: 'llmVndOaiImageGeneration' },
-      { paramId: 'llmForceNoStream' },
-    ],
-    chatPrice: { input: 1.25, cache: { cType: 'oai-ac', read: 0.125 }, output: 10 },
-    // benchmark: TBD
-  },
-  // GPT-5.1 Codex Mini
-  {
-    hidden: true, // superseded by GPT-5.3 Codex
+    hidden: true, // dead on OpenAI direct; reachable via OpenRouter (Azure)
     idPrefix: 'gpt-5.1-codex-mini',
     label: 'GPT-5.1 Codex Mini [Deprecated]',
     pubDate: '20251113',
     isLegacy: true,
-    description: '[Use: GPT-5.4 Mini - Shut down: 2026-07-23] Smaller, faster version of GPT-5.1 Codex for efficient coding tasks.',
+    description: '[Use: GPT-5.6 Terra - Shut down: 2026-07-23] Smaller, faster version of GPT-5.1 Codex for efficient coding tasks.',
     contextWindow: 400000,
     maxCompletionTokens: 128000,
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
@@ -652,17 +601,37 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     chatPrice: { input: 0.25, cache: { cType: 'oai-ac', read: 0.025 }, output: 2 },
     // benchmark: TBD
   },
+  {
+    hidden: true, // dead on OpenAI direct; reachable via OpenRouter (Azure)
+    idPrefix: 'gpt-5.1-codex',
+    label: 'GPT-5.1 Codex [Deprecated]',
+    pubDate: '20251113',
+    isLegacy: true,
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-07-23] A version of GPT-5.1 optimized for agentic coding tasks in Codex or similar environments.',
+    contextWindow: 400000,
+    maxCompletionTokens: 128000,
+    interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
+    parameterSpecs: [
+      { paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high'] }, // low, medium, high (no minimal)
+      { paramId: 'llmVndOaiWebSearchContext' },
+      { paramId: 'llmVndOaiImageGeneration' },
+      { paramId: 'llmForceNoStream' },
+    ],
+    chatPrice: { input: 1.25, cache: { cType: 'oai-ac', read: 0.125 }, output: 10 },
+    // benchmark: TBD
+  },
 
 
   /// GPT-5 series - Released August 7, 2025
 
   // GPT-5
   {
-    hidden: true, // superseded by GPT-5.4/5.5
+    hidden: true, // deprecated Jun 11, 2026, shutdown 2026-12-11
     idPrefix: 'gpt-5-2025-08-07',
-    label: 'GPT-5',
+    label: 'GPT-5 [Deprecated]',
     pubDate: '20250807',
-    description: 'The best model for coding and agentic tasks across domains.',
+    isLegacy: true,
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-12-11] The best model for coding and agentic tasks across domains.',
     contextWindow: 400000,
     maxCompletionTokens: 128000,
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
@@ -674,7 +643,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
       { paramId: 'llmForceNoStream' }, // non-streaming option for unverified organizations
     ],
     chatPrice: { input: 1.25, cache: { cType: 'oai-ac', read: 0.125 }, output: 10 },
-    benchmark: { cbaElo: 1433 }, // gpt-5-high
+    benchmark: { cbaElo: 1434 }, // gpt-5-high
   },
   {
     hidden: true, // superseded by GPT-5.4/5.5
@@ -685,11 +654,12 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
 
   // GPT-5 Pro
   {
-    hidden: true, // superseded by GPT-5.4/5.5 Pro
+    hidden: true, // deprecated Jun 11, 2026, shutdown 2026-12-11
     idPrefix: 'gpt-5-pro-2025-10-06',
-    label: 'GPT-5 Pro',
+    label: 'GPT-5 Pro [Deprecated]',
     pubDate: '20251006',
-    description: 'Version of GPT-5 that uses more compute to produce smarter and more precise responses. Designed for tough problems.',
+    isLegacy: true,
+    description: '[Use: GPT-5.6 Sol with Pro reasoning - Shut down: 2026-12-11] Version of GPT-5 that uses more compute to produce smarter and more precise responses. Designed for tough problems.',
     contextWindow: 400000,
     maxCompletionTokens: 128000, // official docs: 128K max output (272K is input limit within 400K context)
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_MIN, LLM_IF_OAI_Reasoning, LLM_IF_HOTFIX_NoTemperature],
@@ -704,42 +674,8 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     symLink: 'gpt-5-pro-2025-10-06',
   },
 
-  // GPT-5 Chat Latest
-  {
-    hidden: true, // deprecated per OpenAI docs (2026-04)
-    idPrefix: 'gpt-5-chat-latest',
-    label: 'GPT-5 ChatGPT [Deprecated]',
-    pubDate: '20250807',
-    isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-07-23] GPT-5 model used in ChatGPT. Points to the GPT-5 snapshot currently used in ChatGPT.',
-    contextWindow: 128000,
-    maxCompletionTokens: 16384,
-    interfaces: [LLM_IF_OAI_Responses, LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_PromptCaching], // no reasoning
-    parameterSpecs: [{ paramId: 'llmVndOaiWebSearchContext' }, { paramId: 'llmVndOaiImageGeneration' }],
-    chatPrice: { input: 1.25, cache: { cType: 'oai-ac', read: 0.125 }, output: 10 },
-    benchmark: { cbaElo: 1426 }, // gpt-5-chat
-  },
-
-  // GPT-5 Codex
-  {
-    hidden: true, // deprecated Apr 22, 2026, shutdown 2026-07-23
-    idPrefix: 'gpt-5-codex',
-    label: 'GPT-5 Codex [Deprecated]',
-    pubDate: '20250915',
-    isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-07-23] A version of GPT-5 optimized for agentic coding in Codex.',
-    contextWindow: 400000,
-    maxCompletionTokens: 128000,
-    interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
-    parameterSpecs: [
-      { paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high'] }, // works
-      { paramId: 'llmVndOaiWebSearchContext' }, // works, although is not triggered often
-      // { paramId: 'llmVndOaiRestoreMarkdown', initialValue: false }, // since this is for code, let the prompt dictate markdown usage rather than us injecting
-      { paramId: 'llmForceNoStream' },
-    ],
-    chatPrice: { input: 1.25, cache: { cType: 'oai-ac', read: 0.125 }, output: 10 },
-    // benchmark: TBD
-  },
+  // GPT-5 Chat Latest: removed, shut down July 23, 2026
+  // GPT-5 Codex: removed, shut down July 23, 2026
 
   // GPT-5 Search API
   {
@@ -764,11 +700,12 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
 
   // GPT-5 mini
   {
-    hidden: true, // superseded by GPT-5.4 Mini
+    hidden: true, // deprecated Jun 11, 2026, shutdown 2026-12-11
     idPrefix: 'gpt-5-mini-2025-08-07',
-    label: 'GPT-5 Mini',
+    label: 'GPT-5 Mini [Deprecated]',
     pubDate: '20250807',
-    description: 'A faster, more cost-efficient version of GPT-5 for well-defined tasks.',
+    isLegacy: true,
+    description: '[Use: GPT-5.6 Terra - Shut down: 2026-12-11] A faster, more cost-efficient version of GPT-5 for well-defined tasks.',
     contextWindow: 400000,
     maxCompletionTokens: 128000,
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
@@ -785,11 +722,12 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
 
   // GPT-5 nano
   {
-    hidden: true, // superseded by GPT-5.4 Nano
+    hidden: true, // deprecated Jun 11, 2026, shutdown 2026-12-11
     idPrefix: 'gpt-5-nano-2025-08-07',
-    label: 'GPT-5 Nano',
+    label: 'GPT-5 Nano [Deprecated]',
     pubDate: '20250807',
-    description: 'Fastest, most cost-efficient version of GPT-5 for summarization and classification tasks.',
+    isLegacy: true,
+    description: '[Use: GPT-5.6 Luna - Shut down: 2026-12-11] Fastest, most cost-efficient version of GPT-5 for summarization and classification tasks.',
     contextWindow: 400000,
     maxCompletionTokens: 128000,
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_CACHE_REASON, LLM_IF_HOTFIX_NoTemperature],
@@ -814,26 +752,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
 
   /// Reasoning models - o-series
 
-  // o4-mini-deep-research - (v1/responses API)
-  {
-    hidden: true, // deprecated, shutdown 2026-07-23
-    idPrefix: 'o4-mini-deep-research-2025-06-26',
-    label: 'o4 Mini Deep Research [Deprecated]',
-    pubDate: '20250626',
-    isLegacy: true,
-    description: '[Use: GPT-5.5 Pro with web search - Shut down: 2026-07-23] Faster, more affordable deep research model for complex, multi-step research tasks.',
-    contextWindow: 200000,
-    maxCompletionTokens: 100000,
-    // NOTE: no LLM_IF_OAI_Fn - deep research models reject custom function tools (web_search/code_interpreter only), per the parameter sweep (no fn roundtrip)
-    interfaces: [LLM_IF_OAI_Responses, LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_PromptCaching, LLM_IF_OAI_Reasoning, LLM_IF_HOTFIX_NoTemperature],
-    parameterSpecs: PS_DEEP_RESEARCH,
-    chatPrice: { input: 2, cache: { cType: 'oai-ac', read: 0.5 }, output: 8 },
-  },
-  {
-    idPrefix: 'o4-mini-deep-research',
-    label: 'o4 Mini Deep Research',
-    symLink: 'o4-mini-deep-research-2025-06-26',
-  },
+  // o4-mini-deep-research: removed, shut down July 23, 2026
 
   /// o4-mini
   {
@@ -842,7 +761,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     label: 'o4 Mini [Deprecated]',
     pubDate: '20250416',
     isLegacy: true,
-    description: '[Use: GPT-5.4 Mini - Shut down: 2026-10-23] Latest o4-mini model. Optimized for fast, effective reasoning with exceptionally efficient performance in coding and visual tasks.',
+    description: '[Use: GPT-5.6 Terra - Shut down: 2026-10-23] Latest o4-mini model. Optimized for fast, effective reasoning with exceptionally efficient performance in coding and visual tasks.',
     contextWindow: 200000,
     maxCompletionTokens: 100000,
     interfaces: IFS_CHAT_CACHE_REASON,
@@ -856,33 +775,16 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     symLink: 'o4-mini-2025-04-16',
   },
 
-  // o3-deep-research - (v1/responses API)
-  {
-    hidden: true, // deprecated, shutdown 2026-07-23
-    idPrefix: 'o3-deep-research-2025-06-26',
-    label: 'o3 Deep Research [Deprecated]',
-    pubDate: '20250626',
-    isLegacy: true,
-    description: '[Use: GPT-5.5 Pro with web search - Shut down: 2026-07-23] Our most powerful deep research model for complex, multi-step research tasks.',
-    contextWindow: 200000,
-    maxCompletionTokens: 100000,
-    // NOTE: no LLM_IF_OAI_Fn - deep research models reject custom function tools (web_search/code_interpreter only), per the parameter sweep (no fn roundtrip)
-    interfaces: [LLM_IF_OAI_Responses, LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_PromptCaching, LLM_IF_OAI_Reasoning, LLM_IF_HOTFIX_NoTemperature],
-    parameterSpecs: PS_DEEP_RESEARCH,
-    chatPrice: { input: 10, cache: { cType: 'oai-ac', read: 2.5 }, output: 40 },
-  },
-  {
-    idPrefix: 'o3-deep-research',
-    label: 'o3 Deep Research',
-    symLink: 'o3-deep-research-2025-06-26',
-  },
+  // o3-deep-research: removed, shut down July 23, 2026
 
   // o3-pro - (v1/responses API)
   {
+    hidden: true, // deprecated Jun 11, 2026, shutdown 2026-12-11
     idPrefix: 'o3-pro-2025-06-10',
-    label: 'o3 Pro',
+    label: 'o3 Pro [Deprecated]',
     pubDate: '20250610',
-    description: 'Version of o3 with more compute for better responses. Provides consistently better answers for complex tasks.',
+    isLegacy: true,
+    description: '[Use: GPT-5.6 Sol with Pro reasoning - Shut down: 2026-12-11] Version of o3 with more compute for better responses. Provides consistently better answers for complex tasks.',
     contextWindow: 200000,
     maxCompletionTokens: 100000,
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_MIN, LLM_IF_OAI_Reasoning, LLM_IF_HOTFIX_NoTemperature],
@@ -898,10 +800,12 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
 
   /// o3
   {
+    hidden: true, // deprecated Jun 11, 2026, shutdown 2026-12-11
     idPrefix: 'o3-2025-04-16',
-    label: 'o3',
+    label: 'o3 [Deprecated]',
     pubDate: '20250416',
-    description: 'A well-rounded and powerful model across domains. Sets a new standard for math, science, coding, and visual reasoning tasks.',
+    isLegacy: true,
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-12-11] A well-rounded and powerful model across domains. Sets a new standard for math, science, coding, and visual reasoning tasks.',
     contextWindow: 200000,
     maxCompletionTokens: 100000,
     interfaces: IFS_CHAT_CACHE_REASON,
@@ -922,7 +826,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     label: 'o3 Mini [Deprecated]',
     pubDate: '20250131',
     isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-10-23] Latest o3-mini model snapshot. High intelligence at the same cost and latency targets of o1-mini. Excels at science, math, and coding tasks.',
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-10-23] Latest o3-mini model snapshot. High intelligence at the same cost and latency targets of o1-mini. Excels at science, math, and coding tasks.',
     contextWindow: 200000,
     maxCompletionTokens: 100000,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_PromptCaching, LLM_IF_OAI_Reasoning, LLM_IF_HOTFIX_StripImages],
@@ -943,7 +847,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     label: 'o1 Pro [Deprecated]',
     pubDate: '20250319',
     isLegacy: true,
-    description: '[Use: GPT-5.5 Pro - Shut down: 2026-10-23] A version of o1 with more compute for better responses. Provides consistently better answers for complex tasks.',
+    description: '[Use: GPT-5.6 Sol with Pro reasoning - Shut down: 2026-10-23] A version of o1 with more compute for better responses. Provides consistently better answers for complex tasks.',
     contextWindow: 200000,
     maxCompletionTokens: 100000,
     interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_MIN, LLM_IF_OAI_Reasoning, LLM_IF_HOTFIX_NoTemperature],
@@ -963,7 +867,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     label: 'o1 [Deprecated]',
     pubDate: '20241217',
     isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-10-23] Previous full o-series reasoning model.',
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-10-23] Previous full o-series reasoning model.',
     contextWindow: 200000,
     maxCompletionTokens: 100000,
     interfaces: IFS_CHAT_CACHE_REASON,
@@ -990,7 +894,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     maxCompletionTokens: 32768,
     interfaces: IFS_CHAT_CACHE,
     chatPrice: { input: 2, cache: { cType: 'oai-ac', read: 0.5 }, output: 8 },
-    benchmark: { cbaElo: 1413 }, // gpt-4.1-2025-04-14
+    benchmark: { cbaElo: 1414 }, // gpt-4.1-2025-04-14
   },
   {
     idPrefix: 'gpt-4.1',
@@ -1008,7 +912,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     maxCompletionTokens: 32768,
     interfaces: IFS_CHAT_CACHE,
     chatPrice: { input: 0.4, cache: { cType: 'oai-ac', read: 0.1 }, output: 1.6 },
-    benchmark: { cbaElo: 1382 }, // gpt-4.1-mini-2025-04-14
+    benchmark: { cbaElo: 1383 }, // gpt-4.1-mini-2025-04-14
   },
   {
     idPrefix: 'gpt-4.1-mini',
@@ -1023,7 +927,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     label: 'GPT-4.1 Nano [Deprecated]',
     pubDate: '20250414',
     isLegacy: true,
-    description: '[Use: GPT-5.4 Nano - Shut down: 2026-10-23] Fastest, most cost-effective GPT 4.1 model. Delivers exceptional performance with low latency, ideal for tasks like classification or autocompletion.',
+    description: '[Use: GPT-5.6 Luna - Shut down: 2026-10-23] Fastest, most cost-effective GPT 4.1 model. Delivers exceptional performance with low latency, ideal for tasks like classification or autocompletion.',
     contextWindow: 1047576,
     maxCompletionTokens: 32768,
     interfaces: IFS_CHAT_CACHE,
@@ -1054,11 +958,12 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
 
   // gpt-audio
   {
-    hidden: true, // superseded by GPT Audio 1.5
+    hidden: true, // deprecated Jul 20, 2026, shutdown 2027-01-20
     idPrefix: 'gpt-audio-2025-08-28',
-    label: 'GPT Audio',
+    label: 'GPT Audio [Deprecated]',
     pubDate: '20250828',
-    description: 'First generally available audio model. Accepts audio inputs and outputs, and can be used in the Chat Completions REST API.',
+    isLegacy: true,
+    description: '[Use: GPT Audio 1.5 - Shut down: 2027-01-20] First generally available audio model. Accepts audio inputs and outputs, and can be used in the Chat Completions REST API.',
     contextWindow: 128000,
     maxCompletionTokens: 16384,
     interfaces: IFS_GPT_AUDIO,
@@ -1073,26 +978,16 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
   },
   {
     idPrefix: 'gpt-audio-mini-2025-12-15',
-    label: 'GPT Audio Mini',
-    pubDate: '20251215',
-    description: 'Cost-efficient audio model. Accepts audio inputs and outputs via Chat Completions REST API.',
-    contextWindow: 128000,
-    maxCompletionTokens: 16384,
-    interfaces: IFS_GPT_AUDIO,
-    chatPrice: { input: 0.6, output: 2.4 },
-  },
-  {
-    idPrefix: 'gpt-audio-mini-2025-10-06',
     label: 'GPT Audio Mini [Deprecated]',
-    pubDate: '20251006',
-    hidden: true, // previous version
+    pubDate: '20251215',
     isLegacy: true,
-    description: '[Use: GPT Audio 1.5 - Shut down: 2026-07-23] Cost-efficient audio model. Accepts audio inputs and outputs via Chat Completions REST API.',
+    description: '[Use: GPT Audio 1.5 - Shut down: 2027-01-20] Cost-efficient audio model. Accepts audio inputs and outputs via Chat Completions REST API.',
     contextWindow: 128000,
     maxCompletionTokens: 16384,
     interfaces: IFS_GPT_AUDIO,
     chatPrice: { input: 0.6, output: 2.4 },
   },
+  // gpt-audio-mini-2025-10-06: removed, shut down July 23, 2026
   {
     idPrefix: 'gpt-audio-mini',
     label: 'GPT Audio Mini',
@@ -1114,7 +1009,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     maxCompletionTokens: 16384,
     interfaces: IFS_CHAT_CACHE,
     chatPrice: { input: 2.5, cache: { cType: 'oai-ac', read: 1.25 }, output: 10 },
-    benchmark: { cbaElo: 1265 + 1 }, // not reported; using gpt-4o-2024-08-06 + 1
+    benchmark: { cbaElo: 1335 + 1 }, // not reported; using gpt-4o-2024-08-06 + 1
   },
   {
     idPrefix: 'gpt-4o-2024-08-06',
@@ -1134,12 +1029,12 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     pubDate: '20240513',
     hidden: true, // previous version
     isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-10-23] Original gpt-4o snapshot from May 13, 2024.',
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-10-23] Original gpt-4o snapshot from May 13, 2024.',
     contextWindow: 128000,
     maxCompletionTokens: 4096,
     interfaces: IFS_CHAT_MIN,
     chatPrice: { input: 5, output: 15 },
-    benchmark: { cbaElo: 1345 }, // gpt-4o-2024-05-13
+    benchmark: { cbaElo: 1346 }, // gpt-4o-2024-05-13
   },
   {
     idPrefix: 'gpt-4o',
@@ -1148,27 +1043,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
   },
   // chatgpt-4o-latest: removed, shut down February 17, 2026
 
-  // GPT-4o Search Preview: When using Chat Completions, the model always retrieves information from the web before responding to your query.
-  {
-    hidden: true, // old
-    idPrefix: 'gpt-4o-search-preview-2025-03-11',
-    label: 'GPT-4o Search Preview [Deprecated]',
-    pubDate: '20250311',
-    isLegacy: true,
-    description: '[Use: GPT-5.4 Mini - Shut down: 2026-07-23] Latest snapshot of the GPT-4o model optimized for web search capabilities.',
-    contextWindow: 128000,
-    maxCompletionTokens: 16384,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_HOTFIX_NoTemperature], // NOTE: 2025-03-15: confirmed on 'playground' that this model does not support images
-    parameterSpecs: [{ paramId: 'llmVndOaiWebSearchContext' }, { paramId: 'llmVndOaiWebSearchGeolocation' }],
-    chatPrice: { input: 2.5, output: 10 },
-    // benchmarks don't apply to search models
-    isPreview: true,
-  },
-  {
-    idPrefix: 'gpt-4o-search-preview',
-    label: 'GPT-4o Search Preview',
-    symLink: 'gpt-4o-search-preview-2025-03-11',
-  },
+  // GPT-4o Search Preview: removed, the zombie alias finally died too (404 deprecated on OpenAI, 'No endpoints found' on OpenRouter - probed 2026-08-24)
 
   // GPT-4o Audio Preview: removed, no longer returned by API (superseded by GPT Audio family)
 
@@ -1182,7 +1057,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     maxCompletionTokens: 16384,
     interfaces: IFS_CHAT_CACHE,
     chatPrice: { input: 0.15, cache: { cType: 'oai-ac', read: 0.075 }, output: 0.6 },
-    benchmark: { cbaElo: 1317 }, // gpt-4o-mini-2024-07-18
+    benchmark: { cbaElo: 1318 }, // gpt-4o-mini-2024-07-18
   },
   {
     idPrefix: 'gpt-4o-mini',
@@ -1191,27 +1066,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
   },
   // GPT-4o Mini Audio Preview: removed, no longer returned by API (superseded by GPT Audio Mini family)
 
-  // GPT-4o Mini Search Preview: When using Chat Completions, the model always retrieves information from the web before responding to your query.
-  {
-    hidden: true, // old
-    idPrefix: 'gpt-4o-mini-search-preview-2025-03-11',
-    label: 'GPT-4o Mini Search Preview [Deprecated]',
-    pubDate: '20250311',
-    isLegacy: true,
-    description: '[Use: GPT-5.4 Mini - Shut down: 2026-07-23] Latest snapshot of the GPT-4o Mini model optimized for web search capabilities.',
-    contextWindow: 128000,
-    maxCompletionTokens: 16384,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_HOTFIX_NoTemperature], // NOTE: this support function calling, but only its own, not a Custom Function
-    parameterSpecs: [{ paramId: 'llmVndOaiWebSearchContext' }, { paramId: 'llmVndOaiWebSearchGeolocation' }],
-    chatPrice: { input: 0.15, output: 0.6 },
-    // benchmarks don't apply to search models
-    isPreview: true,
-  },
-  {
-    idPrefix: 'gpt-4o-mini-search-preview',
-    label: 'GPT-4o Mini Search Preview',
-    symLink: 'gpt-4o-mini-search-preview-2025-03-11',
-  },
+  // GPT-4o Mini Search Preview: removed, same as gpt-4o-search-preview above (dead on OpenAI and OpenRouter - probed 2026-08-24)
 
   // GPT-4 Turbo
   {
@@ -1220,7 +1075,7 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     pubDate: '20240409',
     hidden: true, // OLD
     isLegacy: true,
-    description: '[Use: GPT-5.5 - Shut down: 2026-10-23] GPT-4 Turbo with Vision model. Vision requests can now use JSON mode and function calling. gpt-4-turbo currently points to this version.',
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-10-23] GPT-4 Turbo with Vision model. Vision requests can now use JSON mode and function calling. gpt-4-turbo currently points to this version.',
     contextWindow: 128000,
     maxCompletionTokens: 4096,
     interfaces: IFS_CHAT_MIN,
@@ -1240,11 +1095,11 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     label: 'GPT-4 [Deprecated]',
     pubDate: '20230613',
     hidden: true, // OLD
-    description: '[Use: GPT-5.5 - Shut down: 2026-10-23] Snapshot of gpt-4 from June 13th 2023 with improved function calling support. Data up to Sep 2021.',
+    description: '[Use: GPT-5.6 Sol - Shut down: 2026-10-23] Snapshot of gpt-4 from June 13th 2023 with improved function calling support. Data up to Sep 2021.',
     contextWindow: 8192,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
     chatPrice: { input: 30, output: 60 },
-    benchmark: { cbaElo: 1274 }, // gpt-4-0613
+    benchmark: { cbaElo: 1275 }, // gpt-4-0613
     isLegacy: true,
   },
   // gpt-4-0314: removed, no longer returned by API
@@ -1265,12 +1120,12 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     pubDate: '20240125',
     hidden: true, // deprecated Apr 22, 2026, shutdown 2026-10-23
     isLegacy: true,
-    description: '[Use: GPT-5.4 Mini - Shut down: 2026-10-23] The latest GPT-3.5 Turbo model with higher accuracy at responding in requested formats.',
+    description: '[Use: GPT-5.6 Terra - Shut down: 2026-10-23] The latest GPT-3.5 Turbo model with higher accuracy at responding in requested formats.',
     contextWindow: 16385,
     maxCompletionTokens: 4096,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
     chatPrice: { input: 0.5, output: 1.5 },
-    benchmark: { cbaElo: 1223 }, // gpt-3.5-turbo-0125
+    benchmark: { cbaElo: 1225 }, // gpt-3.5-turbo-0125
   },
   {
     idPrefix: 'gpt-3.5-turbo-1106',
@@ -1278,12 +1133,12 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
     pubDate: '20231106',
     hidden: true, // OLD
     isLegacy: true,
-    description: '[Use: GPT-5.4 Mini - Shut down: 2026-09-28] GPT-3.5 Turbo model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more.',
+    description: '[Use: GPT-5.6 Terra - Shut down: 2026-09-28] GPT-3.5 Turbo model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more.',
     contextWindow: 16385,
     maxCompletionTokens: 4096,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
     chatPrice: { input: 1, output: 2 },
-    benchmark: { cbaElo: 1202 }, // gpt-3.5-turbo-1106
+    benchmark: { cbaElo: 1203 }, // gpt-3.5-turbo-1106
   },
   {
     idPrefix: 'gpt-3.5-turbo',
@@ -1297,24 +1152,36 @@ export const _knownOpenAIChatModels = llmsDefineModels<_OpenAIModelDef>()([
 // -- 0-day or unknown models --
 
 export function llmsFallbackForOpenAIModel(modelId: string, isLikelyOpenAI: boolean): KnownModel {
-  return isLikelyOpenAI && _isLikelyResponsesAPIModel(modelId) ? _llmsOpenAIModelResponsesFallback : _llmsOpenAIModelFallback;
+  if (!isLikelyOpenAI)
+    return _llmsOpenAICompatModelFallback;
+  return _isLikelyResponsesAPIModel(modelId) ? _llmsOpenAIModelResponsesFallback : _llmsOpenAIModelFallback;
 }
 
+// native OpenAI (and Azure deployments): the ids-only list discloses no type or context, so
+// unknowns carry the uncurated marker (see llmsLabelUncurated) and a null (never guessed) context
 const _llmsOpenAIModelFallback: KnownModel = {
   idPrefix: '',
-  label: '?',
-  description: 'Unknown, please let us know the ID. Assuming a context window of 128k tokens, and a maximum output of 4k tokens.',
-  contextWindow: 128000,
-  maxCompletionTokens: 4096,
+  label: '[?]', // + ' [<id>]' via the variant append below
+  description: 'Unknown OpenAI model, not yet curated - please let us know the ID.',
+  contextWindow: null,
   interfaces: IFS_CHAT_MIN,
   // hidden: true,
 };
 
 const _llmsOpenAIModelResponsesFallback: KnownModel = {
   ..._llmsOpenAIModelFallback,
-  description: 'Unknown OpenAI model. Assuming Responses API support, 128k context, 16k output.',
-  maxCompletionTokens: 16384,
+  description: 'Unknown OpenAI model, not yet curated - assuming Responses API support.',
   interfaces: [LLM_IF_OAI_Responses, ...IFS_CHAT_MIN],
+};
+
+// OpenAI-compatible hosts: unknown is the norm there, so stay lenient and unmarked
+// ('[?]' would mark every model and hold whole services off the registry-sync push)
+const _llmsOpenAICompatModelFallback: KnownModel = {
+  ..._llmsOpenAIModelFallback,
+  label: '?', // + ' [<id>]'
+  description: 'Unknown, please let us know the ID. Assuming a context window of 128k tokens, and a maximum output of 8k tokens.',
+  contextWindow: 128000,
+  maxCompletionTokens: 8192,
 };
 
 function _isLikelyResponsesAPIModel(modelId: string): boolean {
@@ -1327,7 +1194,7 @@ function _isLikelyResponsesAPIModel(modelId: string): boolean {
 
 // exact-match deny list (id must equal entry, not just include it) - use for ambiguous aliases
 const openAIModelsDenyExactList: string[] = [
-  'chat-latest', // unstable alias (not a real model); included by the API list. Filtered to avoid noise in dev checks.
+  // (empty) - 'chat-latest' graduated to a real documented+priced model and is defined above
 ];
 
 const openAIModelsDenyList: string[] = [
@@ -1346,9 +1213,6 @@ const openAIModelsDenyList: string[] = [
   // [OpenAI, 2025-03-11] Computer Use (Responses API) - NOT YET SUPPORTED; still returned by some accounts until shutdown 2026-07-23
   'computer-use-preview', // single entry catches '-2025-03-11' too via includes()
 
-  // [OpenAI Deprecations] Explicitly deny shut-down model IDs that we removed
-  'codex-mini-latest', // shut down February 12, 2026
-  'chatgpt-4o-latest', // shut down February 17, 2026
   // 'gpt-4.5-preview',
   // 'o1-preview',
   // 'gpt-4-32k',
@@ -1368,8 +1232,9 @@ const openAIModelsDenyList: string[] = [
   // TTS Models: /v1/audio/speech
   'tts-1-hd', 'tts-1', 'gpt-4o-mini-tts', // FIXME: support these
 
-  // STT models: /v1/audio/transcriptions, /v1/audio/translations
-  'whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe-diarize', // FIXME: support these
+  // STT models: /v1/audio/transcriptions, /v1/audio/translations - not chat models (supported by ASRx batch instead)
+  'whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe-diarize', 'gpt-transcribe',
+  'gpt-live-transcribe', // STT via realtime transcription sessions only - no batch endpoint, not supported yet
 
   // Image-focused chat models (non-standard image output pricing)
   'gpt-5-image', 'gpt-5-image-mini',
@@ -1380,8 +1245,9 @@ const openAIModelsDenyList: string[] = [
   // Video models: /v1/videos
   'sora-2-pro', 'sora-2',
 
-  // Specialized domain models
-  'gpt-5.5-cyber', // cybersecurity-specific, limited preview
+  // Specialized domain models - cybersecurity, gated behind the Daybreak program ('does not exist or you do not have access', probed 2026-08-17)
+  'gpt-5.4-cyber', 'gpt-5.5-cyber', 'gpt-5.6-cyber',
+  'daybreak-blue-latest', 'daybreak-red-latest', // program aliases -> gpt-5.6-sol / gpt-5.6-cyber
 
   // Safety/moderation models
   'gpt-oss-safeguard',
@@ -1390,8 +1256,37 @@ const openAIModelsDenyList: string[] = [
   'omni-moderation-latest', 'omni-moderation-2024-09-26', 'text-moderation-latest',
 ];
 
-export function openAIModelFilter(model: OpenAIWire_API_Models_List.Model) {
+// [OpenAI Deprecations] Shut-down ids, filtered ONLY on native api.openai.com listings: other OpenAI-compatible
+// hosts (Azure re-exports, gateways, proxies) may legitimately keep serving these and must not lose them.
+// /v1/models is not a liveness signal - it keeps listing dead models (even GET /v1/models/<id> returns 200);
+// only a generation attempt is: 404 'has been deprecated' = dead.
+// POLICY before adding here: probe generation on OpenAI direct AND on OpenRouter (openai/<id> - Azure kept the
+// 5.1/5.2 codex family alive post-shutdown), and distinguish 404-deprecated from permission errors (an entitled
+// key may retain access - a permission error means alive, do not deny). Keep the def in _knownOpenAIChatModels
+// when OpenRouter still serves the id, so llmOrtOaiLookup keeps its native interfaces/params.
+const openAIModelsShutdownDenyList: string[] = [
+  'codex-mini-latest', // shut down February 12, 2026
+  'chatgpt-4o-latest', // shut down February 17, 2026
+  // shut down July 23, 2026
+  'gpt-5-chat-latest', // dead on OpenRouter too
+  'gpt-5-codex', // on OpenRouter only as unusable :batch
+  'gpt-5.1-chat-latest', // dead on OpenRouter too
+  'gpt-5.1-codex', // catches -max and -mini too; defs kept above (OpenRouter serves all three via Azure)
+  'gpt-5.2-codex', // def kept above (OpenRouter serves it via Azure)
+  'gpt-4o-search-preview', // catches the -2025-03-11 snapshot too: the bare alias died as well (probed 2026-08-24), defs removed
+  'gpt-4o-mini-search-preview', // same: alias + snapshot
+  'gpt-audio-mini-2025-10-06', // the -2025-12-15 snapshot and the alias stay
+  'o3-deep-research', // dead everywhere (OpenRouter: no endpoints; Bedrock: absent)
+  'o4-mini-deep-research', // dead everywhere
+  // shut down August 10, 2026 - defs removed (OpenRouter delisted both slugs too)
+  'gpt-5.2-chat-latest',
+  'gpt-5.3-chat-latest',
+];
+
+export function openAIModelFilter(model: OpenAIWire_API_Models_List.Model, isNativeOpenAI: boolean) {
   if (openAIModelsDenyExactList.includes(model.id)) return false;
+  // shut-down ids only vanish from native OpenAI listings - compatible hosts may still serve them
+  if (isNativeOpenAI && openAIModelsShutdownDenyList.some(deny => model.id.includes(deny))) return false;
   return !openAIModelsDenyList.some(deny => model.id.includes(deny));
 }
 
@@ -1419,6 +1314,8 @@ const _manualOrderingIdPrefixes = [
   'gpt-5.6-terra',
   'gpt-5.6-luna',
   'gpt-5.6-',
+  // ChatGPT Instant (version-less rolling pointer)
+  'chat-latest',
   // GPT-5.5
   'gpt-5.5-20',
   'gpt-5.5-pro-20',
@@ -1570,7 +1467,7 @@ export function openAISortModels(a: ModelDescriptionSchema, b: ModelDescriptionS
  * 2. Unknown models: in API but not in our known models (should add)
  * 3. Parsing gaps: in API but lost during parsing pipeline (bug detection)
  */
-export function openaiValidateModelDefs_DEV(apiModels: unknown, parsedModels?: object[]): void {
+export function openaiValidateModelDefs_DEV(apiModels: unknown, parsedModels: object[] | undefined, isNativeOpenAI: boolean): void {
 
   if (DEV_DEBUG_OPENAI_MODELS) {
 
@@ -1586,14 +1483,17 @@ export function openaiValidateModelDefs_DEV(apiModels: unknown, parsedModels?: o
       .map(model => model.idPrefix);
 
     // 1 & 2: Check stale and unknown definitions
-    llmDevCheckModels_DEV('OpenAI', apiIds, knownIds, { apiFilter: id => openAIModelFilter({ id } as any) });
+    llmDevCheckModels_DEV('OpenAI', apiIds, knownIds, {
+      apiFilter: id => openAIModelFilter({ id } as any, isNativeOpenAI),
+      ignoreStale: ['gpt-5.6'], // docs-official alias: generates but never lists (see the symlink def)
+    });
 
     // 3: Check for parsing gaps (models lost during filter/map pipeline)
     if (parsedModels) {
       const parsedIds = new Set(parsedModels.map((m: any) => m.id));
       const parsingGaps = apiIds.filter(id =>
         !parsedIds.has(id) && // not in parsed output
-        openAIModelFilter({ id } as any), // not filtered by deny list
+        openAIModelFilter({ id } as any, isNativeOpenAI), // not filtered by deny list
       );
       if (parsingGaps.length)
         console.log(`[DEV] OpenAI: parsing gaps (in API, passed filter, but not in output): [ ${parsingGaps.join(', ')} ]`);
@@ -1631,18 +1531,20 @@ export function llmOrtOaiLookup(orModelName: string): OrtVendorLookupResult | un
     'gpt-5.6-sol-pro': 'gpt-5.6-sol',
     'gpt-5.6-terra-pro': 'gpt-5.6-terra',
     'gpt-5.6-luna-pro': 'gpt-5.6-luna',
+    'gpt-chat-latest': 'chat-latest', // OR slug for the version-less ChatGPT Instant pointer
     'gpt-5.5-chat': 'gpt-5.5-2026-04-23', // gpt-5.5-chat-latest not yet in API, map to snapshot
     'gpt-5.4-chat': 'gpt-5.4-2026-03-05', // no chat-latest yet, map to snapshot
-    'gpt-5.3-chat': 'gpt-5.3-chat-latest',
-    'gpt-5.2-chat': 'gpt-5.2-chat-latest',
-    'gpt-5.1-chat': 'gpt-5.1-chat-latest',
-    'gpt-5-chat': 'gpt-5-chat-latest',
+    // 'gpt-5.3-chat' / 'gpt-5.1-chat' / 'gpt-5-chat': no longer OR slugs at all
     // remove openai variants
     'o4-mini-high': null,
     'o3-mini-high': null,
+    'gpt-5.4-image-2': null,
     'gpt-5-image-mini': null,
     'gpt-5-image': null,
     'gpt-4o:extended': null,
+    // dead ids OR still lists (probed 2026-08-17): no endpoints, or the upstream 404s
+    'gpt-5.2-chat': null,
+    'gpt-4-turbo-preview': null,
   } as const;
   if (orModelName in ortOaiRefMap) {
     if (ortOaiRefMap[orModelName] === null) return null;

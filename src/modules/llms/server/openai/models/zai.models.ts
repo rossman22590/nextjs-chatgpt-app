@@ -1,6 +1,8 @@
 import { LLM_IF_HOTFIX_NoWebP, LLM_IF_HOTFIX_StripImages, LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
 
-import type { ModelDescriptionSchema } from '../../llm.server.types';
+import type { DModelParameterId } from '~/common/stores/llms/llms.parameters';
+
+import type { ModelDescriptionSchema, OrtVendorLookupResult } from '../../llm.server.types';
 
 import { KnownModel, llmsDefineModels, fromManualMapping } from '../../models.mappings';
 
@@ -9,7 +11,7 @@ export type LlmsZAIModelId = typeof _knownZAIModels[number]['idPrefix'];
 
 
 // Interfaces for Z.ai models
-// - Thinking mode: supported by GLM-4.5 series and higher (GLM-4.5, 4.6, 4.7, 5, 5.1, 5.2)
+// - Thinking mode: supported by GLM-4.5 series and higher (GLM-4.5, 4.6, 4.7, 5, 5.1, 5.2, 5.3)
 // - Text-only models strip images (Z.ai API rejects image parts on non-vision models)
 // - Ref: https://docs.z.ai/guides/capabilities/thinking-mode
 const _IF_Chat = [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_HOTFIX_StripImages];
@@ -18,29 +20,73 @@ const _IF_Vision_Reasoning = [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Vision,
 
 // Parameter specs for Z.ai models
 // - Z.ai thinking maps from effort: 'none' -> disabled, anything else -> enabled
-// - Most models support binary enabled/disabled, so we expose 'none' and 'high'
-// - GLM-5.2 additionally supports reasoning_effort (max/xhigh/high/medium/low/minimal/none) - we expose 'none', 'high', 'max'
-//   The zai adapter (openai.chatCompletions.ts) gates reasoning_effort to glm-5.2 and sends it alongside thinking:enabled
+//   The zai adapter (openai.chatCompletions.ts) maps effort dialect-wide: 'none' -> thinking:disabled, else thinking:enabled + reasoning_effort passthrough
+// - reasoning_effort is GLM-5.2+ only (openapi.json); 5.1 and below are binary -> 'none'/'high', do not widen
+// - GLM-5.2 collapses the 7-value enum (none/minimal skip, low/medium -> high, xhigh -> max) -> 3 distinct tiers
+// - GLM-5.3 and 5.3-Flash: thinking compulsory ('disabled' -> 400 code 1210), effort exactly low|high|max, default max
+//   Live-verified 2026-08-16, re-verified 2026-08-28
 const _PS_Reasoning: ModelDescriptionSchema['parameterSpecs'] = [
   { paramId: 'llmVndMiscEffort', enumValues: ['none', 'high'] },
+] as const;
+const _PS_Reasoning_Compulsory: ModelDescriptionSchema['parameterSpecs'] = [
+  { paramId: 'llmVndMiscEffort', enumValues: ['low', 'high', 'max'] },
 ] as const;
 
 
 // [Z.ai] Known Models - Manual Mappings
 // Also used for prefix-matching 0-day API-discovered models
-// Flash = free tier (1 concurrent request, throttled); FlashX = paid with higher concurrency & priority routing
-// Ref: https://docs.z.ai/api-reference/llm/chat-completion (model enum), https://docs.z.ai/guides/overview/pricing
+// Flash = free tier (1 concurrent request, throttled); FlashX = paid with higher concurrency & priority routing; exception: GLM-5.3-Flash is paid
+// Ref: https://docs.z.ai/openapi.json (authoritative enums + per-model limits), https://docs.z.ai/guides/overview/pricing
 // pubDate is REQUIRED on every entry (same pattern as _AnthropicModelDef in anthropic.models.ts).
+// [2026-08-28] Re-verified vs openapi.json, pricing page, live probes: prices unchanged. GET /models lists only
+// 10 of these ids - this curated list stays authoritative. 204800 "200K" entries kept (weights say 202752).
 type _ZaiModelDef = KnownModel & { pubDate: string };
 
 const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
 
+  // GLM-5.3 - 1M context flagship (post-train of the GLM-5.2 base; coding, cyber, agentic)
+  // 1M context, 128K output (max_tokens ceiling live-verified 131072). Thinking compulsory, reasoning_effort low|high|max.
+  // Released 2026-08-14 on the GLM Coding Plan; standard API GA since (pay-as-you-go key live-verified 2026-08-27, rate card published).
+  // Weights not public as of 2026-08-27 (no zai-org/GLM-5.3 on HF; GLM-5.3-Flash weights are out, see below).
+  {
+    idPrefix: 'glm-5.3',
+    label: 'GLM-5.3 (1M)',
+    pubDate: '20260814',
+    description: 'Z.ai 1M-context flagship, post-trained on the GLM-5.2 base for coding, cybersecurity and agentic work. Thinking always on, with low/high/max effort. 1M context, 128K output.',
+    contextWindow: 1048576, // 1M
+    interfaces: _IF_Reasoning,
+    maxCompletionTokens: 131072, // 128K
+    parameterSpecs: _PS_Reasoning_Compulsory,
+    chatPrice: { input: 1.4, output: 4.4, cache: { cType: 'oai-ac', read: 0.26 } },
+    initialTemperature: 1.0,
+    benchmark: { cbaElo: 1487 }, // lmarena: glm-5.3-max
+  },
+
+  // GLM-5.3-Flash - 1M context multimodal Flash (paid, unlike prior free Flash tiers)
+  // New base: 320B MoE (18B activated), hybrid sparse+linear attention, 30T-token multimodal corpus. Accepts image
+  // input (live-verified 2026-08-27; glm-5.3 rejects image parts). Thinking compulsory, reasoning_effort low|high|max,
+  // max_tokens ceiling 131072 - same ladder as glm-5.3. Weights: MIT, HF zai-org/GLM-5.3-Flash (2026-08-25).
+  {
+    idPrefix: 'glm-5.3-flash',
+    label: 'GLM-5.3 Flash (1M)',
+    pubDate: '20260825',
+    description: 'Multimodal Flash on a new 320B MoE base (18B activated, hybrid sparse+linear attention). Image inputs, thinking always on with low/high/max effort. 1M context, 128K output.',
+    contextWindow: 1048576, // 1M
+    interfaces: _IF_Vision_Reasoning,
+    maxCompletionTokens: 131072, // 128K
+    parameterSpecs: _PS_Reasoning_Compulsory,
+    chatPrice: { input: 0.15, output: 0.5, cache: { cType: 'oai-ac', read: 0.03 } }, // list price; 50% promo (0.075/0.25, cache 0.015) through 2026-09-09
+    initialTemperature: 1.0, // HF generation_config
+    // benchmark: not on lmarena as of 2026-08-27
+  },
+
   // GLM-5.2 - 1M context flagship (Agentic Coding)
-  // 1M context, 128K output. Thinking default enabled. reasoning_effort supported (GLM-5.2 only).
+  // 1M context, 128K output. Thinking default enabled. reasoning_effort supported (live-ablated 2026-08-16, n=9/arm:
+  // none/minimal = off, low/medium/high = one reduced tier, xhigh/max/default = the deep tier ~1.6x - matches the docs).
   {
     idPrefix: 'glm-5.2',
     label: 'GLM-5.2 (1M)',
-    pubDate: '20260613',
+    pubDate: '20260616', // docs release notes 2026-06-16 + HF zai-org/GLM-5.2
     description: 'Z.ai 1M-context flagship (744B MoE, 40B activated). Agentic coding with reasoning_effort control (high/max). 1M context, 128K output.',
     contextWindow: 1048576, // 1M
     interfaces: _IF_Reasoning,
@@ -48,7 +94,7 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
     parameterSpecs: [{ paramId: 'llmVndMiscEffort', enumValues: ['none', 'high', 'max'] }],
     chatPrice: { input: 1.4, output: 4.4, cache: { cType: 'oai-ac', read: 0.26 } },
     initialTemperature: 1.0,
-    benchmark: { cbaElo: 1471 }, // lmarena: glm-5.2 (max)
+    benchmark: { cbaElo: 1470 }, // lmarena: glm-5.2-max
   },
 
   // GLM-5.1 / GLM-5 Series - Flagship (Agentic Engineering)
@@ -64,7 +110,7 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
     parameterSpecs: _PS_Reasoning,
     chatPrice: { input: 1.4, output: 4.4, cache: { cType: 'oai-ac', read: 0.26 } },
     initialTemperature: 1.0,
-    benchmark: { cbaElo: 1475 }, // lmarena: glm-5.1
+    benchmark: { cbaElo: 1468 }, // lmarena: glm-5.1
   },
   {
     idPrefix: 'glm-5',
@@ -79,6 +125,7 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
     initialTemperature: 1.0, // Z.ai default for GLM-5
     benchmark: { cbaElo: 1457 }, // lmarena: glm-5
   },
+  // undocumented but live; price from the OpenRouter card
   {
     idPrefix: 'glm-5-turbo',
     label: 'GLM-5 Turbo',
@@ -93,26 +140,26 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
   },
 
   // GLM-4.7 Series
-  // 128K context, 128K output. Thinking compulsory when enabled (default: enabled).
+  // 200K context, 128K output. Thinking compulsory when enabled (default: enabled).
   {
     idPrefix: 'glm-4.7',
     label: 'GLM-4.7',
     pubDate: '20251222',
-    description: 'Latest-gen GLM model with 128K context. Thinking mode activated by default.',
-    contextWindow: 131072, // 128K
+    description: 'Latest-gen GLM model with 200K context. Thinking mode activated by default.',
+    contextWindow: 204800, // 200K
     interfaces: _IF_Reasoning,
     maxCompletionTokens: 131072,
     parameterSpecs: _PS_Reasoning,
     chatPrice: { input: 0.6, output: 2.2, cache: { cType: 'oai-ac', read: 0.11 } },
     initialTemperature: 1.0,
-    benchmark: { cbaElo: 1443 }, // lmarena: glm-4.7
+    benchmark: { cbaElo: 1442 }, // lmarena: glm-4.7
   },
   {
     idPrefix: 'glm-4.7-flashx',
     label: 'GLM-4.7 FlashX', // fast, low cost
     pubDate: '20260119',
     description: 'Fast GLM-4.7 variant with priority routing and higher concurrency. Same model as Flash, better infrastructure.',
-    contextWindow: 131072,
+    contextWindow: 204800, // 200K
     interfaces: _IF_Reasoning,
     maxCompletionTokens: 131072,
     parameterSpecs: _PS_Reasoning,
@@ -124,17 +171,18 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
     label: 'GLM-4.7 Flash (Free)',
     pubDate: '20260119',
     description: 'Free GLM-4.7 variant. Same model as FlashX but with limited concurrency (1 concurrent request) and lower priority.',
-    contextWindow: 131072,
+    contextWindow: 204800, // 200K
     interfaces: _IF_Reasoning,
     maxCompletionTokens: 131072,
     parameterSpecs: _PS_Reasoning,
     chatPrice: { input: 'free', output: 'free' },
     initialTemperature: 1.0,
-    benchmark: { cbaElo: 1368 }, // lmarena: glm-4.7-flash
+    benchmark: { cbaElo: 1367 }, // lmarena: glm-4.7-flash
   },
 
   // GLM-5V-Turbo (Vision + Reasoning)
   // 200K context, 128K output. Multimodal coding model: images, video, files.
+  // undocumented and not in GET /models, but answering (2026-08-28) - do not prune off the docs alone
   {
     idPrefix: 'glm-5v-turbo',
     label: 'GLM-5V Turbo',
@@ -146,6 +194,7 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
     parameterSpecs: _PS_Reasoning,
     chatPrice: { input: 1.2, output: 4, cache: { cType: 'oai-ac', read: 0.24 } },
     initialTemperature: 0.8, // Z.ai default for vision models
+    benchmark: { cbaElo: 1433 }, // lmarena: glm-5v-turbo
   },
 
   // GLM-4.6V Series (Vision + Reasoning)
@@ -190,19 +239,19 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
   },
 
   // GLM-4.6 Text
-  // 128K context, 128K output. Hybrid thinking (auto-determines whether to think).
+  // 200K context, 128K output. Hybrid thinking (auto-determines whether to think).
   {
     idPrefix: 'glm-4.6',
     label: 'GLM-4.6',
     pubDate: '20250930',
-    description: 'GLM-4.6 model with 128K context/output. Hybrid thinking: auto-determines whether to engage deep reasoning.',
-    contextWindow: 131072,
+    description: 'GLM-4.6 model with 200K context, 128K output. Hybrid thinking: auto-determines whether to engage deep reasoning.',
+    contextWindow: 204800, // 200K
     interfaces: _IF_Reasoning,
     maxCompletionTokens: 131072,
     parameterSpecs: _PS_Reasoning,
     chatPrice: { input: 0.6, output: 2.2, cache: { cType: 'oai-ac', read: 0.11 } },
     initialTemperature: 1.0,
-    benchmark: { cbaElo: 1425 }, // lmarena: glm-4.6
+    benchmark: { cbaElo: 1424 }, // lmarena: glm-4.6
   },
 
   // GLM-OCR (Vision, no reasoning)
@@ -234,13 +283,14 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
   },
 
   // GLM-4.5V (Vision + Reasoning)
-  // 96K context, 16K output. Supports interleaved thinking.
+  // 64K context, 16K output. Supports interleaved thinking.
   {
     idPrefix: 'glm-4.5v',
     label: 'GLM-4.5 V',
     pubDate: '20250811',
-    description: 'Vision-enabled GLM-4.5 model. 96K context, 16K output, interleaved thinking.',
-    contextWindow: 98304, // 96K
+    description: 'Vision-enabled GLM-4.5 model. 64K context, 16K output, interleaved thinking.',
+    // 64K per Z.AI's own declarations (OR endpoint, HF text_config); 98304 was the 4.5-text output cap miscopied
+    contextWindow: 65536, // 64K
     interfaces: _IF_Vision_Reasoning,
     maxCompletionTokens: 16384,
     parameterSpecs: _PS_Reasoning,
@@ -251,13 +301,13 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
   },
 
   // GLM-4.5 Text Series
-  // 96K context, 96K output. Supports interleaved thinking.
+  // 128K context, 96K output (Z.AI's OR endpoint + HF agree, needle-verified at 129K; 98304 was the output cap miscopied)
   {
     idPrefix: 'glm-4.5-flash',
     label: 'GLM-4.5 Flash (Free)',
     pubDate: '20250728',
     description: 'Free GLM-4.5 variant with limited concurrency. Prior-gen, superseded by GLM-4.7 Flash.',
-    contextWindow: 98304,
+    contextWindow: 131072,
     interfaces: _IF_Reasoning,
     maxCompletionTokens: 98304,
     parameterSpecs: _PS_Reasoning,
@@ -270,7 +320,7 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
     label: 'GLM-4.5 AirX',
     pubDate: '20250728',
     description: 'Extended lightweight GLM-4.5 variant. Interleaved thinking.',
-    contextWindow: 98304,
+    contextWindow: 131072,
     interfaces: _IF_Reasoning,
     maxCompletionTokens: 98304,
     parameterSpecs: _PS_Reasoning,
@@ -283,7 +333,7 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
     label: 'GLM-4.5 Air',
     pubDate: '20250728',
     description: 'Lightweight GLM-4.5 variant. Interleaved thinking.',
-    contextWindow: 98304,
+    contextWindow: 131072,
     interfaces: _IF_Reasoning,
     maxCompletionTokens: 98304,
     parameterSpecs: _PS_Reasoning,
@@ -297,7 +347,7 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
     label: 'GLM-4.5 X',
     pubDate: '20250728',
     description: 'Extended GLM-4.5 model. Interleaved thinking.',
-    contextWindow: 98304,
+    contextWindow: 131072,
     interfaces: _IF_Reasoning,
     maxCompletionTokens: 98304,
     parameterSpecs: _PS_Reasoning,
@@ -309,8 +359,8 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
     idPrefix: 'glm-4.5',
     label: 'GLM-4.5',
     pubDate: '20250728',
-    description: 'Prior-gen GLM-4.5 model with 96K context/output. Interleaved thinking.',
-    contextWindow: 98304,
+    description: 'Prior-gen GLM-4.5 model with 128K context, 96K output. Interleaved thinking.',
+    contextWindow: 131072,
     interfaces: _IF_Reasoning,
     maxCompletionTokens: 98304,
     parameterSpecs: _PS_Reasoning,
@@ -339,8 +389,8 @@ const _knownZAIModels = llmsDefineModels<_ZaiModelDef>()([
 /// Curated model IDs - authoritative list of Z.ai models
 /// This is the primary source; the list API is unreliable.
 const _zaiCuratedModelIds: string[] = [
-  // Text: GLM-5.2
-  'glm-5.2',
+  // GLM-5.3 (+ multimodal Flash) / GLM-5.2
+  'glm-5.3', 'glm-5.3-flash', 'glm-5.2',
   // Text: GLM-5.1 / GLM-5 series
   'glm-5.1', 'glm-5', 'glm-5-turbo',
   // Text: GLM-4.7 series
@@ -361,7 +411,7 @@ const _zaiCuratedModelIds: string[] = [
 
 
 /// Denylist: never surface these, even if the Z.ai API returns them.
-/// - glm-5-code: advertised but not actually working/accessible via the API (verified 2026-06-16).
+/// - glm-5-code: entitlement-gated, 1220 'no permission' on a pay-as-you-go key (2026-06-16, re-probed 2026-08-28)
 const _zaiDeniedModelIdPrefixes: string[] = ['glm-5-code'];
 
 
@@ -394,6 +444,40 @@ export function zaiModelSort(a: ModelDescriptionSchema, b: ModelDescriptionSchem
   if (aIndex !== -1) return -1;
   if (bIndex !== -1) return 1;
   return a.id.localeCompare(b.id);
+}
+
+
+// --- OpenRouter inheritance ---
+
+const _ORT_ZAI_IF_ALLOWLIST: ReadonlySet<string> = new Set([
+  LLM_IF_OAI_Chat, LLM_IF_OAI_Vision, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning,
+] as const);
+
+// only the thinking spec travels (StripImages/NoWebP are native-endpoint quirks)
+const _ORT_ZAI_PARAM_ALLOWLIST: ReadonlySet<string> = new Set([
+  'llmVndMiscEffort',
+] as const satisfies DModelParameterId[]);
+
+/**
+ * Lookup for OpenRouter: match an OR Z.ai model ID to a known hardcoded GLM model.
+ * OR's `reasoning.supported_efforts` is wrong for GLM (reports [xhigh, high] where the ladder is none/high/max), so
+ * the native spec travels as-is; the OR parser subtracts 'none' on mandatory-reasoning models.
+ * @param orModelName - The model name after stripping 'z-ai/' and the ':free' suffix (e.g. 'glm-5.2')
+ */
+export function llmOrtZaiLookup(orModelName: string): OrtVendorLookupResult | undefined {
+
+  // no ref map: every z-ai/ slug on OR is an exact native idPrefix
+  const entry = _knownZAIModels.find(m => m.idPrefix === orModelName);
+  if (!entry?.interfaces) return undefined;
+
+  const interfaces = entry.interfaces.filter(i => _ORT_ZAI_IF_ALLOWLIST.has(i));
+
+  const parameterSpecs = entry.parameterSpecs
+    ?.filter(spec => _ORT_ZAI_PARAM_ALLOWLIST.has(spec.paramId))
+    .map(spec => ({ ...spec }));
+
+  // initialTemperature: Z.ai's per-model default beats the global 0.5 fallback
+  return { pubDate: entry.pubDate, interfaces, parameterSpecs, initialTemperature: entry.initialTemperature ?? undefined };
 }
 
 

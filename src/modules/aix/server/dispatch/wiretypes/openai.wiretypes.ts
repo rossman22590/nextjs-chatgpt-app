@@ -50,10 +50,20 @@ export namespace OpenAIWire_ContentParts {
     }),
   });
 
+  const OpenRouter_VideoUrlContentPart_schema = z.object({
+    // [OpenRouter] input content: video by URL - OR extension, not standard OpenAI. Provider-dependent:
+    // YouTube URLs pass through only to AI-Studio-served Gemini; other providers need direct/base64 URLs
+    type: z.literal('video_url'),
+    video_url: z.object({
+      url: z.string(),
+    }),
+  });
+
   export const ContentPart_schema = z.discriminatedUnion('type', [
     TextContentPart_schema,
     ImageContentPart_schema,
     OpenAI_AudioContentPart_schema,
+    OpenRouter_VideoUrlContentPart_schema,
   ]);
 
   export function TextContentPart(text: string): z.infer<typeof TextContentPart_schema> {
@@ -66,6 +76,10 @@ export namespace OpenAIWire_ContentParts {
 
   export function OpenAI_AudioContentPart(data: string, format: 'wav' | 'mp3'): z.infer<typeof OpenAI_AudioContentPart_schema> {
     return { type: 'input_audio', input_audio: { data, format } };
+  }
+
+  export function OpenRouter_VideoUrlContentPart(url: string): z.infer<typeof OpenRouter_VideoUrlContentPart_schema> {
+    return { type: 'video_url', video_url: { url } };
   }
 
   /// Content parts - Output
@@ -473,6 +487,10 @@ export namespace OpenAIWire_API_Chat_Completions {
     // [Alibaba, 2026-06-26] Qwen (and DashScope-hosted third-party) thinking toggle via compatible-mode; Qwen ignores `reasoning_effort`
     enable_thinking: z.boolean().optional(),
 
+    // [NVIDIA NIM, 2026-07-25] vLLM-style chat template kwargs - the inner key is model-family-specific
+    // (verified live: `{thinking: false}` suppresses `reasoning_content` on Nemotron 3; accepted as a no-op elsewhere)
+    chat_template_kwargs: z.record(z.string(), z.union([z.boolean(), z.string(), z.number()])).optional(),
+
     seed: z.number().int().optional(),
     stop: z.array(z.string()).optional(), // Up to 4 sequences where the API will stop generating further tokens.
     user: z.string().optional(),
@@ -623,6 +641,13 @@ export namespace OpenAIWire_API_Chat_Completions {
       }),
     })).optional(),
 
+    /**
+     * [2026-08-16] Plain reasoning text, sent INSTEAD of reasoning_content by some hosts (non-streaming): Modular Cloud
+     * z-ai/glm-5.2 + moonshotai/kimi-k2.7-code (reasoning_content: null there), Groq + Cerebras gpt-oss-120b, TogetherAI
+     * DeepSeek-V4-Flash. OpenRouter/Nous send it too, duplicated in reasoning_details - the parser reads it as a fallback only.
+     */
+    reasoning: z.string().nullable().optional(),
+
   });
 
   const Choice_NS_schema = z.object({
@@ -740,6 +765,8 @@ export namespace OpenAIWire_API_Chat_Completions {
     reasoning_content: z.string().nullable().optional(), // [Deepseek, 2025-01-20]
     // [OpenRouter, 2025-01-20] Reasoning traces
     reasoning_details: z.array(OpenAIWire_ContentParts.OpenRouter_ReasoningDetail_schema).nullish(),
+    // [2026-08-16, Modular] plain reasoning text, sent instead of reasoning_content by some hosts (Modular glm-5.2/kimi-k2.7-code, Groq + Cerebras gpt-oss-120b, Together DeepSeek-V4-Flash; OpenRouter duplicates it in reasoning_details)
+    reasoning: z.string().nullable().optional(),
     // delta-tool-calls content
     tool_calls: z.array(ChunkDeltaToolCalls_schema).optional()
       .nullable(), // [TogetherAI] added .nullable(), see https://github.com/togethercomputer/together-python/issues/160
@@ -1264,8 +1291,25 @@ export namespace OpenAIWire_Responses_Items {
 
   // Output Items: Content ('message': ['output_text', 'refusal']), Reasoning ('reasoning': [ReasoningItemSummaryTextPart_schema]), Function Call ('function_call': [OutputFunctionCallItem_schema]), and more
 
+  /**
+   * Output item 'status' values are EMPIRICAL, and vendors invent new ones per item type (xAI especially).
+   * A closed enum fails the whole OutputItem union, which kills the stream and loses an otherwise-good
+   * response, so an unobserved value degrades to undefined ('no status known') with a log, never a throw.
+   * Rule: list only values actually seen for THAT item type - the fallback covers the rest.
+   * NOTE: a union match attempts EVERY branch, so one odd item logs once per candidate branch, not once.
+   */
+  const _outputItemStatus_schema = <const T extends readonly [string, ...string[]]>(itemType: string, statuses: T) =>
+    z.enum(statuses).optional().catch((ctx) => {
+      console.log(`[DEV] AIX: OpenAI Responses: unknown item status (matching '${itemType}'), ignoring:`, ctx.value);
+      return undefined;
+    });
+
   const _OutputItemBase_schema = z.object({
-    status: z.enum(['in_progress', 'completed', 'incomplete']).optional(), // status of the output item
+    // NOTE: no 'failed' here - not observed on the items that use this base ('message', 'reasoning', 'function_call'),
+    // which have no server-side execution to fail; the hosted-tool items below redefine this with what they do emit
+    status: _outputItemStatus_schema('*', [
+      'in_progress', 'completed', 'incomplete', // base
+    ]),
   });
 
   const OutputContentItem_schema = _OutputItemBase_schema.extend({
@@ -1312,11 +1356,11 @@ export namespace OpenAIWire_Responses_Items {
     // BREAKING CHANGE from OpenAI - 2025-12-11
     // redefining the following because we need 'searching' too here (seen during web search streaming)
     // [XAI] 2025-01-23: added 'failed' as xAI returns this when web search fails
-    status: z.enum([
+    status: _outputItemStatus_schema('web_search_call', [
       'searching', // 2025-12-11: seen on OpenAI for `web_search_call` items when used with GPT 5.2 Pro, with web search on
       'failed', // 2025-01-23: seen on xAI for `web_search_call` items when web search fails
-      'in_progress', 'completed', 'incomplete',
-    ]).optional(),
+      'in_progress', 'completed', 'incomplete', // base
+    ]),
 
     // action may be present with `include: ['web_search_call.action.sources']`
     action: z.union([
@@ -1368,11 +1412,10 @@ export namespace OpenAIWire_Responses_Items {
     result: z.string().optional(), // base64 image data when completed
     revised_prompt: z.string().optional(), // the revised prompt used for generation
     // Docs: "in_progress" | "completed" | "generating" | "failed".
-    // 'incomplete' kept as defensive carryover from OutputItemBase (not doc'd for this item).
-    status: z.enum([
+    status: _outputItemStatus_schema('image_generation_call', [
       'in_progress', 'completed', 'generating', 'failed',
       'incomplete', // defensive: not in docs for image_generation_call, but harmless to accept
-    ]).optional(),
+    ]),
     // Echoed configuration from the tool request - the API returns these on the done item with
     // RESOLVED values (e.g. size:"auto" becomes "1536x1024"). Confirmed live on 2026-04-21 log.
     output_format: z.enum(['png' /* default */, 'jpeg', 'webp']).optional(),
@@ -1393,10 +1436,10 @@ export namespace OpenAIWire_Responses_Items {
     type: z.literal('code_interpreter_call'),
 
     // override
-    status: z.enum([
+    status: _outputItemStatus_schema('code_interpreter_call', [
       'interpreting', 'failed',
-      'in_progress', 'completed', 'incomplete', // default
-    ]).optional(),
+      'in_progress', 'completed', 'incomplete', // base
+    ]),
 
     id: z.string(),
     container_id: z.string().nullish(),
@@ -1419,6 +1462,13 @@ export namespace OpenAIWire_Responses_Items {
     call_id: z.string(), // identifier to map this custom tool call to a tool call output
     name: z.string(), // name of the custom tool being called (e.g., "x_user_search")
     input: z.string(), // the input for the custom tool call generated by the model
+
+    // override - OpenAI doesn't document a status here (client-executed, nothing server-side to fail),
+    // but xAI reuses this item to REPORT its own hosted x_* tools, which do fail
+    status: _outputItemStatus_schema('custom_tool_call', [
+      'failed', // 2026-08-14: seen on xAI for `x_user_search` when the hosted search fails
+      'in_progress', 'completed', 'incomplete', // base
+    ]),
   });
 
 
@@ -1529,6 +1579,10 @@ export namespace OpenAIWire_Responses_Items {
     role: z.literal('assistant'),
     // assistant inputs: 'output_text', 'refusal'
     content: z.array(_ContentItem_Parts_schema),
+    // [OpenAI, 2026-02-24] message phase: 'commentary' (preambles/progress) vs 'final_answer'. gpt-5.4+ set
+    // it on every assistant message; docs require resending it on replay (dropping it degrades performance).
+    // Assistant messages only - the API 400s it on user/system/developer/function_call items.
+    phase: z.enum(['commentary', 'final_answer']).optional(),
   });
 
   const InputMessage_Compat_schema = z.union([
@@ -1728,6 +1782,7 @@ export namespace OpenAIWire_API_Responses {
 
     // configure reasoning
     reasoning: z.object({
+      context: z.enum(['auto', 'current_turn', 'all_turns']).nullish(), // [2026-02-24, OpenAI] how much prior reasoning the model consumes; 'all_turns' is gpt-5.4+ only (older models 400 with "Unsupported value")
       effort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).nullish(), // defaults to 'none' for GPT-5.2, 'medium' for older; [2026-07-09, OpenAI] 'max' added with GPT-5.6
       mode: z.enum(['standard', 'pro']).nullish(), // [2026-07-09, OpenAI] GPT-5.6+: 'pro' performs additional model work, billed at standard token rates; orthogonal to effort
       summary: z.enum(['auto', 'concise', 'detailed']).nullish(),

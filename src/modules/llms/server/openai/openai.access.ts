@@ -4,8 +4,9 @@
  * This module only imports zod for schema definition and provides access logic
  * that works identically on server and client environments.
  *
- * Supports 18 OpenAI-compatible dialects: alibaba, azure, cerebras, cohere, deepseek, groq, lmstudio,
- * localai, minimax, mistral, moonshot, openai, openrouter, perplexity, sakanaai, togetherai, xai, zai
+ * Supports 20 OpenAI-compatible dialects: alibaba, azure, cerebras, cohere, deepseek, groq, lmstudio,
+ * localai, minimax, mistral, modular, moonshot, nvidianim, openai, openrouter, perplexity, sakanaai,
+ * togetherai, xai, zai
  */
 
 import * as z from 'zod/v4';
@@ -25,13 +26,14 @@ const DEFAULT_CEREBRAS_HOST = 'https://api.cerebras.ai';
 const DEFAULT_COHERE_HOST = 'https://api.cohere.ai/compatibility';
 const DEFAULT_DEEPSEEK_HOST = 'https://api.deepseek.com';
 const DEFAULT_GROQ_HOST = 'https://api.groq.com/openai';
-const DEFAULT_HELICONE_OPENAI_HOST = 'oai.hconeai.com';
 const DEFAULT_LMSTUDIO_HOST = 'http://localhost:1234';
 const DEFAULT_LOCALAI_HOST = 'http://127.0.0.1:8080';
 const DEFAULT_MINIMAX_HOST = 'https://api.minimax.io';
 const DEFAULT_MISTRAL_HOST = 'https://api.mistral.ai';
+const DEFAULT_MODULAR_HOST = 'https://api.modular.com'; // Modular Cloud - host is user-overridable to point at a self-hosted MAX server
 const DEFAULT_MOONSHOT_HOST = 'https://api.moonshot.ai';
 const DEFAULT_MOONSHOT_CODING_HOST = 'https://api.kimi.com/coding'; // Kimi Code subscription ('sk-kimi-' keys)
+const DEFAULT_NVIDIANIM_HOST = 'https://integrate.api.nvidia.com'; // NVIDIA API Catalog (build.nvidia.com) - host is user-overridable to point at a local NIM/vLLM
 const DEFAULT_OPENAI_HOST = 'api.openai.com';
 const DEFAULT_OPENROUTER_HOST = 'https://openrouter.ai/api';
 const DEFAULT_PERPLEXITY_HOST = 'https://api.perplexity.ai';
@@ -94,14 +96,13 @@ export type OpenAIAccessSchema = z.infer<typeof openAIAccessSchema>;
 export const openAIAccessSchema = z.object({
   dialect: z.enum([
     'alibaba', 'azure', 'cerebras', 'cohere', 'deepseek', 'groq', 'lmstudio',
-    'localai', 'minimax', 'mistral', 'moonshot', 'openai',
+    'localai', 'minimax', 'mistral', 'modular', 'moonshot', 'nvidianim', 'openai',
     'openrouter', 'perplexity', 'sakanaai', 'togetherai', 'xai', 'zai',
   ]),
   clientSideFetch: z.boolean().optional(), // optional: backward compatibility from newer server version - can remove once all clients are updated
   oaiKey: z.string().trim(),
   oaiOrg: z.string().trim(),
   oaiHost: z.string().trim(),
-  heliKey: z.string().trim(),
 
   // [OpenRouter only] Debug/routing service-level settings
   orRequireParameters: z.boolean().optional(), // Only route to providers supporting all request params
@@ -270,6 +271,28 @@ export function openAIAccess(access: OpenAIAccessSchema, modelRefId: string | nu
         url: mistralHost + apiPath,
       };
 
+    case 'modular':
+      // [Modular, 2026-08-13] Modular Cloud (api.modular.com), OpenAI-compatible shared endpoints.
+      // Host is user-overridable to target a self-hosted MAX server (same wire protocol, any model).
+      let modularKey = access.oaiKey || env.MODULAR_API_KEY || '';
+      const modularHost = llmsFixupHost(access.oaiHost || DEFAULT_MODULAR_HOST, apiPath);
+
+      // Use function to select a random key if multiple keys are provided
+      modularKey = llmsRandomKeyFromMultiKey(modularKey);
+
+      // NOTE: no key check - the cloud host requires an 'sk-mod-' key, but self-hosted MAX servers run keyless
+      if (!modularHost)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Modular API Host. Add it on the UI (Models Setup) or server side (your deployment).' });
+
+      return {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(modularKey && { 'Authorization': `Bearer ${modularKey}` }),
+        },
+        url: modularHost + apiPath,
+      };
+
     case 'moonshot':
       // https://platform.moonshot.ai/docs/api/chat
       let moonshotKey = access.oaiKey || env.MOONSHOT_API_KEY || '';
@@ -292,28 +315,47 @@ export function openAIAccess(access: OpenAIAccessSchema, modelRefId: string | nu
         url: moonshotHost + apiPath,
       };
 
+    case 'nvidianim':
+      // [NVIDIA, 2026-07-25] NVIDIA API Catalog (build.nvidia.com), free rate-limited hosted inference on integrate.api.nvidia.com.
+      // Host is user-overridable to target a self-hosted NIM / vLLM endpoint (identical wire protocol and model ids).
+      let nvidiaKey = access.oaiKey || env.NVIDIANIM_API_KEY || '';
+      const nvidiaHost = llmsFixupHost(access.oaiHost || env.NVIDIANIM_API_HOST || DEFAULT_NVIDIANIM_HOST, apiPath);
+
+      // Use function to select a random key if multiple keys are provided
+      nvidiaKey = llmsRandomKeyFromMultiKey(nvidiaKey);
+
+      // NOTE: no key check - the default host requires an 'nvapi-' key (403 without), but self-hosted NIM/vLLM endpoints run keyless
+      if (!nvidiaHost)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing NVIDIA API Host. Add it on the UI (Models Setup) or server side (your deployment).' });
+
+      return {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(nvidiaKey && { 'Authorization': `Bearer ${nvidiaKey}` }),
+        },
+        url: nvidiaHost + apiPath,
+      };
+
     case 'openai': {
 
       // Credential resolution: client-dominated
       // - if the client provides a host, they own the whole request - no server
-      // - credentials (API key, org, Helicone key) are sent to client-chosen endpoints
+      // - credentials (API key, org) are sent to client-chosen endpoints
       // - if the client doesn't set a host, they can still override the key (own billing).
       let oaiKey: string;
       let oaiHost: string;
       let oaiOrg: string;
-      let heliKey: string | false;
       if (access.oaiHost) {
         // Client controls the endpoint: only client credentials
         oaiHost = access.oaiHost;
         oaiKey = access.oaiKey || ''; // key can be null, e.g. LocalAI
         oaiOrg = access.oaiOrg || '';
-        heliKey = access.heliKey || false;
       } else {
         // Client hasn't touched the endpoint: server infrastructure
         oaiHost = /* NO access.oaiHost */ env.OPENAI_API_HOST || DEFAULT_OPENAI_HOST;
         oaiKey = access.oaiKey || env.OPENAI_API_KEY || '';
         oaiOrg = access.oaiOrg || env.OPENAI_API_ORG_ID || '';
-        heliKey = access.heliKey || env.HELICONE_API_KEY || false;
       }
 
       oaiHost = llmsFixupHost(oaiHost, apiPath);
@@ -321,15 +363,6 @@ export function openAIAccess(access: OpenAIAccessSchema, modelRefId: string | nu
       // Require a key when targeting the default OpenAI host
       if (!oaiKey && llmsHostnameMatches(oaiHost, DEFAULT_OPENAI_HOST))
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing OpenAI API Key. Add it on the UI or server side (your deployment).' });
-
-      // [Helicone] proxy: redirect default OpenAI host to Helicone when key present;
-      // if host is already Helicone keep it; for any other host, disable the Helicone key
-      if (heliKey) {
-        if (llmsHostnameMatches(oaiHost, DEFAULT_OPENAI_HOST))
-          oaiHost = `https://${DEFAULT_HELICONE_OPENAI_HOST}`;
-        else if (!llmsHostnameMatches(oaiHost, DEFAULT_HELICONE_OPENAI_HOST))
-          heliKey = false;
-      }
 
       // [Cloudflare AI Gateway] proxy: adapt API paths for Cloudflare's routing
       if (llmsHostnameMatches(oaiHost, 'gateway.ai.cloudflare.com')) {
@@ -356,7 +389,6 @@ export function openAIAccess(access: OpenAIAccessSchema, modelRefId: string | nu
           'Content-Type': 'application/json',
           ...(oaiKey && { Authorization: `Bearer ${oaiKey}` }),
           ...(oaiOrg && { 'OpenAI-Organization': oaiOrg }),
-          ...(heliKey && { 'Helicone-Auth': `Bearer ${heliKey}` }),
         },
         url: oaiHost + apiPath,
       };
@@ -376,8 +408,14 @@ export function openAIAccess(access: OpenAIAccessSchema, modelRefId: string | nu
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${orKey}`,
+          // App attribution (openrouter.ai/docs/app-attribution): drives our app page, rankings and
+          // marketplace category. Set here rather than centrally because these must ride the CSF
+          // (browser) path too - OpenRouter allowlists all four names for CORS, so they preflight fine.
+          // 'X-Title' is the legacy name of 'X-OpenRouter-Title'; both are sent for compatibility.
           'HTTP-Referer': BaseProduct.ProductURL,
           'X-Title': BaseProduct.ProductName,
+          'X-OpenRouter-Title': BaseProduct.ProductName,
+          'X-OpenRouter-Categories': 'general-chat,personal-agent', // max 2/request, from their fixed vocabulary
         },
         url: orHost + apiPath,
       };
@@ -400,6 +438,10 @@ export function openAIAccess(access: OpenAIAccessSchema, modelRefId: string | nu
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': `Bearer ${perplexityKey}`,
+          // the pair Perplexity's own SDKs send (undocumented; both are on their CORS allowlist, so
+          // they also ride the CSF path). Consumption unverified - identity only.
+          'X-Source': BaseProduct.ProductName,
+          'X-Title': BaseProduct.ProductName,
         },
         url: perplexityHost + apiPath,
       };

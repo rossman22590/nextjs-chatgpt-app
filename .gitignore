@@ -17,6 +17,7 @@
 
 # next.js
 /.next/
+/.next-*/
 /dist/
 /out/
 
@@ -42,7 +43,6 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
 # other
 .idea/
@@ -53,7 +53,10 @@ next-env.d.ts
 .env*.local
 /.run/dev (ENV).run.xml
 /src/modules/3rdparty/aider/scratch*
-temp-reset-tokens.json 
+temp-reset-tokens.json
 
 # Ignore temporary CC files
 /tmpclaude*
+
+# Chrome DevTools workspace binding (per-worktree)
+/public/.well-known/appspecific/com.chrome.devtools.json

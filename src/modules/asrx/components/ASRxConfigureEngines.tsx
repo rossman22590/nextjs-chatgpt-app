@@ -21,6 +21,7 @@ import { ButtonServiceAdd } from '~/common/components/ButtonServiceAdd';
 import { CloseablePopup } from '~/common/components/CloseablePopup';
 import { ConfirmationModal } from '~/common/components/modals/ConfirmationModal';
 import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
+import { GeminiIcon } from '~/common/components/icons/vendors/GeminiIcon';
 import { OpenAIIcon } from '~/common/components/icons/vendors/OpenAIIcon';
 import { TooltipOutlined } from '~/common/components/TooltipOutlined';
 import { themeZIndexOverMobileDrawer } from '~/common/app.theme';
@@ -36,9 +37,14 @@ const VENDOR_INFO: { [key in DASRxVendorType]: { label: string; description: str
     description: 'Specialized ASR, fast',
     icon: GraphicEqRoundedIcon,
   },
+  gemini: {
+    label: 'Gemini',
+    description: 'Gemini 3.5 Transcribe',
+    icon: GeminiIcon,
+  },
   openai: {
     label: 'OpenAI',
-    description: 'Whisper / GPT-4o transcribe',
+    description: 'GPT Transcribe / Whisper',
     icon: OpenAIIcon,
   },
 } as const;

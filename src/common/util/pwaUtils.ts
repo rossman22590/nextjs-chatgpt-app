@@ -10,6 +10,7 @@ const _safeUA = isBrowser ? window.navigator?.userAgent.toLowerCase() || '' : ''
 // Frontend Environment Classification
 export const Is = {
   Desktop: !/mobile|android|iphone|ipad|ipod/.test(_safeUA),
+  Electron: isBrowser && !!((window as any).electron || (window as any).process?.type === 'renderer' || _safeUA.includes('electron')),
   Browser: {
     Brave: isBrowser && !!(navigator as any).brave,
     Chrome: _safeUA.includes('chrome') || _safeUA.includes('crios'),
@@ -62,7 +63,7 @@ export function isPwa(): boolean {
  * Generates a human-readable device name with improved accuracy.
  * Handles browser precedence correctly, considers PWA status.
  *
- * Examples: "Windows Edge", "iPhone Safari", "Android Chrome (App)"
+ * Examples: "Windows (Edge)", "iPhone (Safari)", "Android (Chrome App)"
  */
 export function generateDeviceName(): string {
   if (!isBrowser) return 'Server';
@@ -104,10 +105,9 @@ export function generateDeviceName(): string {
 
   // Check for PWA status
   const isPwaInstalled = isPwa();
-  const pwaIndicator = isPwaInstalled ? ' (App)' : '';
 
-  // Format the name based on platform and browser
-  return `${platform} ${browser}${pwaIndicator}`;
+  // Format: platform first, browser (+ App form) as the parenthetical
+  return `${platform} (${browser}${isPwaInstalled ? ' App' : ''})`;
 }
 
 

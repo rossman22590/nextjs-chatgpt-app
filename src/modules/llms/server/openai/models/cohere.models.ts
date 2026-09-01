@@ -11,8 +11,9 @@ export type LlmsCohereModelId = typeof _knownCohereModels[number]['idPrefix'];
 // Cohere is accessed via its OpenAI-compatible endpoint (https://api.cohere.ai/compatibility/v1).
 // - Chat Completions + Models list are standard OpenAI shapes (verified 2026-07-08).
 // - Reasoning models emit `reasoning_content` (parsed by the shared OpenAI adapter).
-// - Context windows below are the real tokenizer limits reported by the native /v1/models API
-//   (which can differ from the rounded marketing numbers, e.g. Command A = 288k not 256k).
+// - Context windows below are the API-enforced token limits reported by the native /v1/models API, not
+//   the rounded doc numbers (e.g. Command A+ = 436k not 128k, Command A = 288k not 256k; over-long inputs
+//   are rejected with "The limit for this model is N tokens" - verified 2026-08-06).
 const _IF_Chat = [LLM_IF_OAI_Chat];
 const _IF_Chat_Vision = [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision];
 const _IF_Tools = [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn];
@@ -36,6 +37,10 @@ const _PS_Reasoning: ModelDescriptionSchema['parameterSpecs'] = [
 // pubDate is derived from the dated model ID where available (YYYYMMDD); omitted when unknown.
 // chatPrice is set only where Cohere publishes per-token prices; newer/agentic models are
 // "contact sales" or free-until-limits, so we leave chatPrice unset rather than invent numbers.
+// [Cohere, 2026-08-17] cohere.com/pricing dropped the per-token cards for Command A and Command A
+// Reasoning (Command A Reasoning is contact-sales for production; Command A keeps a normal 500 req/min
+// production limit - docs.cohere.com/docs/rate-limits); the $2.5/$10 below is the last published price,
+// unverified since.
 type _CohereModelDef = KnownModel;
 
 const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
@@ -44,14 +49,14 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
   {
     idPrefix: 'command-a-plus-05-2026',
     label: 'Command A Plus',
-    pubDate: '20260501',
-    description: 'Cohere flagship. Agentic reasoning with vision, tool use, and long-context RAG. 436K context, 64K output. Thinking enabled by default.',
+    pubDate: '20260520',
+    description: 'Cohere flagship MoE (218B total, 25B active, Apache 2.0). Agentic reasoning with vision, tool use, and long-context RAG across 48 languages. 436K context, 64K output. Thinking enabled by default.',
     contextWindow: 436000,
     interfaces: _IF_Tools_Vision_Reasoning,
     maxCompletionTokens: 64000, // API-enforced ceiling (verified 2026-07-08)
     parameterSpecs: _PS_Reasoning,
     initialTemperature: 0.6, // Cohere sampling default for command-a-plus
-    // chatPrice: contact sales / not publicly published
+    // chatPrice: unset - the pricing page card says "Free" but the pricing doc still lists Command A+ as per-token, and production is contact-sales (2026-08-17)
   },
 
   // Command A Reasoning
@@ -79,6 +84,7 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
     maxCompletionTokens: 8192,
     chatPrice: { input: 2.5, output: 10 },
     initialTemperature: 0.3,
+    benchmark: { cbaElo: 1354 }, // lmarena: command-a-03-2025
   },
 
   // Command A Vision
@@ -98,13 +104,14 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
   {
     idPrefix: 'north-mini-code-1-0',
     label: 'North Mini Code',
-    description: 'Compact agentic coding model from Cohere\'s North platform. Reasoning and tool use over very long context (436K).',
+    pubDate: '20260609',
+    description: 'Compact agentic coding MoE (30B total, 3B active, Apache 2.0) from Cohere\'s North platform. Reasoning and tool use over very long context (436K).',
     contextWindow: 436000,
     interfaces: _IF_Tools_Reasoning,
     maxCompletionTokens: 64000, // API-enforced ceiling (verified 2026-07-08)
     parameterSpecs: _PS_Reasoning,
-    initialTemperature: 0.6, // Cohere sampling default for north-mini-code
-    // chatPrice: North platform / not publicly published
+    initialTemperature: 1, // Cohere sampling default for north-mini-code (verified 2026-08-04)
+    // chatPrice: unset - cohere.com/pricing shows "Free" with labels "API key" $0 / "Model download" $0 (open-weights availability, same card as Command A+), not a published per-token rate (2026-08-17)
   },
 
   // Command R+ (Aug 2024) - prior-gen flagship
@@ -118,6 +125,7 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
     maxCompletionTokens: 4096,
     chatPrice: { input: 2.5, output: 10 },
     initialTemperature: 0.3,
+    benchmark: { cbaElo: 1276 }, // lmarena: command-r-plus-08-2024
     isLegacy: true,
   },
 
@@ -132,6 +140,7 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
     maxCompletionTokens: 4096,
     chatPrice: { input: 0.15, output: 0.6 },
     initialTemperature: 0.3,
+    benchmark: { cbaElo: 1250 }, // lmarena: command-r-08-2024
     isLegacy: true,
   },
 
@@ -186,12 +195,14 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
     maxCompletionTokens: 4096,
     chatPrice: { input: 0.5, output: 1.5 },
     initialTemperature: 0.3,
+    benchmark: { cbaElo: 1267 }, // lmarena: c4ai-aya-expanse-32b
   },
 
   // Aya Vision 32B - multilingual vision research
   {
     idPrefix: 'c4ai-aya-vision-32b',
     label: 'Aya Vision 32B',
+    pubDate: '20250304',
     description: 'Open-weights multilingual vision research model (23 languages) with image understanding. 16K context.',
     contextWindow: 16384,
     interfaces: _IF_Chat_Vision,
@@ -200,13 +211,50 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
     initialTemperature: 0.3,
   },
 
-  // Tiny Aya - research minis (hidden by default)
+  // Tiny Aya - 3.35B research minis covering 70 languages, announced 2026-02-17 (hidden by default)
   {
     idPrefix: 'tiny-aya-global',
     label: 'Tiny Aya Global',
-    description: 'Tiny multilingual research model. 8K context. Text only.',
+    pubDate: '20260217',
+    description: 'Tiny multilingual research model (3.35B), best balance across 70 languages. 8K context. Text only.',
     contextWindow: 8192,
     interfaces: _IF_Chat, // native 'tools' feature is advertised but FC does not fire (returns text) - verified 2026-07-09
+    maxCompletionTokens: 8192,
+    initialTemperature: 0.3,
+    hidden: true,
+  },
+
+  {
+    idPrefix: 'tiny-aya-earth',
+    label: 'Tiny Aya Earth',
+    pubDate: '20260217',
+    description: 'Tiny Aya (3.35B) region-specialized for West Asian and African languages. 8K context. Text only.',
+    contextWindow: 8192,
+    interfaces: _IF_Chat,
+    maxCompletionTokens: 8192,
+    initialTemperature: 0.3,
+    hidden: true,
+  },
+
+  {
+    idPrefix: 'tiny-aya-fire',
+    label: 'Tiny Aya Fire',
+    pubDate: '20260217',
+    description: 'Tiny Aya (3.35B) region-specialized for South Asian languages. 8K context. Text only.',
+    contextWindow: 8192,
+    interfaces: _IF_Chat,
+    maxCompletionTokens: 8192,
+    initialTemperature: 0.3,
+    hidden: true,
+  },
+
+  {
+    idPrefix: 'tiny-aya-water',
+    label: 'Tiny Aya Water',
+    pubDate: '20260217',
+    description: 'Tiny Aya (3.35B) region-specialized for European and Asia-Pacific languages. 8K context. Text only.',
+    contextWindow: 8192,
+    interfaces: _IF_Chat,
     maxCompletionTokens: 8192,
     initialTemperature: 0.3,
     hidden: true,
@@ -216,8 +264,8 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
 
 
 /// Denylist prefixes: non-chat endpoints returned by the compat /v1/models list
-/// (embeddings, rerankers, transcription) - never surface these as chat models.
-const _cohereNonChatPrefixes: string[] = ['embed-', 'rerank-', 'cohere-transcribe'];
+/// (embeddings, rerankers, transcription, document parsing) - never surface these as chat models.
+const _cohereNonChatPrefixes: string[] = ['embed-', 'rerank-', 'cohere-transcribe', 'parse-'];
 
 /** Keep only chat-capable models from the compat /v1/models list (drops embed/rerank/transcribe). */
 export function cohereModelFilter(cohereModelId: string): boolean {

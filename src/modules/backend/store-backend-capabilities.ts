@@ -20,6 +20,7 @@ export interface BackendCapabilities {
   hasLlmMiniMax: boolean;
   hasLlmMistral: boolean;
   hasLlmMoonshot: boolean;
+  hasLlmNvidiaNIM: boolean;
   hasLlmOllama: boolean;
   hasLlmOpenAI: boolean;
   hasLlmOpenRouter: boolean;
@@ -31,7 +32,7 @@ export interface BackendCapabilities {
   hasBrowsing: boolean;
   hasGoogleCustomSearch: boolean;
   hasVoiceElevenLabs: boolean;
-  // hashes
+  // hashes - TODO(2026-11): remove, unread since LLM-Defs (per-vendor defsV), kept for pre-LLM-Defs clients
   hashLlmReconfig: string;
   // build data
   build?: {
@@ -62,6 +63,7 @@ const useBackendCapabilitiesStore = create<BackendStore>()(
     hasLlmMiniMax: false,
     hasLlmMistral: false,
     hasLlmMoonshot: false,
+    hasLlmNvidiaNIM: false,
     hasLlmOllama: false,
     hasLlmOpenAI: false,
     hasLlmOpenRouter: false,

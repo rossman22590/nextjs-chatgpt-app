@@ -7,11 +7,12 @@ import { GoodTooltip } from '~/common/components/GoodTooltip';
 import { Link } from '~/common/components/Link';
 
 import { ArceeAIIcon } from '~/common/components/icons/vendors/ArceeAIIcon';
+import { BasetenIcon } from '~/common/components/icons/vendors/BasetenIcon';
 import { ChutesAIIcon } from '~/common/components/icons/vendors/ChutesAIIcon';
 import { FireworksAIIcon } from '~/common/components/icons/vendors/FireworksAIIcon';
 import { CloudflareIcon } from '~/common/components/icons/vendors/CloudflareIcon';
-import { HeliconeIcon } from '~/common/components/icons/vendors/HeliconeIcon';
 import { MiniMaxIcon } from '~/common/components/icons/vendors/MiniMaxIcon';
+import { NousResearchIcon } from '~/common/components/icons/vendors/NousResearchIcon';
 import { NovitaAIIcon } from '~/common/components/icons/vendors/NovitaAIIcon';
 
 
@@ -39,14 +40,15 @@ interface VerifiedProvider {
 const OPENAI_COMPATIBLE_PROVIDERS: VerifiedProvider[] = [
   // Example Providers
   { id: 'arcee', label: 'Arcee AI', host: 'https://api.arcee.ai/api', hostMatch: 'arcee.ai', category: 'Example Providers', description: 'Open-weight MoE models', docsUrl: 'https://docs.arcee.ai/', icon: ArceeAIIcon },
+  { id: 'baseten', label: 'Baseten', host: 'https://inference.baseten.co', hostMatch: 'inference.baseten.co', category: 'Example Providers', description: 'Curated open models, production inference', docsUrl: 'https://docs.baseten.co/inference/model-apis/overview', icon: BasetenIcon },
   { id: 'chutes', label: 'Chutes AI', host: 'https://llm.chutes.ai', hostMatch: '.chutes.ai', category: 'Example Providers', description: 'Serverless open model inference', docsUrl: 'https://chutes.ai/docs', icon: ChutesAIIcon },
   { id: 'empiriolabs', label: 'EmpirioLabs AI', host: 'https://api.empiriolabs.ai', hostMatch: 'empiriolabs.ai', category: 'Example Providers', description: 'Multi-model API platform', docsUrl: 'https://docs.empiriolabs.ai' },
   { id: 'fireworks', label: 'Fireworks AI', host: 'https://api.fireworks.ai/inference', hostMatch: 'fireworks.ai', category: 'Example Providers', description: 'Fast open model inference', docsUrl: 'https://docs.fireworks.ai/getting-started/quickstart', icon: FireworksAIIcon },
   { id: 'llmapi', label: 'LLM API', host: 'https://api.llmapi.ai', hostMatch: 'llmapi.ai', category: 'Example Providers', description: 'Multi-provider API gateway', docsUrl: 'https://llmapi.ai' },
   { id: 'minimax', label: 'MiniMax', host: 'https://api.minimax.io', hostMatch: 'minimax.io', category: 'Example Providers', description: 'Proprietary reasoning models', docsUrl: 'https://platform.minimax.io/docs', icon: MiniMaxIcon },
+  { id: 'nous', label: 'Nous Research', host: 'https://inference-api.nousresearch.com', hostMatch: 'nousresearch.com', category: 'Example Providers', description: 'Hermes models + Portal subscription gateway', docsUrl: 'https://portal.nousresearch.com/', icon: NousResearchIcon },
   { id: 'novita', label: 'Novita AI', host: 'https://api.novita.ai/openai', hostMatch: 'novita.ai', category: 'Example Providers', description: 'Budget open model inference', docsUrl: 'https://novita.ai/docs', icon: NovitaAIIcon },
   // Example Proxies
-  { id: 'helicone', label: 'Helicone', host: 'https://oai.hconeai.com', hostMatch: 'hconeai.com', category: 'Example Proxies', description: 'Observability and caching proxy', docsUrl: 'https://docs.helicone.ai/getting-started/quick-start', icon: HeliconeIcon },
   { id: 'cloudflare', label: 'Cloudflare AI Gateway', host: 'https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/openai', hostMatch: 'gateway.ai.cloudflare.com', category: 'Example Proxies', description: 'Caching and analytics gateway', docsUrl: 'https://developers.cloudflare.com/ai-gateway/', icon: CloudflareIcon },
 ];
 

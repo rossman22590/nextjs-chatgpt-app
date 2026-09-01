@@ -21,6 +21,7 @@ import { openAIAccessSchema } from '~/modules/llms/server/openai/openai.access';
 export type AixParts_DocPart = z.infer<typeof AixWire_Parts.DocPart_schema>;
 export type AixParts_InlineAudioPart = z.infer<typeof AixWire_Parts.InlineAudioPart_schema>;
 export type AixParts_InlineImagePart = z.infer<typeof AixWire_Parts.InlineImagePart_schema>;
+export type AixParts_MediaUrlPart = z.infer<typeof AixWire_Parts.MediaUrlPart_schema>;
 export type AixParts_ModelAuxPart = z.infer<typeof AixWire_Parts.ModelAuxPart_schema>;
 export type AixParts_MetaCacheControl = z.infer<typeof AixWire_Parts.MetaCacheControl_schema>;
 export type AixParts_MetaInReferenceToPart = z.infer<typeof AixWire_Parts.MetaInReferenceToPart_schema>;
@@ -109,6 +110,9 @@ export namespace AixWire_Parts {
           id: z.string().optional(),               // rs_... - item id
           encryptedContent: z.string().optional(), // blob returned when include:['reasoning.encrypted_content']
         }).optional(),
+        // Responses API message phase (on text parts): gpt-5.4+ set it on every assistant message;
+        // resent on replay (dropping it degrades performance per OpenAI docs)
+        phase: z.enum(['commentary', 'final_answer']).optional(),
       }).optional(),
       xai: z.object({
         // xAI Responses API reasoning item continuity handle. Same WIRE shape as OpenAI's, but the encrypted_content
@@ -117,6 +121,8 @@ export namespace AixWire_Parts {
           id: z.string().optional(),
           encryptedContent: z.string().optional(),
         }).optional(),
+        // message phase - captured via the shared Responses parser; not replayed to xAI yet
+        phase: z.enum(['commentary', 'final_answer']).optional(),
       }).optional(),
       // NOTE: we do NOT use this mechanism for per-vendor customization/ALT for parts
       // anthropic: z.object({
@@ -196,6 +202,22 @@ export namespace AixWire_Parts {
     }),
 
     // meta: ignored...
+  });
+
+  /**
+   * URL-referenced media (user-only part): a public URL the provider fetches server-side - never
+   * downloaded or inlined by us (e.g. YouTube or direct .mp4 for Gemini video understanding).
+   * Dialects without native support lower this to text via `approxMediaUrlPart_To_String`.
+   */
+  export const MediaUrlPart_schema = z.object({
+    pt: z.literal('media_url'),
+    mediaKind: z.literal('video'), // future: 'audio'
+    url: z.string(),
+    mimeType: z.string().optional(), // for direct media URLs; absent for YouTube
+    // FUTURE (no producer yet - enable with the trim/sampling UI; the Gemini lowering maps these to videoMetadata):
+    // clipStartSec: z.number().optional(), // -> videoMetadata.startOffset '<n>s' (verified: bills only the slice)
+    // clipEndSec: z.number().optional(),   // -> videoMetadata.endOffset '<n>s'
+    // fps: z.number().optional(),          // -> videoMetadata.fps (default: 1)
   });
 
   // Tool Call
@@ -307,6 +329,7 @@ export namespace AixWire_Content {
       // AixWire_Parts.InlineAudioPart_schema,
       AixWire_Parts.InlineImagePart_schema,
       AixWire_Parts.DocPart_schema,
+      AixWire_Parts.MediaUrlPart_schema, // Aug 14, 2026: URL-referenced video input (user-only)
       AixWire_Parts.MetaCacheControl_schema,
       AixWire_Parts.MetaInReferenceToPart_schema,
     ])),
@@ -522,7 +545,7 @@ export namespace AixWire_API {
     vndAntWebSearchMaxUses: z.number().int().min(1).max(50).optional(),
 
     // Bedrock
-    vndBedrockAPI: z.enum(['converse', 'invoke-anthropic', 'mantle']).optional(),
+    vndBedrockAPI: z.enum(['converse', 'invoke-anthropic', 'mantle', 'mantle-responses']).optional(),
 
     // Gemini
     vndGeminiAPI: z.enum(['interactions-agent']).optional(), // opt-in per-model API dialect; unset = generateContent
@@ -814,8 +837,8 @@ export namespace AixWire_Particles {
       | { vendor: 'openai-container', state: { container: { id: string; expiresAt: string } } } // message-level - OpenAI Responses code-interpreter container reuse; 20min TTL stamped by parser
       | { vendor: 'gemini-envid', state: { environment: { id: string; expiresAt: string | null } } } // message-level - Gemini Interactions sandbox handle (today: Antigravity); 7d TTL stamped by parser
       | { vendor: 'gemini', state: { thoughtSignature: string } } // fragment-level
-      | { vendor: 'openai', state: { reasoningItem: { id?: string, encryptedContent?: string } } } // fragment-level (attach to ma reasoning fragment)
-      | { vendor: 'xai', state: { reasoningItem: { id?: string, encryptedContent?: string } } } // fragment-level - DISTINCT from openai (different encryption keys, different server-side ids)
+      | { vendor: 'openai', state: { reasoningItem?: { id?: string, encryptedContent?: string }, messagePhase?: 'commentary' | 'final_answer' } } // fragment-level: reasoningItem attaches to the last (ma) fragment; messagePhase breaks + tags the NEXT text fragment
+      | { vendor: 'xai', state: { reasoningItem?: { id?: string, encryptedContent?: string }, messagePhase?: 'commentary' | 'final_answer' } } // fragment-level - DISTINCT from openai (different encryption keys, different server-side ids)
       // | { vendor: string, state: Record<string, unknown> } // disable catch-all becasue it forces casts in type discriminations
       )
     ;

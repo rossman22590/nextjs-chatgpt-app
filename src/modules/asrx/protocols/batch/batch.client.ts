@@ -12,6 +12,7 @@
  * the key never leaves the browser except to go to the vendor.
  */
 
+import type { DGeminiServiceSettings } from '~/modules/llms/vendors/gemini/gemini.vendor';
 import type { DOpenAIServiceSettings } from '~/modules/llms/vendors/openai/openai.vendor';
 
 import { findModelsServiceOrNull } from '~/common/stores/llms/store-llms';
@@ -53,7 +54,11 @@ export async function asrxTranscribeBatch(
     return { success: false, errorType: 'asr-no-engine', errorText: 'No ASR engine configured. Please configure a transcription engine in Settings.' };
 
   // 2. Apply profile override from selector (if provided and dialect matches)
-  const effectiveEngine = _engineApplyProfileOverride(engine, selector);
+  let effectiveEngine = _engineApplyProfileOverride(engine, selector);
+
+  // 2b. Caller topics hint wins over the profile policy - only where the capability exists (Deepgram)
+  if (options?.topicsHint !== undefined && effectiveEngine.vendorType === 'deepgram')
+    effectiveEngine = { ...effectiveEngine, profile: { ...effectiveEngine.profile, topics: options.topicsHint } };
 
   // 3. Build wire access from credentials (dereferences 'llms-service')
   const access = _buildBatchWireAccess(effectiveEngine);
@@ -87,6 +92,8 @@ export async function asrxTranscribeBatch(
       ...(output.language ? { language: output.language } : {}),
       ...(output.confidence !== undefined ? { confidence: output.confidence } : {}),
       ...(output.durationMs !== undefined ? { durationMs: output.durationMs } : {}),
+      ...(output.topics?.length ? { topics: output.topics } : {}),
+      ...(output.sentiment ? { sentiment: output.sentiment } : {}),
     };
   } catch (error: any) {
     // abort -> specific error type so callers can distinguish user-stop from failure
@@ -157,6 +164,13 @@ function _buildBatchWireAccess(engine: DASRxEngineAny): ASRxAccess | null {
             ...(c.apiHost ? { apiHost: c.apiHost } : {}),
           };
 
+        case 'gemini':
+          return {
+            dialect: 'gemini',
+            ...(c.apiKey ? { apiKey: c.apiKey } : {}),
+            ...(c.apiHost ? { apiHost: c.apiHost } : {}),
+          };
+
         case 'openai':
           return {
             dialect: 'openai',
@@ -169,17 +183,32 @@ function _buildBatchWireAccess(engine: DASRxEngineAny): ASRxAccess | null {
           return null;
       }
 
-    case 'llms-service':
-      // Only OpenAI supports llms-service linking (Deepgram credentials are forced api-key by _TypeMap)
-      if (engine.vendorType !== 'openai') return null;
+    case 'llms-service': {
+      // Deepgram never links (credentials forced api-key by _TypeMap)
       const service = findModelsServiceOrNull(c.serviceId);
       if (!service) return null;
-      const oai = (service.setup || {}) as Partial<DOpenAIServiceSettings>;
-      return {
-        dialect: 'openai',
-        ...(oai.oaiKey ? { apiKey: oai.oaiKey } : {}),
-        ...(oai.oaiHost ? { apiHost: oai.oaiHost } : {}),
-        ...(oai.oaiOrg ? { apiOrgId: oai.oaiOrg } : {}),
-      };
+      switch (engine.vendorType) {
+
+        case 'gemini':
+          const gem = (service.setup || {}) as Partial<DGeminiServiceSettings>;
+          return {
+            dialect: 'gemini',
+            ...(gem.geminiKey ? { apiKey: gem.geminiKey } : {}),
+            ...(gem.geminiHost ? { apiHost: gem.geminiHost } : {}),
+          };
+
+        case 'openai':
+          const oai = (service.setup || {}) as Partial<DOpenAIServiceSettings>;
+          return {
+            dialect: 'openai',
+            ...(oai.oaiKey ? { apiKey: oai.oaiKey } : {}),
+            ...(oai.oaiHost ? { apiHost: oai.oaiHost } : {}),
+            ...(oai.oaiOrg ? { apiOrgId: oai.oaiOrg } : {}),
+          };
+
+        default:
+          return null;
+      }
+    }
   }
 }

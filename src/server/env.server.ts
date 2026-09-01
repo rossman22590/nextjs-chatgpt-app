@@ -4,7 +4,7 @@
  */
 // [client-side] throw immediately if imported
 if (typeof window !== 'undefined')
-  throw new Error('[DEV] env.server: server module should never be imported on the client.');
+  throw new Error('[DEV] env.server: server module should never be imported on the client. (--turbopack skips the webpack() client mocks - use `npm run dev`.)');
 
 // noinspection ES6PreferShortImport - because this is included by `next.config.ts` and build would not find this file with ~/...
 import { createEnv } from '../modules/3rdparty/t3-env';
@@ -83,8 +83,15 @@ export const env = createEnv({
     // LLM: Mistral
     MISTRAL_API_KEY: z.string().optional(),
 
+    // LLM: Modular
+    MODULAR_API_KEY: z.string().optional(),
+
     // LLM: Moonshot AI
     MOONSHOT_API_KEY: z.string().optional(),
+
+    // LLM: NVIDIA NIM (build.nvidia.com hosted, or self-hosted NIM/vLLM)
+    NVIDIANIM_API_KEY: z.string().optional(),
+    NVIDIANIM_API_HOST: z.url().optional(),
 
     // LLM: Ollama
     OLLAMA_API_HOST: z.url().optional(),
@@ -104,10 +111,6 @@ export const env = createEnv({
 
     // LLM: xAI
     XAI_API_KEY: z.string().optional(),
-
-
-    // Helicone - works on both OpenAI and Anthropic vendors
-    HELICONE_API_KEY: z.string().optional(),
 
 
     // Browsing Service
