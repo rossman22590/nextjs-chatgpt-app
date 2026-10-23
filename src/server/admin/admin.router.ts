@@ -261,7 +261,7 @@ export const adminRouter = createTRPCRouter({
       }),
       prisma.user.findUnique({
         where: { id: input.userId },
-        select: { id: true, name: true, email: true, image: true, isActive: true, plan: true, tokenLimit: true, noSessionLimit: true },
+        select: { id: true, name: true, email: true, image: true, isActive: true, plan: true, tokenLimit: true, noSessionLimit: true, sessionTokenLimit: true },
       }),
       checkUserAllowance(input.userId),
     ]);
@@ -341,6 +341,17 @@ export const adminRouter = createTRPCRouter({
       });
     }),
 
+  // Set a custom rolling 5-hour session limit for a user (null = plan default, > 0 = custom override)
+  setSessionTokenLimit: isAdmin
+    .input(z.object({ userId: z.string(), sessionTokenLimit: z.number().int().positive().nullable() }))
+    .mutation(async ({ input }) => {
+      return prisma.user.update({
+        where: { id: input.userId },
+        data: { sessionTokenLimit: input.sessionTokenLimit },
+        select: { id: true, email: true, sessionTokenLimit: true },
+      });
+    }),
+
   // Exempt a user from the rolling 5-hour session limit (weekly limits still apply)
   setNoSessionLimit: isAdmin
     .input(z.object({ userId: z.string(), noSessionLimit: z.boolean() }))
@@ -386,6 +397,17 @@ export const adminRouter = createTRPCRouter({
       const result = await prisma.user.updateMany({
         where: { NOT: { email: { in: [...ADMIN_EMAILS], mode: 'insensitive' } } },
         data: { tokenLimit: input.tokenLimit },
+      });
+      return { updated: result.count };
+    }),
+
+  // Bulk set the 5-hour session limit for ALL non-admin users (null = plan default, > 0 = custom override)
+  setAllSessionTokenLimits: isAdmin
+    .input(z.object({ sessionTokenLimit: z.number().int().positive().nullable() }))
+    .mutation(async ({ input }) => {
+      const result = await prisma.user.updateMany({
+        where: { NOT: { email: { in: [...ADMIN_EMAILS], mode: 'insensitive' } } },
+        data: { sessionTokenLimit: input.sessionTokenLimit },
       });
       return { updated: result.count };
     }),

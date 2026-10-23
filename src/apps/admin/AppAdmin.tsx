@@ -154,6 +154,13 @@ const creditPresets = [
   { label: '5M', value: 5_000_000 },
 ];
 
+const sessionLimitPresets = [
+  { label: '500K', value: 500_000 },
+  { label: '1M', value: 1_000_000 },
+  { label: '2M', value: 2_000_000 },
+  { label: '5M', value: 5_000_000 },
+];
+
 const planMeta = {
   PREMIUM: { label: 'Premium', color: 'primary' as JoyColor },
   ULTRA: { label: 'Ultra', color: 'warning' as JoyColor },
@@ -670,6 +677,7 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
   const [planSaving, setPlanSaving] = React.useState(false);
   const [sessionResetting, setSessionResetting] = React.useState(false);
   const [sessionLimitSaving, setSessionLimitSaving] = React.useState(false);
+  const [sessionLimitValue, setSessionLimitValue] = React.useState('');
 
   const loadData = React.useCallback(() => {
     setIsLoading(true);
@@ -678,6 +686,7 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
         setUsage(userUsage);
         setLogs(userLogs);
         setLimitValue(userUsage.user?.tokenLimit == null ? '' : String(userUsage.user.tokenLimit));
+        setSessionLimitValue(userUsage.user?.sessionTokenLimit == null ? '' : String(userUsage.user.sessionTokenLimit));
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -754,6 +763,25 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
         props.onRefresh();
       })
       .catch((error) => alert(error?.message || 'Failed to update session limit'))
+      .finally(() => setSessionLimitSaving(false));
+  };
+
+  const handleSetSessionTokenLimit = (nextLimit?: number | null) => {
+    const parsed = nextLimit !== undefined ? nextLimit : sessionLimitValue.trim() === '' ? null : Number.parseInt(sessionLimitValue.trim(), 10);
+
+    if (parsed !== null && (!Number.isFinite(parsed) || parsed <= 0)) {
+      alert('Enter a positive number. Leave blank to use the plan default.');
+      return;
+    }
+
+    setSessionLimitSaving(true);
+    apiAsyncNode.admin.setSessionTokenLimit
+      .mutate({ userId: props.userId, sessionTokenLimit: parsed })
+      .then(() => {
+        loadData();
+        props.onRefresh();
+      })
+      .catch((error) => alert(error?.message || 'Failed to update 5-hour limit'))
       .finally(() => setSessionLimitSaving(false));
   };
 
@@ -984,6 +1012,38 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
                             color={sessionPct >= 100 ? 'danger' : sessionPct >= 75 ? 'warning' : 'success'}
                             sx={{ height: 6, borderRadius: 8 }}
                           />
+                        )}
+                        {!user.noSessionLimit && (
+                          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ mt: 1.5, alignItems: { xs: 'stretch', md: 'center' } }}>
+                            <Input
+                              size="sm"
+                              placeholder="Blank = plan default 5-hour limit"
+                              value={sessionLimitValue}
+                              onChange={(event) => setSessionLimitValue(event.target.value)}
+                              sx={{ minWidth: 220, borderRadius: 8 }}
+                            />
+                            <Button size="sm" startDecorator={<SaveIcon />} loading={sessionLimitSaving} onClick={() => handleSetSessionTokenLimit()} sx={{ borderRadius: 8 }}>
+                              Save
+                            </Button>
+                            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                              {sessionLimitPresets.map((preset) => (
+                                <Button
+                                  key={preset.value}
+                                  size="sm"
+                                  variant="soft"
+                                  color="neutral"
+                                  disabled={sessionLimitSaving}
+                                  onClick={() => handleSetSessionTokenLimit(preset.value)}
+                                  sx={{ borderRadius: 8 }}
+                                >
+                                  {preset.label} /5h
+                                </Button>
+                              ))}
+                              <Button size="sm" variant="soft" color="neutral" disabled={sessionLimitSaving} onClick={() => handleSetSessionTokenLimit(null)} sx={{ borderRadius: 8 }}>
+                                Plan default
+                              </Button>
+                            </Box>
+                          </Stack>
                         )}
                       </Box>
                     )}
@@ -1408,6 +1468,8 @@ export function AppAdmin() {
   const [selectedUserId, setSelectedUserId] = React.useState<string | null>(null);
   const [bulkLimit, setBulkLimit] = React.useState('');
   const [bulkSaving, setBulkSaving] = React.useState(false);
+  const [bulkSessionLimit, setBulkSessionLimit] = React.useState('');
+  const [bulkSessionSaving, setBulkSessionSaving] = React.useState(false);
   const [statusSavingUserId, setStatusSavingUserId] = React.useState<string | null>(null);
   const [bannerDraft, setBannerDraft] = React.useState<BannerDraft>(emptyBannerDraft);
   const [bannerSaving, setBannerSaving] = React.useState(false);
@@ -1623,6 +1685,19 @@ export function AppAdmin() {
       })
       .catch((error) => alert(error?.message || 'Failed to update limits'))
       .finally(() => setBulkSaving(false));
+  };
+
+  const handleSetAllSessionLimits = (sessionTokenLimit: number | null) => {
+    setBulkSessionSaving(true);
+    apiAsyncNode.admin.setAllSessionTokenLimits
+      .mutate({ sessionTokenLimit })
+      .then((data) => {
+        setBulkSessionLimit('');
+        alert('Updated ' + data.updated + ' users');
+        loadAllData();
+      })
+      .catch((error) => alert(error?.message || 'Failed to update 5-hour limits'))
+      .finally(() => setBulkSessionSaving(false));
   };
 
   const handlePublishBanner = (enabledOverride?: boolean) => {
@@ -2308,6 +2383,77 @@ export function AppAdmin() {
                             const value = Number.parseInt(bulkLimit, 10);
                             if (Number.isNaN(value) || value < 0) return alert('Enter 0 or a positive number');
                             if (confirm('Set a custom ' + value.toLocaleString() + ' tokens/week override for every non-admin user?')) handleSetAllLimits(value);
+                          }}
+                          sx={{ borderRadius: 8 }}
+                        >
+                          Apply custom
+                        </Button>
+                      </Box>
+                    </Stack>
+                  </Box>
+                </Surface>
+
+                <Surface>
+                  <SectionHeader
+                    icon={<AccessTimeIcon sx={{ fontSize: 18 }} />}
+                    title="5-Hour Session Limit"
+                    right={
+                      <Chip color="warning" variant="soft">
+                        Affects all non-admin users
+                      </Chip>
+                    }
+                  />
+                  <Box sx={{ p: 2.5 }}>
+                    <Stack spacing={2}>
+                      <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
+                        Weighted tokens allowed per rolling 5 hours (premium models count 3x). Plan default is 1M. Users marked &quot;No 5h limit&quot; stay unlimited.
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {sessionLimitPresets.map((preset) => (
+                          <Button
+                            key={preset.value}
+                            variant="soft"
+                            color="neutral"
+                            loading={bulkSessionSaving}
+                            startDecorator={<AccessTimeIcon />}
+                            onClick={() => {
+                              if (confirm('Set a ' + preset.value.toLocaleString() + ' tokens per 5 hours limit for every non-admin user?')) handleSetAllSessionLimits(preset.value);
+                            }}
+                            sx={{ borderRadius: 8 }}
+                          >
+                            {preset.label} /5h
+                          </Button>
+                        ))}
+                        <Button
+                          variant="soft"
+                          color="neutral"
+                          loading={bulkSessionSaving}
+                          startDecorator={<AllInclusiveIcon />}
+                          onClick={() => {
+                            if (confirm('Reset every non-admin user to the plan\'s default 5-hour limit?')) handleSetAllSessionLimits(null);
+                          }}
+                          sx={{ borderRadius: 8 }}
+                        >
+                          Plan default everyone
+                        </Button>
+                      </Box>
+                      <Divider />
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Input
+                          size="sm"
+                          placeholder="Custom 5-hour limit"
+                          value={bulkSessionLimit}
+                          onChange={(event) => setBulkSessionLimit(event.target.value)}
+                          sx={{ width: 240, borderRadius: 8 }}
+                        />
+                        <Button
+                          size="sm"
+                          loading={bulkSessionSaving}
+                          startDecorator={<SaveIcon />}
+                          onClick={() => {
+                            const value = Number.parseInt(bulkSessionLimit, 10);
+                            if (Number.isNaN(value) || value <= 0) return alert('Enter a positive number');
+                            if (confirm('Set a ' + value.toLocaleString() + ' tokens per 5 hours limit for every non-admin user?')) handleSetAllSessionLimits(value);
                           }}
                           sx={{ borderRadius: 8 }}
                         >
