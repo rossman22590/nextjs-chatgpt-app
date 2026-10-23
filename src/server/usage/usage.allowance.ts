@@ -68,7 +68,7 @@ export async function checkUserAllowance(userId: string, modelId?: string): Prom
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { plan: true, tokenLimit: true, email: true, isActive: true, sessionResetAt: true },
+    select: { plan: true, tokenLimit: true, email: true, isActive: true, sessionResetAt: true, noSessionLimit: true },
   });
 
   if (!user)
@@ -119,8 +119,8 @@ export async function checkUserAllowance(userId: string, modelId?: string): Prom
   const weeklyLimit = isAdmin ? null : (user.tokenLimit != null && user.tokenLimit > 0) ? user.tokenLimit : planWeeklyTokens(plan);
   const overLimit = weeklyLimit != null && weightedUsed >= weeklyLimit;
 
-  // Session (rolling 5-hour) limit: burst protection, blocks ALL models when exhausted. Admin = uncapped.
-  const sessionLimit = isAdmin ? null : planSessionTokens(plan);
+  // Session (rolling 5-hour) limit: burst protection, blocks ALL models when exhausted. Admin and no-session-limit users = uncapped.
+  const sessionLimit = (isAdmin || user.noSessionLimit) ? null : planSessionTokens(plan);
   const session: UsageSession = {
     used: sessionUsed,
     limit: sessionLimit,

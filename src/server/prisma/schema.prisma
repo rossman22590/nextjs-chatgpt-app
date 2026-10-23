@@ -65,6 +65,7 @@ model User {
   isActive      Boolean?  @default(false) // false = blocked, null = legacy active user, true = active
   plan          UserPlan  @default(PREMIUM) // subscription tier - drives the weekly token limit
   tokenLimit    Int?      @default(0) // per-user WEEKLY token override: > 0 = custom weekly limit, 0 = blocked (no credits), null = use plan default
+  noSessionLimit Boolean   @default(false) // true = the rolling 5-hour session limit doesn't apply (weekly limits still do)
   sessionResetAt DateTime? // admin reset of the rolling 5-hour session: usage before this instant doesn't count toward the session limit
   accounts      Account[]
   sessions      Session[]

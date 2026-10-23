@@ -669,6 +669,7 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
   const [statusSaving, setStatusSaving] = React.useState(false);
   const [planSaving, setPlanSaving] = React.useState(false);
   const [sessionResetting, setSessionResetting] = React.useState(false);
+  const [sessionLimitSaving, setSessionLimitSaving] = React.useState(false);
 
   const loadData = React.useCallback(() => {
     setIsLoading(true);
@@ -742,6 +743,18 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
       })
       .catch((error) => alert(error?.message || 'Failed to reset session'))
       .finally(() => setSessionResetting(false));
+  };
+
+  const handleToggleNoSessionLimit = () => {
+    setSessionLimitSaving(true);
+    apiAsyncNode.admin.setNoSessionLimit
+      .mutate({ userId: props.userId, noSessionLimit: !usage?.user?.noSessionLimit })
+      .then(() => {
+        loadData();
+        props.onRefresh();
+      })
+      .catch((error) => alert(error?.message || 'Failed to update session limit'))
+      .finally(() => setSessionLimitSaving(false));
   };
 
   const user = usage?.user;
@@ -921,34 +934,57 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
                         </Button>
                       </Box>
                     </Stack>
-                    {session && session.limit != null && (
+                    {session && (session.limit != null || user.noSessionLimit) && (
                       <Box sx={{ mt: 2.5, pt: 2, borderTop: '1px solid var(--joy-palette-neutral-outlinedBorder)' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: session.limit != null ? 1 : 0 }}>
                           <AccessTimeIcon sx={{ fontSize: 18, color: 'text.tertiary' }} />
                           <Typography level="title-sm">5-Hour Session</Typography>
-                          <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
-                            {fmtNum(session.used)} / {fmtNum(session.limit)} weighted tokens
-                            {session.freesAt != null && session.used > 0 && ` - frees up ${new Date(session.freesAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
-                          </Typography>
-                          <Button
-                            size="sm"
-                            variant="soft"
-                            color={sessionPct >= 100 ? 'danger' : 'neutral'}
-                            startDecorator={<RefreshIcon />}
-                            loading={sessionResetting}
-                            disabled={session.used === 0}
-                            onClick={handleResetSession}
-                            sx={{ ml: 'auto', borderRadius: 8 }}
-                          >
-                            Reset 5h session
-                          </Button>
+                          {session.limit != null ? (
+                            <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                              {fmtNum(session.used)} / {fmtNum(session.limit)} weighted tokens
+                              {session.freesAt != null && session.used > 0 && ` - frees up ${new Date(session.freesAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                            </Typography>
+                          ) : (
+                            <Chip size="sm" variant="soft" color="success" startDecorator={<AllInclusiveIcon sx={{ fontSize: 14 }} />}>
+                              No limit - {fmtNum(session.used)} used
+                            </Chip>
+                          )}
+                          <Box sx={{ ml: 'auto', display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                            {session.limit != null && (
+                              <Button
+                                size="sm"
+                                variant="soft"
+                                color={sessionPct >= 100 ? 'danger' : 'neutral'}
+                                startDecorator={<RefreshIcon />}
+                                loading={sessionResetting}
+                                disabled={session.used === 0}
+                                onClick={handleResetSession}
+                                sx={{ borderRadius: 8 }}
+                              >
+                                Reset 5h session
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant={user.noSessionLimit ? 'outlined' : 'soft'}
+                              color={user.noSessionLimit ? 'neutral' : 'success'}
+                              startDecorator={user.noSessionLimit ? <AccessTimeIcon /> : <AllInclusiveIcon />}
+                              loading={sessionLimitSaving}
+                              onClick={handleToggleNoSessionLimit}
+                              sx={{ borderRadius: 8 }}
+                            >
+                              {user.noSessionLimit ? 'Apply 5h limit' : 'No 5h limit'}
+                            </Button>
+                          </Box>
                         </Box>
-                        <LinearProgress
-                          determinate
-                          value={sessionPct}
-                          color={sessionPct >= 100 ? 'danger' : sessionPct >= 75 ? 'warning' : 'success'}
-                          sx={{ height: 6, borderRadius: 8 }}
-                        />
+                        {session.limit != null && (
+                          <LinearProgress
+                            determinate
+                            value={sessionPct}
+                            color={sessionPct >= 100 ? 'danger' : sessionPct >= 75 ? 'warning' : 'success'}
+                            sx={{ height: 6, borderRadius: 8 }}
+                          />
+                        )}
                       </Box>
                     )}
                   </Box>

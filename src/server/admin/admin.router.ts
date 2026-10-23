@@ -261,7 +261,7 @@ export const adminRouter = createTRPCRouter({
       }),
       prisma.user.findUnique({
         where: { id: input.userId },
-        select: { id: true, name: true, email: true, image: true, isActive: true, plan: true, tokenLimit: true },
+        select: { id: true, name: true, email: true, image: true, isActive: true, plan: true, tokenLimit: true, noSessionLimit: true },
       }),
       checkUserAllowance(input.userId),
     ]);
@@ -338,6 +338,17 @@ export const adminRouter = createTRPCRouter({
         where: { id: input.userId },
         data: { sessionResetAt: new Date() },
         select: { id: true, email: true, sessionResetAt: true },
+      });
+    }),
+
+  // Exempt a user from the rolling 5-hour session limit (weekly limits still apply)
+  setNoSessionLimit: isAdmin
+    .input(z.object({ userId: z.string(), noSessionLimit: z.boolean() }))
+    .mutation(async ({ input }) => {
+      return prisma.user.update({
+        where: { id: input.userId },
+        data: { noSessionLimit: input.noSessionLimit },
+        select: { id: true, email: true, noSessionLimit: true },
       });
     }),
 
