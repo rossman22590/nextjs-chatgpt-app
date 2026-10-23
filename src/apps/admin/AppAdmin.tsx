@@ -668,6 +668,7 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
   const [saving, setSaving] = React.useState(false);
   const [statusSaving, setStatusSaving] = React.useState(false);
   const [planSaving, setPlanSaving] = React.useState(false);
+  const [sessionResetting, setSessionResetting] = React.useState(false);
 
   const loadData = React.useCallback(() => {
     setIsLoading(true);
@@ -730,6 +731,19 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
       .finally(() => setPlanSaving(false));
   };
 
+  const handleResetSession = () => {
+    if (!confirm('Reset this user\'s 5-hour session? Weekly usage is not affected.')) return;
+    setSessionResetting(true);
+    apiAsyncNode.admin.resetUserSession
+      .mutate({ userId: props.userId })
+      .then(() => {
+        loadData();
+        props.onRefresh();
+      })
+      .catch((error) => alert(error?.message || 'Failed to reset session'))
+      .finally(() => setSessionResetting(false));
+  };
+
   const user = usage?.user;
   const weekTokens = usage?.thisWeek?._sum?.totalTokens ?? 0;
   const monthTokens = usage?.thisMonth?._sum?.totalTokens ?? 0;
@@ -741,6 +755,8 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
     ? userHealth({ ...user, monthUsage: usage?.thisMonth as any, weekUsage: usage?.thisWeek as any, allTimeUsage: null, _count: { conversations: 0, messages: 0, usageLogs: 0 } } as AdminUser)
     : null;
   const plan = planChip(user?.plan);
+  const session = usage?.session;
+  const sessionPct = session?.limit ? Math.min(100, (session.used / session.limit) * 100) : 0;
 
   return (
     <Modal open onClose={props.onClose}>
@@ -905,6 +921,36 @@ function UserDetailModal(props: { userId: string; onClose: () => void; onRefresh
                         </Button>
                       </Box>
                     </Stack>
+                    {session && session.limit != null && (
+                      <Box sx={{ mt: 2.5, pt: 2, borderTop: '1px solid var(--joy-palette-neutral-outlinedBorder)' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                          <AccessTimeIcon sx={{ fontSize: 18, color: 'text.tertiary' }} />
+                          <Typography level="title-sm">5-Hour Session</Typography>
+                          <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                            {fmtNum(session.used)} / {fmtNum(session.limit)} weighted tokens
+                            {session.freesAt != null && session.used > 0 && ` - frees up ${new Date(session.freesAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                          </Typography>
+                          <Button
+                            size="sm"
+                            variant="soft"
+                            color={sessionPct >= 100 ? 'danger' : 'neutral'}
+                            startDecorator={<RefreshIcon />}
+                            loading={sessionResetting}
+                            disabled={session.used === 0}
+                            onClick={handleResetSession}
+                            sx={{ ml: 'auto', borderRadius: 8 }}
+                          >
+                            Reset 5h session
+                          </Button>
+                        </Box>
+                        <LinearProgress
+                          determinate
+                          value={sessionPct}
+                          color={sessionPct >= 100 ? 'danger' : sessionPct >= 75 ? 'warning' : 'success'}
+                          sx={{ height: 6, borderRadius: 8 }}
+                        />
+                      </Box>
+                    )}
                   </Box>
                 </Surface>
 

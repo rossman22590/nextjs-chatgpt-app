@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { ADMIN_EMAILS, isAdminEmail } from '~/common/auth/adminEmails';
 import { createTRPCRouter, protectedProcedure, publicProcedure } from '~/server/trpc/trpc.server';
 import { prisma } from '~/server/prisma/prisma-client';
+import { checkUserAllowance } from '~/server/usage/usage.allowance';
 import { planLabel, planWeeklyTokens, USER_PLAN_IDS, WEEKLY_WINDOW_MS } from '~/server/usage/usage.plans';
 import { adminBannerInputSchema, isAllowedBannerUrl, readAdminBanner, readPublicAdminBanner, writeAdminBanner } from './admin.banner';
 import { readDisabledModels, writeDisabledModels } from './admin.models';
@@ -242,7 +243,7 @@ export const adminRouter = createTRPCRouter({
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const weekStart = new Date(Date.now() - WEEKLY_WINDOW_MS);
 
-    const [allTime, thisMonth, thisWeek, user] = await Promise.all([
+    const [allTime, thisMonth, thisWeek, user, allowance] = await Promise.all([
       prisma.usageLog.aggregate({
         where: { userId: input.userId },
         _sum: { inputTokens: true, outputTokens: true, totalTokens: true, costCents: true },
@@ -262,6 +263,7 @@ export const adminRouter = createTRPCRouter({
         where: { id: input.userId },
         select: { id: true, name: true, email: true, image: true, isActive: true, plan: true, tokenLimit: true },
       }),
+      checkUserAllowance(input.userId),
     ]);
 
     return {
@@ -269,6 +271,7 @@ export const adminRouter = createTRPCRouter({
       allTime,
       thisMonth,
       thisWeek,
+      session: allowance.session,
     };
   }),
 
@@ -324,6 +327,17 @@ export const adminRouter = createTRPCRouter({
         where: { id: input.userId },
         data: { tokenLimit: input.tokenLimit },
         select: { id: true, email: true, tokenLimit: true },
+      });
+    }),
+
+  // Reset a user's rolling 5-hour session: usage before now stops counting toward the session limit (weekly usage is unchanged)
+  resetUserSession: isAdmin
+    .input(z.object({ userId: z.string() }))
+    .mutation(async ({ input }) => {
+      return prisma.user.update({
+        where: { id: input.userId },
+        data: { sessionResetAt: new Date() },
+        select: { id: true, email: true, sessionResetAt: true },
       });
     }),
 

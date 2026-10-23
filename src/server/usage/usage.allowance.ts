@@ -68,7 +68,7 @@ export async function checkUserAllowance(userId: string, modelId?: string): Prom
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { plan: true, tokenLimit: true, email: true, isActive: true },
+    select: { plan: true, tokenLimit: true, email: true, isActive: true, sessionResetAt: true },
   });
 
   if (!user)
@@ -88,10 +88,11 @@ export async function checkUserAllowance(userId: string, modelId?: string): Prom
 
   // Single query for the rolling 7-day window: classify + weight per model family in JS
   // (regex matching can't be expressed in a Prisma aggregate); the 5-hour session
-  // window is computed in the same pass.
+  // window is computed in the same pass. An admin session reset moves the session start
+  // forward (weekly usage is unaffected).
   const now = Date.now();
   const windowStart = new Date(now - WEEKLY_WINDOW_MS);
-  const sessionStart = now - SESSION_WINDOW_MS;
+  const sessionStart = Math.max(now - SESSION_WINDOW_MS, user.sessionResetAt?.getTime() ?? 0);
   const logs = await prisma.usageLog.findMany({
     where: { userId, createdAt: { gte: windowStart } },
     select: { modelId: true, totalTokens: true, createdAt: true },
