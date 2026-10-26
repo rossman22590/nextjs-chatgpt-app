@@ -72,24 +72,8 @@ export type ModelVendorOf<V extends ModelVendorId> = (typeof MODEL_VENDOR_REGIST
 export type ModelVendorAccessOf<V extends ModelVendorId> = ModelVendorOf<V> extends IModelVendor<any, infer TAccess> ? TAccess : never;
 
 
-/**
- * Vendors this deployment offers. OpenRouter (free models only) is the sole provider.
- *
- * The other vendors stay in the registry on purpose: shared server code and the
- * OpenRouter model parser still read their model definitions. They simply cannot be
- * added as services, are never auto-configured from server keys, and any service
- * persisted from an earlier build is pruned on load (see store-llms rehydration).
- */
-const ENABLED_MODEL_VENDOR_IDS = new Set<ModelVendorId>([
-  'openrouter',
-]);
-
-export function isModelVendorEnabled(vendorId?: ModelVendorId): boolean {
-  return !!vendorId && ENABLED_MODEL_VENDOR_IDS.has(vendorId);
-}
-
 export function findAllModelVendors(): IModelVendor[] {
-  const modelVendors = Object.values(MODEL_VENDOR_REGISTRY).filter(vendor => isModelVendorEnabled(vendor.id));
+  const modelVendors = Object.values(MODEL_VENDOR_REGISTRY);
   modelVendors.sort((a, b) => a.displayRank - b.displayRank);
   return modelVendors;
 }

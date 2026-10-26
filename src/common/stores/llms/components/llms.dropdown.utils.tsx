@@ -4,18 +4,18 @@ import type { DLLM, DLLMId } from '../llms.types';
 import type { DModelsServiceId } from '../llms.service.types';
 import { findModelsServiceOrNull } from '../store-llms';
 import { getLLMLabel, isLLMVisible } from '../llms.types';
-import { OPENROUTER_VISIBLE_MODELS_LIMIT } from '../llms.model-limits';
-import { isLLMChatFree_cached } from '../llms.pricing';
+import { OPENROUTER_MAX_OUTPUT_PRICE_PER_MTOK, OPENROUTER_VISIBLE_MODELS_LIMIT } from '../llms.model-limits';
+import { isLLMChatOutputPriceUnder } from '../llms.pricing';
 
 
 export function limitOpenRouterDropdownLLMs<T extends DLLM>(
   llms: ReadonlyArray<T>,
   _currentModelId?: DLLMId | null,
 ): T[] {
-  // OpenRouter is free-models-only here: the pricing check also drops paid models
-  // left over in the store from a build that still listed them
+  // OpenRouter is capped by output price here: the pricing check also drops costlier
+  // models left over in the store from a build that still listed them
   const visibleOpenRouterLlms = llms
-    .filter(llm => llm.vId === 'openrouter' && isLLMChatFree_cached(llm))
+    .filter(llm => llm.vId === 'openrouter' && isLLMChatOutputPriceUnder(llm, OPENROUTER_MAX_OUTPUT_PRICE_PER_MTOK))
     .slice(0, OPENROUTER_VISIBLE_MODELS_LIMIT);
 
   const output: T[] = [];
@@ -60,7 +60,7 @@ export function filterLLMsForDropdown(
     // Filter by search string
     if (lcSearch && !getLLMLabel(llm).toLowerCase().includes(lcSearch)) return false;
 
-    // OpenRouter is filtered to free models below; keep its factory-hidden models eligible so persisted old caps do not shrink the list.
+    // OpenRouter is filtered by output price below; keep its factory-hidden models eligible so persisted old caps do not shrink the list.
     if (llm.vId === 'openrouter') return llm.userHidden !== true;
 
     // Show visible models, or all if actively searching

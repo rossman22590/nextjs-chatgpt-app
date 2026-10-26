@@ -1,7 +1,7 @@
 import * as z from 'zod/v4';
 
 import { LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision, LLM_IF_Outputs_Audio, LLM_IF_Outputs_Image } from '~/common/stores/llms/llms.types';
-import { OPENROUTER_VISIBLE_MODELS_LIMIT } from '~/common/stores/llms/llms.model-limits';
+import { OPENROUTER_MAX_OUTPUT_PRICE_PER_MTOK, OPENROUTER_VISIBLE_MODELS_LIMIT } from '~/common/stores/llms/llms.model-limits';
 import { Release } from '~/common/app.release';
 
 import type { ModelDescriptionSchema, OrtVendorLookupResult } from '../../llm.server.types';
@@ -108,13 +108,13 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
     };
   }
 
-  // -- Pricing: free-only --
-  // This deployment surfaces free-of-charge OpenRouter models only: drop everything that bills.
-  const seemsFree = chatPrice.input === 'free' && chatPrice.output === 'free';
-  if (!seemsFree) return null;
-
-  // every model here is free, so the ':free' suffix carries no information in the label
-  label = label.replace(/\s*\(free\)\s*$/i, '');
+  // -- Pricing: output-price cap --
+  // This deployment only offers models whose output price is known and under the ceiling.
+  // OpenRouter prices its auto-routers as "-1" (varies), so anything not a finite,
+  // non-negative number is dropped rather than assumed cheap.
+  const outputPricePerMTok = outputPrice * 1000 * 1000;
+  if (!Number.isFinite(outputPricePerMTok) || outputPricePerMTok < 0 || outputPricePerMTok >= OPENROUTER_MAX_OUTPUT_PRICE_PER_MTOK)
+    return null;
 
 
   // -- Context windows --
@@ -269,10 +269,9 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
 
   // -- Hidden --
 
-  // hidden: only retire known-old models - the free roster is long-tail by nature, so the
-  // family allowlist is not applied here (it would hide nearly everything). The visible
-  // count is capped by openRouterLimitVisibleModels() instead.
-  const hidden = orOldModelIDs.some(prefix => model.id.startsWith(prefix));
+  // hidden: hide by default older models or models not in known families; match with startsWith for both orOldModelIDs and orModelFamilyOrder
+  const hidden = orOldModelIDs.some(prefix => model.id.startsWith(prefix))
+    || !orModelFamilyOrder.some(prefix => model.id.startsWith(prefix));
 
 
   return fromManualMapping([], model.id, model?.created, undefined, {
@@ -336,8 +335,9 @@ export function openRouterInjectVariants(models: ModelDescriptionSchema[], model
 export function openRouterLimitVisibleModels(models: ModelDescriptionSchema[]): ModelDescriptionSchema[] {
   let visibleCount = 0;
 
-  // all models reaching this point are free (see openRouterModelToModelDescription): order
-  // the better-known families first, then cap how many are visible by default
+  // all models reaching this point are under the output-price cap (see
+  // openRouterModelToModelDescription): order the better-known families first,
+  // then cap how many are visible by default
   const familyRank = (modelId: string): number => {
     const idx = orModelFamilyOrder.findIndex(prefix => modelId.startsWith(prefix));
     return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;

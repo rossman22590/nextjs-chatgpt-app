@@ -65,6 +65,38 @@ function _isPricingFree(pricing: DTieredPricing | undefined): boolean {
 }
 
 
+/// detect Pricing under a ceiling
+
+/**
+ * True when the model's output price is known and strictly below the given $/MTok ceiling.
+ *
+ * Unknown, negative or variable pricing counts as over the cap: OpenRouter prices its
+ * auto-routers as -1 ("varies"), and those must not pass a cheapness test.
+ */
+export function isLLMChatOutputPriceUnder(llm: DLLM | null, maxPricePerMTok: number): boolean {
+  const pricing = llm?.userPricing ?? llm?.pricing;
+  if (!pricing?.chat) return false;
+  const peakPrice = _peakPricePerMTok(pricing.chat.output);
+  return peakPrice !== undefined && peakPrice < maxPricePerMTok;
+}
+
+/** Worst-case $/MTok across all tiers, or undefined when any tier is unknown/negative. */
+function _peakPricePerMTok(pricing: DTieredPricing | undefined): number | undefined {
+  if (pricing === undefined) return undefined;
+  if (pricing === 'free') return 0;
+  if (typeof pricing === 'number')
+    return (Number.isFinite(pricing) && pricing >= 0) ? pricing : undefined;
+
+  let peak = 0;
+  for (const tier of pricing) {
+    const tierPrice = tier.price === 'free' ? 0 : tier.price;
+    if (!Number.isFinite(tierPrice) || tierPrice < 0) return undefined;
+    if (tierPrice > peak) peak = tierPrice;
+  }
+  return peak;
+}
+
+
 /// Human readable cost
 
 export function getLlmCostForTokens(tierTokens: number, tokens: number, pricing: DTieredPricing | undefined): number | undefined {

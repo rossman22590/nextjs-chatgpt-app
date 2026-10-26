@@ -2,8 +2,8 @@ import { useShallow } from 'zustand/react/shallow';
 
 import type { DModelsServiceId } from './llms.service.types';
 import { DLLM, DLLMId, isLLMVisible } from './llms.types';
-import { OPENROUTER_VISIBLE_MODELS_LIMIT } from './llms.model-limits';
-import { isLLMChatFree_cached } from './llms.pricing';
+import { OPENROUTER_MAX_OUTPUT_PRICE_PER_MTOK, OPENROUTER_VISIBLE_MODELS_LIMIT } from './llms.model-limits';
+import { isLLMChatFree_cached, isLLMChatOutputPriceUnder } from './llms.pricing';
 import { useModelsStore } from './store-llms';
 
 
@@ -34,10 +34,10 @@ export function useLLMsByService(serviceId: false | DModelsServiceId): DLLM[] {
 }
 
 function _limitOpenRouterVisibleLLMs<T extends DLLM>(llms: ReadonlyArray<T>): T[] {
-  // OpenRouter is free-models-only here: the pricing check also drops paid models
-  // left over in the store from a build that still listed them
+  // OpenRouter is capped by output price here: the pricing check also drops costlier
+  // models left over in the store from a build that still listed them
   const visibleOpenRouterLlms = llms
-    .filter(llm => llm.vId === 'openrouter' && isLLMChatFree_cached(llm))
+    .filter(llm => llm.vId === 'openrouter' && isLLMChatOutputPriceUnder(llm, OPENROUTER_MAX_OUTPUT_PRICE_PER_MTOK))
     .slice(0, OPENROUTER_VISIBLE_MODELS_LIMIT);
 
   const output: T[] = [];
@@ -71,7 +71,7 @@ export function useVisibleLLMs(includeLlmId: undefined | DLLMId | null, starredO
       // always include the specified LLM ID if provided
       if (includeLlmId && llm.id === includeLlmId) return true;
 
-      // OpenRouter is filtered to free models after this; keep factory-hidden models eligible so old persisted caps do not shrink it.
+      // OpenRouter is filtered by output price after this; keep factory-hidden models eligible so old persisted caps do not shrink it.
       if (llm.vId === 'openrouter') return llm.userHidden !== true && (!starredOnly || llm.userStarred);
 
       // visibility filter
