@@ -1,7 +1,7 @@
 import * as z from 'zod/v4';
 
 import { LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM_IF_OAI_PromptCaching, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision, LLM_IF_Outputs_Audio, LLM_IF_Outputs_Image } from '~/common/stores/llms/llms.types';
-import { isOpenRouterCuratedModelRef, OPENROUTER_VISIBLE_MODELS_LIMIT, openRouterCuratedModelRank } from '~/common/stores/llms/llms.model-limits';
+import { OPENROUTER_VISIBLE_MODELS_LIMIT } from '~/common/stores/llms/llms.model-limits';
 import { Release } from '~/common/app.release';
 
 import type { ModelDescriptionSchema, OrtVendorLookupResult } from '../../llm.server.types';
@@ -108,10 +108,13 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
     };
   }
 
-  // -- Pricing: free --
+  // -- Pricing: free-only --
+  // This deployment surfaces free-of-charge OpenRouter models only: drop everything that bills.
   const seemsFree = chatPrice.input === 'free' && chatPrice.output === 'free';
-  if (seemsFree)
-    label += ' · 🎁'; // Free? Discounted?
+  if (!seemsFree) return null;
+
+  // every model here is free, so the ':free' suffix carries no information in the label
+  label = label.replace(/\s*\(free\)\s*$/i, '');
 
 
   // -- Context windows --
@@ -266,9 +269,10 @@ export function openRouterModelToModelDescription(wireModel: object): ModelDescr
 
   // -- Hidden --
 
-  // hidden: hide by default older models or models not in known families; match with startsWith for both orOldModelIDs and orModelFamilyOrder
-  const hidden = orOldModelIDs.some(prefix => model.id.startsWith(prefix))
-    || !orModelFamilyOrder.some(prefix => model.id.startsWith(prefix));
+  // hidden: only retire known-old models - the free roster is long-tail by nature, so the
+  // family allowlist is not applied here (it would hide nearly everything). The visible
+  // count is capped by openRouterLimitVisibleModels() instead.
+  const hidden = orOldModelIDs.some(prefix => model.id.startsWith(prefix));
 
 
   return fromManualMapping([], model.id, model?.created, undefined, {
@@ -332,16 +336,22 @@ export function openRouterInjectVariants(models: ModelDescriptionSchema[], model
 export function openRouterLimitVisibleModels(models: ModelDescriptionSchema[]): ModelDescriptionSchema[] {
   let visibleCount = 0;
 
+  // all models reaching this point are free (see openRouterModelToModelDescription): order
+  // the better-known families first, then cap how many are visible by default
+  const familyRank = (modelId: string): number => {
+    const idx = orModelFamilyOrder.findIndex(prefix => modelId.startsWith(prefix));
+    return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+  };
+
   return models
     .map((model, index) => ({ model, index }))
     .sort((a, b) =>
-      openRouterCuratedModelRank(a.model.id) - openRouterCuratedModelRank(b.model.id)
+      familyRank(a.model.id) - familyRank(b.model.id)
       || a.index - b.index,
     )
     .map(({ model }) => {
-      const isCurated = isOpenRouterCuratedModelRef(model.id);
-      const hidden = model.hidden || !isCurated || visibleCount >= OPENROUTER_VISIBLE_MODELS_LIMIT;
-      if (isCurated && !hidden) visibleCount++;
+      const hidden = model.hidden || visibleCount >= OPENROUTER_VISIBLE_MODELS_LIMIT;
+      if (!hidden) visibleCount++;
       return {
         ...model,
         hidden,

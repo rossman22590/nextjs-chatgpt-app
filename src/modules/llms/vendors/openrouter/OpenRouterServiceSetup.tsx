@@ -61,20 +61,15 @@ export function OpenRouterServiceSetup(props: { serviceId: DModelsServiceId }) {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       <Typography level='body-sm'>
         <Link href='https://openrouter.ai' target='_blank'>OpenRouter</Link> is a service
-        providing access to <Link href='https://openrouter.ai/models' target='_blank'>a wide range of models</Link>. See our <Link
-        href='https://github.com/enricoros/big-agi/blob/main/docs/config-openrouter.md' target='_blank'>
-        Docs</Link>.
+        providing access to <Link href='https://openrouter.ai/models' target='_blank'>a wide range of models</Link>.
       </Typography>
 
       <Typography level='body-sm' endDecorator={
         <PhGift sx={{ color: 'success.softColor' }} />
-        // <Chip component='span' size='sm' color='success' variant='soft' sx={{ borderRadius: 'sm', boxShadow: 'none', border: '1px solid', borderColor: 'success.outlinedBorder', mr: 0.5 }} startDecorator={<PhGift />}>
-        //   free
-        // </Chip>
       }>
         <span>
-          {/*A <Link href='https://openrouter.ai/models?q=%3Afree&order=newest' target='_blank'>selection</Link> of*/}
-          A selection of OpenRouter models is made available free of charge.
+          Only the <Link href='https://openrouter.ai/models?q=%3Afree' target='_blank'>free-of-charge</Link> OpenRouter
+          models are listed here - paid models are not offered.
         </span>
       </Typography>
     </Box>

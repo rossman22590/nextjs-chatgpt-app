@@ -2,7 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import type { DModelsServiceId } from './llms.service.types';
 import { DLLM, DLLMId, isLLMVisible } from './llms.types';
-import { isOpenRouterCuratedModelRef, OPENROUTER_VISIBLE_MODELS_LIMIT, openRouterCuratedModelRank } from './llms.model-limits';
+import { OPENROUTER_VISIBLE_MODELS_LIMIT } from './llms.model-limits';
 import { isLLMChatFree_cached } from './llms.pricing';
 import { useModelsStore } from './store-llms';
 
@@ -34,15 +34,11 @@ export function useLLMsByService(serviceId: false | DModelsServiceId): DLLM[] {
 }
 
 function _limitOpenRouterVisibleLLMs<T extends DLLM>(llms: ReadonlyArray<T>): T[] {
+  // OpenRouter is free-models-only here: the pricing check also drops paid models
+  // left over in the store from a build that still listed them
   const visibleOpenRouterLlms = llms
-    .map((llm, index) => ({ llm, index }))
-    .filter(({ llm }) => llm.vId === 'openrouter' && isOpenRouterCuratedModelRef(llm.initialParameters?.llmRef))
-    .sort((a, b) =>
-      openRouterCuratedModelRank(a.llm.initialParameters?.llmRef) - openRouterCuratedModelRank(b.llm.initialParameters?.llmRef)
-      || a.index - b.index,
-    )
-    .slice(0, OPENROUTER_VISIBLE_MODELS_LIMIT)
-    .map(({ llm }) => llm);
+    .filter(llm => llm.vId === 'openrouter' && isLLMChatFree_cached(llm))
+    .slice(0, OPENROUTER_VISIBLE_MODELS_LIMIT);
 
   const output: T[] = [];
   let injectedOpenRouterLlms = false;
@@ -75,7 +71,7 @@ export function useVisibleLLMs(includeLlmId: undefined | DLLMId | null, starredO
       // always include the specified LLM ID if provided
       if (includeLlmId && llm.id === includeLlmId) return true;
 
-      // OpenRouter is curated after this filter; keep factory-hidden models eligible so old persisted caps do not shrink it.
+      // OpenRouter is filtered to free models after this; keep factory-hidden models eligible so old persisted caps do not shrink it.
       if (llm.vId === 'openrouter') return llm.userHidden !== true && (!starredOnly || llm.userStarred);
 
       // visibility filter
