@@ -16,7 +16,7 @@ free-of-charge models.
 - Local-first storage: chats live in IndexedDB in your browser
 
 ## Run locally
-
+ 
 ```bash
 npm install
 npm run dev
