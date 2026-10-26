@@ -7,7 +7,7 @@
  * price is unknown or variable - OpenRouter prices its auto-routers as "-1" - are
  * excluded, since their real cost is not knowable up front.
  */
-export const OPENROUTER_MAX_OUTPUT_PRICE_PER_MTOK = 1;
+export const OPENROUTER_MAX_OUTPUT_PRICE_PER_MTOK = 5;
 
 /** Caps how many of the eligible models are surfaced by default. */
 export const OPENROUTER_VISIBLE_MODELS_LIMIT = 30;
