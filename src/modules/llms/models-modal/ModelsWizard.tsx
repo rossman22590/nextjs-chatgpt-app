@@ -10,26 +10,23 @@ import { useShallowStabilizer } from '~/common/util/hooks/useShallowObject';
 
 import type { IModelVendor } from '../vendors/IModelVendor';
 import { LLMVendorIconSprite } from '../components/LLMVendorIconSprite';
-import { ModelVendorAnthropic } from '../vendors/anthropic/anthropic.vendor';
-import { ModelVendorGemini } from '../vendors/gemini/gemini.vendor';
 import { ModelVendorLMStudio } from '../vendors/lmstudio/lmstudio.vendor';
 import { ModelVendorLocalAI } from '../vendors/localai/localai.vendor';
 import { ModelVendorOllama } from '../vendors/ollama/ollama.vendor';
-import { ModelVendorOpenAI } from '../vendors/openai/openai.vendor';
 import { ModelVendorOpenRouter } from '../vendors/openrouter/openrouter.vendor';
+import { isModelVendorEnabled } from '../vendors/vendors.registry';
 import { llmsUpdateModelsForServiceOrThrow } from '../llm.client';
 
 
-// configuration
-const WizardProviders: ReadonlyArray<WizardProvider> = [
-  { cat: 'popular', vendor: ModelVendorOpenAI, settingsKey: 'oaiKey' } as const,
-  { cat: 'popular', vendor: ModelVendorAnthropic, settingsKey: 'anthropicKey' } as const,
-  { cat: 'popular', vendor: ModelVendorGemini, settingsKey: 'geminiKey' } as const,
+// configuration - narrowed to the vendors this deployment offers
+const WizardProviders: ReadonlyArray<WizardProvider> = ([
   { cat: 'popular', vendor: ModelVendorOpenRouter, settingsKey: 'oaiKey' } as const,
   { cat: 'local', vendor: ModelVendorLocalAI, settingsKey: 'localAIHost' } as const,
   { cat: 'local', vendor: ModelVendorOllama, settingsKey: 'ollamaHost' } as const,
   { cat: 'local', vendor: ModelVendorLMStudio, settingsKey: 'oaiHost', omit: true } as const,
-] as const;
+] as const).filter(p => isModelVendorEnabled(p.vendor.id));
+
+const WizardHasLocalProviders = WizardProviders.some(p => p.cat === 'local');
 
 type VendorCategory = 'popular' | 'local';
 
@@ -301,12 +298,14 @@ export function ModelsWizard(props: {
       <Box sx={props.isMobile ? _styles.text1Mobile : _styles.text1}>
         <Typography component='div' level='title-sm'>
           Enter {isLocal ? 'the addresses of ' : 'your API keys for '}
-          <Chip variant={!isLocal ? 'solid' : 'outlined'} sx={{ mx: 0.25 }} onClick={() => setActiveCategory('popular')}>
-            Popular
-          </Chip>
-          <Chip variant={isLocal ? 'solid' : 'outlined'} sx={{ mx: 0.25 }} onClick={() => setActiveCategory('local')}>
-            Local
-          </Chip>
+          {WizardHasLocalProviders && <>
+            <Chip variant={!isLocal ? 'solid' : 'outlined'} sx={{ mx: 0.25 }} onClick={() => setActiveCategory('popular')}>
+              Popular
+            </Chip>
+            <Chip variant={isLocal ? 'solid' : 'outlined'} sx={{ mx: 0.25 }} onClick={() => setActiveCategory('local')}>
+              Local
+            </Chip>
+          </>}
           {' '}<Box component='a' onClick={props.onSwitchToWhy} sx={{ color: 'text.tertiary', cursor: 'pointer' }}>AI services </Box> below.
         </Typography>
         {/*<Box sx={{ fontSize: 'sm', color: 'text.primary' }}>*/}

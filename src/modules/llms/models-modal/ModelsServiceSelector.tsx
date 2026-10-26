@@ -291,33 +291,32 @@ export function ModelsServiceSelector(props: {
         };
       });
 
-    // rendered components split by display groups
-    const components: React.ReactNode[] = [
+    // rendered components split by display groups - a header is only emitted for a non-empty group
+    const components: React.ReactNode[] = [];
 
-      _renderSectionHeader('Featured', true),
-      ...vendorItems
-        .filter(v => v.vendor.displayGroup === 'popular')
-        .sort((a, b) => a.vendor.name.localeCompare(b.vendor.name))
-        // .sort((a, b) => a.vendor.displayRank - b.vendor.displayRank)
-        .map(item => _renderVendorItem(item, isMobile, handleAddServiceForVendor)),
+    const _pushSection = (title: string, groupItems: VendorItemData[]) => {
+      if (!groupItems.length) return;
+      components.push(_renderSectionHeader(title, !components.length));
+      components.push(...groupItems.map(item => _renderVendorItem(item, isMobile, handleAddServiceForVendor)));
+    };
 
-      _renderSectionHeader('Cloud'),
-      ...vendorItems
-        .filter(v => v.vendor.displayGroup === 'cloud')
-        .sort((a, b) => a.vendor.name.localeCompare(b.vendor.name))
-        .map(item => _renderVendorItem(item, isMobile, handleAddServiceForVendor)),
+    _pushSection('Featured', vendorItems
+      .filter(v => v.vendor.displayGroup === 'popular')
+      .sort((a, b) => a.vendor.name.localeCompare(b.vendor.name)));
 
-      _renderSectionHeader('Local'),
-      ...vendorItems
-        .filter(v => v.vendor.displayGroup === 'local')
-        .sort((a, b) => {
-          // LocalAI first, then alphabetically
-          if (a.vendor.id === 'localai') return -1;
-          if (b.vendor.id === 'localai') return 1;
-          return a.vendor.name.localeCompare(b.vendor.name);
-        })
-        .map(item => _renderVendorItem(item, isMobile, handleAddServiceForVendor)),
-    ];
+    _pushSection('Cloud', vendorItems
+      .filter(v => v.vendor.displayGroup === 'cloud')
+      .sort((a, b) => a.vendor.name.localeCompare(b.vendor.name)));
+
+    _pushSection('Local', vendorItems
+      .filter(v => v.vendor.displayGroup === 'local')
+      .sort((a, b) => {
+        // LocalAI first, then alphabetically
+        if (a.vendor.id === 'localai') return -1;
+        if (b.vendor.id === 'localai') return 1;
+        return a.vendor.name.localeCompare(b.vendor.name);
+      }));
+
     return components;
   }, [handleAddServiceForVendor, modelsServices, isMobile]);
 

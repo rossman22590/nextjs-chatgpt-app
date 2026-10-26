@@ -8,7 +8,7 @@ import { persist } from 'zustand/middleware';
 import type { DOpenRouterServiceSettings } from '~/modules/llms/vendors/openrouter/openrouter.vendor';
 import type { IModelVendor } from '~/modules/llms/vendors/IModelVendor';
 import { createDLLMUserClone, getDLLMCloneId } from '~/modules/llms/llm.client';
-import { findModelVendor, type ModelVendorId } from '~/modules/llms/vendors/vendors.registry';
+import { findModelVendor, isModelVendorEnabled, type ModelVendorId } from '~/modules/llms/vendors/vendors.registry';
 
 import { hasKeys } from '~/common/util/objectUtils';
 
@@ -484,6 +484,10 @@ export const useModelsStore = create<LlmsStore>()(persist(
     // Post-loading: ensure a valid starting state
     onRehydrateStorage: () => (state) => {
       if (!state) return;
+
+      // [GC] drop services for vendors this deployment no longer offers (their models
+      // are then removed by the pass below, which requires a valid service)
+      state.sources = state.sources.filter(service => isModelVendorEnabled(service.vId));
 
       // [GC] remove models that do not refer to a valid service
       state.llms = state.llms.map((llm: DLLM): DLLM | null => {
