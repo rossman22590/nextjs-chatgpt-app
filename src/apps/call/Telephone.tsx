@@ -65,10 +65,6 @@ function CallMenu(props: {
       <Switch checked={grayUI} sx={{ ml: 'auto' }} />
     </MenuItem>
 
-    <MenuItem component={Link} href='https://github.com/enricoros/big-agi/issues/175' target='_blank'>
-      Voice Calls Feedback
-    </MenuItem>
-
   </OptimaPanelGroupedList>;
 }
 

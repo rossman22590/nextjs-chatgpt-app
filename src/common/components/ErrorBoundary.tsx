@@ -1,6 +1,5 @@
 import * as React from 'react';
 
-import { BaseProduct } from '~/common/app.release';
 import { logger } from '~/common/logger';
 import { posthogCaptureException } from '~/common/components/3rdparty/PostHogAnalytics';
 import { isBenignDomMutationError, isChunkLoadError } from '~/common/util/errorUtils';
@@ -93,9 +92,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     const isChunkLoad = isChunkLoadError(error);
     const heading = isChunkLoad ? 'Update Required' : 'Oops, we hit a snag';
     const message = isChunkLoad
-      ? 'A part of Big-AGI could not be loaded. This usually happens when the app has been updated while this tab is still running, '
+      ? 'A part of the app could not be loaded. This usually happens when the app has been updated while this tab is still running, '
         + 'so the loaded app and deployed files are out of sync. Reloading should fetch the current version.'
-      : `An unexpected error occurred.${outer ? ' Please try reloading Big-AGI.' : ''}`;
+      : `An unexpected error occurred.${outer ? ' Please try reloading the app.' : ''}`;
 
     if (hasError && error)
       return fallback ? fallback : (
@@ -123,14 +122,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               <h2 className='heading'>{heading}</h2>
               <div className='message'>
                 <p style={{ fontWeight: 500 }}>{message}</p>
-                {outer && (
-                  <p style={{ fontWeight: 500 }}>
-                    {' '}If the issue persists, please{' '}
-                    <a href={BaseProduct.SupportForm()} target='_blank' rel='noopener noreferrer' style={{ color: 'inherit', textDecoration: 'underline' }}>
-                      Contact Support
-                    </a>.
-                  </p>
-                )}
                 {/* Dev-only stack trace */}
                 {/*{!Release.IsNodeDevBuild ? (*/}
                 {/*  <div style={{ opacity: 0.5 }}>*/}
@@ -147,7 +138,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
               {outer || isChunkLoad ? (
                 <button className='button' onClick={() => window.location.reload()}>
-                  Reload Big-AGI
+                  Reload App
                 </button>
               ) : (
                 <button className='button' onClick={() => this.resetErrorBoundary()}>

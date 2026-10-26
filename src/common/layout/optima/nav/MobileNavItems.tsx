@@ -3,16 +3,13 @@ import Router from 'next/router';
 
 import { Box, Button, ButtonGroup, ColorPaletteProp, Sheet } from '@mui/joy';
 
-import { ROUTE_APP_NEWS } from '~/common/app.routes';
 import { checkDivider, checkVisibileIcon, NavItemApp, navItems } from '~/common/app.nav';
 
-import { BringTheLove } from './BringTheLove';
 import { optimaCloseDrawer, optimaOpenModels } from '../useOptima';
 
 
 // configuration
 const INVERT_PANE = true; // if true, the pane will be darker
-const MAX_LINKS = 1; // max number of links to show in mobile mode - the 1st is discord - stop there
 const COLOR_PANE: ColorPaletteProp = 'neutral';
 
 
@@ -123,19 +120,8 @@ export function MobileNavItems(props: { currentApp?: NavItemApp }) {
         })}
       </ButtonGroup>
 
-      {/* Group 2: Modals & Social Links */}
+      {/* Group 2: Modals */}
       <Box sx={_styles.linksGroup}>
-        <Button
-          size='sm'
-          color='neutral'
-          aria-selected={props.currentApp?.route === '/news'}
-          variant={props.currentApp?.route === '/news' ? (INVERT_PANE ? 'soft' : 'solid') : 'plain'}
-          onClick={() => handleNavigate(ROUTE_APP_NEWS, true)}
-          sx={_styles.button}
-        >
-          News
-        </Button>
-
         {/* HARDCODED: Models */}
         <Button
           size='sm'
@@ -146,17 +132,6 @@ export function MobileNavItems(props: { currentApp?: NavItemApp }) {
         >
           Models
         </Button>
-
-        {/* External links (e.g. Discord) */}
-        {navItems.links.slice(0, MAX_LINKS).map((link) => (
-          <BringTheLove
-            key={link.name}
-            text={link.name}
-            icon={link.icon}
-            link={link.href}
-            sx={_styles.button}
-          />
-        ))}
       </Box>
 
     </Sheet>

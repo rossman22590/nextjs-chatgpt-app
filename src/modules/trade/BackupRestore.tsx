@@ -21,7 +21,11 @@ import { prettyTimestampForFilenames } from '~/common/util/timeUtils';
 
 
 // configuration
-const BACKUP_FILE_FORMAT = 'Big-AGI Flash File';
+const BACKUP_FILE_FORMAT = 'Flash File';
+
+// written into new backups; older backups carry the upstream identifier and stay restorable
+const BACKUP_APPLICATION_ID = 'Ai Tutor Plus';
+const BACKUP_APPLICATION_ID_LEGACY = 'Big-AGI';
 const BACKUP_FORMAT_VERSION = '1.2';
 const BACKUP_FORMAT_VERSION_NUMBER = 102000;
 const WINDOW_RELOAD_DELAY = 300;
@@ -638,7 +642,7 @@ async function createFlashObject(backupType: 'full' | 'auto-before-restore', ign
     metadata: {
       version: BACKUP_FORMAT_VERSION,
       timestamp: new Date().toISOString(),
-      application: 'Big-AGI',
+      application: BACKUP_APPLICATION_ID,
       backupType,
     },
     storage: {
@@ -719,10 +723,10 @@ export function FlashRestore(props: { unlockRestore?: boolean }) {
         logger.warn('User selected invalid backup file format', { data: { hasMetadata: !!data?.metadata, hasStorage: !!data?.storage } }, undefined, { skipReporting: true });
         return;
       }
-      if (data.metadata.application !== 'Big-AGI') {
+      if (data.metadata.application !== BACKUP_APPLICATION_ID && data.metadata.application !== BACKUP_APPLICATION_ID_LEGACY) {
         // User selected incompatible file - this is expected, not a system error
         setRestoreState('error');
-        setErrorMessage(`Incompatible Flash file. Found application "${data.metadata.application}" but expected "Big-AGI".`);
+        setErrorMessage(`Incompatible Flash file. Found application "${data.metadata.application}" but expected "${BACKUP_APPLICATION_ID}".`);
         logger.warn('User selected incompatible backup file', { application: data.metadata.application }, undefined, { skipReporting: true });
         return;
       }
@@ -731,7 +735,7 @@ export function FlashRestore(props: { unlockRestore?: boolean }) {
       const currentSchemaVersion = BACKUP_FORMAT_VERSION_NUMBER;
       const backupSchemaVersion = data.schemaVersion || 0;
       if (backupSchemaVersion > currentSchemaVersion)
-        setSchemaVersionWarning(`WARNING: You are restoring from an newer Big-AGI version to this one. This is a DOWNGRADE and may cause data loss or application errors.`);
+        setSchemaVersionWarning(`WARNING: You are restoring from a newer app version to this one. This is a DOWNGRADE and may cause data loss or application errors.`);
       else {
         // Check for tenant slug mismatch
         const currentTenantSlug = Release.TenantSlug;
@@ -988,7 +992,7 @@ export function FlashBackup(props: {
         includeImages,
         includeSettings,
         true, // includeIndexedDB - full backup includes everything
-        `Big-AGI-${tradeFileVariant()}-flash${includeImages ? '+images' : ''}${includeSettings ? '' : '-nosets'}${event.ctrlKey ? '-download' : ''}-${dateStr}.json`,
+        `AiTutorPlus-${tradeFileVariant()}-flash${includeImages ? '+images' : ''}${includeSettings ? '' : '-nosets'}${event.ctrlKey ? '-download' : ''}-${dateStr}.json`,
       );
       setBackupState(success ? 'success' : 'idle');
     } catch (error: any) {

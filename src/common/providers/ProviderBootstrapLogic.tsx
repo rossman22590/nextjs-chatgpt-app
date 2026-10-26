@@ -4,8 +4,8 @@ import { useRouter } from 'next/router';
 import { getChatTokenCountingMethod } from '../../apps/chat/store-app-chat';
 
 import { logger } from '~/common/logger/logger.client';
-import { markNewsAsSeen, shallRedirectToNews, sherpaReconfigureBackendModels, sherpaStorageMaintenanceNoChats_delayed } from '~/common/logic/store-logic-sherpa';
-import { navigateToNews, ROUTE_APP_CHAT } from '~/common/app.routes';
+import { sherpaReconfigureBackendModels, sherpaStorageMaintenanceNoChats_delayed } from '~/common/logic/store-logic-sherpa';
+import { ROUTE_APP_CHAT } from '~/common/app.routes';
 import { preloadTiktokenLibrary } from '~/common/tokens/tokens.text';
 import { useClientLoggerInterception } from '~/common/logger/hooks/useClientLoggerInterception';
 import { useNextLoadProgress } from '~/common/components/useNextLoadProgress';
@@ -25,22 +25,11 @@ export function ProviderBootstrapLogic(props: { children: React.ReactNode }) {
 
   // [boot-up] logic
   const isOnChat = route === ROUTE_APP_CHAT;
-  const doRedirectToNews = isOnChat && shallRedirectToNews();
-
-
-  // redirect Chat -> News if fresh news
-  const isRedirectingToNews = React.useMemo(() => {
-    if (doRedirectToNews) {
-      navigateToNews().then(() => markNewsAsSeen()).catch(console.error);
-      return true;
-    }
-    return false;
-  }, [doRedirectToNews]);
 
 
   // decide what to launch
-  const launchPreload = isOnChat && !isRedirectingToNews && getChatTokenCountingMethod() === 'accurate'; // only preload if using TikToken by default
-  const launchAutoConf = isOnChat && !isRedirectingToNews;
+  const launchPreload = isOnChat && getChatTokenCountingMethod() === 'accurate'; // only preload if using TikToken by default
+  const launchAutoConf = isOnChat;
   const launchStorageGC = true;
 
 
@@ -75,13 +64,6 @@ export function ProviderBootstrapLogic(props: { children: React.ReactNode }) {
     return () => clearTimeout(timeout);
 
   }, [launchStorageGC]);
-
-  //
-  // Render Gates
-  //
-
-  if (isRedirectingToNews)
-    return null;
 
   return props.children;
 }

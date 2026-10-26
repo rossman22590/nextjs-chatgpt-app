@@ -23,8 +23,6 @@ export const Brand = {
     CardImage: 'https://img.mytsi.org/i/2wWp518.png',
     OpenRepo: 'https://myapps.ai',
     OpenProject: 'https://docs.myapps.ai',
-    SupportInvite: 'https://discord.gg/D3r3HrHHeG',
-    // Twitter: 'https://x.com/enricoros',
     PrivacyPolicy: 'https://myapps.ai',
     TermsOfService: 'https://myapps.ai',
   },

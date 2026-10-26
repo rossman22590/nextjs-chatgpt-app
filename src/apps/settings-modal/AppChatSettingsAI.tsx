@@ -168,7 +168,7 @@ export function AppChatSettingsAI() {
     <FormSelectControl<AIVndAntInlineFilesPolicy>
       title='Anthropic Files'
       tooltip={<>
-        When Claude uses tools like code execution, it may produce text and image files stored in Anthropic&apos;s File API. This setting controls whether Big-AGI should automatically download and embed them in the chat.
+        When Claude uses tools like code execution, it may produce text and image files stored in Anthropic&apos;s File API. This setting controls whether the app should automatically download and embed them in the chat.
         <ul>
           <li><b>Show</b>: keep as references.</li>
           <li><b>Embed</b>: download and embed text/images (default).</li>

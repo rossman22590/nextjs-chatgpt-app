@@ -81,7 +81,7 @@ function AppDebug() {
   const chatsCount = useChatStore.getState().conversations?.length;
   const uxLabsExperiments = Object.entries(useUXLabsStore.getState()).filter(([_k, v]) => v === true).map(([k, _]) => k).join(', ');
   const { folders, enableFolders } = useFolderStore.getState();
-  const { lastSeenNewsVersion, usageCount } = useLogicSherpaStore.getState();
+  const { usageCount } = useLogicSherpaStore.getState();
 
   // derived state
   const cClient = {
@@ -102,8 +102,6 @@ function AppDebug() {
       chatsCount,
       foldersCount: folders?.length,
       foldersEnabled: enableFolders,
-      newsCurrent: Release.Monotonics.NewsVersion,
-      newsSeen: lastSeenNewsVersion,
       labsActive: uxLabsExperiments,
       reloads: usageCount,
     },
@@ -126,7 +124,7 @@ function AppDebug() {
   const handleDownload = async () => {
     fileSave(
       new Blob([JSON.stringify({ client: cClient, agi: cProduct, backend: cBackend }, null, 2)], { type: 'application/json' }),
-      { fileName: `big-agi_debug_${prettyTimestampForFilenames()}.json`, extensions: ['.json'] },
+      { fileName: `app_debug_${prettyTimestampForFilenames()}.json`, extensions: ['.json'] },
     )
       .then(() => setSaved(true))
       .catch(e => console.error('Error saving debug.json', e));

@@ -177,7 +177,7 @@ const _xaiWebSearchOptions = [
 ] as const;
 
 const _xaiXSearchOptions = [
-  { value: 'auto', label: 'On', description: 'Active (Big-AGI default)' },
+  { value: 'auto', label: 'On', description: 'Active (app default)' },
   { value: 'off', label: 'Off', description: 'Disabled' },
 ] as const;
 

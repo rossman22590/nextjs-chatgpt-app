@@ -12,8 +12,6 @@ interface AppCallStore {
   showConversations: boolean;
   toggleShowConversations: () => void;
 
-  showSupport: boolean;
-  toggleShowSupport: () => void;
 
 }
 
@@ -26,8 +24,6 @@ export const useAppCallStore = create<AppCallStore>()(persist(
     showConversations: true,
     toggleShowConversations: () => _set(state => ({ showConversations: !state.showConversations })),
 
-    showSupport: true,
-    toggleShowSupport: () => _set(state => ({ showSupport: !state.showSupport })),
 
   }), {
     name: 'app-app-call',

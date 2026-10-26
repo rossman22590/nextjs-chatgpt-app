@@ -420,8 +420,7 @@ export function ModelsConfiguratorModal(props: {
             You&#39;ll need to <strong>provide your API credentials</strong> to use AI services.
           </Typography>
           <Typography level='body-sm' textColor='text.secondary' lineHeight='lg'>
-            Big-AGI connects directly to the latest AI models using your API keys.{' '}
-            {/*Big-AGI is a local App running on your computer.{' '}*/}
+            This app connects directly to the latest AI models using your API keys.{' '}
             {/*We want you to have access to the top models. */}
             We don&#39;t limit or bill your usage, giving you full control,
             privacy, freedom of choice and unparalleled speed.

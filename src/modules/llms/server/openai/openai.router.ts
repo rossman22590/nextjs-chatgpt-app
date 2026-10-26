@@ -207,7 +207,7 @@ export const llmOpenAIRouter = createTRPCRouter({
           ...restConfig, // includes response_format for dall-e-3 and dall-e-2 models
           model: model as any, // [LocalAI] Fix: LocalAI wants 'stablediffusion' as model name
           n: count,
-          user: config.user || 'Big-AGI',
+          user: config.user || 'AiTutorPlus',
         };
 
         // auto-selects the output image mime type - or defaults to the first one
@@ -227,7 +227,7 @@ export const llmOpenAIRouter = createTRPCRouter({
         if (quality && (quality as string) !== 'auto') requestBody.append('quality', quality);
         if (size && (size as string) !== 'auto') requestBody.append('size', size);
         // if (model === 'dall-e-2') requestBody.append('response_format', 'b64_json');
-        requestBody.append('user', user || 'Big-AGI');
+        requestBody.append('user', user || 'AiTutorPlus');
 
         // append input images
         const imagesCount = editConfig.inputImages.length;

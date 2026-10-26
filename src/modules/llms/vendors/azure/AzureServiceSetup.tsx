@@ -58,7 +58,7 @@ export function AzureServiceSetup(props: { serviceId: DModelsServiceId }) {
           See more for Azure AI Foundry.
           {checkboxExpanded && <>
             {' '}This is because the <ExternalLink href='https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio'>Azure
-            AI Foundry</ExternalLink> requires a different model definition/enumeration, which <ExternalLink icon='issue' href='https://github.com/enricoros/big-AGI/issues/757'>not supported yet</ExternalLink> (PRs welcome).
+            AI Foundry</ExternalLink> requires a different model definition/enumeration, which is not supported yet.
           </>}
           <Chip component='span' variant='outlined' sx={{ ml: 1, fontSize: '0.75rem' }} onClick={() => setCheckboxExpanded(on => !on)}>
             Show {checkboxExpanded ? 'less' : 'more'}
@@ -70,7 +70,6 @@ export function AzureServiceSetup(props: { serviceId: DModelsServiceId }) {
     <FormTextField
       autoCompleteId='azure-endpoint'
       title='Azure Endpoint'
-      description={<Link level='body-sm' href='https://github.com/enricoros/big-agi/blob/main/docs/config-azure-openai.md' target='_blank'>configuration</Link>}
       placeholder='https://your-resource.openai.azure.com'
       isError={hostError}
       value={azureEndpoint}

@@ -5,20 +5,14 @@ import CallIcon from '@mui/icons-material/Call';
 import CallOutlinedIcon from '@mui/icons-material/CallOutlined';
 import DifferenceOutlinedIcon from '@mui/icons-material/DifferenceOutlined';
 import Diversity2Icon from '@mui/icons-material/Diversity2';
-import EventNoteIcon from '@mui/icons-material/EventNote';
-import EventNoteOutlinedIcon from '@mui/icons-material/EventNoteOutlined';
 import GrainIcon from '@mui/icons-material/Grain';
 import IosShareIcon from '@mui/icons-material/IosShare';
 import IosShareOutlinedIcon from '@mui/icons-material/IosShareOutlined';
-// Link icons
-import GitHubIcon from '@mui/icons-material/GitHub';
-import { DiscordIcon } from '~/common/components/icons/3rdparty/DiscordIcon';
 // Modal icons
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
 import SettingsIcon from '@mui/icons-material/Settings';
 
 
-import { Brand } from '~/common/app.config';
 import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
 import { PhChats } from '~/common/components/icons/phosphor/PhChats';
 import { PhChatsDuotone } from '~/common/components/icons/phosphor/PhChatsDuotone';
@@ -210,16 +204,6 @@ export const navItems: {
       hideIcon: hasNoChatLinkItems,
       hideNav: hasNoChatLinkItems,
     },
-    {
-      name: 'News',
-      icon: EventNoteOutlinedIcon,
-      iconActive: EventNoteIcon,
-      type: 'app',
-      route: '/news',
-      hideBar: true,
-      hideDrawer: true,
-      hideOnMobile: true,
-    },
   ],
 
   // Modals
@@ -239,26 +223,7 @@ export const navItems: {
   ],
 
   // External links
-  links: [
-    // {
-    //   type: 'extLink',
-    //   name: 'X',
-    //   icon: TwitterIcon,
-    //   href: 'https://twitter.com',
-    // },
-    {
-      type: 'extLink',
-      name: 'Discord',
-      icon: DiscordIcon,
-      href: Brand.URIs.SupportInvite,
-    },
-    // {
-    //   type: 'extLink',
-    //   name: 'GitHub',
-    //   icon: GitHubIcon,
-    //   href: Brand.URIs.OpenRepo,
-    // },
-  ],
+  links: [],
 
 };
 

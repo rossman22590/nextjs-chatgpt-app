@@ -74,7 +74,7 @@ export function geminiAccess(access: GeminiAccessSchema, modelRefId: string | nu
   return {
     headers: {
       'Content-Type': 'application/json',
-      'x-goog-api-client': `big-agi/${packageJson['version'] || '1.0.0'}`,
+      'x-goog-api-client': `aitutorplus/${packageJson['version'] || '1.0.0'}`,
       'x-goog-api-key': geminiKey,
     },
     url: geminiHost + apiPath,

@@ -26,7 +26,7 @@ only they are AI models. And as with people,
 each AI model has its own unique perspective.
 And Beam lets you make the best of them.
 
-![big-AGI BEAM Rays](https://img.mytsi.org/i/piV9538.png)
+![BEAM Rays](https://img.mytsi.org/i/piV9538.png)
 
 `, // Let&apos;s get you to better chat answers, faster.
   },
@@ -59,7 +59,7 @@ Merging is **combining the best parts of each response** into a great, coherent 
 You can choose from various merge options, including **Fusion**, **Checklist**, **Compare**, and **Custom**.
 Experiment with different options to find the one that works best for your chat.
 
-![big-AGI BEAM Rays](https://img.mytsi.org/i/pl6j537.png)
+![BEAM Rays](https://img.mytsi.org/i/pl6j537.png)
     `, // > Merge until you have a single, high-quality response. Or choose the final response manually, skipping merge.
   },
 //   {

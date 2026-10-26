@@ -4,7 +4,6 @@ import type { SxProps } from '@mui/joy/styles/types';
 import { Avatar, Box, Card, CardContent, Chip, IconButton, Link as MuiLink, ListDivider, MenuItem, Sheet, Switch, Typography } from '@mui/joy';
 import CallIcon from '@mui/icons-material/Call';
 
-import { GitHubProjectIssueCard } from '~/common/components/GitHubProjectIssueCard';
 import { OptimaPanelGroupedList } from '~/common/layout/optima/panel/OptimaPanelGroupedList';
 import { OptimaPanelIn } from '~/common/layout/optima/portals/OptimaPortalsIn';
 import { animationShadowRingLimey } from '~/common/util/animUtils';
@@ -216,7 +215,6 @@ function ContactsMenuItems() {
   const {
     grayUI, toggleGrayUI,
     showConversations, toggleShowConversations,
-    showSupport, toggleShowSupport,
   } = useAppCallStore();
 
   return (
@@ -232,11 +230,6 @@ function ContactsMenuItems() {
         <Switch checked={showConversations} sx={{ ml: 'auto' }} />
       </MenuItem>
 
-      <MenuItem onClick={toggleShowSupport}>
-        Show Support
-        <Switch checked={showSupport} sx={{ ml: 'auto' }} />
-      </MenuItem>
-
     </OptimaPanelGroupedList>
   );
 }
@@ -246,7 +239,7 @@ export function Contacts(props: { setCallIntent: (intent: AppCallIntent) => void
 
   // external state
   const { personas } = useMockPersonas();
-  const { grayUI, showConversations, showSupport } = useAppCallStore();
+  const { grayUI, showConversations } = useAppCallStore();
   const conversationsByPersona = useConversationsByPersona();
 
 
@@ -310,22 +303,6 @@ export function Contacts(props: { setCallIntent: (intent: AppCallIntent) => void
         />,
       )}
     </Box>
-
-    {showSupport && <ListDivider sx={{ my: 1 }} />}
-
-    {showSupport && <GitHubProjectIssueCard
-      issue={354}
-      text='Call App: Support thread and compatibility matrix'
-      note={<>
-        Voice input uses the HTML Web Speech API.
-      </>}
-      // note2='Please report any issues you encounter'
-      sx={{
-        width: '100%',
-        mb: 2,
-        mt: 5,
-      }}
-    />}
 
   </>;
 }

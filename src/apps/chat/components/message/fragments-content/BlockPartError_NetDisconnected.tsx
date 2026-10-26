@@ -93,7 +93,6 @@ export function BlockPartError_NetDisconnected(props: {
             <Box component='ul' sx={{ color: 'text.secondary' }}>
               <li>Check your internet connection and try again</li>
               <li>The AI service may be experiencing issues - wait a moment and retry</li>
-              <li>If the issue persists, please let us know promptly on Discord or GitHib</li>
             </Box>
           </div>
         )}
