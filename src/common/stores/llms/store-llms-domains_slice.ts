@@ -4,11 +4,11 @@ import type { ModelVendorId } from '~/modules/llms/vendors/vendors.registry';
 
 import type { DModelDomainId } from './model.domains.types';
 import type { DModelParameterValues } from './llms.parameters';
-import { DLLM, DLLMId, isLLMHidden, isLLMVisible } from './llms.types';
+import { DLLM, DLLMId, DModelInterfaceV1, isLLMHidden, isLLMVisible } from './llms.types';
 import { LlmsRootState, useModelsStore } from './store-llms';
 import { ModelDomainsList, ModelDomainsRegistry } from './model.domains.registry';
 import { createDModelConfiguration, DModelConfiguration } from './modelconfiguration.types';
-import { llmsEditorialPickForDomain } from './model.domains.editorial';
+import { llmsEditorial_ModelIdForDomain_SLOW } from './model.domains.editorial';
 import { type DPricingChatGenerate, getLlmCostForTokens, llmChatPricing_adjusted } from './llms.pricing';
 
 
@@ -223,16 +223,19 @@ export function llmsAssignmentsPruneStale(universe: ReadonlyArray<DLLM>, existin
 
 export function createDModelConfigurationAuto(domainId: DModelDomainId, modelParameters: DModelParameterValues | undefined): DModelConfiguration | undefined {
   const { llms } = useModelsStore.getState();
-  const autoLLMId = llmsAssignmentsAutoModelId(domainId, llms);
+  const autoLLMId = llmsAuto_ModelIdForDomain_SLOW(domainId, llms);
   return !autoLLMId ? undefined : createDModelConfiguration(domainId, autoLLMId, modelParameters);
 }
 
 
 // Public - Strategies
 
-function _allowedDomainLlms(domainSpec: typeof ModelDomainsRegistry[DModelDomainId], universe: ReadonlyArray<DLLM>): ReadonlyArray<DLLM> {
-  if (domainSpec?.requiredInterfaces?.length) {
-    const reqIfs = domainSpec.requiredInterfaces;
+function _allowedDomainLlmsOrUniverse<TLlm extends Pick<DLLM, 'interfaces'>>(
+  requiredInterfaces: undefined | ReadonlyArray<DModelInterfaceV1>,
+  universe: ReadonlyArray<TLlm>,
+): ReadonlyArray<TLlm> {
+  if (requiredInterfaces?.length) {
+    const reqIfs = requiredInterfaces;
     const subset = universe.filter(llm => reqIfs.every(reqIf => llm.interfaces.includes(reqIf)));
     // only apply filter if we have at least one matching model
     if (subset.length > 0 && subset.length < universe.length)
@@ -241,27 +244,38 @@ function _allowedDomainLlms(domainSpec: typeof ModelDomainsRegistry[DModelDomain
   return universe;
 }
 
-export function llmsAssignmentsAutoModelId(domainId: DModelDomainId, universe: ReadonlyArray<DLLM>): DLLMId | undefined {
+/**
+ * Auto pick for a domain: the id of a model in `universe` (so it exists), or undefined when none fits.
+ *
+ * Layers, in order:
+ * 1. narrow `universe` to the domain's `requiredInterfaces` - relaxed to the full universe when nothing matches
+ * 2. editorial picks, for the domain then its `editorialFallbackDomain` (see model.domains.editorial.ts)
+ * 3. the domain's `autoStrategy` over the ELO-ranked, non-hidden models; `chatPinLlmId`, the user's chat pin, is the
+ *    cost strategy's pick on a winning vendor that has nothing rated or priced, when it is one of that vendor's candidates
+ *
+ * Pure in its arguments and uncached: the hooks and getters reach it through llmsResolvedModelDomain's cache.
+ */
+export function llmsAuto_ModelIdForDomain_SLOW<Tllm extends DLLM>(domainId: DModelDomainId, universe: ReadonlyArray<Tllm>, chatPinLlmId?: DLLMId): DLLMId | undefined {
 
-  // Narrow LLMs based on required interfaces, but relax the filter if none matches
+  // Narrow universe based on required interfaces (if required), but relax the filter if none matches
   const domainSpec = ModelDomainsRegistry[domainId];
-  const allowedLlms = _allowedDomainLlms(domainSpec, universe);
-
-  // Grouped ELO ranking
-  const vendors = _groupLlmsByVendorRankedByElo(allowedLlms);
+  universe = _allowedDomainLlmsOrUniverse(domainSpec?.requiredInterfaces, universe);
 
   // Editorial layer: prefer hand-curated favorites first (precedence is editorial-defined, see model.domains.editorial.ts)
-  const editorialPick = llmsEditorialPickForDomain(domainId, allowedLlms, domainSpec?.editorialFallbackDomain);
+  const editorialPick: DLLMId | undefined = llmsEditorial_ModelIdForDomain_SLOW(
+    [domainId, domainSpec?.editorialFallbackDomain].filter(d => !!d),
+    universe,
+  );
   if (editorialPick) return editorialPick;
 
   // Apply the domain selection strategy
   switch (domainSpec?.autoStrategy) {
 
     case 'topVendorTopLlm':
-      return _strategyTopQuality(vendors);
+      return _strategyTopQuality(_groupLlmsByVendorRankedByElo(universe));
 
     case 'topVendorLowestCost':
-      return _strategyTopVendorLowestCost(vendors);
+      return _strategyTopVendorLowestCost(_groupLlmsByVendorRankedByElo(universe), chatPinLlmId);
 
     default:
       console.log('[DEV] unknown strategy for LLM domain', domainId);
@@ -277,7 +291,7 @@ function _strategyTopQuality(vendors: PreferredRankedVendors): DLLMId | undefine
   return vendors.length ? vendors[0].llmsByElo[0]?.id : undefined;
 }
 
-function _strategyTopVendorLowestCost(vendors: PreferredRankedVendors, requireEloRating: boolean = true): DLLMId | undefined {
+function _strategyTopVendorLowestCost(vendors: PreferredRankedVendors, chatPinLlmId: DLLMId | undefined): DLLMId | undefined {
 
   // based on the assumption that the lowest (but non-zero) cost will happen for:
   // - newest models
@@ -299,14 +313,18 @@ function _strategyTopVendorLowestCost(vendors: PreferredRankedVendors, requireEl
     });
 
     // get the first that has cbaElo, assuming those are more 'social proofed' models
-    if (requireEloRating) {
-      const firstWithElo = sorted.find(llm => llm.cbaElo);
-      if (firstWithElo)
-        return firstWithElo.id;
-    }
+    const firstWithElo = sorted.find(llm => llm.cbaElo);
+    if (firstWithElo)
+      return firstWithElo.id;
 
-    if (sorted.length && sorted[0].id)
+    // else the cheapest priced
+    if (sorted[0]?.costRank)
       return sorted[0].id;
+
+    // nothing rated or priced: the listing order is no basis (hosts whose ids carry no data were measured listing an
+    // image or a speech model first), so the user's chat pin wins if it is one of this vendor's candidates
+    if (sorted.length && sorted[0].id)
+      return sorted.find(llm => llm.id === chatPinLlmId)?.id ?? sorted[0].id;
   }
   return undefined;
 }
@@ -314,7 +332,7 @@ function _strategyTopVendorLowestCost(vendors: PreferredRankedVendors, requireEl
 
 // Private - LLM ELO Ranking functions
 
-function _groupLlmsByVendorRankedByElo(llms: ReadonlyArray<DLLM>): PreferredRankedVendors {
+function _groupLlmsByVendorRankedByElo<Tllm extends Pick<DLLM, 'id' | 'vId' | 'benchmark' | 'pricing' | 'userPricing' | 'hidden' | 'userHidden' | 'parameterSpecs' | 'initialParameters' | 'userParameters'>>(llms: ReadonlyArray<Tllm>): PreferredRankedVendors {
   // group all LLMs by vendor
   const grouped = llms.reduce((acc, llm) => {
     if (isLLMHidden(llm)) return acc;

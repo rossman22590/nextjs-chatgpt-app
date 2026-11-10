@@ -7,11 +7,11 @@ import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 
 import type { DModelDomainId } from '~/common/stores/llms/model.domains.types';
 import { BaseProduct } from '~/common/app.release';
-import { AIVndAntInlineFilesPolicy, useAIPreferencesStore } from '~/common/stores/store-ai';
+import { AIVndAntInlineFilesPolicy, AIVndGeminiVertexLinksPolicy, useAIPreferencesStore } from '~/common/stores/store-ai';
 import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
 import { FormSelectControl, FormSelectOption } from '~/common/components/forms/FormSelectControl';
 import { useLLMSelect } from '~/common/components/forms/useLLMSelect';
-import { useModelDomain } from '~/common/stores/llms/hooks/useModelDomain';
+import { useModelDomain, useModelDomainAutoModelLabel } from '~/common/stores/llms/hooks/useModelDomain';
 
 import type { ChatThinkingPolicy, TokenCountingMethod } from '../chat/store-app-chat';
 import { useChatAutoAI } from '../chat/store-app-chat';
@@ -39,6 +39,12 @@ const _vndAntInlineFilesOptions: FormSelectOption<AIVndAntInlineFilesPolicy>[] =
   { value: 'off', label: 'Show', description: 'Keep as links' },
   { value: 'inline-file', label: 'Embed', description: 'Default, embed in chat' },
   { value: 'inline-file-and-delete', label: 'Embed + Free', description: 'Embed, then free' },
+  { value: 'discard', label: 'Discard', description: 'Free, never embed' },
+] as const;
+
+const _vndGeminiVertexLinksOptions: FormSelectOption<AIVndGeminiVertexLinksPolicy>[] = [
+  { value: 'as-is', label: 'As-Is', description: 'Keep redirect URLs' },
+  { value: 'resolve', label: 'Resolve', description: 'Show destination URLs' },
 ] as const;
 
 const _tokenCountingMethodOptions: FormSelectOption<TokenCountingMethod>[] = [
@@ -63,7 +69,8 @@ function FormControlDomainModel(props: {
 }) {
 
   // external state
-  const { domainModelId, assignDomainModelId, assignDomainModelAuto, resolvedModelIsAuto, autoModelLabel } = useModelDomain(props.domainId);
+  const { domainModelId, assignDomainModelId, assignDomainModelAuto, resolvedModelIsAuto } = useModelDomain(props.domainId);
+  const autoModelLabel = useModelDomainAutoModelLabel(props.domainId);
   const [_llm, llmComponent] = useLLMSelect(domainModelId, assignDomainModelId, {
     label: '',
     setLlmToAuto: assignDomainModelAuto,
@@ -96,6 +103,7 @@ export function AppChatSettingsAI() {
     tokenCountingMethod, setTokenCountingMethod,
   } = useChatAutoAI();
   const vndAntInlineFiles = useAIPreferencesStore(state => state.vndAntInlineFiles);
+  const vndGeminiVertexLinks = useAIPreferencesStore(state => state.vndGeminiVertexLinks);
 
   const showModelIcons = false; // useUIComplexityMode() === 'extra';
 
@@ -175,12 +183,21 @@ export function AppChatSettingsAI() {
           <li><b>Show</b>: keep as references.</li>
           <li><b>Embed</b>: download and embed text/images (default).</li>
           <li><b>Embed + Free</b>: embed, then delete from Anthropic to free storage.</li>
+          <li><b>Discard</b>: delete from Anthropic without embedding; the file stays in the code sandbox for the model.</li>
         </ul>
         Only affects Anthropic models.
       </>}
       options={_vndAntInlineFilesOptions}
       value={vndAntInlineFiles}
       onChange={useAIPreferencesStore.getState().setVndAntInlineFiles}
+    />
+
+    <FormSelectControl<AIVndGeminiVertexLinksPolicy>
+      title='Vertex AI Links'
+      tooltip='Resolve Google redirect links in live search steps and save destination URLs when a message completes. Sends requests to Google’s redirect service. Failed or expired links stay unchanged.'
+      options={_vndGeminiVertexLinksOptions}
+      value={vndGeminiVertexLinks}
+      onChange={useAIPreferencesStore.getState().setVndGeminiVertexLinks}
     />
 
     <ListDivider inset='gutter'>Automatic AI Functions</ListDivider>
@@ -221,7 +238,7 @@ export function AppChatSettingsAI() {
         title='Generative UIs'
         description={autoSuggestHTMLUI ? 'Add HTML' : 'Off'}
         tooltipWarning={autoSuggestHTMLUI}
-        tooltip={<>
+        tooltip={!autoSuggestHTMLUI ? undefined : <>
           [Coding model] Creates interactive UI components within chat responses when appropriate.
           <hr />
           SECURITY WARNING: THIS TURNS ON JS/HTML CODE EXECUTION WITHIN CHAT MESSAGES

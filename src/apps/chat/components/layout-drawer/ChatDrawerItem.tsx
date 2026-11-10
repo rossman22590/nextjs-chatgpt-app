@@ -1,6 +1,7 @@
 import * as React from 'react';
 
 import { Avatar, Box, IconButton, ListItem, ListItemButton, ListItemDecorator, Sheet, styled, Tooltip, Typography } from '@mui/joy';
+import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CopyAllIcon from '@mui/icons-material/CopyAll';
@@ -16,14 +17,10 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { autoConversationTitle } from '~/modules/aifn/autotitle/autoTitle';
 import { getSystemPurpose } from '~/modules/persona/system-personas.catalog';
 
-import {
-  type ConversationPurposeId,
-  type DConversationId,
-  getPersonaIdFromPurposeId,
-  isCustomPersonaPurposeId,
-} from '~/common/stores/chat/chat.conversation';
+import { type ConversationPurposeId, type DConversationId, getPersonaIdFromPurposeId, isCustomPersonaPurposeId } from '~/common/stores/chat/chat.conversation';
 import { usePersonaCacheStore } from '~/common/stores/chat/store-persona-cache';
 import type { DFolder } from '~/common/stores/folders/store-chat-folders';
+import type { FolderChangeRequest } from '~/common/components/folders/FoldersSelectPopup';
 import { ANIM_BUSY_TYPING } from '~/common/util/dMessageUtils';
 import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
 import { InlineTextarea } from '~/common/components/InlineTextarea';
@@ -32,8 +29,25 @@ import { useChatStore } from '~/common/stores/chat/store-chats';
 
 import { CHAT_NOVEL_TITLE } from '../../AppChat';
 
+
 // set to true to display the conversation IDs
 // const DEBUG_CONVERSATION_IDS = false;
+
+
+// title text: mobile (< md) stays on one ellipsized line; desktop wraps, up to 3 tight lines
+const _titleTextSx = {
+  flexGrow: 1,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: { xs: 'nowrap', md: 'normal' },
+  overflowWrap: 'anywhere',
+  display: { md: '-webkit-box' },
+  WebkitLineClamp: 3,
+  lineHeight: 'xs',
+  my: 0.5, // air for wrapped titles (margin, not padding: padding would reveal the clamped line)
+  WebkitBoxOrient: 'vertical',
+} as const;
+
 
 export const FadeInButton = styled(IconButton)({
   opacity: 0.5,
@@ -41,22 +55,21 @@ export const FadeInButton = styled(IconButton)({
   '&:hover': { opacity: 1 },
 });
 
-export const ChatDrawerItemMemo = React.memo(
-  ChatDrawerItem,
-  (prev, next) =>
-    // usign a custom function because `ChatNavigationItemData` is a complex object and memo won't work
-    isDeepEqual(prev.item, next.item) &&
-    prev.showSymbols === next.showSymbols &&
-    prev.bottomBarBasis === next.bottomBarBasis &&
-    prev.onConversationActivate === next.onConversationActivate &&
-    prev.onConversationBranch === next.onConversationBranch &&
-    prev.onConversationDeleteNoConfirmation === next.onConversationDeleteNoConfirmation &&
-    prev.onConversationExport === next.onConversationExport &&
-    prev.onConversationFolderChange === next.onConversationFolderChange,
+
+export const ChatDrawerItemMemo = React.memo(ChatDrawerItem, (prev, next) =>
+  // usign a custom function because `ChatNavigationItemData` is a complex object and memo won't work
+  isDeepEqual(prev.item, next.item) &&
+  prev.showSymbols === next.showSymbols &&
+  prev.bottomBarBasis === next.bottomBarBasis &&
+  prev.onConversationActivate === next.onConversationActivate &&
+  prev.onConversationBranch === next.onConversationBranch &&
+  prev.onConversationDeleteNoConfirmation === next.onConversationDeleteNoConfirmation &&
+  prev.onConversationExport === next.onConversationExport &&
+  prev.onConversationFolderChange === next.onConversationFolderChange,
 );
 
 export interface ChatNavigationItemData {
-  type: 'nav-item-chat-data';
+  type: 'nav-item-chat-data',
   conversationId: DConversationId;
   isActive: boolean;
   isAlsoOpen: string | false;
@@ -77,23 +90,18 @@ export interface ChatNavigationItemData {
   searchFrequency: number;
 }
 
-export interface FolderChangeRequest {
-  conversationId: DConversationId;
-  anchorEl: HTMLButtonElement;
-  currentFolder: DFolder | null;
-}
-
 function ChatDrawerItem(props: {
   // NOTE: always update the Memo comparison if you add or remove props
-  item: ChatNavigationItemData;
-  showSymbols: boolean | 'gif';
-  bottomBarBasis: number;
-  onConversationActivate: (conversationId: DConversationId, closeMenu: boolean) => void;
-  onConversationBranch: (conversationId: DConversationId, messageId: string | null, addSplitPane: boolean) => void;
-  onConversationDeleteNoConfirmation: (conversationId: DConversationId) => void;
-  onConversationExport: (conversationId: DConversationId, exportAll: boolean) => void;
-  onConversationFolderChange: (folderChangeRequest: FolderChangeRequest) => void;
+  item: ChatNavigationItemData,
+  showSymbols: boolean | 'gif',
+  bottomBarBasis: number,
+  onConversationActivate: (conversationId: DConversationId, closeMenu: boolean) => void,
+  onConversationBranch: (conversationId: DConversationId, messageId: string | null, addSplitPane: boolean) => void,
+  onConversationDeleteNoConfirmation: (conversationId: DConversationId) => void,
+  onConversationExport: (conversationId: DConversationId, exportAll: boolean) => void,
+  onConversationFolderChange: (folderChangeRequest: FolderChangeRequest) => void,
 }) {
+
   // state
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const [isAutoEditingTitle, setIsAutoEditingTitle] = React.useState(false);
@@ -120,49 +128,55 @@ function ChatDrawerItem(props: {
   } = props.item;
   const isNew = messageCount === 0;
 
+
   // [effect] auto-disarm when inactive
   const shallClose = deleteArmed && !isActive;
   React.useEffect(() => {
-    if (shallClose) setDeleteArmed(false);
+    if (shallClose)
+      setDeleteArmed(false);
   }, [shallClose]);
+
 
   // Activate
 
   const handleConversationActivate = () => props.onConversationActivate(conversationId, true);
 
+
   // branch
 
-  const handleConversationBranch = React.useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation();
-      conversationId && onConversationBranch(conversationId, null, false /* no pane from Drawer duplicate */);
-    },
-    [conversationId, onConversationBranch],
-  );
+  const handleConversationBranch = React.useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    conversationId && onConversationBranch(conversationId, null, false /* no pane from Drawer duplicate */);
+  }, [conversationId, onConversationBranch]);
+
 
   // export
 
-  const handleConversationExport = React.useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation();
-      conversationId && onConversationExport(conversationId, false);
-    },
-    [conversationId, onConversationExport],
-  );
+  const handleConversationExport = React.useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    conversationId && onConversationExport(conversationId, false);
+  }, [conversationId, onConversationExport]);
+
 
   // Folder change
 
-  const handleFolderChangeBegin = React.useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation();
-      onConversationFolderChange({
-        conversationId,
-        anchorEl: event.currentTarget,
-        currentFolder: folder ?? null,
-      });
-    },
-    [conversationId, folder, onConversationFolderChange],
-  );
+  const handleFolderChangeBegin = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onConversationFolderChange({
+      conversationId,
+      anchorEl: event.currentTarget,
+      currentFolder: folder ?? null,
+    });
+  }, [conversationId, folder, onConversationFolderChange]);
+
+
+  // Archive
+
+  const handleConversationArchive = React.useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    useChatStore.getState().setArchived(conversationId, true);
+  }, [conversationId]);
+
 
   // Title Edit
 
@@ -172,13 +186,10 @@ function ChatDrawerItem(props: {
     setIsEditingTitle(false);
   }, []);
 
-  const handleTitleEditChange = React.useCallback(
-    (text: string) => {
-      setIsEditingTitle(false);
-      useChatStore.getState().setUserTitle(conversationId, text.trim());
-    },
-    [conversationId],
-  );
+  const handleTitleEditChange = React.useCallback((text: string) => {
+    setIsEditingTitle(false);
+    useChatStore.getState().setUserTitle(conversationId, text.trim());
+  }, [conversationId]);
 
   const handleTitleEditAuto = React.useCallback(async () => {
     setIsAutoEditingTitle(true);
@@ -186,173 +197,136 @@ function ChatDrawerItem(props: {
     setIsAutoEditingTitle(false);
   }, [conversationId]);
 
+
   // Delete
 
   const { onConversationDeleteNoConfirmation } = props;
-  const handleDeleteButtonShow = React.useCallback(
-    (event: React.MouseEvent) => {
-      // special case: if 'Shift' is pressed, delete immediately
-      if (event.shiftKey) {
-        // immediately delete:conversation
-        event.stopPropagation();
-        onConversationDeleteNoConfirmation(conversationId);
-        return;
-      }
-      setDeleteArmed(true);
-    },
-    [conversationId, onConversationDeleteNoConfirmation],
-  );
+  const handleDeleteButtonShow = React.useCallback((event: React.MouseEvent) => {
+    // special case: if 'Shift' is pressed, delete immediately
+    if (event.shiftKey) { // immediately delete:conversation
+      event.stopPropagation();
+      onConversationDeleteNoConfirmation(conversationId);
+      return;
+    }
+    setDeleteArmed(true);
+  }, [conversationId, onConversationDeleteNoConfirmation]);
 
   const handleDeleteButtonHide = React.useCallback(() => setDeleteArmed(false), []);
 
-  const handleConversationDelete = React.useCallback(
-    (event: React.MouseEvent) => {
-      if (deleteArmed) {
-        setDeleteArmed(false);
-        event.stopPropagation();
-        onConversationDeleteNoConfirmation(conversationId);
-      }
-    },
-    [conversationId, deleteArmed, onConversationDeleteNoConfirmation],
-  );
+  const handleConversationDelete = React.useCallback((event: React.MouseEvent) => {
+    if (deleteArmed) {
+      setDeleteArmed(false);
+      event.stopPropagation();
+      onConversationDeleteNoConfirmation(conversationId);
+    }
+  }, [conversationId, deleteArmed, onConversationDeleteNoConfirmation]);
 
-  const cachedPersona = isCustomPersonaPurposeId(systemPurposeId)
-    ? usePersonaCacheStore.getState().getPersona(getPersonaIdFromPurposeId(systemPurposeId) ?? '')
-    : undefined;
+
+  const cachedPersona = isCustomPersonaPurposeId(systemPurposeId) ? usePersonaCacheStore.getState().getPersona(getPersonaIdFromPurposeId(systemPurposeId) ?? '') : undefined;
   const systemPurpose = !isCustomPersonaPurposeId(systemPurposeId) ? getSystemPurpose(systemPurposeId) : null;
   const personaSymbol = userSymbol || cachedPersona?.symbol || systemPurpose?.symbol || '❓';
   const personaImageURI = systemPurpose?.imageUri ?? undefined;
 
-  const progress = props.bottomBarBasis ? (100 * (searchFrequency || messageCount)) / props.bottomBarBasis : 0;
 
-  const titleRowComponent = React.useMemo(
-    () => (
-      <>
-        {/* Symbol, if globally enabled */}
-        {(props.showSymbols || isIncognito) && (
-          <ListItemDecorator>
-            {hasBeamOpen ? (
-              <ChatBeamIcon sx={{ fontSize: 'xl' }} />
-            ) : isIncognito ? (
-              <Avatar variant="soft" sx={{ backgroundColor: `#9C27B022`, width: '1.5rem', height: '1.5rem' }}>
-                <VisibilityOffIcon sx={{ fontSize: 'md', color: `#9C27B0` }} />
-              </Avatar>
-            ) : beingGenerated && props.showSymbols === 'gif' ? (
-              <Avatar
-                alt="chat activity"
-                variant="plain"
-                src={ANIM_BUSY_TYPING}
-                sx={{
-                  width: '1.5rem',
-                  height: '1.5rem',
-                  borderRadius: 'var(--joy-radius-sm)',
-                }}
-              />
-            ) : beingGenerated ? (
-              <TelegramIcon sx={{ fontSize: 'xl' }} />
-            ) : personaImageURI && props.showSymbols === 'gif' ? (
-              <Avatar
-                alt={personaSymbol}
-                src={personaImageURI}
-                sx={{
-                  width: '1.5rem',
-                  height: '1.5rem',
-                  borderRadius: 'var(--joy-radius-sm)',
-                }}
-              />
-            ) : (
-              <Typography sx={isNew ? { opacity: 0.4, filter: 'grayscale(0.75)' } : undefined}>{personaSymbol}</Typography>
-            )}
-          </ListItemDecorator>
-        )}
+  const progress = props.bottomBarBasis ? 100 * (searchFrequency || messageCount) / props.bottomBarBasis : 0;
 
-        {/* Title */}
-        {!isEditingTitle ? (
-          // using Box to not reset the parent font scaling
-          <Box
-            onDoubleClick={handleTitleEditBegin}
+  const titleRowComponent = React.useMemo(() => <>
+
+    {/* Symbol, if globally enabled */}
+    {(props.showSymbols || isIncognito) && (
+      <ListItemDecorator>
+        {hasBeamOpen ? (
+          <ChatBeamIcon sx={{ fontSize: 'xl' }} />
+        ) : isIncognito ? (
+          <Avatar variant='soft' sx={{ backgroundColor: `#9C27B022`, width: '1.5rem', height: '1.5rem' }}>
+            <VisibilityOffIcon sx={{ fontSize: 'md', color: `#9C27B0` }} />
+          </Avatar>
+        ) : (beingGenerated && props.showSymbols === 'gif') ? (
+          <Avatar
+            alt='chat activity'
+            variant='plain'
+            src={ANIM_BUSY_TYPING}
             sx={{
-              color: isActive ? 'text.primary' : 'text.secondary',
-              overflowWrap: 'anywhere',
-              flex: 1,
-            }}
-          >
-            {/*{DEBUG_CONVERSATION_IDS && `${conversationId} - `}*/}
-            {title.trim() ? title : CHAT_NOVEL_TITLE}
-            {beingGenerated && ' ...'}
-          </Box>
-        ) : (
-          <InlineTextarea
-            invertedColors
-            initialText={title}
-            onEdit={handleTitleEditChange}
-            onCancel={handleTitleEditCancel}
-            sx={{
-              flexGrow: 1,
-              ml: -1.5,
-              mr: -0.5,
+              width: '1.5rem',
+              height: '1.5rem',
+              borderRadius: 'var(--joy-radius-sm)',
             }}
           />
-        )}
-
-        {/* Right text */}
-        {searchFrequency > 0 ? (
-          // Display search frequency if it exists and is greater than 0
-          <Typography level="body-sm">{Math.round(searchFrequency * 10) / 10}</Typography>
-        ) : props.showSymbols && (userFlagsSummary || containsDocAttachments || containsImageAssets) ? (
-          <Box
+        ) : beingGenerated ? (
+          <TelegramIcon sx={{ fontSize: 'xl' }} />
+        ) : (personaImageURI && props.showSymbols === 'gif') ? (
+          <Avatar
+            alt={personaSymbol}
+            src={personaImageURI}
             sx={{
-              fontSize: 'xs',
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
+              width: '1.5rem',
+              height: '1.5rem',
+              borderRadius: 'var(--joy-radius-sm)',
             }}
-          >
-            {userFlagsSummary}
-            {containsDocAttachments && '📄'}
-            {containsImageAssets && '🖍️'}
-          </Box>
-        ) : null}
-      </>
-    ),
-    [
-      beingGenerated,
-      containsDocAttachments,
-      containsImageAssets,
-      handleTitleEditBegin,
-      handleTitleEditCancel,
-      handleTitleEditChange,
-      hasBeamOpen,
-      isActive,
-      isEditingTitle,
-      isIncognito,
-      isNew,
-      personaImageURI,
-      personaSymbol,
-      props.showSymbols,
-      searchFrequency,
-      title,
-      userFlagsSummary,
-    ],
-  );
+          />
+        ) : (
+          <Typography sx={isNew ? { opacity: 0.4, filter: 'grayscale(0.75)' } : undefined}>
+            {personaSymbol}
+          </Typography>
+        )}
+      </ListItemDecorator>
+    )}
 
-  const progressBarFixedComponent = React.useMemo(
-    () =>
-      progress > 0 && (
-        <Box
-          sx={{
-            backgroundColor: 'neutral.softHoverBg',
-            position: 'absolute',
-            left: 0,
-            bottom: 0,
-            width: progress + '%',
-            height: 4,
-          }}
-        />
-      ),
-    [progress],
-  );
+    {/* Title */}
+    {!isEditingTitle ? (
+      // using Box to not reset the parent font scaling
+      <Box
+        onDoubleClick={handleTitleEditBegin}
+        sx={{
+          ..._titleTextSx,
+          color: isActive ? 'text.primary' : 'text.secondary',
+        }}
+      >
+        {/*{DEBUG_CONVERSATION_IDS && `${conversationId} - `}*/}
+        {title.trim() ? title : CHAT_NOVEL_TITLE}{beingGenerated && ' ...'}
+      </Box>
+    ) : (
+      <InlineTextarea
+        invertedColors
+        maxRows={3} // long titles scroll within ~3 rows instead of making the row very tall
+        initialText={title}
+        onEdit={handleTitleEditChange}
+        onCancel={handleTitleEditCancel}
+        sx={{
+          flexGrow: 1,
+          ml: -1.5, mr: -0.5,
+        }}
+      />
+    )}
 
-  return isActive || isAlsoOpen ? (
+    {/* Right text */}
+    {searchFrequency > 0 ? (
+      // Display search frequency if it exists and is greater than 0
+      <Typography level='body-sm'>
+        {Math.round(searchFrequency * 10) / 10}
+      </Typography>
+    ) : (props.showSymbols && (userFlagsSummary || containsDocAttachments || containsImageAssets)) ? (
+      <Box sx={{
+        fontSize: 'xs',
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+      }}>
+        {userFlagsSummary}{containsDocAttachments && '📄'}{containsImageAssets && '🖍️'}
+      </Box>
+    ) : null}
+
+  </>, [beingGenerated, containsDocAttachments, containsImageAssets, handleTitleEditBegin, handleTitleEditCancel, handleTitleEditChange, hasBeamOpen, isActive, isEditingTitle, isIncognito, isNew, personaImageURI, personaSymbol, props.showSymbols, searchFrequency, title, userFlagsSummary]);
+
+  const progressBarFixedComponent = React.useMemo(() =>
+    progress > 0 && (
+      <Box sx={{
+        backgroundColor: 'neutral.softHoverBg',
+        position: 'absolute', left: 0, bottom: 0, height: 4,
+      }} style={{ width: progress + '%' /* per search keystroke: style, not sx */ }} />
+    ), [progress]);
+
+  return (isActive || isAlsoOpen) ? (
+
     // Active or Also Open
     <Sheet
       aria-current={isActive ? 'true' : undefined}
@@ -365,14 +339,12 @@ function ChatDrawerItem(props: {
         '--ListItem-minHeight': '2.75rem',
 
         // differences between primary and secondary variants
-        ...(isActive
-          ? {
-              border: 'none', // there's a default border of 1px and invisible.. hmm
-            }
-          : {
-              // '--variant-borderWidth': '0.125rem',
-              cursor: 'pointer',
-            }),
+        ...(isActive ? {
+          border: 'none', // there's a default border of 1px and invisible.. hmm
+        } : {
+          // '--variant-borderWidth': '0.125rem',
+          cursor: 'pointer',
+        }),
 
         // style
         fontSize: 'inherit',
@@ -405,65 +377,72 @@ function ChatDrawerItem(props: {
         }),
       }}
     >
+
       <ListItem sx={{ border: 'none', display: 'grid', gap: 0, px: 'calc(var(--ListItem-paddingX) - 0.25rem)' }}>
+
         {/* Title row */}
-        <Box sx={{ display: 'flex', gap: 'var(--ListItem-gap)', minHeight: '2.25rem', alignItems: 'center' }}>{titleRowComponent}</Box>
+        <Box sx={{ display: 'flex', gap: 'var(--ListItem-gap)', minWidth: 0, minHeight: '2.25rem', alignItems: 'center' }}>
+          {titleRowComponent}
+        </Box>
 
         {/* buttons row */}
         {isActive && (
-          <Box sx={{ display: 'flex', gap: 0.5, minHeight: '2.25rem', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, minHeight: '2.25rem', alignItems: 'center' }}>
             {props.showSymbols && <ListItemDecorator />}
 
             {/* Current Folder color, and change initiator */}
-            {!deleteArmed && (
-              <>
-                {folder !== undefined && (
-                  <>
-                    <Tooltip arrow disableInteractive title={folder ? `Change Folder (${folder.title})` : 'Add to Folder'}>
-                      {folder ? (
-                        <IconButton size="sm" onClick={handleFolderChangeBegin}>
-                          <FolderIcon style={{ color: folder.color || 'inherit' }} />
-                        </IconButton>
-                      ) : (
-                        <FadeInButton size="sm" onClick={handleFolderChangeBegin}>
-                          <FolderOutlinedIcon />
-                        </FadeInButton>
-                      )}
-                    </Tooltip>
+            {!deleteArmed && <>
+              {(folder !== undefined) && <>
+                <Tooltip arrow disableInteractive title={folder ? `Change Folder (${folder.title})` : 'Add to Folder'}>
+                  {folder ? (
+                    <IconButton size='sm' onClick={handleFolderChangeBegin}>
+                      <FolderIcon style={{ color: folder.color || 'inherit' }} />
+                    </IconButton>
+                  ) : (
+                    <FadeInButton size='sm' onClick={handleFolderChangeBegin}>
+                      <FolderOutlinedIcon />
+                    </FadeInButton>
+                  )}
+                </Tooltip>
 
-                    {/*<Divider orientation='vertical' sx={{ my: 1, opacity: 0.5 }} />*/}
-                  </>
-                )}
+                {/*<Divider orientation='vertical' sx={{ my: 1, opacity: 0.5 }} />*/}
+              </>}
 
-                <Tooltip arrow disableInteractive title="Rename">
-                  <FadeInButton size="sm" disabled={isEditingTitle || isAutoEditingTitle} onClick={handleTitleEditBegin}>
-                    <EditRoundedIcon />
+              <Tooltip arrow disableInteractive title='Rename'>
+                <FadeInButton size='sm' disabled={isEditingTitle || isAutoEditingTitle} onClick={handleTitleEditBegin}>
+                  <EditRoundedIcon />
+                </FadeInButton>
+              </Tooltip>
+
+              {!isNew && <>
+                <Tooltip arrow disableInteractive color='success' title='Auto-Title'>
+                  <FadeInButton size='sm' disabled={isEditingTitle || isAutoEditingTitle} onClick={handleTitleEditAuto}>
+                    <AutoFixHighIcon />
                   </FadeInButton>
                 </Tooltip>
 
-                {!isNew && (
-                  <>
-                    <Tooltip arrow disableInteractive color="success" title="Auto-Title">
-                      <FadeInButton size="sm" disabled={isEditingTitle || isAutoEditingTitle} onClick={handleTitleEditAuto}>
-                        <AutoFixHighIcon />
-                      </FadeInButton>
-                    </Tooltip>
+                <Tooltip arrow disableInteractive title='Duplicate'>
+                  <FadeInButton size='sm' onClick={handleConversationBranch}>
+                    <CopyAllIcon />
+                  </FadeInButton>
+                </Tooltip>
 
-                    <Tooltip arrow disableInteractive title="Duplicate">
-                      <FadeInButton size="sm" onClick={handleConversationBranch}>
-                        <CopyAllIcon />
-                      </FadeInButton>
-                    </Tooltip>
+                <Tooltip arrow disableInteractive title='Export Chat'>
+                  <FadeInButton size='sm' onClick={handleConversationExport}>
+                    <FileUploadOutlinedIcon />
+                  </FadeInButton>
+                </Tooltip>
 
-                    <Tooltip arrow disableInteractive title="Export Chat">
-                      <FadeInButton size="sm" onClick={handleConversationExport}>
-                        <FileUploadOutlinedIcon />
-                      </FadeInButton>
-                    </Tooltip>
-                  </>
+                {!props.item.isArchived && (
+                  <Tooltip arrow disableInteractive title='Archive'>
+                    <FadeInButton size='sm' aria-label='Archive' onClick={handleConversationArchive}>
+                      <ArchiveOutlinedIcon />
+                    </FadeInButton>
+                  </Tooltip>
                 )}
-              </>
-            )}
+              </>}
+
+            </>}
 
             {/* --> */}
             <Box sx={{ flex: 1 }} />
@@ -471,20 +450,15 @@ function ChatDrawerItem(props: {
             {/* Delete [armed, arming] buttons */}
             {/*{!searchFrequency && <>*/}
             {deleteArmed && (
-              <Tooltip color="danger" arrow disableInteractive title="Confirm Deletion">
-                <FadeInButton key="btn-del" variant="solid" color="success" size="sm" onClick={handleConversationDelete} sx={{ opacity: 1, mr: 0.5 }}>
+              <Tooltip color='danger' arrow disableInteractive title='Confirm Deletion'>
+                <FadeInButton key='btn-del' variant='solid' color='success' size='sm' onClick={handleConversationDelete} sx={{ opacity: 1, mr: 0.5 }}>
                   <DeleteForeverIcon sx={{ color: 'danger.solidBg' }} />
                 </FadeInButton>
               </Tooltip>
             )}
 
             <Tooltip arrow disableInteractive title={deleteArmed ? 'Cancel Delete' : 'Delete'}>
-              <FadeInButton
-                key="btn-arm"
-                size="sm"
-                onClick={deleteArmed ? handleDeleteButtonHide : handleDeleteButtonShow}
-                sx={deleteArmed ? { opacity: 1 } : {}}
-              >
+              <FadeInButton key='btn-arm' size='sm' onClick={deleteArmed ? handleDeleteButtonHide : handleDeleteButtonShow} sx={deleteArmed ? { opacity: 1 } : {}}>
                 {deleteArmed ? <CloseRoundedIcon /> : <DeleteOutlineIcon />}
               </FadeInButton>
             </Tooltip>
@@ -494,37 +468,45 @@ function ChatDrawerItem(props: {
 
         {/* View places row */}
         {isAlsoOpen && (
-          <Typography level="body-xs" sx={{ mx: 'auto' }}>
+          <Typography level='body-xs' sx={{ mx: 'auto' }}>
             <em>In view {isAlsoOpen}</em>
           </Typography>
         )}
+
       </ListItem>
 
       {/* Optional progress bar, underlay */}
       {/* NOTE: disabled on 20240204: quite distracting on the active chat sheet */}
       {/*{progressBarFixedComponent}*/}
+
     </Sheet>
+
   ) : (
+
     // Inactive Conversation - click to activate
     <ListItem
-    // sx={{ '--ListItem-minHeight': '2.75rem' }}
+      // sx={{ '--ListItem-minHeight': '2.75rem' }}
     >
+
       <ListItemButton
         onClick={handleConversationActivate}
         sx={{
           border: 'none', // there's a default border of 1px and invisible.. hmm
           position: 'relative', // for the progress bar
           borderRadius: 'sm', // OPTIMA_NAV_RADIUS, // sync with the optima radius, because they need to match
-          ...(isIncognito && {
+          ...isIncognito && {
             filter: 'contrast(0)',
-          }),
+          },
         }}
       >
+
         {titleRowComponent}
 
         {/* Optional progress bar, underlay */}
         {progressBarFixedComponent}
+
       </ListItemButton>
+
     </ListItem>
   );
 }

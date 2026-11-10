@@ -31,6 +31,7 @@ export const wireOpenrouterModelsListOutputSchema = z.object({
     internal_reasoning: z.string().optional(),
     input_cache_read: z.string().optional(),
     input_cache_write: z.string().optional(),
+    input_cache_write_1h: z.string().optional(), // [OpenRouter, 2026-10-21] Anthropic 1h-TTL write; input_cache_write is then the 5-minute one
     // [OpenRouter, 2026-08-06] long-context surcharge tiers, ascending by `min_prompt_tokens`; a tier
     // omitting a price field keeps the price of the tier below it
     // [OpenRouter, 2026-08-16] a second override shape appeared: time-of-day windows (`utc_start`/`utc_end`, no
@@ -139,6 +140,10 @@ export const wireOpenRouterCreateImagesRequestSchema = z.object({
   model: z.string(),
   prompt: z.string(),
   n: z.number().min(1).max(10).optional(),
+  // passthrough params keyed by provider slug; accepted keys per endpoint: GET /api/v1/images/models/{id}/endpoints -> allowed_passthrough_parameters
+  provider: z.object({
+    options: z.record(z.string(), z.record(z.string(), z.unknown())),
+  }).optional(),
 });
 
 export type WireOpenRouterCreateImagesResponse = z.infer<typeof wireOpenRouterCreateImagesResponseSchema>;

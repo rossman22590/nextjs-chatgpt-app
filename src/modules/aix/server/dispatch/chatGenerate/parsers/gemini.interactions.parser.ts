@@ -476,6 +476,7 @@ export function createGeminiInteractionsParserNS(requestedModelName: string | nu
         pt.setDialectEnded('done-dialect');
         break;
       case 'incomplete':
+      case 'requires_continuation':
         pt.appendText('\n_Response incomplete (run stopped early)._\n');
         pt.setTokenStopReason('out-of-tokens');
         pt.setDialectEnded('done-dialect');
@@ -488,6 +489,7 @@ export function createGeminiInteractionsParserNS(requestedModelName: string | nu
       case 'requires_action':
         pt.setDialectTerminatingIssue('Deep Research returned requires_action (not supported in this client)', null, 'srv-warn');
         break;
+      case 'queued':
       case 'in_progress': {
         // Two scenarios both surface as `in_progress`:
         //  1) Run is genuinely live server-side (just slow) - polling later will yield content.
@@ -500,7 +502,7 @@ export function createGeminiInteractionsParserNS(requestedModelName: string | nu
         const elapsedMin = _minutesSince(interaction.created);
         const updatedMin = _minutesSince(interaction.updated);
         const outCount = (interaction.steps ?? []).length;
-        const lines: string[] = ['\n_Deep Research run is **`in_progress`** server-side._\n'];
+        const lines: string[] = [`\n_Deep Research run is **\`${interaction.status}\`** server-side._\n`];
         if (elapsedMin != null) lines.push(`- Started: **${_humanDuration(elapsedMin)} ago**`);
         if (updatedMin != null && updatedMin !== elapsedMin) lines.push(`- Last server update: **${_humanDuration(updatedMin)} ago**`);
         lines.push(`- Steps so far: **${outCount === 0 ? 'none' : outCount}**`);
@@ -662,14 +664,15 @@ function _emitUrlCitations(pt: IParticleTransmitter, annotations: Array<{ type: 
 //
 // `_emitAntigravityToolOp` takes a typed `SurfacedToolStep` (the callers safeParse the loose step, or a
 // {type,id/call_id,...} synthesized from a typed step.delta, into the union first), so field access is
-// type-checked per variant. Wire shapes VERIFIED on the steps schema (live probe 2026-06-02, zero warnings):
-//   function_call       step.start { id, type:'function_call', name, arguments:{} (EMPTY) }; args stream as
-//                       a JSON string via `arguments_delta` deltas (accumulated -> finalized at step.stop)
-//   function_result     step.start { call_id, type:'function_result' } + typed result step.delta; call_id === call.id
-//   code_execution_call step.start { id, type:'code_execution_call' }; `{code}` arrives via typed code_execution_call step.delta
-//   code_execution_result typed step.delta { result: string (stdout+stderr) }; call_id === call.id
-//   google_search_call  step.start { id, type:'google_search_call' }; `{queries|query}` via typed step.delta
-//   google_search_result typed step.delta { result: { search_suggestions } }
+// type-checked per variant. Wire shapes VERIFIED on antigravity-preview-09-2026 (live probe 2026-09-22, zero warnings):
+// every tool step arrives complete on step.start; no tool step.delta was observed.
+//   function_call       step.start { id, type:'function_call', name, arguments:{ PascalCase params, toolAction, toolSummary } }
+//                       (05-2026 streamed args via `arguments_delta` instead; still accumulated -> finalized at step.stop)
+//   function_result     step.start { call_id, type:'function_result', name, result: string, is_error }; call_id === call.id
+//   code_execution_call step.start { id, type:'code_execution_call', arguments:{ language, code } }
+//   code_execution_result step.start { call_id, result: string ([STDOUT]/[STDERR]), is_error, exit_code }
+//   google_search_call  step.start { id, type:'google_search_call', arguments:{ queries }, search_type }
+//   google_search_result step.start { call_id, result: [{ search_suggestions }] }
 //   url_context_*        NOT observed (Antigravity prefers bash curl); defensive handler retained
 
 const _TOOL_TEXT_MAX = 80;   // chip-line cap (single-line summary)
@@ -682,8 +685,8 @@ function _truncate(s: string, max: number): string {
 function _summarizeFunctionArgs(name: string, args: unknown): string {
   if (typeof args !== 'object' || args === null) return name;
   const a = args as Record<string, unknown>;
-  // Prefer the first stringy field that typically identifies the target of the call.
-  for (const key of ['path', 'query', 'url', 'command', 'pattern']) {
+  // Prefer the first stringy field that typically identifies the target of the call (09-2026 file tools use PascalCase params).
+  for (const key of ['path', 'TargetFile', 'AbsolutePath', 'DirectoryPath', 'query', 'Query', 'url', 'command', 'pattern', 'Pattern']) {
     const v = a[key];
     if (typeof v === 'string' && v.length > 0) return _truncate(`${name} ${v}`, _TOOL_TEXT_MAX);
   }
@@ -705,7 +708,7 @@ function _snippetFromArrayOfText(result: unknown): string | undefined {
 function _emitAntigravityToolOp(pt: IParticleTransmitter, step: TToolStep, parentOpId: string): void {
   switch (step.type) {
 
-    // --- filesystem tools (list_files, read_file, write_file, edit_file, search_files, ...) ---
+    // --- filesystem tools (write_to_file, replace_file_content, view_file, list_dir, find_by_name, grep_search, ...) ---
     case 'function_call':
       pt.sendOperationState('code-exec', _summarizeFunctionArgs(step.name || 'tool', step.arguments), { opId: step.id, parentOpId });
       return;
@@ -845,6 +848,7 @@ function _handleInteractionCompleted(
       break;
 
     case 'incomplete':
+    case 'requires_continuation':
       // Run stopped early (token limit, etc.). Terminate gracefully with a visible note; we keep any content already emitted.
       if (operationOpId)
         pt.sendOperationState(runChipMotif, `${agentLabel} incomplete`, { opId: operationOpId, state: 'done' });
@@ -862,12 +866,13 @@ function _handleInteractionCompleted(
       pt.setDialectEnded('done-dialect');
       break;
 
+    case 'queued':
     case 'in_progress':
       // Anomalous: interaction.completed is the TERMINAL SSE event, so status=in_progress here means the
       // run did not actually finish AND no further frames will arrive. Terminate cleanly instead of leaving
       // the stream hanging until the socket times out (user-visible spinner hang). `cg-issue` keeps the
       // upstream handle alive for retry, matching the NS parser's in_progress policy.
-      console.warn('[GeminiInteractions] interaction.completed with status=in_progress; terminating as retryable');
+      console.warn(`[GeminiInteractions] interaction.completed with status=${interaction.status}; terminating as retryable`);
       if (operationOpId)
         pt.sendOperationState(runChipMotif, `${agentLabel} interrupted`, { opId: operationOpId, state: 'error' });
       pt.setTokenStopReason('cg-issue');

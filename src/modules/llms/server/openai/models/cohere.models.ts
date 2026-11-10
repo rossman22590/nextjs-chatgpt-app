@@ -102,7 +102,7 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
 
   // North Mini Code - agentic coding (North platform)
   {
-    idPrefix: 'north-mini-code-1-0',
+    idPrefix: 'north-mini-code-1.0', // the listed id; 'north-mini-code-1-0' also resolves
     label: 'North Mini Code',
     pubDate: '20260609',
     description: 'Compact agentic coding MoE (30B total, 3B active, Apache 2.0) from Cohere\'s North platform. Reasoning and tool use over very long context (436K).',
@@ -182,6 +182,21 @@ const _knownCohereModels = llmsDefineModels<_CohereModelDef>()([
     maxCompletionTokens: 8000, // API-enforced ceiling (verified 2026-07-08)
     initialTemperature: 0.3,
     hidden: true,
+  },
+
+  // North Small Translate - specialized translation (North platform, hidden by default). The listed id;
+  // the dated 'north-small-translate-09-2026' also resolves, 'north-small-translate-1-0' 404s.
+  {
+    idPrefix: 'north-small-translate-1.0',
+    label: 'North Small Translate',
+    pubDate: '20260910',
+    description: 'Translation MoE (218B total, 25B active, CC BY-NC 4.0) from Cohere\'s North platform, covering 50+ languages and locales. 32K context, 16K output. Text only, no tool use.',
+    contextWindow: 32768,
+    interfaces: _IF_Chat, // the API rejects tool use and image parts
+    maxCompletionTokens: 16384, // API-enforced ceiling
+    initialTemperature: 0, // Cohere sampling default
+    hidden: true,
+    // chatPrice: unset - free-tier Chat API for evaluation, commercial deployment via Model Vault
   },
 
   // Aya Expanse 32B - multilingual research

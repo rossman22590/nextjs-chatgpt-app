@@ -1,7 +1,8 @@
 import { LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
+import { Release } from '~/common/app.release';
 
 import type { ModelDescriptionSchema } from '../../llm.server.types';
-import { llmsDefineModels } from '../../models.mappings';
+import { llmDevCheckModels_DEV, llmsDefineModels, llmsLabelUncurated } from '../../models.mappings';
 
 // --- MiniMax Model ID inference (auto-derived from _knownMiniMaxModels) ---
 export type LlmsMiniMaxModelId = typeof _knownMiniMaxModels[number]['id'];
@@ -14,16 +15,31 @@ export function minimaxHeuristic(urlOrHost: string | undefined): boolean {
 
 
 /**
- * MiniMax hardcoded models - /v1/models now exists, but returns bare ids (no context/pricing/capabilities), and omits the still-served legacy ids.
+ * MiniMax curated models - /v1/models returns bare ids (no context/pricing/capabilities) and omits still-served ids, so this
+ * table stays the catalog and the live list only adds 0-day arrivals (minimaxModelsToModelDescriptions).
  * - Models: https://platform.minimax.io/docs/release-notes/models.md
- * - Pricing: https://platform.minimax.io/docs/guides/pricing-paygo.md
+ * - Pricing: https://platform.minimax.io/docs/pricing/overview.md
  * - Text generation: https://platform.minimax.io/docs/guides/text-generation.md
  * - OpenAI-compatible reference (model enum, max_completion_tokens caps, thinking/service_tier): https://platform.minimax.io/docs/api-reference/text-chat-openai.md
- * - Updated: 2026-08-24
+ * - Updated: 2026-10-23
  */
 type _MiniMaxModelDef = ModelDescriptionSchema & { pubDate: string };
 
 const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
+
+  // M3.1 Flash - efficient open-weight, natively multimodal, 1M context (2026-10-19). The retired 'MiniMax-M3.1-Flash-Preview' name is served as this model
+  {
+    id: 'MiniMax-M3.1-Flash',
+    label: 'MiniMax M3.1 Flash',
+    pubDate: '20261019',
+    description: 'Efficient open-weight M-series model for agentic reasoning, tool use, coding and long-context tasks, natively multimodal (text, image, video input). 1M context, tunable thinking depth.',
+    contextWindow: 1000000,
+    maxCompletionTokens: 131072, // vendor-recommended; live ceiling is 524288 (512K)
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision],
+    // [MiniMax, 2026-10-23] probed: always thinks (reasoning_effort 'none' and thinking.type 'disabled' 400), reasoning_effort allows low..max, vendor default 'max'
+    parameterSpecs: [{ paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high', 'xhigh', 'max'] }],
+    chatPrice: { input: 0.15, output: 0.60, cache: { read: 0.015 } }, // flat; no service_tier
+  },
 
   // M3 - flagship, natively multimodal, 1M context (2026-06-01)
   {
@@ -41,12 +57,13 @@ const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
     chatPrice: {
       input: [{ upTo: 512000, price: 0.30 }, { upTo: null, price: 0.60 }],
       output: [{ upTo: 512000, price: 1.20 }, { upTo: null, price: 2.40 }],
-      cache: { cType: 'oai-ac', read: [{ upTo: 512000, price: 0.06 }, { upTo: null, price: 0.12 }] },
+      cache: { read: [{ upTo: 512000, price: 0.06 }, { upTo: null, price: 0.12 }] },
     },
     benchmark: { cbaElo: 1444 }, // lmarena: minimax-m3
   },
 
-  // M2.7 series
+  // M2.7 series - [MiniMax, 2026-10-19] closed to new users (probed: 404 'no longer available'), retires 2026-11-18. Kept hidden while
+  // /v1/models still lists the M2.x ids: dropping them would resurface each as a '[?]' 0-day arrival.
   {
     id: 'MiniMax-M2.7',
     label: 'MiniMax M2.7',
@@ -55,8 +72,9 @@ const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
     contextWindow: 204800,
     maxCompletionTokens: 131072,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning],
-    chatPrice: { input: 0.30, output: 1.20, cache: { cType: 'oai-ac', read: 0.06 } },
+    chatPrice: { input: 0.30, output: 1.20, cache: { read: 0.06 } },
     benchmark: { cbaElo: 1416 }, // lmarena: minimax-m2.7
+    hidden: true, // retiring
   },
   {
     id: 'MiniMax-M2.7-highspeed',
@@ -66,11 +84,12 @@ const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
     contextWindow: 204800,
     maxCompletionTokens: 131072,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning],
-    chatPrice: { input: 0.60, output: 2.40, cache: { cType: 'oai-ac', read: 0.06 } },
+    chatPrice: { input: 0.60, output: 2.40, cache: { read: 0.06 } },
     benchmark: { cbaElo: 1416 }, // same weights as minimax-m2.7
+    hidden: true, // retiring
   },
 
-  // M2.5 series - vendor Legacy since 2026-08 (hidden, still served)
+  // M2.5 series - same retirement as M2.7
   {
     id: 'MiniMax-M2.5',
     label: 'MiniMax M2.5',
@@ -79,9 +98,9 @@ const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
     contextWindow: 204800,
     maxCompletionTokens: 131072,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning],
-    chatPrice: { input: 0.30, output: 1.20, cache: { cType: 'oai-ac', read: 0.03 } },
+    chatPrice: { input: 0.30, output: 1.20, cache: { read: 0.03 } },
     benchmark: { cbaElo: 1390 }, // lmarena: minimax-m2.5
-    hidden: true, // vendor Legacy
+    hidden: true, // retiring
   },
   {
     id: 'MiniMax-M2.5-highspeed',
@@ -91,24 +110,12 @@ const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
     contextWindow: 204800,
     maxCompletionTokens: 131072,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning],
-    chatPrice: { input: 0.60, output: 2.40, cache: { cType: 'oai-ac', read: 0.03 } },
+    chatPrice: { input: 0.60, output: 2.40, cache: { read: 0.03 } },
     benchmark: { cbaElo: 1390 }, // same weights as minimax-m2.5
-    hidden: true, // vendor Legacy
+    hidden: true, // retiring
   },
 
-  // M2-her - dialogue-first, roleplay and character-driven chat (Jan 2026)
-  {
-    id: 'M2-her', // (!) not 'MiniMax-M2-her': the served id has no vendor prefix
-    label: 'MiniMax M2-her',
-    pubDate: '20260127',
-    description: 'Dialogue-first model for immersive roleplay, character-driven chat, and expressive multi-turn conversations. 64K context.',
-    contextWindow: 65536,
-    maxCompletionTokens: 2048,
-    interfaces: [LLM_IF_OAI_Chat], // no function calling: ignores tools even with tool_choice: 'required'
-    chatPrice: { input: 0.30, output: 1.20 },
-  },
-
-  // M2.1 series (legacy)
+  // M2.1 series - retired (probed: 404 'no longer available'), still listed, kept hidden (see M2.7)
   {
     id: 'MiniMax-M2.1',
     label: 'MiniMax M2.1',
@@ -117,7 +124,7 @@ const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
     contextWindow: 204800,
     maxCompletionTokens: 131072,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning],
-    chatPrice: { input: 0.30, output: 1.20, cache: { cType: 'oai-ac', read: 0.03 } },
+    chatPrice: { input: 0.30, output: 1.20, cache: { read: 0.03 } },
     hidden: true, // yield to newer
   },
   {
@@ -128,11 +135,11 @@ const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
     contextWindow: 204800,
     maxCompletionTokens: 131072,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning],
-    chatPrice: { input: 0.60, output: 2.40, cache: { cType: 'oai-ac', read: 0.03 } },
+    chatPrice: { input: 0.60, output: 2.40, cache: { read: 0.03 } },
     hidden: true, // yield to newer
   },
 
-  // M2
+  // M2 - retired (probed: 404 'no longer available'), still listed, kept hidden (see M2.7)
   {
     id: 'MiniMax-M2',
     label: 'MiniMax M2',
@@ -141,7 +148,7 @@ const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
     contextWindow: 204800,
     maxCompletionTokens: 128000,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning],
-    chatPrice: { input: 0.30, output: 1.20, cache: { cType: 'oai-ac', read: 0.03 } },
+    chatPrice: { input: 0.30, output: 1.20, cache: { read: 0.03 } },
     hidden: true, // yield to newer
   },
 
@@ -174,6 +181,32 @@ const _knownMiniMaxModels = llmsDefineModels<_MiniMaxModelDef>()([
 ]);
 
 
-export function minimaxHardcodedModelDescriptions(): ReadonlyArray<ModelDescriptionSchema> {
-  return _knownMiniMaxModels;
+// Served but never listed by /v1/models (probed 2026-10-23): two still-answering legacy ids. Exempt from the stale-defs drift check.
+const _minimaxUnlistedIds: string[] = ['MiniMax-M1', 'MiniMax-Text-01'] satisfies LlmsMiniMaxModelId[];
+
+/**
+ * The curated table as-is, plus each listed id the table lacks as a visible '[?]' 0-day arrival with no context window (the
+ * NVIDIA NIM convention): the app shows it at once, and the registry sync records and announces it without publishing it.
+ * An empty list (the dispatch tolerates a failed or refused /v1/models) yields exactly the curated table.
+ */
+export function minimaxModelsToModelDescriptions(maybeModels: { id?: unknown }[]): ModelDescriptionSchema[] {
+  const apiIds = maybeModels.map(m => m.id).filter((id): id is string => typeof id === 'string');
+  const knownIds = new Set<string>(_knownMiniMaxModels.map(m => m.id));
+
+  // [DEV] drift: stale curated entries and unknown arrivals (skipped on an empty list, which is a failed fetch, not a delisting)
+  if (Release.IsNodeDevBuild && apiIds.length)
+    llmDevCheckModels_DEV('MiniMax', apiIds, [...knownIds], { ignoreStale: _minimaxUnlistedIds });
+
+  const arrivals = apiIds
+    .filter(id => !knownIds.has(id))
+    .map((id): ModelDescriptionSchema => ({
+      id,
+      label: llmsLabelUncurated(id),
+      description: `New MiniMax arrival '${id}', not yet curated - capabilities and context window unverified.`,
+      contextWindow: null,
+      interfaces: [LLM_IF_OAI_Chat],
+    }));
+
+  // table order is the display order; 0-day arrivals sort last
+  return [..._knownMiniMaxModels, ...arrivals];
 }

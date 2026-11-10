@@ -2,6 +2,8 @@
 
 Information you need to get started, configure, and use big-AGI productively.
 
+> **The current user documentation is at [big-agi.com/docs](https://big-agi.com/docs)**, also readable inside the app (Documentation). Pages in this folder can be out of date; they remain for self-hosting and deployment material not yet covered there.
+
 👉 **[Changelog](https://big-agi.com/changes)** - See what's new
 
 ## Getting Started
@@ -46,7 +48,7 @@ How to set up AI models and features in big-AGI.
 - **Enhanced AI Features**:
   - **[Web Browsing](config-feature-browse.md)**: Enable web page download through third-party services or your own cloud
   - **Web Search**: Google Search API (see '[Environment Variables](environment-variables.md)')
-  - **Image Generation**: GPT Image (gpt-image-1), Nano Banana, DALL·E 3 and 2
+  - **Image Generation**: GPT Image 2.5, 2 and 1.x, Nano Banana
   - **Voice Synthesis**: ElevenLabs, Inworld, OpenAI TTS, LocalAI, or browser Web Speech API
   - **[Google Drive](config-feature-google-drive.md)**: Attach files from Google Drive
 
@@ -64,7 +66,7 @@ For deploying a custom big-AGI instance:
 
 - **Advanced Setup**:
   - **[Source Code Customization](customizations.md)**: Modify the source code
-  - **[Access Control](deploy-authentication.md)**: Optional, add basic user authentication
+  - **[Access Control](https://big-agi.com/docs/self-host-configuration#keys-and-access-control)**: Optional, authentication in front of the app or HTTP Basic Auth in your build
   - **[Reverse Proxy](deploy-reverse-proxy.md)**: Optional, enables custom domains and SSL
   - **[Docker Deployment](deploy-docker.md)**: Deploy with Docker containers
   - **[Kubernetes](deploy-k8s.md)**: Deploy on Kubernetes clusters

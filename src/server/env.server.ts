@@ -79,6 +79,9 @@ export const env = createEnv({
     // LLM: MiniMax
     MINIMAX_API_HOST: z.url().optional(),
     MINIMAX_API_KEY: z.string().optional(),
+    // LLM: Meta AI
+    METAAI_API_KEY: z.string().optional(),
+    METAAI_API_HOST: z.url().optional(),
 
     // LLM: Mistral
     MISTRAL_API_KEY: z.string().optional(),

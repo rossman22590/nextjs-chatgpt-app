@@ -16,7 +16,7 @@ import { Box } from '@mui/joy';
  *   Browsers honor it only when the reveal follows a user interaction (e.g. expanding an
  *   accordion) - activation is delegated via allow="autoplay". Otherwise it loads paused.
  * - 'ambient': like 'auto' but MUTED - the autoplay browsers always allow. For
- *   demo/background loops (dev branch: Spotlight, Variform welcome).
+ *   demo/background loops (What's New announcements, Variform welcome).
  * Both immediate modes are visibility-gated (IntersectionObserver): nothing loads while
  * collapsed/offscreen.
  *
@@ -159,6 +159,7 @@ export function LiteVideoEmbed(props: LiteVideoEmbedProps) {
       onClick={showFacade ? handleActivate : undefined}
       onPointerEnter={showFacade ? handleIntent : undefined}
       onFocus={showFacade ? handleIntent : undefined}
+      style={responsive ? undefined : { width: width ?? '100%', height }} // per-instance sizes: style, not sx
       sx={{
         // reset (the facade is a real <button> for keyboard & screen readers)
         all: 'unset',
@@ -170,10 +171,10 @@ export function LiteVideoEmbed(props: LiteVideoEmbedProps) {
         background: 'red',
         ...(rounded && { borderRadius: 'md' }),
         // sizing: fill the parent when responsive (16:9 only if the parent height is auto),
-        // otherwise explicit width/height (16:9 stands in for a missing height)
+        // otherwise explicit width/height in style (16:9 stands in for a missing height)
         ...(responsive
           ? { width: '100%', height: '100%', aspectRatio: '16 / 9' }
-          : { width: width ?? '100%', ...(height !== undefined ? { height } : { aspectRatio: '16 / 9' }) }),
+          : height === undefined && { aspectRatio: '16 / 9' }),
         // pre-poster skeleton: subtle dark vignette instead of a flat black box
         backgroundColor: '#101010',
         backgroundImage: 'radial-gradient(ellipse at center, #1d1d1d 0%, #101010 70%)',

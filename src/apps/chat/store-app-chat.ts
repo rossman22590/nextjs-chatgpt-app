@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import type { DLLMId } from '~/common/stores/llms/llms.types';
 import { Is } from '~/common/util/pwaUtils';
+import { normalizeUserFragmentGroupsOrder, UserMessageFragmentGroup, UserMessageFragmentPlacement } from '~/common/stores/chat/chat.fragment-order';
 
 
 export type ChatAutoSpeakType = 'off' | 'firstLine' | 'all';
@@ -40,11 +41,19 @@ interface AppChatStore {
   autoVndAntBreakpoints: boolean;
   setAutoVndAntBreakpoints: (autoVndAntBreakpoints: boolean) => void;
 
+  // chat Mechanics / Policies
+
   chatThinkingPolicy: ChatThinkingPolicy,
   setChatThinkingPolicy: (chatThinkingPolicy: ChatThinkingPolicy) => void;
 
   tokenCountingMethod: TokenCountingMethod;
   setTokenCountingMethod: (tokenCountingMethod: TokenCountingMethod) => void;
+
+  userMessageFragmentOrder?: UserMessageFragmentGroup[];
+  setUserMessageFragmentOrder: (order: undefined | UserMessageFragmentGroup[]) => void;
+
+  userMessageAttachmentsMarker?: boolean; // a `{{attachments}}` prompt line places the attachments there
+  setUserMessageAttachmentsMarker: (enabled: boolean) => void;
 
   // chat UI
 
@@ -90,6 +99,10 @@ interface AppChatStore {
   storageWarningDismissed: boolean;
   dismissStorageWarning: () => void;
 
+  // View Options - message timestamps
+  messageTimestampMode: ChatMessageTimestampMode;
+  setMessageTimestampMode: (mode: ChatMessageTimestampMode) => void;
+
   // other chat-specific configuration
 
   notificationEnabledModelIds: DLLMId[];
@@ -130,6 +143,12 @@ const useAppChatStore = create<AppChatStore>()(persist(
 
     tokenCountingMethod: Is.Desktop ? 'accurate' : 'approximate',
     setTokenCountingMethod: (tokenCountingMethod: TokenCountingMethod) => _set({ tokenCountingMethod }),
+
+    // userMessageFragmentOrder: undefined, // keep the default implicit
+    setUserMessageFragmentOrder: (order) => _set({ userMessageFragmentOrder: !order ? undefined : normalizeUserFragmentGroupsOrder(order) }),
+
+    // userMessageAttachmentsMarker: undefined, // off when omitted
+    setUserMessageAttachmentsMarker: (enabled) => _set({ userMessageAttachmentsMarker: enabled || undefined }),
 
     // Chat UI
 
@@ -176,6 +195,9 @@ const useAppChatStore = create<AppChatStore>()(persist(
     // browser-storage disclaimer: shown until the user acknowledges it (persisted, so it survives reloads but not a cache clear - which is exactly the event it warns about)
     storageWarningDismissed: false,
     dismissStorageWarning: () => _set({ storageWarningDismissed: true }),
+
+    messageTimestampMode: 'auto',
+    setMessageTimestampMode: (messageTimestampMode: ChatMessageTimestampMode) => _set({ messageTimestampMode }),
 
     // Other chat-specific configuration
 
@@ -249,9 +271,6 @@ export const getChatAutoAI = (): {
   autoVndAntBreakpoints: boolean,
 } => useAppChatStore.getState();
 
-export const useChatAutoSuggestHTMLUI = (): boolean =>
-  useAppChatStore(state => state.autoSuggestHTMLUI);
-
 export const useChatAutoSuggestAttachmentPrompts = (): boolean =>
   useAppChatStore(state => state.autoSuggestAttachmentPrompts);
 
@@ -260,6 +279,21 @@ export const getChatThinkingPolicy = (): ChatThinkingPolicy =>
 
 export const getChatTokenCountingMethod = (): TokenCountingMethod =>
   useAppChatStore.getState().tokenCountingMethod;
+
+/** Where the attachments go in a new user message: the group order, and whether a `{{attachments}}` marker places them. */
+export const getUserMessageFragmentPlacement = (): UserMessageFragmentPlacement => {
+  const { userMessageFragmentOrder, userMessageAttachmentsMarker } = useAppChatStore.getState();
+  return { order: userMessageFragmentOrder, splitAtMarker: !!userMessageAttachmentsMarker };
+};
+
+export const setUserMessageFragmentOrder = (order: undefined | UserMessageFragmentGroup[]) =>
+  useAppChatStore.getState().setUserMessageFragmentOrder(order);
+
+export const setUserMessageAttachmentsMarker = (enabled: boolean) =>
+  useAppChatStore.getState().setUserMessageAttachmentsMarker(enabled);
+
+export const useUserMessageFragmentPlacement = () =>
+  useAppChatStore(useShallow(state => ({ order: state.userMessageFragmentOrder, splitAtMarker: !!state.userMessageAttachmentsMarker })));
 
 export const useChatMicTimeoutMsValue = (): number =>
   useAppChatStore(state => state.micTimeoutMs);
@@ -304,6 +338,12 @@ export const useChatShowToolbarNavigation = (): boolean =>
 export function useChatStorageWarning(): [boolean, () => void] {
   return useAppChatStore(useShallow(state => [state.storageWarningDismissed, state.dismissStorageWarning]));
 }
+
+/** Off by default. Auto: first user message and final message. All: every user/assistant message. */
+export type ChatMessageTimestampMode = 'off' | 'auto' | 'all';
+
+export const useChatMessageTimestampMode = (): [ChatMessageTimestampMode, (mode: ChatMessageTimestampMode) => void] =>
+  useAppChatStore(useShallow(state => [state.messageTimestampMode, state.setMessageTimestampMode]));
 
 export const getIsNotificationEnabledForModel = (modelId: DLLMId): boolean =>
   useAppChatStore.getState().isNotificationEnabledForModel(modelId);

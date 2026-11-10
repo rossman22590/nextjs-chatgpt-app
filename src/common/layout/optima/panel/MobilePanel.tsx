@@ -3,11 +3,12 @@ import * as React from 'react';
 import { Box, Drawer } from '@mui/joy';
 
 import type { NavItemApp } from '~/common/app.nav';
+import { WhatsNewPanelRow } from '~/modules/news/components/WhatsNewIndicators';
 
-import { MobilePreferencesListItem } from './MobilePreferencesListItem';
 import { OPTIMA_DRAWER_MOBILE_RADIUS, OPTIMA_PANEL_GROUPS_SPACING } from '../optima.config';
 import { OptimaPanelGroupedList } from './OptimaPanelGroupedList';
 import { PanelContentPortal } from './PanelContentPortal';
+import { PreferencesListItem } from './items/PreferencesListItem';
 import { optimaClosePanel, useOptimaPanelOpen } from '../useOptima';
 
 
@@ -24,7 +25,10 @@ export function MobilePanel(props: { component: React.ElementType, currentApp?: 
       open={panelShownAsPanel}
       onClose={optimaClosePanel}
       sx={{
-        '--Drawer-horizontalSize': 'round(clamp(30%, var(--AGI-Mobile-Panel-width), 100%), 1px)',
+        '--Drawer-horizontalSize': 'clamp(30%, var(--AGI-Mobile-Panel-width), 100%)', // unrounded where CSS round() is missing
+        '@supports (width: round(1px, 1px))': {
+          '--Drawer-horizontalSize': 'round(clamp(30%, var(--AGI-Mobile-Panel-width), 100%), 1px)',
+        },
         '--Drawer-transitionDuration': '0.2s',
       }}
       slotProps={{
@@ -55,11 +59,13 @@ export function MobilePanel(props: { component: React.ElementType, currentApp?: 
 
         <Box sx={{ py: 0.5, mb: OPTIMA_PANEL_GROUPS_SPACING }}>
           <OptimaPanelGroupedList>
-            <MobilePreferencesListItem />
+            <PreferencesListItem autoClosePanel />
           </OptimaPanelGroupedList>
         </Box>
 
         <PanelContentPortal />
+
+        <WhatsNewPanelRow />
 
       </Box>
 

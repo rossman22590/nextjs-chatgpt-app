@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 
 import { Button, Chip, Typography } from '@mui/joy';
 
-import { getBackendCapabilities } from '~/modules/backend/store-backend-capabilities';
+import { hasServerConf } from '~/common/app.serverconf';
 
 import type { DModelsServiceId } from '~/common/stores/llms/llms.service.types';
 import { AlreadySet } from '~/common/components/AlreadySet';
@@ -19,6 +19,7 @@ import { SetupFormCorsHint } from '~/common/components/forms/SetupFormCorsHint';
 import { SetupFormRefetchButton } from '~/common/components/forms/SetupFormRefetchButton';
 
 import { ApproximateCosts } from '../ApproximateCosts';
+import { llmsHostStripV1Suffix } from '../../shared/llm.isomorphic';
 import { useLlmUpdateModels } from '../../llm.client.hooks';
 import { useServiceSetup } from '../useServiceSetup';
 
@@ -36,7 +37,8 @@ export function LocalAIServiceSetup(props: { serviceId: DModelsServiceId }) {
   const [adminOpen, setAdminOpen] = React.useState(false);
 
   // external state
-  const { hasLlmLocalAIHost: backendHasHost, hasLlmLocalAIKey: backendHasKey } = getBackendCapabilities();
+  const backendHasHost = hasServerConf('hasLlmLocalAIHost');
+  const backendHasKey = hasServerConf('hasLlmLocalAIKey');
   const { service, serviceAccess, serviceHasLLMs, updateSettings } =
     useServiceSetup(props.serviceId, ModelVendorLocalAI);
 
@@ -88,8 +90,8 @@ export function LocalAIServiceSetup(props: { serviceId: DModelsServiceId }) {
       noKey
       required={userHostRequired}
       isError={userHostError}
-      rightLabel={backendHasHost ? <AlreadySet /> : <Link level='body-sm' href='https://localai.io' target='_blank'>Learn more</Link>}
-      value={localAIHost} onChange={value => updateSettings({ localAIHost: value })}
+      rightLabel={backendHasHost ? <AlreadySet overridden={!!localAIHost} /> : <Link level='body-sm' href='https://localai.io' target='_blank'>Learn more</Link>}
+      value={localAIHost} onChange={value => updateSettings({ localAIHost: llmsHostStripV1Suffix(value) })}
     />
 
     <FormInputKey

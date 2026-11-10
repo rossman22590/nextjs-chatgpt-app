@@ -26,33 +26,53 @@ export function parseBlocksFromText(text: string): RenderBlockInputs {
     // codeBlock: /`{3,}([^\n`]*)\n([\s\S]*?)(`{3,}(?=[ *\n]|$)|$)/g, // length-agnostic close: broke nested fences (any >=3 close)
     // capture the opening fence (g1) and require the close to be at least as long (\1`*), per CommonMark.
     // no-op for 3-backtick fences (the norm); only activates to keep nested fences (````md ... ``` ... ````) together.
-    codeBlock: /(`{3,})([^\n`]*)\n([\s\S]*?)(\1`*(?=[ *\n]|$)|$)/g,
+    // The opener rule (a fence opens at the start of its line, or mid-line only when glued) is a predicate in the loop
+    // below, not part of this regex: a lookbehind-led form measured 10-40x slower on Safari, whose regex JIT skips
+    // lookbehind. Corpus: blocks.textparser.test.ts. Rule, alternatives, measurements: kb/modules/BLOCKS-fence-parser.md
+    codeBlock: /(`{3,})([^\n`]*)\n([\s\S]*?)(\1`*(?=[ *\r\n]|$)|$)/g, // close followed by \r too: CRLF text
     htmlCodeBlock: /<!DOCTYPE html>([\s\S]*?)<\/html>/gi,
     svgBlock: /<svg (xmlns|width|viewBox)=([\s\S]*?)<\/svg>/g,
   };
 
   const blocks: RenderBlockInputs = [];
   let lastIndex = 0;
+  let fenceSearchFrom = 0; // fence candidates rejected by the opener rule are skipped, not consumed
+
+  // per pattern, the leftmost match ahead of the cursor, re-run only once the cursor passes it: each pattern scans the text once
+  const nextMatch: { [T in keyof typeof regexPatterns]?: RegExpExecArray | null } = {};
 
   while (true) {
 
-    // find the first match (if any) trying all the regexes
+    // find the first match (if any) across the patterns
     let match: RegExpExecArray | null = null;
     let matchType: keyof typeof regexPatterns | null = null;
-    let earliestMatchIndex: number | null = null;
 
     for (const type in regexPatterns) {
-      const regex = regexPatterns[type as keyof typeof regexPatterns];
-      regex.lastIndex = lastIndex;
-      const currentMatch = regex.exec(text);
-      if (currentMatch && (earliestMatchIndex === null || currentMatch.index < earliestMatchIndex)) {
-        match = currentMatch;
-        matchType = type as keyof typeof regexPatterns;
-        earliestMatchIndex = currentMatch.index;
+      const patternType = type as keyof typeof regexPatterns;
+      const searchFrom = patternType === 'codeBlock' ? Math.max(lastIndex, fenceSearchFrom) : lastIndex;
+      let patternMatch = nextMatch[patternType];
+      if (patternMatch === undefined || (patternMatch !== null && patternMatch.index < searchFrom)) {
+        const regex = regexPatterns[patternType];
+        regex.lastIndex = searchFrom;
+        patternMatch = nextMatch[patternType] = regex.exec(text);
+      }
+      if (patternMatch && (match === null || patternMatch.index < match.index)) {
+        match = patternMatch;
+        matchType = patternType;
       }
     }
     if (match === null)
       break;
+
+    // opener rule: a fence opens a block at the start of its line (indent and list marker allowed), or mid-line only
+    // when glued (newline or the info string right after the ticks). A mid-line fence followed by a space is prose (#1280).
+    if (matchType === 'codeBlock' && /^[ \t]/.test(match[2] || '')) {
+      const linePrefix = text.slice(text.lastIndexOf('\n', match.index - 1) + 1, match.index);
+      if (!/^[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?$/.test(linePrefix)) {
+        fenceSearchFrom = match.index + 1;
+        continue;
+      }
+    }
 
     // anything leftover before the match is text
     if (match.index > lastIndex)
@@ -66,16 +86,20 @@ export function parseBlocksFromText(text: string): RenderBlockInputs {
         // note: we don't trim blockCode to preserve leading spaces, however if the last line is only made of spaces or tabs, we trim that
         const blockCode: string = match[3].replace(/[\t ]+$/, '');
         const blockEnd: string = match[4];
-        blocks.push({ bkt: 'code-bk', title: blockTitle, code: blockCode, lines: countLines(blockCode), isPartial: !blockEnd.startsWith('```') });
+        blocks.push({ bkt: 'code-bk', sourceStart: match.index, sourceEnd: match.index + match[0].length, title: blockTitle, code: blockCode, lines: countLines(blockCode), isPartial: !blockEnd.startsWith('```') });
         break;
 
       case 'htmlCodeBlock':
         const preMatchHtml: string = `<!DOCTYPE html>${match[1]}</html>`;
-        blocks.push({ bkt: 'code-bk', title: 'html', code: preMatchHtml, lines: countLines(preMatchHtml), isPartial: false });
+        blocks.push({ bkt: 'code-bk', sourceStart: match.index, sourceEnd: match.index + match[0].length, title: 'html', code: preMatchHtml, lines: countLines(preMatchHtml), isPartial: false });
         break;
 
       case 'svgBlock':
-        blocks.push({ bkt: 'code-bk', title: 'svg', code: match[0], lines: countLines(match[0]), isPartial: false });
+        blocks.push({ bkt: 'code-bk', sourceStart: match.index, sourceEnd: match.index + match[0].length, title: 'svg', code: match[0], lines: countLines(match[0]), isPartial: false });
+        break;
+
+      case null:
+        // no pattern matched: nothing to add
         break;
     }
 
@@ -88,4 +112,20 @@ export function parseBlocksFromText(text: string): RenderBlockInputs {
     blocks.push({ bkt: 'md-bk', content: text.slice(lastIndex) });
 
   return blocks;
+}
+
+
+/** Remove only the selected, complete parsed block. Keep all surrounding source unchanged. */
+export function removeCodeBlockFromText(fullText: string, block: Extract<RenderBlockInputs[number], { bkt: 'code-bk' }>): string | null {
+  const { sourceStart, sourceEnd } = block;
+  if (block.isPartial || sourceStart === undefined || sourceEnd === undefined)
+    return null;
+
+  // Revalidate against current text: stale positions or edited code must never delete a different span.
+  const current = parseBlocksFromText(fullText).find(candidate => candidate.bkt === 'code-bk'
+    && candidate.sourceStart === sourceStart && candidate.sourceEnd === sourceEnd);
+  if (!current || current.bkt !== 'code-bk' || current.isPartial || current.code !== block.code || current.title !== block.title)
+    return null;
+
+  return fullText.slice(0, sourceStart) + fullText.slice(sourceEnd);
 }

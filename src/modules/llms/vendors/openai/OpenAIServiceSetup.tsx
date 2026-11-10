@@ -122,7 +122,7 @@ export function OpenAIServiceSetup(props: { serviceId: DModelsServiceId }) {
       autoCompleteId='openai-key' label='API Key'
       rightLabel={<>{needsUserKey
         ? (!oaiKey && !oaiHost && <Link level='body-sm' href='https://platform.openai.com/account/api-keys' target='_blank'>create key</Link>)
-        : (!oaiHost && <AlreadySet /> /* only show "Already set" when using default OpenAI, not custom endpoints */)
+        : (!oaiHost && <AlreadySet overridden={!!oaiKey} /> /* only show "Already set" when using default OpenAI, not custom endpoints */)
       } {oaiKey && !oaiHost && keyValid && <Link level='body-sm' href='https://platform.openai.com/account/usage' target='_blank'>check usage</Link>}
       </>}
       value={oaiKey} onChange={value => updateSettings({ oaiKey: value })}
@@ -146,7 +146,7 @@ export function OpenAIServiceSetup(props: { serviceId: DModelsServiceId }) {
       }
     />}
 
-    {showAdvanced && <FormTextField
+    {(showAdvanced || !!oaiOrg) && <FormTextField
       autoCompleteId='openai-org'
       title='Organization ID'
       description={<Link level='body-sm' href={BaseProduct.DocsBaseSite} target='_blank'>What is this</Link>}

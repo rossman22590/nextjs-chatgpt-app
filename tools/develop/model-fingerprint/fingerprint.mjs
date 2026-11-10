@@ -10,8 +10,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const HERE = path.dirname(new URL(import.meta.url).pathname);
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(HERE, '..', '..', '..');
 const OUT_ROOT = path.join(HERE, 'out');
 
@@ -29,7 +30,7 @@ function apiKey() {
 
 // ---- reference flagships: one per lab, keep current (edit freely)
 const DEFAULT_REFS = [
-  'openai/gpt-5.5',
+  'openai/gpt-6-sol', // current generation at 1/5 of Astra's price
   'anthropic/claude-opus-5',
   'google/gemini-3.7-flash',
   'x-ai/grok-4.6',
@@ -236,16 +237,21 @@ const trunc = (s, n) => { const t = (s || '').trim(); return t.length > n ? t.sl
 async function runAll(tasks, limit) {
   const results = new Array(tasks.length);
   let next = 0, done = 0;
+  const t0 = Date.now();
+  const status = () => `  ${done}/${tasks.length} calls done, ${Math.round((Date.now() - t0) / 1000)}s`;
+  // terminal: one live line; piped or captured: one line per 30s, so a stall shows without flooding the log
+  const ticker = process.stderr.isTTY ? null : setInterval(() => process.stderr.write(status() + '\n'), 30_000);
   async function worker() {
     while (next < tasks.length) {
       const i = next++;
       results[i] = await tasks[i]();
       done++;
-      process.stderr.write(`\r  ${done}/${tasks.length} calls done   `);
+      if (!ticker) process.stderr.write(`\r${status()}   `);
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
-  process.stderr.write('\n');
+  if (ticker) clearInterval(ticker);
+  process.stderr.write(ticker ? status() + '\n' : '\n');
   return results;
 }
 

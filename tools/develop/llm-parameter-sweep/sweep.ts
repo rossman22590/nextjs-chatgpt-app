@@ -193,6 +193,28 @@ const SWEEP_DEFINITIONS = [
     mode: 'enumerate',
   }),
 
+  // Meta AI: reasoning effort (Responses API)
+  // Muse Spark / Wonder: minimal/low/medium/high/xhigh, plus 'max' on muse-wonder-1.0, muse-spark-1.3 and 1.3-contributor
+  // (served since 2026-10). 'none' 400s on every model.
+  defineSweep({
+    name: 'metaai-reasoning-effort',
+    description: 'Meta reasoning.effort values',
+    applicability: { type: 'dialects', dialects: ['metaai'] },
+    applyToModel: (value) => ({ reasoningEffort: value }),
+    values: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] satisfies AixAPI_Model['reasoningEffort'][],
+    mode: 'enumerate',
+  }),
+
+  // Meta AI: web search context (the OpenAI-shaped hosted web_search tool; $2.50 / 1K queries)
+  defineSweep({
+    name: 'metaai-web-search',
+    description: 'Meta web_search search_context_size values',
+    applicability: { type: 'dialects', dialects: ['metaai'] },
+    applyToModel: (value) => ({ vndOaiWebSearchContext: value }),
+    values: ['low', 'medium', 'high'] satisfies AixAPI_Model['vndOaiWebSearchContext'][],
+    mode: 'enumerate',
+  }),
+
 ] as const satisfies SweepDefinition<any>[];
 
 
@@ -282,9 +304,14 @@ const TOOL_PROBE_DEFINITIONS: ToolProbeDefinition[] = [
     validateArgs: (args) => typeof args?.location === 'string' && args.location.length > 0,
     // [2026-06-09] 'required' must reflect raw API support for forced tool use: on adaptive-only Anthropic
     // models (Fable/Mythos 5) the adapter downgrades 'any' -> 'auto' + system hint, which would pass here.
-    preflightFail: (body, dialect) => dialect !== 'anthropic' ? null
-      : body?.tool_choice?.type === 'any' ? null
-        : `coerced on wire: tool_choice=${JSON.stringify(body?.tool_choice ?? null)} (expected type 'any')`,
+    // [2026-09-02] same for Meta (tool_choice accepts only 'auto', the Responses adapter degrades). Judged only when
+    // the body carries a `tool_choice` (Anthropic object / OpenAI-family string); Gemini's tool_config is not inspected.
+    preflightFail: (body) => {
+      const tc = body?.tool_choice;
+      if (tc === undefined || tc === null) return null;
+      const forced = tc?.type === 'any' || tc?.type === 'function' || tc === 'required';
+      return forced ? null : `coerced on wire: tool_choice=${JSON.stringify(tc)} (expected a forced tool choice)`;
+    },
   },
   {
     name: 'fn',
@@ -353,16 +380,21 @@ function isSweepNeutered(sweepName: string, passingValues: SweepValue[]): boolea
 // Types
 // ============================================================================
 
+// ANSI only on a terminal: piped or captured logs stay plain text
+const _ansi = (code: string) => process.stdout.isTTY ? `\x1b[${code}m` : '';
 const COLORS = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  dim: '\x1b[2m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  cyan: '\x1b[36m',
-  magenta: '\x1b[35m',
+  reset: _ansi('0'),
+  bright: _ansi('1'),
+  dim: _ansi('2'),
+  red: _ansi('31'),
+  green: _ansi('32'),
+  yellow: _ansi('33'),
+  cyan: _ansi('36'),
+  magenta: _ansi('35'),
 } as const;
+
+// Non-streaming reasoning calls can take minutes; past this a request is 'blocked' (no verdict), never a hang
+const REQUEST_TIMEOUT_MS = 240_000;
 
 interface CliOptions {
   config?: string;
@@ -484,6 +516,7 @@ class SweepCollectorTransmitter implements IParticleTransmitter {
   appendImageInline(_mimeType: string, _base64Data: string, _label: string, _generator: string, _prompt: string): void { /* no-op */ }
   appendVideoInline(_mimeType: string, _base64Data: string, _label: string, _generator: string): void { /* no-op */ }
   appendHostedResource(_hres: any): void { /* no-op */ }
+  appendVoidNotice(_vnt: any): void { /* no-op */ }
   startFunctionCallInvocation(id: string | null, functionName: string, _expectedArgsFmt: 'incr_str' | 'json_object', args: string | object | null): void {
     this.fnInvocationCount++;
     if (this.firstFnName === null) {
@@ -653,11 +686,13 @@ async function testParameterValue(
   }
 
 
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   try {
     // Execute the request
     const response = await fetchResponseOrTRPCThrow({
       ...dispatch.request,
       name: `Sweep-${sweepDef.name}`,
+      signal: timeoutSignal,
       throwWithoutName: true,
     });
 
@@ -738,6 +773,9 @@ async function testParameterValue(
 
   } catch (error: any) {
     const durationMs = Date.now() - startTime;
+
+    if (timeoutSignal.aborted)
+      return makeResult({ outcome: 'blocked', errorCategory: 'abort', errorMessage: `timeout ${REQUEST_TIMEOUT_MS / 1000}s`, verboseLogs: [`[timeout ${REQUEST_TIMEOUT_MS / 1000}s]`], durationMs });
 
     // Structured HTTP/connection error from fetchResponseOrTRPCThrow
     if (error instanceof TRPCFetcherError) {
@@ -826,10 +864,12 @@ async function _dispatchAndCollect(
       };
   }
 
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   try {
     const response = await fetchResponseOrTRPCThrow({
       ...dispatch.request,
       name: probeLabel,
+      signal: timeoutSignal,
       throwWithoutName: true,
     });
     const body = await response.text();
@@ -864,6 +904,11 @@ async function _dispatchAndCollect(
     return { collector, verboseLogs, debugRequestBody };
 
   } catch (error: any) {
+    if (timeoutSignal.aborted)
+      return {
+        collector, verboseLogs, debugRequestBody,
+        fatalResult: { outcome: 'blocked', errorCategory: 'abort', errorMessage: `timeout ${REQUEST_TIMEOUT_MS / 1000}s`, verboseLogs: [`[timeout ${REQUEST_TIMEOUT_MS / 1000}s]`] },
+      };
     if (error instanceof TRPCFetcherError) {
       const errorMessage = (error.message || '').slice(0, 300);
       const isTransient = error.httpStatus === 503 || error.httpStatus === 429;
@@ -1429,6 +1474,7 @@ function createSingleVendorConfig(dialect: string, key: string, host?: string): 
     case 'groq':
     case 'lmstudio':
     case 'localai':
+    case 'metaai':
     case 'mistral':
     case 'moonshot':
     case 'openrouter':

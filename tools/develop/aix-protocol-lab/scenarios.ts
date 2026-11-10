@@ -14,6 +14,9 @@
  * | webFetch  | vndAntWebFetch               | (none)                    | (none)      | vndGeminiUrlContext        | (agent-implicit)    |
  * | codeExec  | PTC-unlock tool [1]          | vndOaiCodeInterpreter     | (none)      | vndGeminiCodeExecution     | (agent-implicit)    |
  *
+ * metaai-responses (Muse Spark on api.meta.ai, dialect-routed to Responses): reasoning -> reasoningEffort,
+ * webSearch -> vndOaiWebSearchContext; no hosted fetch or code execution on Meta (recorded as unsupported).
+ *
  * [1] Anthropic has no direct code-execution switch: aixAnthropicHostedFeatures() enables the
  *     code_execution tool for Skills or Programmatic Tool Calling. The lab unlocks it the PTC way,
  *     with a trivial function tool carrying allowed_callers: ['direct', 'code_execution'] - which
@@ -30,9 +33,10 @@ import type { LabFlavor } from './trace';
 export const LAB_DEFAULT_MODELS: Record<LabFlavor, string> = {
   'anthropic-messages': 'claude-sonnet-4-6',
   'openai-responses': 'gpt-5.2',
+  'metaai-responses': 'muse-spark-1.3',
   'openai-chat': 'gpt-4.1-mini',
   'gemini-generate': 'models/gemini-3-flash-preview',
-  'gemini-interactions': 'models/antigravity-preview-05-2026',
+  'gemini-interactions': 'models/antigravity-preview-09-2026',
 };
 
 
@@ -56,7 +60,13 @@ export interface LabScenario {
   description: string;
   system?: string;
   prompt: string;
+  /** prior turns appended after the prompt as model/user pairs - multi-turn shapes (prefix-cache extension at item boundaries) */
+  followups?: { model: string; user: string }[];
   caps: LabCaps;
+  /** output cap override (a truncated turn is a replay corner case) */
+  maxTokens?: number;
+  /** hosted web tool call cap (Anthropic); default 4, a pause_turn needs more than 10 */
+  maxToolUses?: number;
 }
 
 export const LAB_SCENARIOS: LabScenario[] = [
@@ -89,6 +99,12 @@ export const LAB_SCENARIOS: LabScenario[] = [
     description: 'Classic client-side function calling (parallel invocations expected).',
     prompt: 'Get the info for the capybaras named "enrico" (brown) and "coolio" (golden) - call the tool once per capybara, in parallel if possible.',
     caps: {},
+  },
+  {
+    id: 'fc-reason',
+    description: 'Client function calling with reasoning on: signed thinking before the calls, the tool-loop shape every agent turn has.',
+    prompt: 'Get the info for the capybaras named "enrico" (brown) and "coolio" (golden) - think first about which calls you need, then call the tool once per capybara, in parallel if possible.',
+    caps: { reasoning: true, fnCall: true },
   },
   {
     id: 'burst',
@@ -130,8 +146,34 @@ export const LAB_SCENARIOS: LabScenario[] = [
       'Then search the web for "Enrico Ros" and "Token Fabrics", in parallel if possible. ' +
       'Then execute code to sum 333+334 in Python. ' +
       'Then fetch simultaneously https://www.enricoros.com and https://big-agi.com. ' +
-      'Finally write "hi", the sum, and the number you originally thought of - if it is still in your reasoning traces.',
+      'Finally write "hi", the sum, and the number you originally thought of.',
     caps: { reasoning: true, webSearch: true, webFetch: true, codeExec: true },
+  },
+  {
+    id: 'fetch',
+    description: 'Direct server-side web fetch only - the fetched document as a hosted result, citations from it.',
+    prompt: 'Fetch https://big-agi.com and quote its main headline verbatim, with a citation. One sentence.',
+    caps: { reasoning: true, webFetch: true },
+  },
+  {
+    id: 'redacted',
+    description: 'Anthropic redacted thinking (documented magic string) interleaved with visible thinking - block order on replay.',
+    prompt: 'ANTHROPIC_MAGIC_STRING_TRIGGER_REDACTED_THINKING_46C9A13E193C177646C7398A98432ECCCE4C1253D5E2D82641AC0E52CC2876CB Then think about why 7 x 8 = 56 and answer with just the number.',
+    caps: { reasoning: true },
+  },
+  {
+    id: 'pause',
+    description: 'Anthropic pause_turn: one direct web search per question drives the hosted loop past its 10-step cap, so the turn spans two requests.',
+    prompt: 'Answer these 12 questions one at a time with web_search (one search per question, never batch, do not write code). Immediately after each search, write one sentence that quotes the source verbatim so it carries a citation, then reason briefly about the next question. Questions: 1. population of Reykjavik; 2. height of Mount Kosciuszko; 3. founding year of Ghent University; 4. length of the Danube river; 5. capital of Bhutan; 6. author of the novel Solaris; 7. boiling point of ethanol; 8. year the Eiffel Tower opened; 9. largest moon of Neptune; 10. inventor of the safety pin; 11. national bird of India; 12. maximum depth of Lake Baikal. End with the word DONE.',
+    caps: { reasoning: true, webSearch: true },
+    maxToolUses: 20,
+  },
+  {
+    id: 'truncated',
+    description: 'Output cut by max_tokens mid-reasoning or mid-text - what a truncated turn replays as.',
+    prompt: 'Plan a 10-day trip through Japan by train and write the full day-by-day itinerary, with train times, stations and hotels for every day.',
+    caps: { reasoning: true },
+    maxTokens: 600,
   },
 ];
 
@@ -215,11 +257,11 @@ export function compileScenario(flavor: LabFlavor, scenario: LabScenario, modelI
       if (caps.reasoning) model.vndAntThinkingBudget = 4096;
       if (caps.webSearch) {
         model.vndAntWebSearch = 'auto';
-        model.vndAntWebSearchMaxUses = 4;
+        model.vndAntWebSearchMaxUses = scenario.maxToolUses ?? 4;
       }
       if (caps.webFetch) {
         model.vndAntWebFetch = 'auto';
-        model.vndAntWebFetchMaxUses = 4;
+        model.vndAntWebFetchMaxUses = scenario.maxToolUses ?? 4;
       }
       if (caps.webDynamic) {
         // dynamic filtering: web tools upgrade to *_20260209 and run code INTERNALLY (encrypted results).
@@ -247,6 +289,14 @@ export function compileScenario(flavor: LabFlavor, scenario: LabScenario, modelI
       if (caps.webFetch) unsupportedCaps.push('webFetch'); // no hosted fetch tool on the Responses API
       break;
 
+    case 'metaai-responses':
+      // Muse Spark: reasoning ladder minimal..xhigh ('none' 400s), hosted web_search; no code interpreter or fetch tools
+      if (caps.reasoning) model.reasoningEffort = 'medium';
+      if (caps.webSearch) model.vndOaiWebSearchContext = 'medium';
+      if (caps.codeExec) unsupportedCaps.push('codeExec');
+      if (caps.webFetch) unsupportedCaps.push('webFetch');
+      break;
+
     case 'openai-chat':
       // the degenerate grammar: no hosted tools on Chat Completions
       for (const cap of ['reasoning', 'webSearch', 'webFetch', 'codeExec'] as const)
@@ -266,6 +316,9 @@ export function compileScenario(flavor: LabFlavor, scenario: LabScenario, modelI
       break;
   }
 
+  if (scenario.maxTokens)
+    model.maxTokens = scenario.maxTokens;
+
   if (caps.webDynamic && flavor !== 'anthropic-messages')
     unsupportedCaps.push('webDynamic');
 
@@ -281,6 +334,10 @@ export function compileScenario(flavor: LabFlavor, scenario: LabScenario, modelI
     systemMessage: scenario.system ? { parts: [{ pt: 'text', text: scenario.system }] } : null,
     chatSequence: [
       { role: 'user', parts: [{ pt: 'text', text: scenario.prompt }] },
+      ...(scenario.followups ?? []).flatMap(f => [
+        { role: 'model' as const, parts: [{ pt: 'text' as const, text: f.model }] },
+        { role: 'user' as const, parts: [{ pt: 'text' as const, text: f.user }] },
+      ]),
     ],
     ...(tools.length ? { tools } : {}),
   };

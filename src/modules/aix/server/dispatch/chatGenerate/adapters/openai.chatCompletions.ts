@@ -5,7 +5,7 @@ import type { OpenAIDialects } from '~/modules/llms/server/openai/openai.access'
 import { AixAPI_Model, AixAPIChatGenerate_Request, AixMessages_ChatMessage, AixMessages_SystemMessage, AixParts_DocPart, AixParts_InlineAudioPart, AixParts_MetaInReferenceToPart, AixTools_ToolDefinition, AixTools_ToolsPolicy } from '../../../api/aix.wiretypes';
 import { OpenAIWire_API_Chat_Completions, OpenAIWire_ContentParts, OpenAIWire_Messages } from '../../wiretypes/openai.wiretypes';
 
-import { AIX_MISSING_TOOL_RESULT_TEXT, aixSpillShallFlush, aixSpillSystemToUser, approxDocPart_To_String, approxMediaUrlPart_To_String } from './adapters.common';
+import { AIX_FORCED_TOOLS_HINT_TEXT, AIX_MISSING_TOOL_RESULT_TEXT, aixFnv1aHex, aixSpillShallFlush, aixSpillSystemToUser, approxDocPart_To_String, approxMediaUrlPart_To_String } from './adapters.common';
 
 
 //
@@ -13,7 +13,7 @@ import { AIX_MISSING_TOOL_RESULT_TEXT, aixSpillShallFlush, aixSpillSystemToUser,
 //
 // - only supports N=1, mainly because the whole ecosystem downstream only supports N=1
 // - not implemented: top_p, parallel_tool_calls, seed (deprecated), stop, user (deprecated -> safety_identifier, prompt_cache_key)
-// - fully ignored at the moment: frequency_penalty, presence_penalty, logit_bias, logprobs, top_logprobs, service_tier
+// - fully ignored at the moment: frequency_penalty, presence_penalty, logit_bias, logprobs, top_logprobs
 // - impedence mismatch: see the notes in the message conversion function for additional decisions, including:
 //   - doc parts embedded as markdown text
 //   - image parts embedded as base64 data URLs
@@ -52,7 +52,7 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
   // [OpenAI] max_tokens is now fully deprecated in favor of max_completion_tokens for all OpenAI models
   const hotFixUseMaxCompletionTokens = openAIDialect === 'openai' || openAIDialect === 'azure';
 
-  // [OpenAI] - o-family and reasoning models: don't support temperature/top_p, use developer role instead of system
+  // [OpenAI] - o-family and reasoning models: strip temperature/top_p (5.2+ take them only at effort 'none'), use developer role instead of system
   const hotFixOpenAIOFamily = (openAIDialect === 'openai' || openAIDialect === 'azure')
     && ['gpt-6', 'gpt-5', 'o4', 'o3', 'o1'].some(_id => model.id === _id || model.id.startsWith(_id + '-') || model.id.startsWith(_id + '.'));
 
@@ -81,6 +81,29 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
   if (openAIDialect === 'openrouter')
     _capTrailingCacheBreakpoints(chatMessages, 4);
 
+  // Forced tool use ('any') -> tool_choice 'auto' + a steering hint in the system message, where the vendor rejects or mishandles
+  // the forced choice; the hint keeps the call rate of the single-tool callers at forced level (mirrors the native Anthropic adapter).
+  // This one condition drives both the hint and _toOpenAIToolChoice.
+  // [OpenRouter] every model: whether a forced call is accepted depends on the upstream provider, and OR relays its 400
+  //   (Anthropic Fable/Mythos 5.x, Opus 5.5, Sonnet 5.5: 'tool_choice: type "tool" and "any" are not supported for this model.';
+  //   the Muse models served by Meta: 'only "auto" is supported')
+  // [Moonshot, 2026-08-17] 'required' 400s while thinking is on (k2.5/k2.6/k2.7-code, probed); K3 and thinking-off requests accept it
+  // [Mistral, 2026-11-09, hypothesis: forcing constrains the call, not the content before it] 'required' and 'any' are accepted, but
+  //   Small 4 writes the answer as text before the forced call, at times a runaway that hits the token cap before any call;
+  //   'auto' + the hint returns the bare call (forced calls on Ministral 8B and Large 3 are clean)
+  const hotFixForcedToolsAsAuto = chatGenerate.toolsPolicy?.type === 'any' && (
+    openAIDialect === 'openrouter'
+    || openAIDialect === 'mistral'
+    || (openAIDialect === 'moonshot' && model.reasoningEffort !== 'none' && !(model.id === 'k3' || model.id.startsWith('kimi-k3')))
+  );
+  if (hotFixForcedToolsAsAuto && chatGenerate.tools?.length) {
+    const firstMessage = chatMessages[0];
+    if (firstMessage?.role === 'system' && typeof firstMessage.content === 'string')
+      firstMessage.content += '\n\n' + AIX_FORCED_TOOLS_HINT_TEXT;
+    else
+      chatMessages.unshift({ role: 'system', content: AIX_FORCED_TOOLS_HINT_TEXT });
+  }
+
   // [DeepSeek, 2026-04-24] When tools are present and thinking isn't disabled, V4 demands reasoning_content on EVERY assistant message in history
   // Inject '' placeholder where missing; real reasoning is attached by _toOpenAIMessages
   if (openAIDialect === 'deepseek' && chatGenerate.tools?.length)
@@ -98,7 +121,7 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     model: model.id,
     messages: chatMessages,
     tools: chatGenerate.tools && _toOpenAITools(chatGenerate.tools, strictToolInvocations),
-    tool_choice: chatGenerate.toolsPolicy && _toOpenAIToolChoice(openAIDialect, chatGenerate.toolsPolicy, model),
+    tool_choice: chatGenerate.toolsPolicy && _toOpenAIToolChoice(chatGenerate.toolsPolicy, hotFixForcedToolsAsAuto),
     parallel_tool_calls: undefined,
     max_tokens: model.maxTokens !== undefined ? model.maxTokens : undefined,
     ...(model.temperature !== null ? { temperature: model.temperature !== undefined ? model.temperature : undefined } : {}),
@@ -162,6 +185,14 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
   if (model.vndOaiReasoningMode && openAIDialect !== 'openrouter')
     throw new Error('OpenAI Chat Completions API does not support the Reasoning Mode parameter (Responses API only)');
 
+  // [2026-09-03, OpenAI] processing tier (native and OpenRouter - other compatible hosts do not know it)
+  if (model.vndOaiServiceTier && (openAIDialect === 'openai' || openAIDialect === 'openrouter')) {
+    // [2026-09-29] 'ultrafast' is Responses-only on native Chat Completions (400); OpenRouter serves it
+    if (model.vndOaiServiceTier === 'ultrafast' && openAIDialect === 'openai')
+      throw new Error('OpenAI Chat Completions API does not support the Ultrafast service tier (Responses API only)');
+    payload.service_tier = model.vndOaiServiceTier;
+  }
+
   // [OpenAI] Vendor-specific reasoning effort
   const reasoningEffort = model.reasoningEffort; // ?? model.vndOaiReasoningEffort;
   if (reasoningEffort
@@ -171,7 +202,9 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     && openAIDialect !== 'nvidianim' // NVIDIA rejects unknown params and gpt-oss strictly validates reasoning_effort - dedicated block below
     && openAIDialect !== 'perplexity' // Perplexity has its own block below with stricter validation
   ) {
-    // for: 'azure' | 'cerebras' | 'cohere' | 'groq' | 'lmstudio' | 'localai' | 'mistral' | 'modular' | 'openai' | 'sakanaai' | 'togetherai' | 'xai'
+    // for: 'azure' | 'cerebras' | 'cohere' | 'groq' | 'lmstudio' | 'localai' | 'metaai' | 'mistral' | 'modular' | 'openai' | 'sakanaai' | 'togetherai' | 'xai'
+    // [2026-09-22, OpenAI] GPT-6 here: 'max' 400s, and function tools 400 unless effort is 'none' (Sol, Luna) or always (Astra);
+    // the native defs route GPT-6 over Responses, so only compatible hosts land on this path
     payload.reasoning_effort = reasoningEffort;
   }
 
@@ -179,8 +212,8 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
   // [Z.ai] GLM thinking mode: 'none' -> disabled, else enabled - https://docs.z.ai/guides/capabilities/thinking-mode. reasoning_effort rides
   //   along: honored on GLM-5.2 (none|high|max) and GLM-5.3 (low|high|max, thinking compulsory - 'disabled' 400s), accepted-and-ignored on
   //   older GLM (live-probed 2026-08-17). Per-model levels are the catalog enumValues, not re-validated here.
-  // [DeepSeek, 2026-04-23] V4 thinking control https://api-docs.deepseek.com/guides/thinking_mode; 'low' keeps reasoning on but skips
-  //   the hidden agentic preamble - the cheap tier
+  // [DeepSeek, 2026-04-23] V4 thinking control https://api-docs.deepseek.com/guides/thinking_mode; low/high/max scale the trace
+  //   (on V4 'low' also skipped a hidden agentic preamble; gone on V4.1-Flash, probed 2026-09-12)
   if (reasoningEffort && (openAIDialect === 'deepseek' || openAIDialect === 'moonshot' || openAIDialect === 'zai')) {
     payload.thinking = { type: reasoningEffort !== 'none' ? 'enabled' : 'disabled' };
     if (reasoningEffort !== 'none') // effort takes effect only when thinking is enabled
@@ -259,14 +292,46 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     _fixVndOaiRestoreMarkdown_Inline(payload);
 
 
-  // [OpenRouter] Vendor-specific web search (native or Exa)
-  if (openAIDialect === 'openrouter' && model.vndOrtWebSearch === 'auto')
-    payload.plugins = [...(payload.plugins || []), {
-      id: 'web',
-      // engine is optional - when undefined, OpenRouter uses native for supported models, falls back to Exa
-      // max_results: 5, // could be configurable in the future
-      // search_prompt: undefined, // could be configurable in the future
-    }];
+  // [OpenRouter, 2026-09-08] Web search and fetch as OpenRouter server tools, or the legacy 'web' plugin where the
+  // client asked for it (endpoints without tool support). Wire facts: aix.wiretypes.openrouter.ts
+  if (openAIDialect === 'openrouter') {
+    const ortSearch = model.vndOrtWebSearch;
+    if (ortSearch?.via === 'plugin')
+      payload.plugins = [...(payload.plugins || []), { id: 'web' }];
+    else if (!skipWebSearchDueToCustomTools) {
+      const ortTools: NonNullable<TRequest['tools']> = [];
+
+      if (ortSearch)
+        ortTools.push({
+          type: 'openrouter:web_search',
+          parameters: {
+            engine: ortSearch.engine,
+            mode: ortSearch.mode,
+            max_results: ortSearch.maxResults,
+            max_uses: ortSearch.maxUses,
+            max_total_results: ortSearch.maxTotalResults,
+            search_context_size: ortSearch.contextSize,
+            max_characters: ortSearch.maxCharacters,
+          },
+        });
+
+      if (model.vndOrtWebFetch)
+        ortTools.push({
+          type: 'openrouter:web_fetch',
+          parameters: {
+            engine: model.vndOrtWebFetch.engine,
+            max_uses: model.vndOrtWebFetch.maxUses,
+            max_content_tokens: model.vndOrtWebFetch.maxContentTokens,
+          },
+        });
+
+      if (ortTools.length) {
+        payload.tools = [...(payload.tools || []), ...ortTools];
+        if (model.vndOrtMaxToolCalls !== undefined)
+          payload.max_tool_calls = model.vndOrtMaxToolCalls;
+      }
+    }
+  }
 
 
   // [OpenRouter, 2026-07-11] Sticky client session id: WE mint this (OpenRouter does not issue session ids) and send it
@@ -274,7 +339,7 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
   // keeps prompt-cache hits alive: caches don't transfer across providers. The affinity id (conversationId/rayId/...) is
   // hashed to avoid shipping internal ids upstream; a 32-bit collision only means two contexts share affinity, harmless.
   if (openAIDialect === 'openrouter' && orSendStickyClientSessionId && sessionAffinityId)
-    payload.session_id = 'bagi-' + _fnv1aHex(sessionAffinityId);
+    payload.session_id = 'bagi-' + aixFnv1aHex(sessionAffinityId);
 
 
   // [Moonshot] Kimi's $web_search builtin function
@@ -316,10 +381,14 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
     if (isTunneledAnt) {
       // Effort -> OpenRouter verbosity -> Anthropic upstream output_config.effort
       // OR verbosity supports low/medium/high/xhigh/max (2026-04-16). 'none'/'minimal' are OpenAI-only.
-      const antEffort = model.reasoningEffort; // ?? model.vndAntEffort;
+      const antThinkingOff = model.vndAntThinkingBudget === null;
+      let antEffort = model.reasoningEffort; // ?? model.vndAntEffort;
       if (antEffort) {
         if (antEffort === 'none' || antEffort === 'minimal') // domain validation
           throw new Error(`OpenRouter->Anthropic API does not support '${antEffort}' reasoning effort`);
+        // [2026-09-23, probed via OR] Opus 5 with thinking off accepts effort <= 'high' only (xhigh/max -> upstream 400) - clamp
+        if (antThinkingOff && (antEffort === 'xhigh' || antEffort === 'max'))
+          antEffort = 'high';
         payload.verbosity = antEffort;
       }
 
@@ -327,14 +396,16 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
       // vndAntThinkingBudget's presence indicates a user preference:
       // - 'adaptive': adaptive thinking (4.6+) - reasoning enabled, no explicit budget
       // - a number: explicit token budget (1024-32000)
-      // - null: disable thinking (don't set reasoning field)
+      // - null: thinking off - explicit `enabled: false`; omitting the field lets on-by-default models (Opus 5) think (probed 2026-09-23)
+      // - undefined: no preference (field omitted, the model's default)
       if (model.vndAntThinkingBudget === 'adaptive') {
         payload.reasoning = { enabled: true };
         delete payload.temperature;
       } else if (typeof model.vndAntThinkingBudget === 'number') {
         payload.reasoning = { enabled: true, max_tokens: model.vndAntThinkingBudget };
         delete payload.temperature;
-      } else /* null or undefined */ {
+      } else if (antThinkingOff) {
+        payload.reasoning = { enabled: false };
         // NOTE: with thinking disabled (null), we can still use temperature, so we don't delete it
         //       see the note on llms.parameters.ts: 'llmVndAntThinkingBudget'
       }
@@ -764,10 +835,11 @@ function _toOpenAIMessages(openAIDialect: OpenAIDialects, systemMessage: AixMess
               let toolCallPart;
               switch (invocation.type) {
                 case 'function_call':
-                  toolCallPart = OpenAIWire_ContentParts.PredictedFunctionCall(part.id, invocation.name, invocation.args || '');
+                  toolCallPart = OpenAIWire_ContentParts.PredictedFunctionCall(aixOpenAICallId(part.id), invocation.name, invocation.args || '');
                   break;
                 case 'code_execution':
-                  toolCallPart = OpenAIWire_ContentParts.PredictedFunctionCall(part.id, 'execute_code' /* suboptimal */, invocation.code || '');
+                  // JSON object arguments, as in every adapter: raw code 400s behind OpenRouter on Anthropic ("Input should be an object")
+                  toolCallPart = OpenAIWire_ContentParts.PredictedFunctionCall(aixOpenAICallId(part.id), 'execute_code' /* suboptimal */, JSON.stringify({ code: invocation.code || '' }));
                   break;
                 default:
                   const _exhaustiveCheck: never = invocation;
@@ -793,7 +865,7 @@ function _toOpenAIMessages(openAIDialect: OpenAIDialects, systemMessage: AixMess
             case 'tool_response':
               const toolErrorPrefix = part.error ? (typeof part.error === 'string' ? `[ERROR] ${part.error} - ` : '[ERROR] ') : '';
               if (part.response.type === 'function_call' || part.response.type === 'code_execution')
-                chatMessages.push(OpenAIWire_Messages.ToolMessage(part.id, toolErrorPrefix + part.response.result));
+                chatMessages.push(OpenAIWire_Messages.ToolMessage(aixOpenAICallId(part.id), toolErrorPrefix + part.response.result));
               else
                 throw new Error(`Unsupported tool response type in Model message: ${(part as any).pt}`);
               break;
@@ -865,16 +937,6 @@ function _stampTrailingCacheBreakpoint(chatMessages: TRequestMessages): void {
   console.warn('AIX: OpenAI-dispatch: cache breakpoint with no stampable text part in any preceding message');
 }
 
-/** FNV-1a 32-bit hex digest - tiny, deterministic, edge-safe; used to mint the OpenRouter sticky client session id. */
-function _fnv1aHex(text: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
-}
-
 /** Enforce the Anthropic 4-breakpoint API limit by un-stamping the earliest (prefix-redundant) breakpoints. */
 function _capTrailingCacheBreakpoints(chatMessages: TRequestMessages, maxBreakpoints: number): void {
   const stampedParts: OpenAIWire_ContentParts.TextContentPart[] = [];
@@ -920,26 +982,15 @@ function _toOpenAITools(itds: AixTools_ToolDefinition[], strictToolInvocations: 
   });
 }
 
-function _toOpenAIToolChoice(openAIDialect: OpenAIDialects, itp: AixTools_ToolsPolicy, model: AixAPI_Model): NonNullable<TRequest['tool_choice']> {
-  // [Mistral] - supports 'auto', 'none', 'any'
-  if (openAIDialect === 'mistral' && itp.type !== 'auto') {
-    // Note: we tried adding the 'any' model, but don't feel comfortable with altering our good parsers
-    // to allow for Mistral's deviation from the de-facto norm set by the OpenAI protocol.
-    throw new Error('We only support automatic tool selection for Mistral models');
-  }
-
+function _toOpenAIToolChoice(itp: AixTools_ToolsPolicy, forcedAsAuto: boolean): NonNullable<TRequest['tool_choice']> {
   // NOTE: OpenAI has an additional policy 'none', which we don't have as it behaves like passing no tools at all.
   //       Passing no tools is mandated instead of 'none'.
   switch (itp.type) {
     case 'auto':
       return 'auto';
     case 'any':
-      // [Moonshot, 2026-08-17] 'required' 400s while thinking is on (k2.5/k2.6/k2.7-code, probed); K3, moonshot-v1
-      // and thinking-off requests accept it. Degrade to 'auto' rather than hard-fail.
-      if (openAIDialect === 'moonshot' && model.reasoningEffort !== 'none'
-        && !(model.id === 'k3' || model.id.startsWith('kimi-k3') || model.id.startsWith('moonshot-v1')))
-        return 'auto';
-      return 'required';
+      // 'auto' where the vendor rejects or mishandles a forced call; the system message then carries the steering hint (hotFixForcedToolsAsAuto)
+      return forcedAsAuto ? 'auto' : 'required';
     // DISABLED 2026-07-17 - forced named tool, see ToolsPolicy_schema. [Moonshot] probe-verified: named tool_choice
     // 400s ("tool_choice 'specified' is incompatible with thinking enabled") on all thinking-mode Kimi requests -
     // always, on the K2.7-code/K3 always-thinking models (re-probed 2026-08-17).
@@ -1001,6 +1052,16 @@ export function aixDocPart_to_OpenAITextContent(part: AixParts_DocPart): OpenAIW
 
 export function aixTexts_to_OpenAIInstructionText(texts: string[]): string {
   return texts.join(approxSystemMessageJoiner);
+}
+
+/** Longest tool call or item id OpenAI accepts, on Responses and Chat Completions alike (OpenRouter forwards it); longer 400s (2026-10-06) */
+export const AIX_OPENAI_MAX_ID_LENGTH = 64;
+
+/** A tool call id OpenAI accepts: the stored one when it fits, else a stable short one - a call and its result map to the same.
+ * Only foreign ids are ever rewritten: vendors' own call ids fit (29-53 chars measured on OpenAI, Meta AI, Sakana, xAI, DeepSeek),
+ * so same-vendor replay stays byte-exact. The long ones are xAI code cells (83 chars), replayed to xAI by its own adapter. */
+export function aixOpenAICallId(id: string): string {
+  return id.length > 0 && id.length <= AIX_OPENAI_MAX_ID_LENGTH ? id : 'aix_' + aixFnv1aHex(id);
 }
 
 

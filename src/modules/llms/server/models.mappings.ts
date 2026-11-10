@@ -13,7 +13,7 @@ import type { ModelDescriptionSchema } from './llm.server.types';
  * Not an "uncatalogued" badge: API-characterized 0-day arrivals stay unmarked.
  *
  * Mark:    type-blind catalogs (ids only), where a video/TTS/embedding id could masquerade as
- *          chat - nvidianim, modular, sakanaai, moonshot, groq, deepseek, alibaba - plus the
+ *          chat - nvidianim, modular, sakanaai, metaai, moonshot, groq, deepseek, alibaba - plus the
  *          'super' resolution below (unknown variant of a known family).
  * Don't:   a type/modality filter proves chat - gemini, xai, together, novita, chutesai, cerebras.
  *
@@ -44,8 +44,10 @@ const _paramIdToInterface: { paramIds: DModelParameterId[], iface: DModelInterfa
       'llmVndAntWebFetch',
       'llmVndAntWebSearch',
       'llmVndGeminiGoogleSearch',
+      'llmVndGeminiUrlContext',
       'llmVndMoonshotWebSearch',
       'llmVndOaiWebSearchContext',
+      'llmVndOrtWebFetch',
       'llmVndOrtWebSearch',
       'llmVndPerplexitySearchMode',
       'llmVndXaiWebSearch',
@@ -76,6 +78,18 @@ export function llmsAutoImplyInterfaces(model: ModelDescriptionSchema): ModelDes
       interfaces = [...interfaces, iface];
 
   return interfaces !== model.interfaces ? { ...model, interfaces } : model;
+}
+
+
+/**
+ * Wire compatibility for clients built before the one-shape cache pricing (2026-09): they switch on `cache.cType`
+ * and throw on an unknown tag. 'ant-bp' when writes are priced, else 'oai-ac'; current clients drop the tag on ingest.
+ * TODO: delete after 2026-12-03, with the schema field and the client strip.
+ */
+export function llmsWireCompatCacheTag(model: ModelDescriptionSchema): ModelDescriptionSchema {
+  const cache = model.chatPrice?.cache;
+  if (!cache || cache.cType) return model;
+  return { ...model, chatPrice: { ...model.chatPrice, cache: { ...cache, cType: cache.write !== undefined ? 'ant-bp' : 'oai-ac' } } };
 }
 
 
@@ -259,9 +273,12 @@ export function fromManualMapping(mappings: ReadonlyArray<KnownModel | KnownLink
   let description = m.description || '';
   if (variant)
     label += ` [${variant}]`;
+  // an unknown variant of a curated base is shown as uncurated, while the base keeps its own `hidden`:
+  // never mutate `m`, it is the shared table entry (a `delete m.hidden` here un-hid the base for every later listing of the process)
+  let hidden = m.hidden;
   if (resolution === 'super') {
     label = llmsLabelUncurated(label);
-    delete m.hidden;
+    hidden = undefined;
   } else if (!disableSymlinkLooks && symlinkTarget) {
     // add a symlink icon to the label
     label = `🔗 ${label} -> ${symlinkTarget/*.replace(known.idPrefix, '')*/}`;
@@ -289,7 +306,7 @@ export function fromManualMapping(mappings: ReadonlyArray<KnownModel | KnownLink
   if (m.maxCompletionTokens) md.maxCompletionTokens = m.maxCompletionTokens;
   if (m.benchmark) md.benchmark = m.benchmark;
   if (m.chatPrice) md.chatPrice = m.chatPrice;
-  if (m.hidden) md.hidden = true;
+  if (hidden) md.hidden = true;
   if (m.initialTemperature !== undefined) md.initialTemperature = m.initialTemperature;
 
   return md;

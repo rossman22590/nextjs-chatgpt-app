@@ -21,6 +21,7 @@ import { GroqIcon } from '~/common/components/icons/vendors/GroqIcon';
 import { LMStudioIcon } from '~/common/components/icons/vendors/LMStudioIcon';
 import { LocalAIIcon } from '~/common/components/icons/vendors/LocalAIIcon';
 import { MiniMaxIcon } from '~/common/components/icons/vendors/MiniMaxIcon';
+import { MetaAIIcon } from '~/common/components/icons/vendors/MetaAIIcon';
 import { MistralIcon } from '~/common/components/icons/vendors/MistralIcon';
 import { ModularIcon } from '~/common/components/icons/vendors/ModularIcon';
 import { MoonshotIcon } from '~/common/components/icons/vendors/MoonshotIcon';
@@ -53,6 +54,7 @@ const vendorIcons: Record<ModelVendorId, React.FunctionComponent<SvgIconProps>> 
   lmstudio: LMStudioIcon,
   localai: LocalAIIcon,
   minimax: MiniMaxIcon,
+  metaai: MetaAIIcon,
   mistral: MistralIcon,
   modular: ModularIcon,
   moonshot: MoonshotIcon,

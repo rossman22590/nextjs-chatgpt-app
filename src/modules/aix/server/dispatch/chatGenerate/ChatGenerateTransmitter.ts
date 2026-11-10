@@ -1,9 +1,10 @@
 import { SERVER_DEBUG_WIRE } from '~/server/wire';
+import type { TRPCFetcherError } from '~/server/trpc/trpc.router.fetchers';
 import { serverSideId } from '~/server/trpc/trpc.nanoid';
 
 import { objectDeepCloneWithStringLimit, objectEstimateJsonSize, objectStringifyWithIndentDepth } from '~/common/util/objectUtils';
 
-import type { AixWire_Particles } from '../../api/aix.wiretypes';
+import { AixWire_Particles } from '../../api/aix.wiretypes';
 
 import type { IParticleTransmitter, ParticleCGDialectEndReason, ParticleServerLogLevel } from './parsers/IParticleTransmitter';
 
@@ -11,6 +12,24 @@ import type { IParticleTransmitter, ParticleCGDialectEndReason, ParticleServerLo
 // configuration
 const ENABLE_EXTRA_DEV_MESSAGES = true;
 const DEBUG_REQUEST_MAX_STRING_BYTES = 2048;
+
+// query-string credentials (Gemini's `?key=`, and anything named like one) never reach the client
+const DEBUG_REQUEST_URL_SECRET_PARAMS = new Set(['key', 'api_key', 'apikey', 'api-key', 'token', 'access_token', 'sig', 'signature']);
+
+function _redactUrlSecrets(url: string): string {
+  try {
+    const parsed = new URL(url);
+    let redacted = false;
+    for (const name of [...parsed.searchParams.keys()])
+      if (DEBUG_REQUEST_URL_SECRET_PARAMS.has(name.toLowerCase())) {
+        parsed.searchParams.set(name, 'hidden');
+        redacted = true;
+      }
+    return redacted ? parsed.toString() : url;
+  } catch {
+    return url.split('?')[0]; // unparsable: drop the whole query string
+  }
+}
 
 /**
  * This is enabled by default because probabilistically unlikely -- however there will be false positives/negatives.
@@ -25,6 +44,21 @@ export const IssueSymbols = {
   Recitation: '🦜',
   Language: '🌐',
 };
+
+/** [dispatch-fetch] TRPCFetcherError -> issue cause: system error name (connection), or HTTP status and vendor body code (http) */
+export function trpcFetcherError_to_IssueCause(error: unknown): AixWire_Particles.CGIssueCause | undefined {
+  const fe = error as Partial<TRPCFetcherError> | undefined;
+  if (fe?.name !== 'TRPCFetcherError') return undefined;
+  const causeConn = fe.category === 'connection' ? _machineShaped(fe.connErrorName) : undefined;
+  const causeHttpStatus = fe.category === 'http' ? fe.httpStatus : undefined;
+  const causeVendorCode = fe.category === 'http' ? _machineShaped(fe.httpErrorCode) : undefined;
+  return (causeConn || causeHttpStatus || causeVendorCode) ? { ...(causeConn && { causeConn }), ...(causeHttpStatus && { causeHttpStatus }), ...(causeVendorCode && { causeVendorCode }) } : undefined;
+}
+
+/** codes only, never prose: these may leave the server (analytics) */
+function _machineShaped(value: unknown): string | undefined {
+  return typeof value === 'string' && /^[\w.:-]{1,64}$/.test(value) ? value : undefined;
+}
 
 
 /**
@@ -142,7 +176,7 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
       cg: '_debugDispatchRequest',
       security: 'dev-env',
       dispatchRequest: {
-        url: url,
+        url: hideSensitiveData ? _redactUrlSecrets(url) : url,
         headers: hideSensitiveData ? '(hidden sensitive data)' : JSON.stringify(headers, null, 2),
         body: processedBody,
         bodySize: body ? objectEstimateJsonSize(body, 'aix.addDebugRequest') : 0,
@@ -178,8 +212,8 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
     | 'dispatch-fetch'
     | 'dispatch-read'
     | 'dispatch-parse'
-  >, issueText: string, serverLog: ParticleServerLogLevel) {
-    this._addIssue(issueId, issueText, serverLog);
+  >, issueText: string, serverLog: ParticleServerLogLevel, issueCause?: AixWire_Particles.CGIssueCause) {
+    this._addIssue(issueId, issueText, serverLog, issueCause);
     this.setDispatchEnded('issue-dispatch-rpc');
   }
 
@@ -209,7 +243,9 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
     if (this.tokenStopReason && this.tokenStopReason !== reason)
       console.warn(`[Aix.${this.prettyDialect}] setTokenStopReason('${reason}'): already has token stop reason '${this.tokenStopReason}' (overriding)`);
     this.tokenStopReason = reason;
-    if (errorText) this.tokenStopError = errorText;
+    // STOPGAP #1288 - REVERT to `if (errorText) this.tokenStopError = errorText;` with the typed errors: a later stop reason replaces
+    // the text here only so that a held OpenAI Responses error is dropped when its terminal event arrives
+    this.tokenStopError = errorText || undefined;
   }
 
 
@@ -372,11 +408,17 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
     this.transmissionQueue.push(hres);
   }
 
+  /** Appends a void notice - inline between text fragments, display-only */
+  appendVoidNotice(vnt: Extract<AixWire_Particles.PartParticleOp, { p: 'vnt' }>) {
+    this.endMessagePart();
+    this.transmissionQueue.push(vnt);
+  }
+
 
   /**
    * Undocumented, internal, as the IPartTransmitter callers will call setDialectTerminatingIssue instead
    */
-  private _addIssue(issueId: AixWire_Particles.CGIssueId, issueText: string, serverLog: ParticleServerLogLevel) {
+  private _addIssue(issueId: AixWire_Particles.CGIssueId, issueText: string, serverLog: ParticleServerLogLevel, issueCause?: AixWire_Particles.CGIssueCause) {
     if (serverLog || ENABLE_EXTRA_DEV_MESSAGES || SERVER_DEBUG_WIRE) {
       const logLevel = serverLog === 'srv-warn' ? 'warn' as const : 'log' as const;
       console[logLevel](`Aix.${this.prettyDialect} ${issueId}: ${issueText}`);
@@ -384,10 +426,27 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
 
     // queue the issue
     this.endMessagePart();
+
+    // after a clean or truncated stop reason the response content is final: a later issue is a notice, never content -
+    // an error fragment would make the stored outcome 'failed' (a clean stop is stored as no stop reason, so the trailing
+    // error decides) and be replayed to the model on the next turn. After an error stop reason, the issue is its explanation.
+    if (this.tokenStopReason !== undefined && AixWire_Particles.gcStopReasonRow(this.tokenStopReason)?.class !== 'error') {
+      this.transmissionQueue.push({
+        p: 'vnt',
+        nt: 'late-issue',
+        issueId,
+        text: 'Issue after the response ended',
+        detail: issueText.trim(),
+        level: 'warn',
+      });
+      return;
+    }
+
     this.transmissionQueue.push({
       cg: 'issue',
       issueId,
       issueText,
+      ...(issueCause && { issueCause }),
     });
   }
 

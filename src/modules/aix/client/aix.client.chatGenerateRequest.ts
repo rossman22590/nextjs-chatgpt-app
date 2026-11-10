@@ -1,15 +1,17 @@
 import type { Immutable } from '~/common/types/immutable.types';
+import { findLastUserPromptFragment } from '~/common/stores/chat/chat.fragment-order';
 import { getImageAsset } from '~/common/stores/blob/dblobs-portability';
 
 import { DLLM, LLM_IF_ANT_PromptCaching, LLM_IF_HOTFIX_NoStream, LLM_IF_HOTFIX_NoWebP, LLM_IF_HOTFIX_StripImages, LLM_IF_HOTFIX_StripSys0, LLM_IF_HOTFIX_Sys0ToUsr0 } from '~/common/stores/llms/llms.types';
 import { DMessage, DMessageRole, DMetaReferenceItem, MESSAGE_FLAG_AIX_SKIP, MESSAGE_FLAG_VND_ANT_CACHE_AUTO, MESSAGE_FLAG_VND_ANT_CACHE_USER, messageHasUserFlag } from '~/common/stores/chat/chat.message';
-import { DMessageFragment, DMessageImageRefPart, DMessageZyncAssetReferencePart, hostedResourceMutedText, isContentOrAttachmentFragment, isToolResponseFunctionCallPart, isVoidThinkingFragment } from '~/common/stores/chat/chat.fragments';
+import { DMessageFragment, DMessageImageRefPart, DMessageZyncAssetReferencePart, hostedResourceMutedText, isContentOrAttachmentFragment, isToolResponseFunctionCallPart, isUnstampedFragment, isVoidThinkingFragment } from '~/common/stores/chat/chat.fragments';
 import { Is } from '~/common/util/pwaUtils';
 import { convert_Base64WithMimeType_To_Blob, convert_Blob_To_Base64 } from '~/common/util/blobUtils';
 import { imageBlobConvertType, imageBlobResizeIfNeeded, LLMImageResizeMode } from '~/common/util/imageUtils';
 
 // NOTE: pay particular attention to the "import type", as this is importing from the server-side Zod definitions
 import type { AixAPIChatGenerate_Request, AixMessages_ModelMessage, AixMessages_UserMessage, AixParts_InlineImagePart, AixParts_MetaCacheControl, AixParts_MetaInReferenceToPart, AixParts_ModelAuxPart } from '../server/api/aix.wiretypes';
+import { AixWire_Vendors } from '../server/api/aix.wiretypes';
 
 // TODO: remove console messages to zero, or replace with throws or something
 
@@ -69,7 +71,7 @@ function aixCGRTextPart(text: string) {
 
 
 export async function aixCGR_SystemMessage_FromDMessageOrThrow(
-  systemInstruction: null | Pick<DMessage, 'fragments' | 'metadata' | 'userFlags'>,
+  systemInstruction: null | Pick<Immutable<DMessage>, 'fragments' | 'metadata' | 'userFlags'>,
 ): Promise<AixAPIChatGenerate_Request['systemMessage']> {
 
   // quick bypass for no message
@@ -262,7 +264,7 @@ export async function aixCGR_SystemMessage_FromDMessageOrThrow(
 
 
 export async function aixCGR_ChatSequence_FromDMessagesOrThrow(
-  messageSequenceWithoutSystem: Readonly<Pick<DMessage, 'role' | 'fragments' | 'metadata' | 'userFlags'>[]>, // Note: adding the "Pick" to show the low requirement from the DMessage type, as we'll move to simpler APIs soon
+  messageSequenceWithoutSystem: Readonly<Pick<Immutable<DMessage>, 'role' | 'fragments' | 'metadata' | 'userFlags'>[]>, // Note: adding the "Pick" to show the low requirement from the DMessage type, as we'll move to simpler APIs soon
   // _assemblyMode: 'complete' = 'complete',
 ): Promise<AixAPIChatGenerate_Request['chatSequence']> {
 
@@ -286,6 +288,8 @@ export async function aixCGR_ChatSequence_FromDMessagesOrThrow(
     if (dMessageRole === 'user') {
 
       const dMessageUserFragments = m.fragments;
+      let inReferenceToInsertIndex = 0;
+      const lastPromptFragmentId = findLastUserPromptFragment(dMessageUserFragments)?.fId;
       const aixChatMessageUser = await dMessageUserFragments.reduce(async (uMsgPromise, uFragment: DMessageFragment) => {
 
         const uMsg = await uMsgPromise;
@@ -295,6 +299,9 @@ export async function aixCGR_ChatSequence_FromDMessagesOrThrow(
         switch (uFragment.part.pt) {
           case 'text':
             uMsg.parts.push(uFragment.part);
+            // In-reference-to goes after the authored text; without any, after the leading stamped text (e.g. persona prefix) - inside the outer prefix/suffix either way.
+            if (uFragment.fId === lastPromptFragmentId || (!lastPromptFragmentId && !isUnstampedFragment(uFragment) && inReferenceToInsertIndex === uMsg.parts.length - 1))
+              inReferenceToInsertIndex = uMsg.parts.length;
             break;
 
           case 'reference':
@@ -388,12 +395,9 @@ export async function aixCGR_ChatSequence_FromDMessagesOrThrow(
         return uMsg;
       }, Promise.resolve({ role: 'user', parts: [] } as AixMessages_UserMessage));
 
-      // handle in-reference-to metadata, adding a part right after the user text (or at the beginning)
+      // handle in-reference-to metadata (the quoted text the user replies to): after the authored prompt, independent of attachment order and muted media
       if (m.metadata?.inReferenceTo?.length) {
-        // find the index of the last text part
-        const lastTextPartIndex = aixChatMessageUser.parts.findLastIndex(p => p.pt === 'text');
-        // insert the meta part after the last text part (and before the first attachment)
-        aixChatMessageUser.parts.splice(lastTextPartIndex + 1, 0, _clientCreateAixMetaInReferenceToPart(m.metadata.inReferenceTo));
+        aixChatMessageUser.parts.splice(inReferenceToInsertIndex, 0, _clientCreateAixMetaInReferenceToPart(m.metadata.inReferenceTo));
       }
 
       // (on User messages) handle the ant-cache-prompt user/auto flags
@@ -405,6 +409,7 @@ export async function aixCGR_ChatSequence_FromDMessagesOrThrow(
     } else if (dMessageRole === 'assistant') {
 
       const modelMessage: AixMessages_ModelMessage = { role: 'model', parts: [] };
+      let modelErrorParts = 0;
 
       for (const aFragment of m.fragments) {
 
@@ -425,12 +430,12 @@ export async function aixCGR_ChatSequence_FromDMessagesOrThrow(
           case 'ma':
             // Preserve reasoning continuity across turns. Three channels, any one is sufficient:
             // - Anthropic: part.textSignature / part.redactedData (bespoke fields, see Anthropic extended thinking docs)
-            // - OpenAI Responses / Gemini: _vnd sidecar (reasoningItem.* / thoughtSignature, opaque continuity handle)
+            // - Responses vendors (AixWire_Vendors.RSP_VENDORS) / Gemini: _vnd sidecar (reasoningItem.* / thoughtSignature, opaque continuity handle)
             // - DeepSeek V4 (OpenAI chat-completions): plain reasoning text in aText is the payload itself
-            const oaiReasoning = _vnd?.openai?.reasoningItem;
+            const rspReasoning = _vnd && AixWire_Vendors.RSP_VENDORS.map(d => _vnd[d]?.reasoningItem).find(r => !!r); // any namespace: the adapter replays only its own; Muse Spark often returns an empty summary, so the handle is the only signal
             const hasReasoningHandle =
               (aPart.textSignature || aPart.redactedData?.length)
-              || (oaiReasoning?.encryptedContent || oaiReasoning?.id)
+              || (rspReasoning?.encryptedContent || rspReasoning?.id)
               || (aPart.aText && aPart.aType === 'reasoning'); // DeepSeek V4 reasoning in plain text - NOTE: will send LOTS of 'ma' parts (e.g. to Gemini, which doesn't even need them)
             if (hasReasoningHandle) {
               const aModelAuxPart = aPart as AixParts_ModelAuxPart; // NOTE: this is a forced cast from readonly string[] to string[], but not a big deal here
@@ -449,8 +454,10 @@ export async function aixCGR_ChatSequence_FromDMessagesOrThrow(
             break;
 
           case 'error':
-            // Note: the llm will receive the extra '[ERROR]' text; this could be optimized to handle errors better
+            // after content, the error tells the model what went wrong (a cut reply, a failed image); a turn of errors alone is not sent (below)
+            // TODO: AIX typed errors - a per-error replay policy replaces this '[ERROR]' text and the errors-alone rule
             modelMessage.parts.push({ pt: 'text', text: `[ERROR] ${aPart.error}` });
+            modelErrorParts++;
             break;
 
           case 'reference':
@@ -565,7 +572,10 @@ export async function aixCGR_ChatSequence_FromDMessagesOrThrow(
         }
       }
 
-      if (modelMessage.parts.length > 0) {
+      // a turn of errors alone (e.g. a rejected request) is not sent: the model never answered, and with the error in its place it treats the user's prompt as handled;
+      // the user turns around it become adjacent, as with a skipped or an empty assistant message
+      // DISABLED: not enough testing, will need to monitor this
+      if (modelMessage.parts.length > 0 /* modelErrorParts: DISABLED */) {
 
         // (on Assistant messages) handle the ant-cache-prompt user/auto flags, on the very last message
         if (mHasAntCacheFlag)
@@ -614,7 +624,7 @@ export async function aixConvertZyncImageAssetRefToInlineImageOrThrow(assetRefPa
   throw new Error(`Asset reference ${assetRefPart.zUuid} - Asset system not yet implemented or legacy fallback missing`);
 }
 
-export async function aixConvertImageRefToInlineImageOrThrow(imageRefPart: DMessageImageRefPart, resizeMode: LLMImageResizeMode | false): Promise<AixParts_InlineImagePart> {
+export async function aixConvertImageRefToInlineImageOrThrow(imageRefPart: Immutable<DMessageImageRefPart>, resizeMode: LLMImageResizeMode | false): Promise<AixParts_InlineImagePart> {
 
   // validate
   const { dataRef } = imageRefPart;
@@ -676,8 +686,8 @@ function _clientCreateAixMetaCacheControlPart(control: AixParts_MetaCacheControl
   return { pt: 'meta_cache_control', control: control };
 }
 
-function _clientCreateAixMetaInReferenceToPart(items: DMetaReferenceItem[]): AixParts_MetaInReferenceToPart {
-  return { pt: 'meta_in_reference_to', referTo: items };
+function _clientCreateAixMetaInReferenceToPart(items: Immutable<DMetaReferenceItem[]>): AixParts_MetaInReferenceToPart {
+  return { pt: 'meta_in_reference_to', referTo: items.map(refItem => ({ ...refItem })) };
 }
 
 

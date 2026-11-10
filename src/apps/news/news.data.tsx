@@ -73,6 +73,28 @@ export const DevNewsItem: NewsItem = {
 // news and feature surfaces
 export const NewsItems: NewsItem[] = [
   {
+    versionCode: '2.1.3',
+    versionName: 'Doxy Foxy',
+    versionDate: new Date('2026-10-27T12:00:00Z'),
+    items: [
+      { text: <><B>Docs</B> and <B>What&apos;s New</B> inside the app</> },
+      { text: <>Replies that ran out of tokens are marked apart from failures</> },
+      { text: <>Fix: Next.js 15.5 minifier breakages</> },
+    ],
+  },
+  {
+    versionCode: '2.1.2',
+    versionName: 'Render Tree',
+    versionDate: new Date('2026-10-25T12:00:00Z'),
+    items: [
+      { text: <><B>GPT-6</B>, <B>Opus 5.5</B>, <B>Fable 5.1</B>, <B>Sonnet/Haiku 5.5</B>, <B>Gemini 4 Argon</B>, <B>DeepSeek V4.1</B>, Grok 4.7, Kimi K3.1</> },
+      { text: <>New vendor: <B>Meta AI</B> (Muse); BaseTen via Custom OpenAI</> },
+      { text: <>Edit session: reorder blocks, edit documents, add and reorder attachments</> },
+      { text: <>Rendering: adaptive streaming markdown, HTML blocks, task lists, timestamps, user markdown</> },
+      { text: <>Security: server Gemini key fix, Next.js 15.5, Node 24.22 image</> },
+    ],
+  },
+  {
     versionCode: '2.1.1',
     versionName: 'Weights Dust',
     versionDate: new Date('2026-08-27T00:00:00Z'),
@@ -327,7 +349,7 @@ export const NewsItems: NewsItem[] = [
       { text: <>Desktop <B issue={253}>webcam access</B> for direct image capture (Labs option)</> },
       { text: <>Independent browsing with <B code='/docs/config-feature-browse.md'>Browserless</B> support</> },
       { text: <><B issue={256}>Overheat</B> LLMs with higher temperature limits</> },
-      { text: <>Enhanced security via <B code='/docs/deploy-authentication.md'>password protection</B></> },
+      { text: <>Enhanced security via <B href={Brand.Docs.Public('self-host-configuration')}>password protection</B></> },
       { text: <>{platformAwareKeystrokes('Ctrl+Shift+O')}: quick access to model options</> },
       { text: <>Optimized voice input and performance</> },
       { text: <>Latest Ollama models</> },

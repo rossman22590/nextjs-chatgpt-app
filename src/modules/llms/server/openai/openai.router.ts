@@ -2,7 +2,7 @@ import * as z from 'zod/v4';
 import { TRPCError } from '@trpc/server';
 
 import { createTRPCRouterEdge, edgeProcedure } from '~/server/trpc/trpc.server-edge';
-import { fetchJsonOrTRPCThrow, fetchResponseOrTRPCThrow, TRPCFetcherError } from '~/server/trpc/trpc.router.fetchers';
+import { fetchJsonOrTRPCThrow, fetchResponseOrTRPCThrow, fetchTextOrTRPCThrow, TRPCFetcherError } from '~/server/trpc/trpc.router.fetchers';
 import { serverCapitalizeFirstLetter } from '~/server/wire';
 
 import { convert_Base64_To_UInt8Array, convert_UInt8Array_To_Base64 } from '~/common/util/blobUtils';
@@ -18,7 +18,7 @@ import { WireOpenRouterCreateImagesRequest, wireOpenRouterCreateImagesResponseSc
 import { ListModelsResponse_schema, ModelDescriptionSchema } from '../llm.server.types';
 import { listModelsRunDispatch } from '../listModels.dispatch';
 
-import { openAIAccess, OpenAIAccessSchema, openAIAccessSchema, OPENAI_API_PATHS, OPENROUTER_API_PATHS } from './openai.access';
+import { OPENAI_API_PATHS, openAIAccess, openAIAccessSchema, OpenAIAccessSchema, OPENROUTER_API_PATHS } from './openai.access';
 
 
 // Router Input/Output Schemas
@@ -39,40 +39,18 @@ const createImageConfigGI = _createImageConfigBase.extend({
   model: OpenAIWire_API_Images_Generations.GptImageModels_schema,
   prompt: z.string().max(32000),
   size: z.enum([/*'auto',*/ '1024x1024', '1536x1024', '1024x1536']),
-  quality: z.enum(['high', 'medium', 'low']).optional(),
+  quality: z.enum(['max', 'xhigh', 'high', 'medium', 'low']).optional(), // 'max'/'xhigh': gpt-image-2.5 and 2.6 only - the client clamps
   background: z.enum(['auto', 'transparent', 'opaque']).optional(),
   output_format: z.enum(['png', 'jpeg', 'webp']).optional(),
   output_compression: z.number().min(0).max(100).int().optional(),
   moderation: z.enum(['low', 'auto']).optional(),
 });
 
-// DALL-E 3
-const createImageConfigD3 = _createImageConfigBase.extend({
-  model: z.literal('dall-e-3'),
-  count: z.number().min(1).max(1), // DALL-E 3 only supports n=1
-  prompt: z.string().max(4000),
-  quality: z.enum(['standard', 'hd']),
-  size: z.enum(['1024x1024', '1792x1024', '1024x1792']),
-  style: z.enum(['vivid', 'natural']).optional(),
-  response_format: z.enum([/*'url',*/ 'b64_json']).optional(),
-});
-
-// DALL-E 2
-const createImageConfigD2 = _createImageConfigBase.extend({
-  model: z.literal('dall-e-2'),
-  prompt: z.string().max(1000),
-  quality: z.literal('standard').optional(),
-  size: z.enum(['256x256', '512x512', '1024x1024']),
-  response_format: z.enum([/*'url',*/ 'b64_json']).optional(),
-});
-
 // [LocalAI] simple default configuration
 const createImageConfigLocalAI = _createImageConfigBase.extend({
   model: z.enum([
-    'stablediffusion', // default, mapped to 'gpt-image-1'
-    'dreamshaper', // mapped to 'high', mapped to 'gpt-image-1-mini'
-    'sd-3.5-large-ggml', // mapped to 'medium', mapped to 'dall-e-3'
-    'sd-3.5-medium-ggml', // mapped to 'medium', mapped to 'dall-e-2'
+    'stablediffusion', // default, for the gpt-image models
+    'dreamshaper', // for 'gpt-image-1-mini'
   ]),
   prompt: z.string(),
   size: z.enum([
@@ -85,14 +63,16 @@ const createImageConfigLocalAI = _createImageConfigBase.extend({
 });
 
 
+function _isGptImageConfig(config: CreateImagesInputSchema['generationConfig']): config is z.infer<typeof createImageConfigGI> {
+  return OpenAIWire_API_Images_Generations.GptImageModels_schema.safeParse(config.model).success;
+}
+
 export type CreateImagesInputSchema = z.infer<typeof createImagesInputSchema>;
 const createImagesInputSchema = z.object({
   access: openAIAccessSchema,
   // for this object sync with <> OpenAIWire_API_Images_Generations.Request_schema
   generationConfig: z.discriminatedUnion('model', [
-    createImageConfigGI, // handles both gpt-image-1 and gpt-image-1-mini
-    createImageConfigD3,
-    createImageConfigD2,
+    createImageConfigGI,
     createImageConfigLocalAI,
   ]),
   editConfig: z.object({
@@ -185,6 +165,26 @@ export const llmOpenAIRouter = createTRPCRouterEdge({
       };
     }),
 
+  /* [OpenAI] Containers API - delete a container file (the container itself expires on its own) */
+  containerFileDelete: edgeProcedure
+    .input(z.object({
+      access: openAIAccessSchema,
+      containerId: z.string(),
+      fileId: z.string(),
+    }))
+    .mutation(async ({ input: { access, containerId, fileId } }) => {
+      const { headers, url } = openAIAccess(access, null, `/v1/containers/${containerId}/files/${fileId}`);
+      try {
+        await fetchTextOrTRPCThrow({ url, headers, method: 'DELETE', name: 'OpenAI' });
+        return { success: true, alreadyGone: false };
+      } catch (error: any) {
+        // 404: the file is gone, or the whole container expired ("Container is expired.") - the outcome the caller wanted
+        if (error instanceof TRPCFetcherError && error.httpStatus === 404)
+          return { success: true, alreadyGone: true };
+        throw error;
+      }
+    }),
+
 
   /* [OpenAI/LocalAI] images/generations */
   createImages: edgeProcedure
@@ -194,18 +194,12 @@ export const llmOpenAIRouter = createTRPCRouterEdge({
       const { access, generationConfig: config, editConfig } = input;
 
       // Determine if this is an edit request (any member of the GPT Image family supports edits)
-      const isGptImageFamily = config.model === 'gpt-image-2' || config.model === 'gpt-image-1.5' || config.model === 'gpt-image-1' || config.model === 'gpt-image-1-mini';
+      const isGptImageFamily = _isGptImageConfig(config);
       const isEdit = !!editConfig?.inputImages?.length && isGptImageFamily;
 
       // validate input
       if (isEdit && !isGptImageFamily)
         throw new TRPCError({ code: 'BAD_REQUEST', message: `Image editing is only supported for GPT Image models` });
-      if (config.model === 'dall-e-3' && config.count > 1)
-        throw new TRPCError({ code: 'BAD_REQUEST', message: `[OpenAI Issue] dall-e-3 model does not support more than 1 image` });
-      // if (config.model !== 'gpt-image-1' && (config.background || config.moderation || config.output_compression || config.output_format))
-      //   throw new TRPCError({ code: 'BAD_REQUEST', message: `[OpenAI Issue] background, moderation, output_compression, output_format are only supported for gpt-image-1` });
-      // if (config.model !== 'dall-e-3' && config.style)
-      //   throw new TRPCError({ code: 'BAD_REQUEST', message: `[OpenAI Issue] style is only supported for dall-e-3` });
 
 
       // Prepare request body (JSON for generation, FormData for edit)
@@ -216,7 +210,7 @@ export const llmOpenAIRouter = createTRPCRouterEdge({
 
         const { model, count, ...restConfig } = config;
         requestBody = {
-          ...restConfig, // includes response_format for dall-e-3 and dall-e-2 models
+          ...restConfig, // includes response_format for LocalAI
           model: model as any, // [LocalAI] Fix: LocalAI wants 'stablediffusion' as model name
           n: count,
           user: config.user || 'Big-AGI',
@@ -238,7 +232,6 @@ export const llmOpenAIRouter = createTRPCRouterEdge({
         if (count > 1) requestBody.append('n', '' + count);
         if (quality && (quality as string) !== 'auto') requestBody.append('quality', quality);
         if (size && (size as string) !== 'auto') requestBody.append('size', size);
-        // if (model === 'dall-e-2') requestBody.append('response_format', 'b64_json');
         requestBody.append('user', user || 'Big-AGI');
 
         // append input images
@@ -358,6 +351,9 @@ export const llmOpenAIRouter = createTRPCRouterEdge({
             model: config.model,
             prompt: config.prompt,
             ...(config.count > 1 && { n: config.count }), // note: the current client fans out count=1 requests instead, as most models cap n at 1
+            // least-strict content filters: BFL safety_tolerance 0-5 (default 2; >5 needs BFL authorization), OpenAI as the direct GPT Image default
+            ...(config.model.startsWith('black-forest-labs/') && { provider: { options: { 'black-forest-labs': { safety_tolerance: 5 } } } }),
+            ...(config.model.startsWith('openai/') && { provider: { options: { 'openai': { moderation: 'low' } } } }),
           },
           OPENROUTER_API_PATHS.images,
           signal,
@@ -451,10 +447,10 @@ export const llmOpenAIRouter = createTRPCRouterEdge({
   dialectLocalAI_galleryModelsJob: edgeProcedure
     .input(z.object({
       access: openAIAccessSchema,
-      jobId: z.string(),
+      jobId: z.guid(), // LocalAI job uuid
     }))
     .query(async ({ input: { access, jobId } }) => {
-      const wireLocalAIModelsJobs = await openaiGETOrThrow(access, `/models/jobs/${jobId}`);
+      const wireLocalAIModelsJobs = await openaiGETOrThrow(access, `/models/jobs/${encodeURIComponent(jobId)}`);
       return wireLocalAIModelsListOutputSchema.parse(wireLocalAIModelsJobs);
     }),
 

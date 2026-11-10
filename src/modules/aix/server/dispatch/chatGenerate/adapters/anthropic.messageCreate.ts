@@ -11,7 +11,6 @@ import { AIX_MISSING_TOOL_RESULT_TEXT, aixSpillShallFlush, aixSpillSystemToUser,
 // configuration
 // const DEFAULT_WEB_FETCH_MAX_USES = 5; // we don't set a default anymore, we let it be
 // const DEFAULT_WEB_SEARCH_MAX_USES = 10; // we don't set a default anymore, we let it be
-const hotFixImagePartsFirst = true;
 const hotFixMapModelImagesToUser = true;
 const hotFixDisableThinkingWhenToolsForced = true; // "Thinking may not be enabled when tool_choice forces tool use."
 const hotFixAntSeparateContiguousThinkingBlocks = true; // Interleave continuous thinking blocks (without aText) with the following text block, instead of merging them into a single block - should be more robust to unexpected thinking block formats and to changes in the thinking block format, as we have seen some variations and we might see more in the future
@@ -37,7 +36,7 @@ export type AixAnthropicTarget = 'anthropic' | 'bedrock';
  * Determines which Anthropic hosted features will be active for a request.
  * Single source of truth for both the request builder (tools, container) and the dispatch (beta headers).
  */
-export function aixAnthropicHostedFeatures(model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request): AnthropicHostedFeatures {
+export function aixAnthropicHostedFeatures(model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request, target: AixAnthropicTarget = 'anthropic'): AnthropicHostedFeatures {
 
   // Allow/deny auto-adding hosted tools when custom tools are present with a restrictive policy
   const _hasAixCustomTools = chatGenerate.tools?.some(t => t.type === 'function_call');
@@ -76,6 +75,11 @@ export function aixAnthropicHostedFeatures(model: AixAPI_Model, chatGenerate: Ai
     enableSkills: !!model.vndAntSkills,
     enableStrictOutputs: !!model.strictJsonOutput || !!model.strictToolInvocations,
     enableToolAdvanced20251120: !!model.vndAntToolSearch || programmaticToolCalling,
+    // Claude API: every thinking request. Bedrock takes the flag per model deployment (probed: 'invalid beta flag' on Opus 4.5; accepted on
+    // Opus/Sonnet 4.6 and Haiku 4.5, where the response then carries input_transformations) and 400s block_binding without it, so there it
+    // is sent only to the models that run the prefix check on Bedrock.
+    // [Bedrock, 2026-11-09, hypothesis: Fable/Mythos 5.2 take the flag and 400 an edited history without it - both documented, neither probed: our account 403s on these models]
+    enableThinkingBindingControls: target === 'anthropic' || /claude-(fable|mythos)-5-2/.test(model.id),
     modelIdForPerModelFeatures: model.id,
   };
 }
@@ -215,17 +219,27 @@ export function aixToAnthropicMessageCreate(target: AixAnthropicTarget, model: A
     delete payload.temperature;
   }
 
-  // [Anthropic, 2026-06-09] Fable 5 / Mythos 5: adaptive is the only thinking mode - 'enabled' (budget_tokens) and 'disabled' return 400
-  // [2026-07-24] Opus 5 launch-verified: adaptive-only too ('enabled'/budget_tokens return 400), so 'opus' stays in this regex.
-  // (Opus 5 nuance: 'disabled' is legal at effort <= high, but we coerce to adaptive anyway - single always-thinking entry.)
-  const hotFixAdaptiveThinkingOnlyModel = /claude-(fable|mythos|opus)-5/.test(model.id);
+  // [Anthropic] Thinking and tool-choice constraints by family, newest first (all probed live):
+  //   Fable/Mythos 5.x, Opus 5.5        adaptive only, always on: 'disabled' 400; forced tool_choice ('any'/'tool') 400
+  //   Sonnet 5.5                        adaptive only; on by default; off is 'between_tools' ('disabled' 400) at effort <= high only (clamped below); forced tool_choice 400
+  //   Opus 5, Haiku 5.5                 adaptive only; on by default; 'disabled' OK at effort <= high only (xhigh/max 400, clamped below) - the Thinking switch;
+  //                                     Haiku 5.5 also 400s 'between_tools', and takes forced tool_choice (the reply skips thinking)
+  //   Sonnet 5, Opus 4.8 / 4.7          adaptive only (budget_tokens 400); 'disabled' OK at every effort; on by default on Sonnet 5, off on 4.x
+  //   4.6                               adaptive + deprecated budgets; off by default; 'disabled' OK
+  //   4.5 and earlier                   extended thinking only (budget_tokens); 'adaptive' 400
+  // From 4.7 up, temperature != 1, top_p, top_k and assistant prefill are 400 in any thinking mode.
+  // Forward-compatible: every Fable/Mythos/Opus 5.x is assumed always-on, with Opus 5 itself carved out (bare id, or dated / Bedrock '-vN:M' suffixed);
+  // every Sonnet 5.x is assumed to turn thinking off with 'between_tools', with Sonnet 5 itself carved out the same way;
+  // every Haiku 5.x is assumed to take 'disabled' at effort <= high only, as Opus 5.
+  const isOpus5Base = /claude-opus-5(?:-\d{8})?(?:-v\d+(?::\d+)?)?$/.test(model.id);
+  const isSonnet5Base = /claude-sonnet-5(?:-\d{8})?(?:-v\d+(?::\d+)?)?$/.test(model.id);
+  const hotFixAdaptiveThinkingOnlyModel = !isOpus5Base && /claude-(fable|mythos|opus)-5/.test(model.id); // 'disabled' and budgets both coerced to adaptive
+  const hotFixThinkingOffIsBetweenTools = !isSonnet5Base && /claude-sonnet-5/.test(model.id); // 'disabled' sent as 'between_tools'
+  const hotFixThinkingOffCapsEffort = isOpus5Base || /claude-haiku-5/.test(model.id); // 'disabled' legal at effort <= 'high' only
+  const hotFixNoBudgetTokensModel = /claude-(fable|mythos|opus|sonnet|haiku)-5|claude-(opus|sonnet)-4-[78]/.test(model.id); // budgets coerced to adaptive
+  const hotFixNoForcedToolUse = hotFixAdaptiveThinkingOnlyModel || hotFixThinkingOffIsBetweenTools;
 
-  // HOTFIX: Fable/Mythos 5 ONLY reject forced tool use: 400 'tool_choice forces tool use is not compatible with this model.'
-  // (model-level, regardless of thinking config). Downgrade to 'auto' + a system hint - empirically the model
-  // reliably calls the tool when instructed. Forced tool use is deprecated AIX-wide, see ToolsPolicy_schema.
-  // [2026-07-24] Opus 5 EXCLUDED (launch probes): tool_choice 'any'/'tool' return 200 with thinking left to its
-  // adaptive-on default, so requests pass through unchanged (thinking is skipped below when tools are forced).
-  const hotFixNoForcedToolUse = /claude-(fable|mythos)-5/.test(model.id);
+  // Forced tool use -> 'auto' + a system hint: empirically the model still calls the tool. Forced tool use is deprecated AIX-wide, see ToolsPolicy_schema.
   if (hotFixNoForcedToolUse && payload.tool_choice && (payload.tool_choice.type === 'any' || payload.tool_choice.type === 'tool')) {
     const mustUseHint = payload.tool_choice.type === 'tool'
       ? `IMPORTANT: You MUST respond by calling the \`${payload.tool_choice.name}\` tool. Do not respond with text.`
@@ -239,13 +253,14 @@ export function aixToAnthropicMessageCreate(target: AixAnthropicTarget, model: A
       payload.output_config = { effort: 'low' };
   }
 
-  // [Anthropic] Thinking: adaptive (4.6+), enabled with budget (≤4.5), or disabled
+  // [Anthropic] Thinking: adaptive (4.6+), enabled with budget (4.5 and earlier), or disabled. An explicit 'disabled' (null) always
+  // goes through, even with forced tools (legal pairing; omitting it would let an on-by-default model think despite the user's switch).
+  // A numeric budget on a no-budget family (legacy persisted value, or the Max override pushing the range max) means "thinking on" -> adaptive.
   const areToolCallsRequired = payload.tool_choice && typeof payload.tool_choice === 'object' && (payload.tool_choice.type === 'any' || payload.tool_choice.type === 'tool');
-  const canUseThinking = !areToolCallsRequired || !hotFixDisableThinkingWhenToolsForced;
+  const canUseThinking = !areToolCallsRequired || !hotFixDisableThinkingWhenToolsForced || model.vndAntThinkingBudget === null;
   if (model.vndAntThinkingBudget !== undefined && canUseThinking) {
-    if (model.vndAntThinkingBudget === 'adaptive' || hotFixAdaptiveThinkingOnlyModel) {
-      if (model.vndAntThinkingBudget !== 'adaptive')
-        console.log(`[Anthropic] ${model.id}: coercing thinking '${model.vndAntThinkingBudget}' -> 'adaptive' (adaptive-only model)`);
+    if (model.vndAntThinkingBudget === 'adaptive' || hotFixAdaptiveThinkingOnlyModel || (typeof model.vndAntThinkingBudget === 'number' && hotFixNoBudgetTokensModel)) {
+      // a number or null on these families is silently coerced to adaptive (a Max-override budget lands here on every request)
       payload.thinking = {
         type: 'adaptive',
         display: 'summarized', // Opus 4.7+ and Fable/Mythos 5 default to 'omitted' - explicit 'summarized' preserves 4.6-era UX (slight latency cost)
@@ -259,20 +274,34 @@ export function aixToAnthropicMessageCreate(target: AixAnthropicTarget, model: A
       };
       delete payload.temperature;
     } else {
-      payload.thinking = {
-        type: 'disabled',
-      };
+      // Sonnet 5.5+: 'disabled' 400s - 'between_tools' is the lowest setting (no up-front thinking; progress updates between tool calls still arrive as thinking)
+      payload.thinking = hotFixThinkingOffIsBetweenTools ? { type: 'between_tools' } : { type: 'disabled' };
       // NOTE: with thinking disabled, we can still use temperature, so we don't delete it
       //       see the note on llms.parameters.ts: 'llmVndAntThinkingBudget'
     }
   }
 
+  // [Anthropic, 2026-09-01] Preserved thinking: on Fable 5.1+ a replayed thinking block is valid only against the unchanged
+  // system/tools/history prefix, and after any edit (routine here: edits, deletes, persona/tool changes) new accounts 400, and every account on Fable/Mythos 5.2.
+  // 'drop_block' drops the stale blocks instead (accepted on every model, probed); the parser relays the drops as 'vnt' void-notice particles.
+  // Not on 'between_tools' (400 'Extra inputs'): there, and on Haiku 5.x 'disabled', earlier turns' thinking is stripped instead (below).
+  if (hostedFeatures.enableThinkingBindingControls && (payload.thinking?.type === 'adaptive' || payload.thinking?.type === 'enabled'))
+    payload.thinking.block_binding = { prefix_mismatch_behavior: 'drop_block' };
+
+  // [Anthropic, 2026-11-05, hypothesis: the 400 is documented, not reproduced - our key predates the cutoff] Haiku 5.x 'disabled' (or unset, with forced tools) and Sonnet 5.x 'between_tools' take no block_binding, yet replayed blocks
+  // still face the prefix check: a 400 on accounts created on or after 2026-08-31 after any prefix change (routine here: the system prompt's
+  // hour tick, edits, tool changes). Strip earlier turns' thinking, the documented remedy; a tool loop in progress keeps its own, as required.
+  if (payload.thinking?.type === 'between_tools' || (/claude-haiku-5/.test(model.id) && (payload.thinking?.type === 'disabled' || (!payload.thinking && areToolCallsRequired))))
+    _stripThinkingBeforeCurrentTurn(chatMessages);
+
   // [Anthropic] Effort parameter
   const reasoningEffort = model.reasoningEffort; // ?? model.vndAntEffort;
   if (reasoningEffort) {
     if (reasoningEffort === 'none' || reasoningEffort === 'minimal') throw new Error(`Anthropic API does not support '${reasoningEffort}' effort level`);
+    // Opus 5 / Haiku 5.5 'disabled' and Sonnet 5.5 'between_tools' are legal only at effort <= 'high' (Sonnet 5 and 4.x 'disabled' at every effort, see the family table) - silently clamp rather than fail the turn
+    const clampToHigh = ((hotFixThinkingOffCapsEffort && payload.thinking?.type === 'disabled') || payload.thinking?.type === 'between_tools') && ['xhigh', 'max'].includes(reasoningEffort);
     payload.output_config = {
-      effort: reasoningEffort,
+      effort: clampToHigh ? 'high' : reasoningEffort,
     };
   }
 
@@ -293,7 +322,7 @@ export function aixToAnthropicMessageCreate(target: AixAnthropicTarget, model: A
       console.warn('[Anthropic] Structured output_config.format may conflict with web_fetch citations');
   }
 
-  // [Anthropic, fast-mode-2026-02-01] Fast inference mode (preview/waitlist)
+  // [Anthropic, fast-mode-2026-02-01] Fast inference mode
   if (model.vndAntInfSpeed === 'fast')
     payload.speed = 'fast';
 
@@ -355,6 +384,24 @@ export function aixToAnthropicMessageCreate(target: AixAnthropicTarget, model: A
     // Merge hosted tools with custom tools
     if (hostedTools.length > 0) {
       payload.tools = payload.tools ? [...payload.tools, ...hostedTools] : hostedTools;
+
+      /**
+       * Hosted tools run in a server-side agentic loop, and every iteration re-samples the whole growing turn.
+       * The API places an automatic cache breakpoint on each server tool result before the next iteration, but
+       * only when the request already carries at least one `cache_control` marker ("Server tool results are
+       * cached automatically", Tool use with prompt caching). A request with no marker gets no breakpoint at
+       * all, so each iteration re-reads the turn as fresh input: a 10-search turn on a 300-token prompt billed
+       * ~490K input tokens with 0 cached (measured 2026-09-24); the same turn with one marker reads ~450K from
+       * cache at a quarter of the price or less.
+       *
+       * The client's automatic breakpoints (historyApply_vndAntCachingFlags) skip histories under ~1000 tokens,
+       * the vendor's cacheable minimum - exactly the shape of a short research question. So when hosted tools
+       * are on and no marker made it into the request, ask for automatic caching at the top level: the marker
+       * itself may be too small to cache, but it is what turns on the per-iteration breakpoints. Claude API
+       * only: Bedrock rejects the top-level field.
+       */
+      if (target === 'anthropic' && !_hasAnyCacheControl(systemMessage, chatMessages, payload.tools))
+        payload.cache_control = { type: 'ephemeral' };
     }
   }
 
@@ -423,6 +470,8 @@ export function aixToAnthropicMessageCreate(target: AixAnthropicTarget, model: A
 
     // Fast inference mode is not offered on partner clouds: 400 'speed: Extra inputs are not permitted'
     delete payload.speed;
+
+    // Preserved-thinking controls (thinking.block_binding) are gated per model in aixAnthropicHostedFeatures, with their beta flag
   }
 
   // Preemptive error detection with server-side payload validation before sending it upstream
@@ -435,6 +484,15 @@ export function aixToAnthropicMessageCreate(target: AixAnthropicTarget, model: A
   return validated.data;
 }
 
+
+/** Whether the request already carries a cache breakpoint anywhere: system, message blocks, or tool definitions. */
+function _hasAnyCacheControl(systemMessage: TRequest['system'], chatMessages: TRequest['messages'], tools: TRequest['tools']): boolean {
+  if (systemMessage?.some(block => !!block.cache_control))
+    return true;
+  if (chatMessages.some(message => message.content.some(block => 'cache_control' in block && !!block.cache_control)))
+    return true;
+  return !!tools?.some(tool => 'cache_control' in tool && !!tool.cache_control);
+}
 
 /** Enforce the Anthropic 4-breakpoint API limit by un-stamping the earliest (prefix-redundant) breakpoints. */
 function _capTrailingCacheBreakpoints(systemMessage: TRequest['system'], chatMessages: TRequest['messages'], maxBreakpoints: number): void {
@@ -503,6 +561,21 @@ function _pairInteriorToolUseBlocks(chatMessages: TRequest['messages']): void {
   }
 }
 
+/** Removes thinking blocks from the assistant messages before the turn in progress (from the last user message that is not only tool results). */
+function _stripThinkingBeforeCurrentTurn(chatMessages: TRequest['messages']): void {
+  const turnStart = chatMessages.findLastIndex(m => m.role === 'user' && m.content.some(block => block.type !== 'tool_result'));
+  for (let i = turnStart - 1; i >= 0; i--) {
+    const message = chatMessages[i];
+    if (message.role !== 'assistant') continue;
+    message.content = message.content.filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking');
+    // [Anthropic, 2026-11-06, hypothesis: an empty assistant turn is accepted but undocumented; on Bedrock probed only through OpenRouter's route]
+    // a reply that was only thinking (or thinking + the '\n' separator hotfix) stays as an empty turn: whitespace-only text is a 400,
+    // and without the turn the two user messages merge and the model also answers the earlier one
+    if (!message.content.some(block => block.type !== 'text' || block.text.trim()))
+      message.content = [];
+  }
+}
+
 function* _generateAnthropicMessagesContentBlocks({ parts, role }: AixMessages_ChatMessage): Generator<{
   role: 'user' | 'assistant',
   content: TRequest['messages'][number]['content'][number]
@@ -510,14 +583,6 @@ function* _generateAnthropicMessagesContentBlocks({ parts, role }: AixMessages_C
   set_cache_control: 'anthropic-ephemeral'
 }> {
   if (parts.length < 1) return; // skip empty messages
-
-  if (hotFixImagePartsFirst) {
-    parts.sort((a, b) => {
-      if (a.pt === 'inline_image' && b.pt !== 'inline_image') return -1;
-      if (a.pt !== 'inline_image' && b.pt === 'inline_image') return 1;
-      return 0;
-    });
-  }
 
   switch (role) {
 

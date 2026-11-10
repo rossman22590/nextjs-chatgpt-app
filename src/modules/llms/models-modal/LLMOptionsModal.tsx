@@ -7,8 +7,6 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import RestoreIcon from '@mui/icons-material/Restore';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
-import StarIcon from '@mui/icons-material/Star';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
@@ -16,6 +14,7 @@ import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import { type DPricingChatGenerate, isLLMChatFree_cached, llmChatPricing_adjusted } from '~/common/stores/llms/llms.pricing';
 import type { ModelOptionsContext } from '~/common/layout/optima/store-layout-optima';
 import { DLLMId, DModelInterfaceV1, getLLMContextTokens, getLLMLabel, getLLMMaxOutputTokens, getLLMPubDate, isLLMVisible, LLM_IF_HOTFIX_NoStream, LLM_IF_HOTFIX_NoTemperature, LLM_IF_OAI_Reasoning } from '~/common/stores/llms/llms.types';
+import { StarredState } from '~/common/components/StarIcons';
 import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
 import { GoodModal } from '~/common/components/modals/GoodModal';
 import { LLMImplicitParametersRuntimeFallback } from '~/common/stores/llms/llms.parameters';
@@ -73,23 +72,10 @@ function prettyPricingComponent(pricingChatGenerate: DPricingChatGenerate): Reac
   const inputPrice = formatPrice(pricingChatGenerate.input);
   const outputPrice = formatPrice(pricingChatGenerate.output);
 
-  let cacheInfo = '';
-  if (pricingChatGenerate.cache) {
-    switch (pricingChatGenerate.cache.cType) {
-      case 'ant-bp': {
-        const { read, write, duration } = pricingChatGenerate.cache;
-        cacheInfo = `Cache: Read ${formatPrice(read)}, Write ${formatPrice(write)}, Duration: ${duration}s`;
-        break;
-      }
-      case 'oai-ac': {
-        const { read } = pricingChatGenerate.cache;
-        cacheInfo = `Cache: Read ${formatPrice(read)}`;
-        break;
-      }
-      default:
-        throw new Error('LLMOptionsModal: Unknown cache type');
-    }
-  }
+  const cache = pricingChatGenerate.cache;
+  const cacheInfo = !cache ? '' : `Cache: Read ${formatPrice(cache.read)}`
+    + (cache.write !== undefined ? `, Write ${formatPrice(cache.write)}` : '')
+    + (cache.duration !== undefined ? `, Duration: ${cache.duration}s` : '');
 
   return (
     <div>
@@ -142,6 +128,9 @@ export function LLMOptionsModal(props: { id: DLLMId, context?: ModelOptionsConte
         };
         const { llmTemperature: _, ...otherUserParameters } = { ...llm.userParameters };
         updates.userParameters = otherUserParameters;
+        break;
+      default:
+        // other interfaces: no parameter side effects
         break;
     }
 
@@ -307,7 +296,7 @@ export function LLMOptionsModal(props: { id: DLLMId, context?: ModelOptionsConte
           <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0, md: 1 } }} onClick={event => event.shiftKey && console.log({ llm })}>
             {ENABLE_STARRING_ICON && <TooltipOutlined title={llm.userStarred ? 'Unstar this model' : 'Star this model for quick access'}>
               <IconButton aria-label={llm.userStarred ? 'Unstar model' : 'Star model'} size='sm' onClick={handleLlmStarredToggle} sx={{ ml: -0.5 }}>
-                {llm.userStarred ? <StarIcon sx={{ color: '#fad857', fontSize: 'xl2' }} /> : <StarBorderIcon />}
+                <StarredState isStarred={!!llm.userStarred} />
               </IconButton>
             </TooltipOutlined>}
             {ENABLE_HIDING_ICON && <TooltipOutlined title={visible ? 'Show this model in the app' : 'Hide this model from the app'}>
@@ -433,8 +422,8 @@ export function LLMOptionsModal(props: { id: DLLMId, context?: ModelOptionsConte
             {ModelDomainsList.filter(dId => !['imageCaption'].includes(dId)).map(domainId => {
               const domainSpec = ModelDomainsRegistry[domainId];
               const domainEntry = domainAssignments[domainId];
-              const isActive = domainEntry?.resolvedModelId === llm.id;
-              const isAuto = domainEntry?.resolvedModelIsAuto;
+              const isActive = domainEntry?.config?.modelId === llm.id;
+              const isAuto = domainEntry?.isAuto;
               return (
                 // Note: use Tooltip instead of GoodTooltip here, because GoodTooltip is not working well with ButtonGroup
                 <Tooltip arrow placement='top' key={domainId} title={isActive && isAuto ? `${domainSpec.confTooltip} (currently Auto - click to pin this model)` : domainSpec.confTooltip}>
@@ -459,7 +448,7 @@ export function LLMOptionsModal(props: { id: DLLMId, context?: ModelOptionsConte
           <FormLabelStart title='Starred' sx={{ minWidth: 80 }} />
           <Tooltip title={llm.userStarred ? 'Unstar this model' : 'Star this model for quick access'}>
             <Switch checked={!!llm.userStarred} onChange={handleLlmStarredToggle}
-                    endDecorator={llm.userStarred ? <StarIcon sx={{ color: '#fad857' }} /> : <StarBorderIcon />}
+                    endDecorator={<StarredState isStarred={!!llm.userStarred} />}
                     slotProps={{ endDecorator: { sx: { minWidth: 26 } } }}
             />
           </Tooltip>

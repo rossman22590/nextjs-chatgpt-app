@@ -1,7 +1,8 @@
 import type { NextConfig } from 'next';
 import type { WebpackConfigContext } from 'next/dist/server/config-shared';
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 
 // Log only on the first pass (next build evaluates this module twice: build() setup, then the webpack step)
@@ -24,7 +25,7 @@ process.env.NEXT_PUBLIC_BUILD_HASH = buildHash.slice(0, 10);
 process.env.NEXT_PUBLIC_BUILD_PKGVER = JSON.parse('' + readFileSync(new URL('./package.json', import.meta.url))).version;
 process.env.NEXT_PUBLIC_BUILD_TIMESTAMP = new Date().toISOString();
 process.env.NEXT_PUBLIC_DEPLOYMENT_TYPE ||= (process.env.VERCEL_ENV ? `vercel-${process.env.VERCEL_ENV}` : 'local'); // Docker or custom, Vercel
-log(`\x1b[1mBig-AGI\x1b[0m v${process.env.NEXT_PUBLIC_BUILD_PKGVER} (\x1b[2m@\x1b[0m${process.env.NEXT_PUBLIC_BUILD_HASH}${process.env.VERCEL_ENV ? `, \x1b[2mV:\x1b[0m${process.env.VERCEL_ENV}` : ''}, \x1b[2mN:\x1b[0m${process.env.NODE_ENV})`);
+log(`\x1b[1mBig-AGI\x1b[0m v${process.env.NEXT_PUBLIC_BUILD_PKGVER} (\x1b[2m@\x1b[0m${process.env.NEXT_PUBLIC_BUILD_HASH}, \x1b[2mN:\x1b[0m${process.env.NODE_ENV}${process.env.VERCEL_ENV ? `, \x1b[2mV:\x1b[0m${process.env.VERCEL_ENV}` : ''})`);
 
 
 // Handle non-default build types
@@ -64,7 +65,7 @@ let nextConfig: NextConfig = {
   serverExternalPackages: ['puppeteer-core', 'crypto-browserify'],
 
   // WEBPACK ONLY: turbopack skips this hook (client mocks, wasm) - never run --turbopack
-  webpack: (config: any, { isServer, webpack /*, dev, nextRuntime*/ }: WebpackConfigContext) => {
+  webpack: (config: any, { isServer, dev, webpack, nextRuntime }: WebpackConfigContext) => {
     // @mui/joy: anything material gets redirected to Joy
     config.resolve.alias['@mui/material'] = '@mui/joy';
 
@@ -101,6 +102,17 @@ let nextConfig: NextConfig = {
         ),
       ];
 
+      // zustand, `next dev` only: app imports of the package resolve to the app's entry point (trace layer). Builds keep the package.
+      if (dev) {
+        const zustandUtils = fileURLToPath(new URL('./src/common/util/zustandUtils.ts', import.meta.url));
+        config.plugins.push(new webpack.NormalModuleReplacementPlugin(/^zustand(\/vanilla)?$/, (resource: any) => {
+          const issuer: string = resource.contextInfo?.issuer || '';
+          if (!issuer || /[\\/]node_modules[\\/]/.test(issuer) || issuer.endsWith('zustandUtils.ts')) return; // the package's own internals and the entry point keep the package
+          // console.log('- WEBPACK ZUSTAND REDIRECT:', resource.request, 'from', issuer); // console.log, not log(): the helper is silent past the first config pass
+          resource.request = zustandUtils;
+        }));
+      }
+
       // cosmetic: fix warnings for (absent!) top-level awaits in the browser (https://github.com/vercel/next.js/issues/64792)
       config.output.environment = { ...config.output.environment, asyncFunction: true };
       
@@ -111,6 +123,23 @@ let nextConfig: NextConfig = {
         tls: false,
         crypto: require.resolve('crypto-browserify'),
       };
+    }
+
+    // server-side bundling, `next dev` only: the single-tab gate (ProviderSingleTab) renders a placeholder on the server, which never
+    // renders the chat app or the Optima layout - compile their server mocks instead of ~1k modules. Builds keep the real modules.
+    if (isServer && dev && nextRuntime === 'nodejs') {
+      const clientToServerMocks: ReadonlyArray<[RegExp, string]> = [
+        [/\/AppChat$/, '/AppChat.server-mock'],
+        [/\/OptimaLayout$/, '/OptimaLayout.server-mock'],
+      ];
+      config.plugins = [
+        ...config.plugins,
+        ...clientToServerMocks.map(([pattern, replacement]) =>
+          new webpack.NormalModuleReplacementPlugin(pattern, (resource: any) => {
+            resource.request = resource.request.replace(pattern, replacement);
+          }),
+        ),
+      ];
     }
 
     // prevent too many small chunks (40kb min) on 'client' packs (not 'server' or 'edge-server')
@@ -137,6 +166,12 @@ let nextConfig: NextConfig = {
       { source: '/dev/inspect/:tool(\\w+)', destination: '/dev/inspect/:tool.html' },
     ];
   },
+  async redirects() {
+    return [
+      // /preview: 2025 dark-launch marketing page (prod-only [PROD] commit) - Google indexed it, keep the 301 to preserve searchers
+      { source: '/preview', destination: 'https://big-agi.com/', permanent: true },
+    ];
+  },
 
   // Note: disabled to check whether the project becomes slower with this
   // modularizeImports: {
@@ -157,6 +192,24 @@ import { env as validateEnv } from '~/server/env.server';
 void validateEnv; // Triggers env validation - throws if required vars are missing
 
 
+// Stale service workers: a build on another branch line may leave a generated (gitignored)
+// public/sw.js behind, which survives branch switches - and .dockerignore admits public/, so a
+// production build would even ship it. This branch never emits a worker: always delete. Note a
+// 404 at /sw.js does NOT unregister an existing worker (w3c/ServiceWorker#204, wontfix) - only
+// unregister(), a replacement no-op worker at the same URL, or DevTools do.
+['./public/sw.js', './public/sw.js.map'].forEach((f) => rmSync(new URL(f, import.meta.url), { force: true }));
+
+
+// conditionally enable the nextjs bundle analyzer
+// ORDER: before PostHog - withBundleAnalyzer Object.assign's onto the config object, while
+//        withPostHogConfig returns a function-form config; wrapping that would keep only
+//        {webpack} and silently drop the rest of the config
+import withBundleAnalyzer from '@next/bundle-analyzer';
+if (process.env.ANALYZE_BUNDLE) {
+  nextConfig = withBundleAnalyzer({ openAnalyzer: true })(nextConfig) as NextConfig;
+}
+
+
 // PostHog error reporting with source maps for production builds
 import { withPostHogConfig } from '@posthog/nextjs-config';
 if (process.env.POSTHOG_API_KEY && process.env.POSTHOG_ENV_ID) {
@@ -173,13 +226,6 @@ if (process.env.POSTHOG_API_KEY && process.env.POSTHOG_ENV_ID) {
       deleteAfterUpload: false, // false: leave them in the tree, which would also help debugging of open-source installs
     },
   });
-}
-
-
-// conditionally enable the nextjs bundle analyzer
-import withBundleAnalyzer from '@next/bundle-analyzer';
-if (process.env.ANALYZE_BUNDLE) {
-  nextConfig = withBundleAnalyzer({ openAnalyzer: true })(nextConfig) as NextConfig;
 }
 
 

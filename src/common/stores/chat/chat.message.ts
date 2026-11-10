@@ -1,6 +1,6 @@
 import { agiUuid } from '~/common/util/idUtils';
 
-import { createPlaceholderVoidFragment, createTextContentFragment, DMessageFragment, duplicateDMessageFragments } from './chat.fragments';
+import { createPlaceholderVoidFragment, createTextContentFragment, DMessageFragment, DMessageFragmentId, duplicateDMessageFragments } from './chat.fragments';
 
 import type { ModelVendorId } from '~/modules/llms/vendors/vendors.registry';
 
@@ -39,6 +39,9 @@ export interface DMessage {
 
   // TODO: add a Beam JSON state load/store
   // volatileBeamRestore?: object;
+
+  /** Optional display overrides. Omit to follow defaults; remove to reset all. */
+  presentation?: DMessagePresentation;
 
   created: number;                    // created timestamp
   updated: number | null;             // updated timestamp - null means incomplete - TODO: disambiguate vs pendingIncomplete
@@ -124,6 +127,7 @@ export type DMessageGenerator = ({
   },
 }) & {
   metrics?: DMetricsChatGenerate_Md;   // medium-sized metrics stored in the message
+  endedAt?: number;                    // generation end (epoch ms), including interruption; unaffected by message edits
   providerInfraLabel?: string;         // upstream provider that served the request (e.g., OpenRouter provider routing)
   upstreamContainer?:
     | {
@@ -153,6 +157,18 @@ export type DMessageGenerator = ({
     | 'issue'                         // (error fragment follows) if the generator stopped due to an issue
     | 'out-of-tokens'                 // if the generator stopped due to running out of tokens
 };
+
+
+// Message > Presentation
+
+export interface DMessagePresentation {
+  /** Body prose across roles; excludes attachments, reasoning, and fenced blocks. */
+  textMode?: 'plain' | 'markdown';
+  /** Controls fragment fusion, tool pairing, and citation placement. */
+  fragmentGrouping?: 'grouped' | 'ungrouped';
+
+  // Future: markdownSingleDollarMath?: 'literal' | 'math';
+}
 
 
 // helpers - creation
@@ -199,7 +215,7 @@ export function createDMessageFromFragments(role: DMessageRole, fragments: DMess
 
 // helpers - duplication
 
-export function duplicateDMessage(message: Readonly<DMessage>, skipVoid: boolean): DMessage {
+export function duplicateDMessage(message: Immutable<DMessage>, skipVoid: boolean): DMessage {
   return {
     id: agiUuid('chat-dmessage'),
 
@@ -219,12 +235,14 @@ export function duplicateDMessage(message: Readonly<DMessage>, skipVoid: boolean
 
     tokenCount: message.tokenCount,
 
+    ...(message.presentation ? { presentation: { ...message.presentation } } : {}),
+
     created: message.created,
     updated: message.updated,
   };
 }
 
-export function duplicateDMessageMetadata(metadata: Readonly<DMessageMetadata>): DMessageMetadata {
+export function duplicateDMessageMetadata(metadata: Immutable<DMessageMetadata>): DMessageMetadata {
   // NOTE: update this function when adding metadata fields
   return {
     ...(metadata.inReferenceTo ? {
@@ -239,7 +257,7 @@ export function duplicateDMessageMetadata(metadata: Readonly<DMessageMetadata>):
   };
 }
 
-export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator>): DMessageGenerator {
+export function duplicateDMessageGenerator(generator: Immutable<DMessageGenerator>): DMessageGenerator {
   switch (generator.mgt) {
     case 'named':
       return {
@@ -247,6 +265,7 @@ export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator
         name: generator.name,
         // ...(generator.xeOpCode ? { xeOpCode: generator.xeOpCode } : {}),
         ...(generator.metrics ? { metrics: { ...generator.metrics } } : {}),
+        ...(generator.endedAt !== undefined ? { endedAt: generator.endedAt } : {}),
         ...(generator.providerInfraLabel ? { providerInfraLabel: generator.providerInfraLabel } : {}),
         ...(generator.upstreamContainer ? { upstreamContainer: { ...generator.upstreamContainer } } : {}),
         ...(generator.upstreamHandle ? { upstreamHandle: { ...generator.upstreamHandle } } : {}),
@@ -258,6 +277,7 @@ export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator
         name: generator.name,
         aix: { ...generator.aix },
         ...(generator.metrics ? { metrics: { ...generator.metrics } } : {}),
+        ...(generator.endedAt !== undefined ? { endedAt: generator.endedAt } : {}),
         ...(generator.providerInfraLabel ? { providerInfraLabel: generator.providerInfraLabel } : {}),
         ...(generator.upstreamContainer ? { upstreamContainer: { ...generator.upstreamContainer } } : {}),
         ...(generator.upstreamHandle ? { upstreamHandle: { ...generator.upstreamHandle } } : {}),
@@ -309,20 +329,60 @@ export function messageUserFlagToEmoji(flag: DMessageUserFlag): string {
   return flag2EmojiMap[flag] ?? '❓';
 }
 
-export function messageHasUserFlag(message: Pick<DMessage, 'userFlags'>, flag: DMessageUserFlag): boolean {
+export function messageHasUserFlag(message: Pick<Immutable<DMessage>, 'userFlags'>, flag: DMessageUserFlag): boolean {
   return message.userFlags?.includes(flag) ?? false;
 }
 
-export function messageSetUserFlag(message: Pick<DMessage, 'userFlags'>, flag: DMessageUserFlag, on: boolean): DMessageUserFlag[] {
+export function messageSetUserFlag(message: Pick<Immutable<DMessage>, 'userFlags'>, flag: DMessageUserFlag, on: boolean): DMessageUserFlag[] {
   if (on) {
     if (message.userFlags?.includes(flag))
-      return message.userFlags;
+      return [...message.userFlags];
     return [...(message.userFlags || []), flag];
   } else {
     if (!message.userFlags?.includes(flag))
-      return message.userFlags || [];
+      return [...(message.userFlags || [])];
     return (message.userFlags || []).filter(_f => _f !== flag);
   }
+}
+
+
+/**
+ * Rendering hint from raw fragments, not an authoritative AIX cursor: not all part endings are stored.
+ *
+ * Keep aligned with ContentReassembler's text-cursor handling: reasoning text and notices close it;
+ * signatures, vendor state, citations and hosted-tool progress do not.
+ * Redacted reasoning is treated as settled here despite the reassembler's open-text ordering issue.
+ */
+export function messageFragmentsInFluxId(fragments: Immutable<DMessageFragment[]>, pending: boolean): DMessageFragmentId | undefined {
+  if (!pending) return undefined;
+
+  for (let i = fragments.length - 1; i >= 0; i--) {
+    const fragment = fragments[i];
+    if (fragment.ft === 'content')
+      return fragment.part.pt === 'text' ? fragment.fId : undefined;
+    if (fragment.ft !== 'void') continue;
+
+    const { part } = fragment;
+    switch (part.pt) {
+      case 'ma':
+        // Signature/vendor-state-only vehicles can follow text without closing its cursor.
+        if (!part.aText && !part.redactedData?.length && (part.textSignature !== undefined || fragment.vendorState))
+          continue;
+        // Reasoning ends the preceding text's activity. Signed/redacted reasoning is itself settled.
+        return part.textSignature !== undefined || part.redactedData?.length || fragment.vendorState || i !== fragments.length - 1
+          ? undefined : fragment.fId;
+      case 'ph':
+        // Notices and continuation checkpoints close text; hosted-tool progress does not.
+        if (part.pType === 'notice' || part.aixControl?.ctl === 'ac-info') return undefined;
+        break;
+      case 'annotations':
+      case '_pt_sentinel':
+        break;
+      default:
+        const _exhaustiveCheck: never = part;
+    }
+  }
+  return undefined;
 }
 
 

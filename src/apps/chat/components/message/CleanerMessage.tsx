@@ -10,12 +10,13 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 import { DMessage, MESSAGE_FLAG_AIX_SKIP, messageFragmentsReduceText, messageHasUserFlag } from '~/common/stores/chat/chat.message';
-import { DMessageAttachmentFragment, DMessageFragment, isAttachmentFragment, isContentFragment, isImageRefPart, isZyncAssetImageReferencePart } from '~/common/stores/chat/chat.fragments';
+import { messageOutcome, messageOutcomeColor } from '~/common/stores/chat/chat.message.outcome';
+import { DMessageAttachmentFragment, DMessageFragment, isAttachmentFragment, isContentFragment, isImagePart, isImageRefPart, isZyncAssetImageReferencePart } from '~/common/stores/chat/chat.fragments';
+import { ConfirmIconButton } from '~/common/components/ConfirmIconButton';
 import { PhImageSquare } from '~/common/components/icons/phosphor/PhImageSquare';
 import { makeMessageAvatarIcon, messageBackground } from '~/common/util/dMessageUtils';
 
 import { TokenBadgeMemo } from '../composer/tokens/TokenBadge';
-import { isErrorChatMessage } from './explainServiceErrors';
 import { messageSkippedSx } from './ChatMessage';
 
 
@@ -73,9 +74,13 @@ function analyzeMessageFragments(messageFragments: ReadonlyArray<DMessageFragmen
         case 'tool_response':
           result.toolCount++;
           break;
+        case 'hosted_resource':
+        case '_pt_sentinel':
+          // not counted
+          break;
       }
     } else if (isAttachmentFragment(fragment)) {
-      if (isZyncAssetImageReferencePart(fragment.part) || isImageRefPart(fragment.part)) {
+      if (isImagePart(fragment.part)) {
         result.imageCount++;
       } else {
         result.attachmentCount++;
@@ -174,7 +179,13 @@ export const MessagesSelectionHeader = (props: {
  *
  * Shall look similarly to the main ChatMessage, for consistency, but just allow a simple checkbox selection
  */
-export function CleanerMessage(props: { message: DMessage, selected: boolean, remainingTokens?: number, onToggleSelected?: (messageId: string, selected: boolean) => void }) {
+export function CleanerMessage(props: {
+  message: DMessage,
+  selected: boolean,
+  remainingTokens?: number,
+  onDeleteMessage?: (messageId: string) => void,
+  onToggleSelected?: (messageId: string, selected: boolean) => void,
+}) {
 
   // derived state
   const {
@@ -188,6 +199,11 @@ export function CleanerMessage(props: { message: DMessage, selected: boolean, re
     updated: messageUpdated,
   } = props.message;
 
+  // delete handler (two-step)
+  const handleDeleteConfirm = React.useCallback(() => {
+    props.onDeleteMessage?.(messageId);
+  }, [messageId, props]);
+
   const analysis = React.useMemo(() => analyzeMessageFragments(messageFragments), [messageFragments]);
 
   let messageText = messageFragmentsReduceText(messageFragments, '\n\n', true);
@@ -200,14 +216,13 @@ export function CleanerMessage(props: { message: DMessage, selected: boolean, re
 
   const isUserMessageSkipped = messageHasUserFlag(props.message, MESSAGE_FLAG_AIX_SKIP);
 
-  const isAssistantError = fromAssistant && isErrorChatMessage(messageText);
-
   const userCommandApprox = messageRole !== 'user' ? false
     : messageText.startsWith('/draw ') ? 'draw'
       : messageText.startsWith('/react ') ? 'react'
         : false;
 
-  const backgroundColor = messageBackground(messageRole, userCommandApprox, !!messageUpdated, isAssistantError);
+  const outcomeColor = messageOutcomeColor(messageOutcome(props.message));
+  const backgroundColor = messageBackground(messageRole, userCommandApprox, !!messageUpdated, outcomeColor === 'danger' || outcomeColor === 'warning' ? outcomeColor : undefined /* the cleaner tints failures too, to pick them out */);
 
   const avatarIconEl: React.JSX.Element | null = React.useMemo(() => {
     return makeMessageAvatarIcon('pro', messageRole, messageGeneratorName, messagePurposeId, !!messagePendingIncomplete, isUserMessageSkipped, false, false);
@@ -297,6 +312,13 @@ export function CleanerMessage(props: { message: DMessage, selected: boolean, re
         )}
 
       </Box>
+
+      {/* Delete button (desktop only, two-step) */}
+      {!!props.onDeleteMessage && (
+        <Box sx={{ display: 'flex', alignItems: 'center', ml: 'auto' }}>
+          <ConfirmIconButton color='danger' side='start' tooltip='Delete' onConfirm={handleDeleteConfirm} />
+        </Box>
+      )}
     </ListItem>
   );
 }

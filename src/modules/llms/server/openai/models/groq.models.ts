@@ -18,7 +18,7 @@ const DEV_DEBUG_GROQ_MODELS = Release.IsNodeDevBuild; // not in staging to reduc
  * - models list: https://console.groq.com/docs/models
  * - pricing: the per-model card PRICING block, e.g. https://console.groq.com/docs/model/openai/gpt-oss-120b (groq.com/pricing is JS-rendered, no table)
  * - deprecations (shutdown dates + replacements): https://console.groq.com/docs/deprecations
- * - updated: 2026-08-31
+ * - updated: 2026-11-05
  */
 type _GroqModelDef = (KnownModel & { pubDate: string }) | KnownLink;
 
@@ -27,31 +27,33 @@ const _knownGroqModels = llmsDefineModels<_GroqModelDef>()([
   // Preview Models
   {
     isPreview: true,
+    idPrefix: 'meta-models/muse-spark-open',
+    label: 'Muse Spark Open (Preview)',
+    pubDate: '20261015', // upstream Muse Spark Open release (as in metaai.models.ts), not the Groq listing date
+    description: 'Meta open-weight MoE (816B total, 42B active). Always reasons, tool use, structured outputs, vision (max 5 images). 131K context, 131K max output. ~350 t/s on Groq. Enterprise-only: pricing on request.',
+    contextWindow: 131072,
+    maxCompletionTokens: 131072,
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Vision, LLM_IF_OAI_Reasoning],
+    parameterSpecs: [
+      { paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high', 'xhigh'] }, // per docs/reasoning: always reasons ('none' unsupported), default xhigh
+    ],
+    initialTemperature: 1.0, // Meta-recommended (dev.meta.ai/docs/muse-spark-open/settings)
+    // Limited preview on Groq (contact sales): standard API keys do not list it and 400 'model_terms_required' until the org admin accepts its terms
+  },
+  {
+    isPreview: true,
     idPrefix: 'qwen/qwen3.8-27b',
     label: 'Qwen 3.8 · 27B (Preview)',
     pubDate: '20260805', // upstream Qwen3.8-27B weights release (HF repo createdAt 2026-08-05), not the Groq listing date (20260817)
     description: 'Qwen3.8 27B by Alibaba Cloud. Multimodal (vision + text, max 3 images / 20MB), frontier-level agentic coding for its size, thinking/instruct modes, tool use. 131K context, 16K max output. ~450 t/s on Groq.',
-    contextWindow: 131042, // odd but real: the list API and the model card agree
-    maxCompletionTokens: 16384,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Vision, LLM_IF_OAI_Reasoning],
-    parameterSpecs: [
-      { paramId: 'llmVndOaiEffort', enumValues: ['none', 'low', 'medium', 'high'] }, // full ladder per docs/reasoning + live-accepted (unlike 3.6's none-only)
-    ],
-    chatPrice: { input: 0.80, output: 4.00 }, // no cache: prompt caching stays gpt-oss-only (docs/prompt-caching)
-  },
-  {
-    isPreview: true,
-    idPrefix: 'qwen/qwen3.6-27b',
-    label: 'Qwen 3.6 · 27B (Preview)',
-    pubDate: '20260421', // upstream Qwen3.6-27B weights release (HF repo createdAt 2026-04-21; announced Apr 22), not the Groq listing date (20260509)
-    description: 'Qwen3.6 27B by Alibaba Cloud. Multimodal (vision + text, max 3 images / 20MB), flagship-level agentic coding, thinking/non-thinking modes, tool use. 131K context, 16K max output. ~500 t/s on Groq.',
     contextWindow: 131072,
     maxCompletionTokens: 16384,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Vision, LLM_IF_OAI_Reasoning],
     parameterSpecs: [
-      { paramId: 'llmVndOaiEffort', enumValues: ['none'] }, // Groq accepts only none|default here; unset = default = thinking on
+      { paramId: 'llmVndOaiEffort', enumValues: ['none', 'low', 'medium', 'high'] }, // full ladder per docs/reasoning + live-accepted
     ],
-    chatPrice: { input: 0.60, output: 3.00 }, // no cache: prompt caching is gpt-oss-only, despite the list API advertising an input_cache_read rate here
+    chatPrice: { input: 0.80, output: 4.00 }, // no cache: prompt caching is gpt-oss-only, despite the list API advertising an input_cache_read rate here
+    benchmark: { cbaElo: 1436 }, // lmarena: qwen3.8-27b
   },
   {
     isPreview: true,
@@ -69,36 +71,15 @@ const _knownGroqModels = llmsDefineModels<_GroqModelDef>()([
   // REMOVED MODELS (no longer returned by API):
   // - (Jan 21, 2026) qwen-qwq-32b, qwen-2.5-32b, qwen-2.5-coder-32b
   // - (Jan 21, 2026) deepseek-r1-distill-llama-70b, deepseek-r1-distill-qwen-32b
-  // - (Feb 18, 2026) moonshotai/kimi-k2-instruct (deprecated redirect, removed from docs; still returned by API -> symlink above)
   // - (Feb 18, 2026) meta-llama/llama-guard-4-12b (removed from docs; shut down Mar 05 -> gpt-oss-safeguard-20b)
   // - (Apr 02, 2026) meta-llama/llama-4-maverick-17b-128e-instruct (removed from docs and pricing)
   // - (Jun 26, 2026) moonshotai/kimi-k2-instruct-0905 + moonshotai/kimi-k2-instruct (both removed from docs AND API)
   // - (Jul 17, 2026) qwen/qwen3-32b, meta-llama/llama-4-scout-17b-16e-instruct (announced Jun 17, shut down Jul 17 -> gpt-oss-120b / qwen3.6-27b)
   // - (Aug 16, 2026) llama-3.3-70b-versatile, llama-3.1-8b-instant (announced Jun 17, shut down Aug 16 -> gpt-oss-120b or qwen3.6-27b / gpt-oss-20b);
-  //   llama-3.3-70b-versatile still powers groq/compound-mini internally (docs/compound/systems/compound-mini); the shutdown applies to free/developer tiers only (enterprise committed-spend contracts unaffected)
+  //   free/developer tiers only: docs list both as Enterprise (contact sales), standard keys 404
+  // - (Sep 14, 2026) qwen/qwen3.6-27b (-> qwen3.8-27b)
+  // - (Sep 21, 2026) groq/compound, groq/compound-mini (announced Aug 24, no replacement)
 
-
-  // Production Models - Compound Systems (pass-through pricing to underlying models)
-  {
-    idPrefix: 'groq/compound',
-    label: 'Compound (Agentic System)',
-    pubDate: '20250904',
-    description: 'Groq agentic AI with web search, visit website, code execution, Wolfram Alpha. Uses GPT-OSS 120B, Llama 4 Scout, Llama 3.3 70B. Pricing based on underlying model usage.',
-    contextWindow: 131072,
-    maxCompletionTokens: 8192,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    hidden: true, // Pass-through pricing
-  },
-  {
-    idPrefix: 'groq/compound-mini',
-    label: 'Compound Mini (Agentic System)',
-    pubDate: '20250904',
-    description: 'Lighter Groq agentic AI, same built-in tools but a single tool call per request (~3x lower latency). Pricing based on underlying model usage.',
-    contextWindow: 131072,
-    maxCompletionTokens: 8192,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn],
-    hidden: true, // Pass-through pricing
-  },
 
   // Production Models - OpenAI GPT-OSS
   {
@@ -112,7 +93,7 @@ const _knownGroqModels = llmsDefineModels<_GroqModelDef>()([
     parameterSpecs: [
       { paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high'] }, // Groq rejects 'none' on gpt-oss
     ],
-    chatPrice: { input: 0.15, output: 0.60, cache: { cType: 'oai-ac', read: 0.075 } },
+    chatPrice: { input: 0.15, output: 0.60, cache: { read: 0.075 } },
     benchmark: { cbaElo: 1352 }, // lmarena: gpt-oss-120b
   },
   {
@@ -127,7 +108,7 @@ const _knownGroqModels = llmsDefineModels<_GroqModelDef>()([
     parameterSpecs: [
       { paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high'] }, // Groq rejects 'none' on gpt-oss
     ],
-    chatPrice: { input: 0.075, output: 0.30, cache: { cType: 'oai-ac', read: 0.0375 } },
+    chatPrice: { input: 0.075, output: 0.30, cache: { read: 0.0375 } },
   },
   {
     idPrefix: 'openai/gpt-oss-20b',
@@ -140,7 +121,7 @@ const _knownGroqModels = llmsDefineModels<_GroqModelDef>()([
     parameterSpecs: [
       { paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high'] }, // Groq rejects 'none' on gpt-oss
     ],
-    chatPrice: { input: 0.075, output: 0.30, cache: { cType: 'oai-ac', read: 0.0375 } },
+    chatPrice: { input: 0.075, output: 0.30, cache: { read: 0.0375 } },
     benchmark: { cbaElo: 1318 }, // lmarena: gpt-oss-20b
   },
 
@@ -200,7 +181,7 @@ export function groqValidateModelDefs_DEV(apiModelIds: string[]): void {
   if (DEV_DEBUG_GROQ_MODELS) {
     llmDevCheckModels_DEV('Groq', apiModelIds, _knownGroqModels.map(m => m.idPrefix), {
       checkUnknown: false,
-      ignoreStale: ['minimaxai/minimax-m2.7'], // enterprise-only, never lists for standard keys
+      ignoreStale: ['minimaxai/minimax-m2.7', 'meta-models/muse-spark-open'], // enterprise-only, never lists for standard keys
     });
   }
 }

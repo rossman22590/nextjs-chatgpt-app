@@ -5,7 +5,6 @@ import { Box, CircularProgress, IconButton, ListDivider, ListItem, ListItemDecor
 import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import ForkRightIcon from '@mui/icons-material/ForkRight';
 import FormatPaintOutlinedIcon from '@mui/icons-material/FormatPaintOutlined';
@@ -14,6 +13,7 @@ import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
 import TelegramIcon from '@mui/icons-material/Telegram';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
 import TextureIcon from '@mui/icons-material/Texture';
 import VerticalAlignBottomIcon from '@mui/icons-material/VerticalAlignBottom';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -24,12 +24,14 @@ import type { DLLMId } from '~/common/stores/llms/llms.types';
 import { AnthropicIcon } from '~/common/components/icons/vendors/AnthropicIcon';
 import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
 import { CloseablePopup } from '~/common/components/CloseablePopup';
+import { ConfirmMenuItem } from '~/common/components/ConfirmMenuItem';
 import { SubMenuHost, SubMenuItem, useSubMenuHost } from '~/common/components/SubMenu';
-import { DMessageUserFlag, MESSAGE_FLAG_AIX_SKIP, MESSAGE_FLAG_NOTIFY_COMPLETE, MESSAGE_FLAG_STARRED, MESSAGE_FLAG_VND_ANT_CACHE_USER } from '~/common/stores/chat/chat.message';
+import { DMessagePresentation, DMessageUserFlag, MESSAGE_FLAG_AIX_SKIP, MESSAGE_FLAG_NOTIFY_COMPLETE, MESSAGE_FLAG_STARRED, MESSAGE_FLAG_VND_ANT_CACHE_USER } from '~/common/stores/chat/chat.message';
 import { KeyStroke } from '~/common/components/KeyStroke';
 import { PhGearSixIcon } from '~/common/components/icons/phosphor/PhGearSixIcon';
 import { PhTreeStructure } from '~/common/components/icons/phosphor/PhTreeStructure';
 import { PhVoice } from '~/common/components/icons/phosphor/PhVoice';
+import { Release } from '~/common/app.release';
 import { StarredState } from '~/common/components/StarIcons';
 import { TooltipOutlined } from '~/common/components/TooltipOutlined';
 import { optimaOpenPreferences } from '~/common/layout/optima/useOptima';
@@ -68,6 +70,8 @@ export function ChatMessageMenu(props: {
   isUserNotifyComplete: boolean,
   userNotifyCompleteLlmId: DLLMId | null,
   isUserStarred: boolean,
+  isViewMarkdown: boolean,
+  isViewUngrouped: boolean,
   isVndAndCacheAuto: boolean,
   isVndAndCacheUser: boolean,
   showVndAntCaching: boolean,
@@ -80,6 +84,7 @@ export function ChatMessageMenu(props: {
   onOpsBranchFrom?: (event: React.MouseEvent) => void,
   onOpsMessageCopySrc?: (event: React.MouseEvent) => void,
   onOpsMessageEditToggle?: (event: React.MouseEvent) => void,
+  onOpsMessagePresentationChange?: (event: React.MouseEvent, update: Partial<DMessagePresentation> | null) => void,
   onOpsMessageTruncate?: (event: React.MouseEvent) => void,
   onOpsShowInfo?: () => void,
   // onOpsTextChart?: (event: React.MouseEvent) => void,
@@ -110,6 +115,7 @@ export function ChatMessageMenu(props: {
     onOpsBranchFrom,
     onOpsMessageCopySrc,
     onOpsMessageEditToggle,
+    onOpsMessagePresentationChange,
     onOpsMessageTruncate,
     onOpsShowInfo,
     onOpsTextDiagram,
@@ -120,6 +126,11 @@ export function ChatMessageMenu(props: {
 
 
   // handlers
+
+  const handleDeleteConfirmed = React.useCallback((event: React.MouseEvent) => {
+    onClose();
+    onMessageDelete?.(event);
+  }, [onClose, onMessageDelete]);
 
   const handleShowInfo = React.useCallback(() => {
     onClose();
@@ -232,20 +243,27 @@ export function ChatMessageMenu(props: {
         </SubMenuItem>
       )}
       {onMessageDelete && (
-        <MenuItem onClick={onMessageDelete}>
-          <ListItemDecorator><DeleteOutlineIcon /></ListItemDecorator>
-          Delete <span style={{ opacity: 0.5 }}>message</span>
-        </MenuItem>
+        <ConfirmMenuItem label={<>Delete <span style={{ opacity: 0.5 }}>message</span></>} confirmLabel='Confirm Delete' onConfirm={handleDeleteConfirmed} />
       )}
       {onOpsMessageTruncate && (
-        <MenuItem onClick={onOpsMessageTruncate} disabled={props.isBottom}>
-          <ListItemDecorator><VerticalAlignBottomIcon /></ListItemDecorator>
-          Truncate <span style={{ opacity: 0.5 }}>after this</span>
-        </MenuItem>
+        <ConfirmMenuItem icon={VerticalAlignBottomIcon} label={<>Truncate <span style={{ opacity: 0.5 }}>after this</span></>} confirmLabel='Confirm Truncate' disabled={props.isBottom} onConfirm={onOpsMessageTruncate} />
       )}
 
-      {/* Aix Skip Message */}
       {!pending && <ListDivider />}
+      {/* Saved presentation of this message */}
+      {!pending && onOpsMessagePresentationChange && (
+        <MenuItem onClick={event => onOpsMessagePresentationChange(event, { textMode: props.isViewMarkdown ? 'plain' : 'markdown' })}>
+          <ListItemDecorator><TextFieldsIcon /></ListItemDecorator>
+          {props.isViewMarkdown ? 'View as text' : 'View as markdown'}
+        </MenuItem>
+      )}
+      {Release.IsNodeDevBuild && !pending && onOpsMessagePresentationChange && (
+        <MenuItem onClick={event => onOpsMessagePresentationChange(event, { fragmentGrouping: props.isViewUngrouped ? 'grouped' : 'ungrouped' })}>
+          <ListItemDecorator><PhTreeStructure /></ListItemDecorator>
+          {props.isViewUngrouped ? 'Group fragments' : 'Ungroup fragments'}
+        </MenuItem>
+      )}
+      {/* Aix Skip Message */}
       {!pending && onMessageUserFlagToggle && (
         <MenuItem onClick={() => onMessageUserFlagToggle(MESSAGE_FLAG_AIX_SKIP)}>
           <ListItemDecorator>{props.isUserMessageSkipped ? <VisibilityOffIcon sx={{ color: 'danger.plainColor' }} /> : <VisibilityOffIcon sx={{ color: 'neutral.plainDisabledColor' }} /> /*<VisibilityIcon />*/}</ListItemDecorator>

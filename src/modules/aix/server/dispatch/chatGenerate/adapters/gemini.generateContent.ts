@@ -7,7 +7,6 @@ import { AIX_MISSING_TOOL_RESULT_TEXT, aixSpillSystemToUser, approxDocPart_To_St
 
 
 // configuration
-const hotFixSingleImagePartFirst = true; // https://ai.google.dev/gemini-api/docs/image-understanding#tips-best-practices
 const hotFixReplaceEmptyMessagesWithEmptyTextPart = true;
 
 // [Gemini 3, 2025-11-20] Bypass dummy thoughtSignature for Gemini 3+ validation
@@ -80,7 +79,7 @@ export function aixToGeminiGenerateContent(model: AixAPI_Model, _chatGenerate: A
   // Construct the request payload
   const payload: TRequest = {
     contents,
-    safetySettings: _toGeminiSafetySettings(geminiSafetyThreshold),
+    safetySettings: geminiSafetySettings(geminiSafetyThreshold),
     systemInstruction,
     generationConfig: {
       stopSequences: undefined, // (default, optional)
@@ -92,6 +91,8 @@ export function aixToGeminiGenerateContent(model: AixAPI_Model, _chatGenerate: A
       topP: undefined, // (default, optional)
       topK: undefined, // (default, optional)
     },
+    // [Gemini, 2026-10-26, hypothesis: the field is accepted on every model, its effect on the logs is not observable] generateContent logs requests to AI Studio by default on paid projects created from this date - the request field overrides the project setting
+    store: false,
   };
 
   // Top-P instead of temperature
@@ -158,6 +159,10 @@ export function aixToGeminiGenerateContent(model: AixAPI_Model, _chatGenerate: A
 
     // activate audio (/only) output
     payload.generationConfig!.responseModalities = noTextOutput ? ['AUDIO'] : ['TEXT', 'AUDIO'];
+
+    // [Gemini, 2026-11-09] TTS is single-turn: any request with more than one content is rejected (400 "Multiturn chat is not enabled"), so only the last turn is spoken
+    if (noTextOutput)
+      payload.contents = payload.contents.slice(-1);
 
     // default voice config - list here: https://ai.google.dev/gemini-api/docs/speech-generation#voices
     payload.generationConfig!.speechConfig = {
@@ -256,12 +261,10 @@ export function aixToGeminiGenerateContent(model: AixAPI_Model, _chatGenerate: A
   const _noToolContextCirculation = ['gemini-2.', '-image', 'nano-banana', 'deep-research'];
   const hasToolContextCirculation = !_noToolContextCirculation.some((p) => model.id.includes(p));
 
-  // [NO-CIRCULATION] can't combine hosted + custom tools with restrictive policies - custom wins -> wipe hosted if any
-  const hasUserRestrictivePolicy = chatGenerate.toolsPolicy?.type === 'any' /* || chatGenerate.toolsPolicy?.type === 'function_call' - DISABLED 2026-07-17, see ToolsPolicy_schema */;
-  // NOTE: we may have to remove the 'hasUserRestrictivePolicy' as some models seem to not want any other tool when user tools are set
-  if (_addedHostedTools && hasUserTools && !hasToolContextCirculation && hasUserRestrictivePolicy) {
+  // [NO-CIRCULATION] can't combine hosted + custom tools, regardless of policy (400 "Built-in tools ... and Function Calling cannot be combined") - custom wins -> wipe hosted if any
+  if (_addedHostedTools && hasUserTools && !hasToolContextCirculation) {
     _addedHostedTools = false;
-    payload.tools = undefined; // wipe
+    payload.tools = computerUseEnv ? payload.tools?.filter(tool => 'computerUse' in tool) : undefined; // wipe, except Computer Use: client-side, and its models 400 without it
   }
 
   // Function Calls
@@ -362,19 +365,7 @@ function _toGeminiContents(chatSequence: AixMessages_ChatMessage[], apiRequiresS
     const isModelMessage = message.role === 'model';
     const baseRole: GeminiWire_Messages.Content['role'] = isModelMessage ? 'model' : 'user';
 
-    let messageParts: AixMessages_ChatMessage['parts'][number][] = message.parts;
-    if (
-      hotFixSingleImagePartFirst &&
-      messageParts.filter(part => part.pt === 'inline_image').length === 1 // only 1 image part
-    ) {
-      // https://ai.google.dev/gemini-api/docs/image-understanding#tips-best-practices
-      // "When using a single image with text, place the text prompt after the image part in the contents array."
-      messageParts = [...messageParts].sort((a, b) => {
-        if (a.pt === 'inline_image' && b.pt !== 'inline_image') return -1;
-        if (a.pt !== 'inline_image' && b.pt === 'inline_image') return 1;
-        return 0;
-      });
-    }
+    const messageParts = message.parts;
 
     // Gemini requires tool_response (FunctionResponse/CodeExecutionResult) in 'user' Content,
     // but tool_invocation (FunctionCall/ExecutableCode) in 'model' Content. For model messages
@@ -627,7 +618,7 @@ function _toGeminiToolConfig(itp: AixTools_ToolsPolicy): NonNullable<TRequest['t
   }
 }
 
-function _toGeminiSafetySettings(threshold: GeminiWire_Safety.HarmBlockThreshold): TRequest['safetySettings'] {
+export function geminiSafetySettings(threshold: GeminiWire_Safety.HarmBlockThreshold): TRequest['safetySettings'] {
   return threshold === 'HARM_BLOCK_THRESHOLD_UNSPECIFIED' ? undefined : [
     { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: threshold },
     { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: threshold },

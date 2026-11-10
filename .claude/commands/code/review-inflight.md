@@ -2,7 +2,7 @@
 description: Review in-flight changes for coherence, completeness, and quality
 ---
 
-Review the current in-flight changes in the big-agi-private repository (dev branch, continuously rebased ~1800 commits on top of main).
+Review the current in-flight changes in the big-agi-private repository (dev branch, continuously rebased on top of main).
 
 **Step 1: Scope and read**
 
@@ -16,7 +16,7 @@ but don't stop here, continue to the full review in the same response.
 
 **Step 3: Validate**
 
-Run `tsc --noEmit --pretty` and `npm run lint` (in parallel). Report any errors with the review.
+Run `npm run tscheck` and `npm run lint` (in parallel). Report any errors with the review.
 If the diff removes/renames identifiers, grep the codebase for stale references to the OLD names. This catches broken guards, stale imports, and incomplete migrations.
 
 **Step 4: Deep review**
@@ -30,5 +30,4 @@ codebase consistency, etc.
 Think about what happens when the next developer touches this code.
 Rank findings by severity (bug > correctness > cleanup > cosmetic). Be specific about what to change and where.
 
-Remember: design values for this codebase: orthogonal features, features that generalize well, modularized and reusable code,
-type-discriminated data, optimized code, zero maintenance burden. Minimize future pain, etc.
+Judge design by the Design and Irreversible choices sections of CLAUDE.md, loaded in every session; do not restate them here.

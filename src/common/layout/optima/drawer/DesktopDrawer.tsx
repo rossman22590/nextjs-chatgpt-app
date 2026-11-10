@@ -10,7 +10,10 @@ import { optimaCloseDrawer, optimaOpenDrawer, useOptimaDrawerOpen, useOptimaDraw
 import { useOptimaPortalOutRef } from '../portals/useOptimaPortalOutRef';
 
 
-const DesktopDrawerFixRoot = styled(Box)({
+// Desktop Drawer
+
+const DesktopDrawerFixRoot = styled(Box, { name: 'DesktopDrawerFixRoot' })({
+  // fix the drawer size
   width: 'var(--AGI-Desktop-Drawer-width)',
   flexShrink: 0,
   flexGrow: 0,
@@ -24,7 +27,8 @@ const DesktopDrawerFixRoot = styled(Box)({
   },
 });
 
-const DesktopDrawerTranslatingSheet = styled(Sheet)({
+const DesktopDrawerTranslatingSheet = styled(Sheet, { name: 'DesktopDrawerTranslatingSheet' })({
+  // layout
   width: '100%',
   height: 'calc(100dvh - 1.5rem)',
   marginTop: '0.75rem',

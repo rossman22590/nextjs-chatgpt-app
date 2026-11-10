@@ -116,6 +116,7 @@ function AttachmentSources(props: {
   color?: ColorPaletteProp, // menu-rich and inline-buttons
   richButtonStandOut?: boolean, // menu-rich only
   menuButton?: React.ReactNode, // custom MenuButton trigger for menu-compact/menu-message modes
+  menuButtonLabel?: string, // menu-message: the button text (default 'Attach')
   // source availability - note that hasGoogleDriveCapability is local
   canBrowse: boolean, // whether browsing is available (for Web button and showing the auto-attach toggle)
   hasCamera: boolean,
@@ -202,6 +203,9 @@ function AttachmentSources(props: {
     const isMessage = props.mode === 'menu-message';
     return <>
 
+      {/* [mobile] Responsive Camera OCR button, before the [+] menu */}
+      {props.hasCamera && !isMessage && <ButtonAttachCameraMemo isMobile color={props.color} onOpenCamera={props.onOpenCamera} />}
+
       <Dropdown>
         {props.menuButton ? props.menuButton : !isMessage ? (
           <RichMenuButton icon={<AddRoundedIcon />} />
@@ -215,7 +219,7 @@ function AttachmentSources(props: {
               sx: { minHeight: '2.25rem', m: -0.25 /* absorb parent's padding */ },
             },
           } as const}>
-            Attach
+            {props.menuButtonLabel ?? 'Attach'}
           </MenuButton>
         )}
         <RichMenu compact darkenBackdrop={!isMessage /* mobile '+': scrim signals a modal choice, like the voice engine picker */} /* menu-compact or menu-message: above dialogs (default zIndex) */>
@@ -265,9 +269,6 @@ function AttachmentSources(props: {
 
         </RichMenu>
       </Dropdown>
-
-      {/* [mobile] Responsive Camera OCR button */}
-      {props.hasCamera && !isMessage && <ButtonAttachCameraMemo isMobile color={props.color} onOpenCamera={props.onOpenCamera} />}
 
     </>;
   }

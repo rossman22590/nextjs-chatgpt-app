@@ -3,29 +3,43 @@ import { useShallow } from 'zustand/react/shallow';
 
 import type { SxProps } from '@mui/joy/styles/types';
 import { Box, ButtonGroup, Sheet, Typography } from '@mui/joy';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import ChangeHistoryTwoToneIcon from '@mui/icons-material/ChangeHistoryTwoTone';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import FitScreenIcon from '@mui/icons-material/FitScreen';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import HtmlIcon from '@mui/icons-material/Html';
 import NumbersRoundedIcon from '@mui/icons-material/NumbersRounded';
+import PaletteIcon from '@mui/icons-material/Palette';
+import PhotoLibraryOutlinedIcon from '@mui/icons-material/PhotoLibraryOutlined';
 import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
+import RotateRightIcon from '@mui/icons-material/RotateRight';
 import SquareTwoToneIcon from '@mui/icons-material/SquareTwoTone';
 import WrapTextIcon from '@mui/icons-material/WrapText';
 import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
 
-import { copyToClipboard } from '~/common/util/clipboardUtils';
+import { copyBlobPromiseToClipboard, copyToClipboard } from '~/common/util/clipboardUtils';
+import { downloadBlob } from '~/common/util/downloadUtils';
+import { isChunkLoadError } from '~/common/util/errorUtils';
+import { posthogCaptureException } from '~/common/components/3rdparty/PostHogAnalytics';
+import { prettyTimestampForFilenames } from '~/common/util/timeUtils';
 import { useFullscreenElement } from '~/common/components/useFullscreenElement';
 import { useUIPreferencesStore } from '~/common/stores/store-ui';
 
+import type { IRenderHandle } from './code-renderers/IRenderHandle';
 import { OVERLAY_BUTTON_RADIUS, OverlayButton, overlayButtonsActiveSx, overlayButtonsClassName, overlayButtonsTopRightSx, overlayGroupWithShadowSx } from '../OverlayButton';
+import { RenderCodeChartJS } from './code-renderers/RenderCodeChartJS';
 import { RenderCodeHtmlIFrame } from './code-renderers/RenderCodeHtmlIFrame';
 import { RenderCodeMarkdown } from './code-renderers/RenderCodeMarkdown';
 import { RenderCodeMermaid } from './code-renderers/RenderCodeMermaid';
-import { heuristicIsSVGCode, RenderCodeSVG } from './code-renderers/RenderCodeSVG';
 import { RenderCodeSyntax } from './code-renderers/RenderCodeSyntax';
 import { heuristicIsBlockPureHTML } from '../danger-html/RenderDangerousHtml';
-import { heuristicIsCodePlantUML, RenderCodePlantUML, usePlantUmlSvg } from './code-renderers/RenderCodePlantUML';
+import { heuristicIsCodePlantUML, plantUMLCodeCycleTheme, plantUMLCodeToggleDirection, RenderCodePlantUML } from './code-renderers/RenderCodePlantUML';
+import { heuristicIsSVGCode, RenderCodeSVG } from './code-renderers/RenderCodeSVG';
+import { useERCDiffContext } from '../enhanced-code/ERCDiffContext';
 import { useStickyCodeOverlay } from './useStickyCodeOverlay';
 
 // style for line-numbers
@@ -34,6 +48,14 @@ import './RenderCode.css';
 
 // configuration
 const ALWAYS_SHOW_OVERLAY = true;
+const BLOCK_CODE_ENABLE_COMPARISON = true; // TODO: make this opt-in (also, 'false' does not disable the hooks)
+export const BLOCK_CODE_VND_AGI_CHARTJS = 'chartjs';
+export const BLOCK_CODE_MERMAID_TITLE = 'mermaid';
+export const BLOCK_CODE_PLANTUML_TITLE = 'plantuml';
+export const BLOCK_CODE_SVG_TITLE = 'svg';
+export const BLOCK_CODE_FALLBACK_TITLE = ''; // 'Code'
+const CONTEXT_HIGHLIGHT_START = '__AGI_MARK_START__' as const;
+const CONTEXT_HIGHLIGHT_END = '__AGI_MARK_END__' as const;
 
 // Perf: while streaming a large code block, throttle Prism re-highlighting (decimator ~15Hz -> capped here to ~7Hz).
 // Set BYTES to 0 to disable the optimization entirely (zero runtime cost when disabled).
@@ -43,8 +65,6 @@ const PARTIAL_HIGHLIGHT_THROTTLE_MS = 150;
 
 // RenderCode
 
-export const renderCodeMemoOrNot = (memo: boolean) => memo ? RenderCodeMemo : RenderCode;
-
 export const RenderCodeMemo = React.memo(RenderCode);
 
 interface RenderCodeBaseProps {
@@ -53,9 +73,10 @@ interface RenderCodeBaseProps {
   code: string,
   isPartial: boolean,
   fitScreen?: boolean,
-  initialShowHTML?: boolean,
+  initialRenderHTML?: boolean,
   noCopyButton?: boolean,
-  optimizeLightweight?: boolean, // set when non-memoed and partial
+  optimizeLightweight?: boolean, // the block being written: throttle highlighting, no tooltips or sticky overlay
+  onReattachAsFile?: (file: File) => void;
   onReplaceInCode?: (search: string, replace: string) => boolean;
   renderHideTitle?: boolean,
   sx?: SxProps,
@@ -63,36 +84,48 @@ interface RenderCodeBaseProps {
 
 function RenderCode(props: RenderCodeBaseProps) {
   return (
-    <React.Suspense
-      fallback={
-        // Mimic the structure of the RenderCodeImpl - to mitigate race conditions that could cause problematic rendering
-        // of code (where two components were missing from the structure)
-        <Box sx={_styles.renderCodecontainer}>
-          <Box component='code' className='language-unknown' aria-label='Displaying Code...' sx={{ p: 1.5, display: 'block', ...props.sx }}>
-            <Box component='span' sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <Box component='span' className='code-container' aria-label='Code block'>
-                {/* Just wait until the correct implementation renders */}
-              </Box>
-            </Box>
-          </Box>
-        </Box>
-      }
-    >
+    <React.Suspense fallback={<RenderCodeLite code={null} sx={props.sx} />}>
       <_DynamicPrism {...props} />
     </React.Suspense>
+  );
+}
+
+/**
+ * The code box without the highlighter: empty while it loads (null code), unhighlighted code in its place when it cannot load.
+ * Mimics the structure of RenderCodeImpl, to mitigate race conditions that could cause problematic rendering of code.
+ */
+function RenderCodeLite(props: { code: string | null, sx?: SxProps }) {
+  return (
+    <Box sx={_styles.renderCodecontainer}>
+      <Box component='code' className='language-unknown' sx={{ p: 1.5, display: 'block', overflowX: 'auto', whiteSpace: 'pre', ...props.sx }}>
+        <Box component='span' sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <Box component='span' className='code-container' aria-label='Code block'>
+            {props.code}
+          </Box>
+        </Box>
+      </Box>
+    </Box>
   );
 }
 
 
 // Lazy loader of the heavy prism functions
 const _DynamicPrism = React.lazy(async () => {
+  try {
+    // Dynamically import the code highlight functions
+    const { highlightCode, inferCodeLanguage } = await import('~/modules/blocks/code/code-highlight/codePrism');
 
-  // Dynamically import the code highlight functions
-  const { highlightCode, inferCodeLanguage } = await import('~/modules/blocks/code/code-highlight/codePrism');
-
-  return {
-    default: (props: RenderCodeBaseProps) => <RenderCodeImpl highlightCode={highlightCode} inferCodeLanguage={inferCodeLanguage} {...props} />,
-  };
+    return {
+      default: (props: RenderCodeBaseProps) => <RenderCodeImpl highlightCode={highlightCode} inferCodeLanguage={inferCodeLanguage} {...props} />,
+    };
+  } catch (error) {
+    // the chunk did not arrive (network, timeout): plain code until the page reloads, in place of the boundary's forced reload;
+    // a module that threw stays an error
+    if (!isChunkLoadError(error)) throw error;
+    console.warn('[RenderCode] highlighter did not load, rendering plain code:', error);
+    posthogCaptureException(error, { agi_domain: 'client-chunk-fallback', agi_runtime: 'browser', component: 'RenderCode' });
+    return { default: (props: RenderCodeBaseProps) => <RenderCodeLite code={props.code} sx={props.sx} /> };
+  }
 });
 
 
@@ -144,6 +177,56 @@ const overlayFirstRowSx: SxProps = {
 };
 
 
+// Give the memoized overlay JSX a named Profiler boundary without duplicating its inputs as props.
+function RCOverlay(props: { children: React.ReactNode }) {
+  return props.children;
+}
+
+
+// Keep deferred catch-up renders inside the syntax subtree. Prism itself remains synchronous.
+const RCSyntaxHighlight = React.memo(function RCSyntaxHighlight(props: {
+  code: string,
+  inferredCodeLanguage: string | null,
+  renderLineNumbers: boolean,
+  presenterMode: boolean,
+  performSymbolHighlight: string | null | undefined,
+  highlightCode: (inferredCodeLanguage: string | null, code: string, addLineNumbers: boolean) => string,
+}) {
+  const { code, inferredCodeLanguage, renderLineNumbers, presenterMode, performSymbolHighlight, highlightCode } = props;
+  const deferredCode = React.useDeferredValue(code);
+  const codeSyntaxHtml = React.useMemo(() => {
+    if (!deferredCode)
+      return null;
+
+    // check if the highlight is within domain conditions >= 3 chars, less than 1000 chars, and no newlines
+    let codeHighlight = performSymbolHighlight?.trim();
+    if (!codeHighlight || codeHighlight.length < 3 || codeHighlight.length > 1000 || codeHighlight.includes('\n'))
+      return highlightCode(inferredCodeLanguage, deferredCode, renderLineNumbers);
+
+    // 1. pre-process with enclosing tags to locate later
+    let codeToProcess = deferredCode;
+    try {
+      codeToProcess = codeToProcess.replaceAll(codeHighlight, `${CONTEXT_HIGHLIGHT_START}${codeHighlight}${CONTEXT_HIGHLIGHT_END}`);
+    } catch (e) {
+      // console.warn('[DEV] Error during string replaceAll for highlighting:', e);
+    }
+
+    // 2. let Prism highlight the code (with placeholders inside, which shall be skipped because agnostic - hopefully)
+    let prismOutputHtml = highlightCode(inferredCodeLanguage, codeToProcess, renderLineNumbers);
+
+    // 3. post-process: replace markers with <mark> tags
+    if (prismOutputHtml)
+      prismOutputHtml = prismOutputHtml
+        .replaceAll(CONTEXT_HIGHLIGHT_START, `<mark class='agi-highlight'>`)
+        .replaceAll(CONTEXT_HIGHLIGHT_END, `</mark>`);
+
+    return prismOutputHtml;
+  }, [deferredCode, highlightCode, inferredCodeLanguage, performSymbolHighlight, renderLineNumbers]);
+
+  return <RenderCodeSyntax highlightedSyntaxAsHtml={codeSyntaxHtml} presenterMode={presenterMode} />;
+});
+
+
 function RenderCodeImpl(props: RenderCodeBaseProps & {
   highlightCode: (inferredCodeLanguage: string | null, code: string, addLineNumbers: boolean) => string,
   inferCodeLanguage: (blockTitle: string, code: string) => string | null,
@@ -153,22 +236,27 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
   // const [isHovering, setIsHovering] = React.useState(false);
   const [fitScreen, setFitScreen] = React.useState(!!props.fitScreen);
   const [htmlReloadKey, setHtmlReloadKey] = React.useState(0);
-  const [showHTML, setShowHTML] = React.useState(props.initialShowHTML === true);
+  const [showHTML, setShowHTML] = React.useState(props.initialRenderHTML === true);
   const [showMarkdown, setShowMarkdown] = React.useState(true);
   const [showMermaid, setShowMermaid] = React.useState(true);
   const [showPlantUML, setShowPlantUML] = React.useState(true);
   const [showSVG, setShowSVG] = React.useState(true);
+  const [showChartJS, setShowChartJS] = React.useState(true);
   const fullScreenElementRef = React.useRef<HTMLDivElement>(null);
+  const renderHandleRef = React.useRef<IRenderHandle>(null);
 
   // external state
+  const diffContext = useERCDiffContext();
   const { isFullscreen, enterFullscreen, exitFullscreen } = useFullscreenElement(fullScreenElementRef);
   const { overlayRef, overlayBoundaryRef } = useStickyCodeOverlay({ disabled: props.optimizeLightweight || isFullscreen });
 
   // sticky overlay positioning
-  const { uiComplexityMode, showLineNumbers, showSoftWrap, setShowLineNumbers, setShowSoftWrap } = useUIPreferencesStore(useShallow(state => ({
+  const { devsUISymbolHighlight, uiComplexityMode, showLineNumbers, showSoftWrap, setRenderHTMLInitial, setShowLineNumbers, setShowSoftWrap } = useUIPreferencesStore(useShallow(state => ({
+    devsUISymbolHighlight: state.devsUISymbolHighlight,
     uiComplexityMode: state.complexityMode,
     showLineNumbers: state.renderCodeLineNumbers,
     showSoftWrap: state.renderCodeSoftWrap,
+    setRenderHTMLInitial: state.setRenderHTMLInitial,
     setShowLineNumbers: state.setRenderCodeLineNumbers,
     setShowSoftWrap: state.setRenderCodeSoftWrap,
   })));
@@ -180,6 +268,8 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
     isPartial: blockIsPartial,
     highlightCode,
     inferCodeLanguage,
+    onReattachAsFile,
+    onReplaceInCode,
   } = props;
 
   const noTooltips = props.optimizeLightweight /*|| !isHovering*/;
@@ -199,6 +289,80 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
     copyToClipboard(codeRef.current, 'Code');
   }, []);
 
+  const handleHtmlRenderToggle = React.useCallback(() => {
+    // persistently save this change, to be used as next initial values
+    const nextState = !showHTML;
+    setRenderHTMLInitial(nextState);
+    setShowHTML(nextState);
+  }, [setRenderHTMLInitial, showHTML]);
+
+  const handleRenderHandleCopy = React.useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    // Keep clipboard.write inside the click gesture for Safari; resolve the image through a promise.
+    const renderBlob = async (): Promise<Blob> => {
+      const render = await renderHandleRef.current?.renderAsPNGBlob(event.shiftKey);
+      if (render) return render.blob;
+      throw new Error(render === undefined ? 'Nothing to copy yet.' : 'Failed to generate image.');
+    };
+    const blobPromise = renderBlob();
+    // The clipboard API can reject before consuming the image promise.
+    void blobPromise.catch(() => undefined);
+    void copyBlobPromiseToClipboard('image/png', blobPromise, `Image${event.shiftKey ? ' with transparent background' : ''}`)
+      .catch((error: unknown) => alert(error instanceof Error ? error.message : 'Failed to copy image.'));
+  }, []);
+
+  const handleRenderHandleDownload = React.useCallback(async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      const render = await renderHandleRef.current?.renderAsPNGBlob(event.shiftKey);
+      if (render) downloadBlob(render.blob, `${render.prefix}_${prettyTimestampForFilenames()}.png`);
+      else if (render === undefined) alert('Nothing to download yet.');
+      else alert('Failed to generate image.');
+    } catch {
+      alert('Failed to generate image.');
+    }
+  }, []);
+
+  const handleRenderHandleReattach = React.useCallback(async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!renderHandleRef.current || !onReattachAsFile) return;
+    renderHandleRef.current.renderAsPNGBlob(false)
+      .then((render) => {
+        if (!render) return alert('Failed to convert SVG to PNG.');
+        const pngFile = new File([render.blob], 'svg-render.png', { type: render.blob.type || 'image/png' });
+        onReattachAsFile(pngFile);
+      })
+      .catch(() => alert('Failed to convert SVG to PNG.'));
+  }, [onReattachAsFile]);
+
+
+  // comparison handlers
+
+  // Compare uses current content without invalidating the overlay on each stream update.
+  const comparisonRef = React.useRef({ diffContext, code, title: blockTitle });
+  comparisonRef.current = { diffContext, code, title: blockTitle };
+  const showCompareButton = BLOCK_CODE_ENABLE_COMPARISON && !!diffContext;
+  const compareBaseSet = !!diffContext?.baseCode;
+  const compareThisIsBase = diffContext?.baseCode === props.code;
+
+  const handleCompareClicked = React.useCallback(() => {
+    const { diffContext, code, title } = comparisonRef.current;
+    if (!diffContext) return;
+    if (!diffContext.baseCode) {
+      // set this as the diff base
+      diffContext.setBase(code, title || '(no title)');
+      diffContext.setShowDiff(false); // just to be sure
+    } else if (diffContext.baseCode === code) {
+      // clear the diff base
+      diffContext.setBase('', '');
+      diffContext.setShowDiff(false);
+    } else {
+      // compare this with the diff base
+      diffContext.setCompare(code, title || '(no title)');
+      diffContext.setShowDiff(true);
+    }
+  }, []);
+
 
   // heuristics for specialized rendering
 
@@ -208,23 +372,30 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
   const isHTMLCode = heuristicIsBlockPureHTML(_tCode);
   const renderHTML = isHTMLCode && showHTML;
 
+  // 'render-at-end' enables HTML at completion without updating state for other code blocks.
+  const shouldAutoRenderHTML = isHTMLCode && props.initialRenderHTML === true;
+  React.useEffect(() => {
+    if (shouldAutoRenderHTML) setShowHTML(true);
+  }, [shouldAutoRenderHTML]);
+
   const isMdCode = !blockIsPartial && (lcBlockTitle === 'md' || lcBlockTitle === 'markdown' || lcBlockTitle.endsWith('.md'));
   const renderMarkdown = isMdCode && showMarkdown;
 
-  const isMermaidCode = lcBlockTitle === 'mermaid' && !blockIsPartial;
+  const isMermaidCode = lcBlockTitle === BLOCK_CODE_MERMAID_TITLE && !blockIsPartial;
   const renderMermaid = isMermaidCode && showMermaid;
 
   const isPlantUMLCode = heuristicIsCodePlantUML(_tCode);
-  let renderPlantUML = isPlantUMLCode && showPlantUML;
-  const { data: plantUmlSvgData, error: plantUmlError } = usePlantUmlSvg(renderPlantUML, code);
-  renderPlantUML = renderPlantUML && (!!plantUmlSvgData || !!plantUmlError);
+  const renderPlantUML = isPlantUMLCode && showPlantUML;
 
   const isSVGCode = heuristicIsSVGCode(_tCode);
   const renderSVG = isSVGCode && showSVG;
   const canScaleSVG = renderSVG && _tCode.includes('viewBox="');
 
-  const renderSyntaxHighlight = !renderHTML && !renderMarkdown && !renderMermaid && !renderPlantUML && !renderSVG;
-  const cannotRenderLineNumbers = !renderSyntaxHighlight || showSoftWrap;
+  const isChartJSCode = lcBlockTitle === BLOCK_CODE_VND_AGI_CHARTJS && !blockIsPartial;
+  const renderChartJS = isChartJSCode && showChartJS;
+
+  const renderSyntaxHighlight = !renderHTML && !renderMarkdown && !renderMermaid && !renderPlantUML && !renderSVG && !renderChartJS;
+  const cannotRenderLineNumbers = !renderSyntaxHighlight || showSoftWrap || renderChartJS;
   const renderLineNumbers = !cannotRenderLineNumbers && ((showLineNumbers && uiComplexityMode !== 'minimal') || isFullscreen);
 
 
@@ -238,9 +409,9 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
   }, [blockTitle, code, inferCodeLanguage, isHTMLCode]);
 
 
-  // Optimization 1: highlight decimation: max 6.6Hz throttle during large partial streams, as skipped intermediates are harmless.
+  // Optimization 1: highlight decimation: max 6.6Hz during large partial streams. Flush on stop, even with an unclosed fence.
   const snapRef = React.useRef({ at: 0, code });
-  const throttle = !!PARTIAL_HIGHLIGHT_THROTTLE_BYTES && blockIsPartial && code.length > PARTIAL_HIGHLIGHT_THROTTLE_BYTES;
+  const throttle = !!PARTIAL_HIGHLIGHT_THROTTLE_BYTES && props.optimizeLightweight && blockIsPartial && code.length > PARTIAL_HIGHLIGHT_THROTTLE_BYTES;
   const now = throttle ? performance.now() : 0;
   if (!throttle || now - snapRef.current.at >= PARTIAL_HIGHLIGHT_THROTTLE_MS) {
     snapRef.current.at = now;
@@ -248,18 +419,7 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
   }
   const throttledCodeForHighlight = snapRef.current.code;
 
-  // Optimization 2: highlight cancellation: React-defer the *input* to Prism syntax highlight memo -> the highlight pass runs in a low-priority, interruptible render.
-  // A higher-priority update (input, scroll, another state change) aborts the pending pass -- so rapid streaming updates coalesce
-  // into fewer Prism runs under pressure.
-  const deferredCodeForHighlight = React.useDeferredValue(throttledCodeForHighlight);
-
-  const codeSyntaxHtml = React.useMemo(() => {
-    // fast-off
-    if (!renderSyntaxHighlight || !deferredCodeForHighlight)
-      return null;
-    return highlightCode(inferredCodeLanguage, deferredCodeForHighlight, renderLineNumbers);
-  }, [deferredCodeForHighlight, highlightCode, inferredCodeLanguage, renderLineNumbers, renderSyntaxHighlight]);
-
+  const performSymbolHighlight = !devsUISymbolHighlight ? undefined : diffContext?.contextHighlightText;
 
   // Title
   let showBlockTitle = !props.renderHideTitle && (blockTitle != inferredCodeLanguage) && (blockTitle.includes('.') || blockTitle.includes('://'));
@@ -294,7 +454,201 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
     // lots more style, incl font, background, embossing, radius, etc.
     ...props.sx,
 
-  }), [isBorderless, isFullscreen, isRenderingDiagram, props.sx, showSoftWrap]);
+    // Markdown preview uses prose styling while keeping the fullscreen element stable.
+    ...renderMarkdown && {
+      fontFamily: 'body',
+      fontWeight: 'normal',
+      fontVariantLigatures: 'normal',
+      whiteSpace: 'normal',
+    },
+
+  }), [isBorderless, isFullscreen, isRenderingDiagram, props.sx, renderMarkdown, showSoftWrap]);
+
+
+  // Keep the overlay stable across streamed code updates. Copy reads the latest code through codeRef.
+  const showFitButton = (isMermaidCode && showMermaid) || (isPlantUMLCode && showPlantUML) || (isSVGCode && showSVG && canScaleSVG);
+  const codeOverlay = React.useMemo(() => (<RCOverlay>
+    <Box
+      ref={overlayRef}
+      className={overlayButtonsClassName}
+      sx={overlayGridSx}
+    >
+
+      {/* [row 1] */}
+      <Box sx={overlayFirstRowSx}>
+
+        {/* Show HTML + Reload */}
+        {isHTMLCode && (
+          <ButtonGroup aria-label='HTML options' sx={overlayGroupWithShadowSx}>
+            <OverlayButton tooltip={noTooltips ? null : renderHTML ? 'Show Code' : 'Show Web Page'} variant={renderHTML ? 'solid' : 'outlined'} color='danger' onClick={handleHtmlRenderToggle}>
+              <HtmlIcon sx={{ fontSize: 'xl2' }} />
+            </OverlayButton>
+            {renderHTML && (
+              <OverlayButton tooltip={noTooltips ? null : 'Reload'} variant='outlined' color='danger' onClick={() => setHtmlReloadKey(k => k + 1)}>
+                <ReplayRoundedIcon />
+              </OverlayButton>
+            )}
+          </ButtonGroup>
+        )}
+
+        {/* Show Markdown Preview */}
+        {isMdCode && (
+          <OverlayButton tooltip={noTooltips ? null : renderMarkdown ? 'Show Code' : 'Show Preview'} variant={renderMarkdown ? 'solid' : 'outlined'} smShadow onClick={() => setShowMarkdown(!showMarkdown)}>
+            <DescriptionOutlinedIcon />
+          </OverlayButton>
+        )}
+
+        {/* SVG, Chart.js, Mermaid, PlantUML -- including a max-out button */}
+        {(isSVGCode || isChartJSCode || isMermaidCode || isPlantUMLCode) && (
+          <ButtonGroup aria-label='Diagram' sx={overlayGroupWithShadowSx}>
+
+            {/* Toggle rendering */}
+            <OverlayButton
+              tooltip={noTooltips ? null
+                : (renderSVG || renderMermaid || renderPlantUML) ? 'Show Code'
+                  : renderChartJS ? 'Show Data'
+                    : isSVGCode ? 'Render SVG'
+                      : isChartJSCode ? 'Show Chart'
+                        : isMermaidCode ? 'Mermaid Diagram'
+                          : 'PlantUML Diagram'
+              }
+              variant={(renderChartJS || renderMermaid || renderPlantUML) ? 'solid' : 'outlined'}
+              color={isSVGCode ? 'warning' : isChartJSCode ? 'primary' : undefined}
+              onClick={() => {
+                if (isSVGCode) setShowSVG(on => !on);
+                if (isChartJSCode) setShowChartJS(on => !on);
+                if (isMermaidCode) setShowMermaid(on => !on);
+                if (isPlantUMLCode) setShowPlantUML(on => !on);
+              }}>
+              {isSVGCode ? <ChangeHistoryTwoToneIcon /> : isChartJSCode ? <BarChartIcon /> : <SquareTwoToneIcon />}
+            </OverlayButton>
+
+            {/* PlantUML code-changing buttons */}
+            {(isPlantUMLCode && showPlantUML) && (
+              <OverlayButton
+                disabled={!onReplaceInCode}
+                tooltip={noTooltips ? null : 'Switch Direction'}
+                onClick={() => onReplaceInCode?.(codeRef.current, plantUMLCodeToggleDirection(codeRef.current))}
+              >
+                <RotateRightIcon />
+              </OverlayButton>
+            )}
+            {(isPlantUMLCode && showPlantUML) && (
+              <OverlayButton
+                disabled={!onReplaceInCode}
+                tooltip={noTooltips ? null : 'Cycle Theme'}
+                onClick={() => onReplaceInCode?.(codeRef.current, plantUMLCodeCycleTheme(codeRef.current))}
+              >
+                <PaletteIcon />
+              </OverlayButton>
+            )}
+
+            {/* Fit-Content */}
+            {showFitButton && (
+              <OverlayButton tooltip={noTooltips ? null : fitScreen ? 'Original Size' : 'Fit Content'} variant={fitScreen ? 'solid' : 'outlined'} onClick={() => setFitScreen(on => !on)}>
+                <FitScreenIcon />
+              </OverlayButton>
+            )}
+
+          </ButtonGroup>
+        )}
+
+        {/* Special Group: Download / Copy (Chart/Diagram) PNG */}
+        {props.noCopyButton !== true && (renderChartJS || renderMermaid || renderPlantUML) && (
+          <ButtonGroup color='neutral' aria-label='Image Actions' sx={overlayGroupWithShadowSx}>
+
+            {/* Download PNG */}
+            <OverlayButton
+              tooltip={noTooltips ? null : !renderChartJS ? 'Download transparent PNG' : <>Download PNG<Box sx={{ fontSize: 'xs', m: 0.5 }}>hold ⇧ for transparent</Box></>}
+              tooltipProps={{ color: 'warning' }}
+              onClick={handleRenderHandleDownload}
+            >
+              <FileDownloadOutlinedIcon />
+            </OverlayButton>
+
+            {/* Copy PNG */}
+            <OverlayButton
+              tooltip={noTooltips ? null : !renderChartJS ? 'Copy transparent PNG' : <>Copy PNG<Box sx={{ fontSize: 'xs', m: 0.5 }}>hold ⇧ for transparent</Box></>}
+              tooltipProps={{ color: 'warning' }}
+              onClick={handleRenderHandleCopy}
+              sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
+            >
+              <PhotoLibraryOutlinedIcon />
+            </OverlayButton>
+
+          </ButtonGroup>
+        )}
+
+        {/* Special Group: Reattach SVG */}
+        {isSVGCode && !!props.onReattachAsFile && (
+          <ButtonGroup color='neutral' aria-label='SVG Actions' sx={overlayGroupWithShadowSx}>
+            <OverlayButton
+              tooltip={noTooltips ? null : 'Attach as image'}
+              onClick={handleRenderHandleReattach}
+            >
+              <AddPhotoAlternateIcon />
+            </OverlayButton>
+          </ButtonGroup>
+        )}
+
+        {/* Group: Text Options */}
+        <ButtonGroup aria-label='Text and code options' sx={overlayGroupWithShadowSx}>
+
+          {/* Fullscreen */}
+          <OverlayButton tooltip={noTooltips ? null : isFullscreen ? 'Exit Fullscreen' : !renderSyntaxHighlight ? 'Fullscreen' : 'Present'} variant={isFullscreen ? 'solid' : 'outlined'} onClick={isFullscreen ? exitFullscreen : enterFullscreen}>
+            <ZoomOutMapIcon sx={{ fontSize: 'xl' }} />
+          </OverlayButton>
+
+          {/* Soft Wrap toggle */}
+          {renderSyntaxHighlight && (
+            <OverlayButton tooltip={noTooltips ? null : 'Wrap Lines'} disabled={!renderSyntaxHighlight} variant={(showSoftWrap && renderSyntaxHighlight) ? 'solid' : 'outlined'} onClick={() => setShowSoftWrap(!showSoftWrap)}>
+              <WrapTextIcon />
+            </OverlayButton>
+          )}
+
+          {/* Line Numbers toggle */}
+          {renderSyntaxHighlight && uiComplexityMode !== 'minimal' && (
+            <OverlayButton tooltip={noTooltips ? null : 'Line Numbers'} disabled={cannotRenderLineNumbers} variant={(renderLineNumbers && renderSyntaxHighlight) ? 'solid' : 'outlined'} onClick={() => setShowLineNumbers(!showLineNumbers)}>
+              <NumbersRoundedIcon />
+            </OverlayButton>
+          )}
+
+          {/* Comparison button: single button to initiate comparison if no base is set, shows as solid if this is the base (instead of formerly having a clear comparison button), and shows as 'color=success' or outlined if clicking it will compare this against the base */}
+          {showCompareButton && (
+            <OverlayButton
+              tooltip={noTooltips ? null :
+                !compareBaseSet ? 'Compare this code'
+                  : compareThisIsBase ? 'Cancel comparison'
+                    : 'Compare with this code'
+              }
+              variant={!compareBaseSet ? 'outlined' : compareThisIsBase ? 'solid' : 'outlined'}
+              color={!compareBaseSet ? undefined : 'warning'}
+              onClick={handleCompareClicked}
+            >
+              <CompareArrowsIcon />
+            </OverlayButton>
+          )}
+
+          {/* Copy */}
+          {props.noCopyButton !== true && !renderChartJS && (
+            <OverlayButton tooltip={noTooltips ? null : 'Copy Code'} variant='outlined' onClick={handleCopyToClipboard}>
+              <ContentCopyIcon />
+            </OverlayButton>
+          )}
+        </ButtonGroup>
+
+      </Box>
+
+    </Box></RCOverlay>
+  ), [
+    cannotRenderLineNumbers, compareBaseSet, compareThisIsBase, enterFullscreen, exitFullscreen, fitScreen, handleCompareClicked,
+    handleCopyToClipboard, handleHtmlRenderToggle, handleRenderHandleCopy, handleRenderHandleDownload,
+    handleRenderHandleReattach, isChartJSCode, isFullscreen, isHTMLCode, isMdCode, isMermaidCode, isPlantUMLCode, isSVGCode,
+    noTooltips, onReplaceInCode, overlayRef, props.noCopyButton, props.onReattachAsFile, renderChartJS, renderHTML,
+    renderLineNumbers, renderMarkdown, renderMermaid, renderPlantUML, renderSVG, renderSyntaxHighlight, setShowLineNumbers,
+    setShowSoftWrap, showCompareButton, showFitButton, showLineNumbers, showMarkdown, showPlantUML, showSoftWrap,
+    uiComplexityMode,
+  ]);
 
 
   return (
@@ -309,6 +663,7 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
         ref={fullScreenElementRef}
         component='code'
         className={`language-${inferredCodeLanguage || 'unknown'}${renderLineNumbers ? ' line-numbers' : ''}`}
+        data-render-markdown={renderMarkdown || undefined}
         sx={codeSx}
       >
 
@@ -331,110 +686,24 @@ function RenderCodeImpl(props: RenderCodeBaseProps & {
           {/* Renders HTML, or inline SVG, inline plantUML rendered, or highlighted code */}
           {renderHTML ? <RenderCodeHtmlIFrame key={htmlReloadKey} htmlCode={code} isFullscreen={isFullscreen} />
             : renderMarkdown ? <RenderCodeMarkdown mdCode={code} />
-              : renderMermaid ? <RenderCodeMermaid mermaidCode={code} fitScreen={fitScreen} />
-                : renderSVG ? <RenderCodeSVG svgCode={code} fitScreen={fitScreen} />
-                  : (renderPlantUML && (plantUmlSvgData || plantUmlError)) ? <RenderCodePlantUML svgCode={plantUmlSvgData ?? null} error={plantUmlError} fitScreen={fitScreen} />
-                    : <RenderCodeSyntax highlightedSyntaxAsHtml={codeSyntaxHtml} presenterMode={isFullscreen} />}
+              : renderMermaid ? <RenderCodeMermaid ref={renderHandleRef} mermaidCode={code} fitScreen={fitScreen} onReplaceInCode={onReplaceInCode} />
+                : renderSVG ? <RenderCodeSVG ref={renderHandleRef} svgCode={code} fitScreen={fitScreen} />
+                  : renderPlantUML ? <RenderCodePlantUML ref={renderHandleRef} plantUMLCode={code} fitContainer={fitScreen} allowDetails={uiComplexityMode === 'extra'} onReplaceInCode={onReplaceInCode} />
+                    : renderChartJS ? <RenderCodeChartJS ref={renderHandleRef} chartJSCode={code} onReplaceInCode={onReplaceInCode} />
+                      : <RCSyntaxHighlight
+                        code={throttledCodeForHighlight}
+                        inferredCodeLanguage={inferredCodeLanguage}
+                        renderLineNumbers={renderLineNumbers}
+                        presenterMode={isFullscreen}
+                        performSymbolHighlight={performSymbolHighlight}
+                        highlightCode={highlightCode}
+                      />}
         </span>
 
       </Box>
 
       {/* [overlay] Buttons (Code blocks (SVG, diagrams, HTML, syntax, ...)) */}
-      {(ALWAYS_SHOW_OVERLAY /*|| isHovering*/) && (
-        <Box
-          ref={overlayRef}
-          className={overlayButtonsClassName}
-          sx={overlayGridSx}
-        >
-
-          {/* [row 1] */}
-          <Box sx={overlayFirstRowSx}>
-
-            {/* Show HTML + Reload */}
-            {isHTMLCode && (
-              <ButtonGroup aria-label='HTML options' sx={overlayGroupWithShadowSx}>
-                <OverlayButton tooltip={noTooltips ? null : renderHTML ? 'Show Code' : 'Show Web Page'} variant={renderHTML ? 'solid' : 'outlined'} color='danger' onClick={() => setShowHTML(!showHTML)}>
-                  <HtmlIcon sx={{ fontSize: 'xl2' }} />
-                </OverlayButton>
-                {renderHTML && (
-                  <OverlayButton tooltip={noTooltips ? null : 'Reload'} variant='outlined' color='danger' onClick={() => setHtmlReloadKey(k => k + 1)}>
-                    <ReplayRoundedIcon />
-                  </OverlayButton>
-                )}
-              </ButtonGroup>
-            )}
-
-            {/* Show Markdown Preview */}
-            {isMdCode && (
-              <OverlayButton tooltip={noTooltips ? null : renderMarkdown ? 'Show Code' : 'Show Preview'} variant={renderMarkdown ? 'solid' : 'outlined'} smShadow onClick={() => setShowMarkdown(!showMarkdown)}>
-                <DescriptionOutlinedIcon />
-              </OverlayButton>
-            )}
-
-            {/* SVG, Mermaid, PlantUML -- including a max-out button */}
-            {(isSVGCode || isMermaidCode || isPlantUMLCode) && (
-              <ButtonGroup aria-label='Diagram' sx={overlayGroupWithShadowSx}>
-                {/* Toggle rendering */}
-                <OverlayButton
-                  tooltip={noTooltips ? null
-                    : (renderSVG || renderMermaid || renderPlantUML) ? 'Show Code'
-                      : isSVGCode ? 'Render SVG'
-                        : isMermaidCode ? 'Mermaid Diagram'
-                          : 'PlantUML Diagram'
-                  }
-                  variant={(renderMermaid || renderPlantUML) ? 'solid' : 'outlined'}
-                  color={isSVGCode ? 'warning' : undefined}
-                  onClick={() => {
-                    if (isSVGCode) setShowSVG(on => !on);
-                    if (isMermaidCode) setShowMermaid(on => !on);
-                    if (isPlantUMLCode) setShowPlantUML(on => !on);
-                  }}>
-                  {isSVGCode ? <ChangeHistoryTwoToneIcon /> : <SquareTwoToneIcon />}
-                </OverlayButton>
-
-                {/* Fit-Content */}
-                {((isMermaidCode && showMermaid) || (isPlantUMLCode && showPlantUML && !plantUmlError) || (isSVGCode && showSVG && canScaleSVG)) && (
-                  <OverlayButton tooltip={noTooltips ? null : fitScreen ? 'Original Size' : 'Fit Content'} variant={fitScreen ? 'solid' : 'outlined'} onClick={() => setFitScreen(on => !on)}>
-                    <FitScreenIcon />
-                  </OverlayButton>
-                )}
-              </ButtonGroup>
-            )}
-
-            {/* Group: Text Options */}
-            <ButtonGroup aria-label='Text and code options' sx={overlayGroupWithShadowSx}>
-
-              {/* Fullscreen */}
-              <OverlayButton tooltip={noTooltips ? null : isFullscreen ? 'Exit Fullscreen' : !renderSyntaxHighlight ? 'Fullscreen' : 'Present'} variant={isFullscreen ? 'solid' : 'outlined'} onClick={isFullscreen ? exitFullscreen : enterFullscreen}>
-                <ZoomOutMapIcon sx={{ fontSize: 'xl' }} />
-              </OverlayButton>
-
-              {/* Soft Wrap toggle */}
-              {renderSyntaxHighlight && (
-                <OverlayButton tooltip={noTooltips ? null : 'Wrap Lines'} disabled={!renderSyntaxHighlight} variant={(showSoftWrap && renderSyntaxHighlight) ? 'solid' : 'outlined'} onClick={() => setShowSoftWrap(!showSoftWrap)}>
-                  <WrapTextIcon />
-                </OverlayButton>
-              )}
-
-              {/* Line Numbers toggle */}
-              {renderSyntaxHighlight && uiComplexityMode !== 'minimal' && (
-                <OverlayButton tooltip={noTooltips ? null : 'Line Numbers'} disabled={cannotRenderLineNumbers} variant={(renderLineNumbers && renderSyntaxHighlight) ? 'solid' : 'outlined'} onClick={() => setShowLineNumbers(!showLineNumbers)}>
-                  <NumbersRoundedIcon />
-                </OverlayButton>
-              )}
-
-              {/* Copy */}
-              {props.noCopyButton !== true && (
-                <OverlayButton tooltip={noTooltips ? null : 'Copy Code'} variant='outlined' onClick={handleCopyToClipboard}>
-                  <ContentCopyIcon />
-                </OverlayButton>
-              )}
-            </ButtonGroup>
-
-          </Box>
-
-        </Box>
-      )}
+      {(ALWAYS_SHOW_OVERLAY /*|| isHovering*/) && codeOverlay}
 
     </Box>
   );

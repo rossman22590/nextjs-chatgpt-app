@@ -10,9 +10,25 @@ Architecture and system documentation is available in the `/kb/` knowledge base,
 
 ### Modules Documentation
 
+#### Blocks - Fenced code pre-pass
+- **[BLOCKS-fence-parser.md](modules/BLOCKS-fence-parser.md)** - the opener rule and why it is a loop predicate (WebKit lookbehind cost), the corpus and its promotion rule, measured alternatives, open rows (#983 close side, CRLF, containers)
+
+#### Chat - Message rendering
+- **[CHAT-render-tree.md](modules/CHAT-render-tree.md)** - the render tree behind ChatMessage: rules in force (citation hoist, fused runs, tool pairing, edit mode shape, key continuity, layout), open work (attachments editor, edit session, block reordering, citation-split text), known limits
+
+#### Trade - Export and Import
+- **[TRADE-claude-code-export.md](modules/TRADE-claude-code-export.md)** - export for Claude Code: session and chat folder formats, measured Claude Code resume behavior, gaps
+
+#### News - What's New and the Docs Reader
+- **[NEWS.md](modules/NEWS.md)** - What's New (changelog, announcements), the per-user seen index, the build window, indicators, the docs reader and its search, the remote-feeds switch, the codeline seam, the dev rewind; open actions and the inventory of what it replaces
+
 #### AIX - AI Communication Framework
 - **[AIX.md](modules/AIX.md)** - AIX streaming architecture documentation
+- **[aix/AIX-TODO-*.md](modules/aix/)** - planned AIX work, one input file per topic; [AIX-TODO-openai-context-compaction.md](modules/aix/AIX-TODO-openai-context-compaction.md): hosted-tool loops that outgrow the context window (#1211)
+- **[AIX-ingestion.md](modules/AIX-ingestion.md)** - lossless parse/reassembly rule, checklist of open conflicts
 - **[AIX-callers-analysis.md](modules/AIX-callers-analysis.md)** - Analysis of AIX entry points, call chains, common and different rendering, error handling, etc.
+- **[AIX-outcome.md](modules/AIX-outcome.md)** - how a generation ended: the four outcomes (completed, truncated, failed, aborted), one derivation from the stored message, the wire stop-reason table, colors, Beam status, what is not done
+- **[AIX-transport-errors.md](modules/AIX-transport-errors.md)** - how a broken connection surfaces on the tRPC and CSF paths: measured browser texts, classification per event, Vercel's 300s kill and the Stop leak, tRPC stream-close history, open issues
 - **[AIX-anthropic-code-execution.md](modules/AIX-anthropic-code-execution.md)** - Anthropic code execution: the three triggers + one container, the #1087 single-environment history, empirically-verified behavior (version-pin/400, coexist, container continuity), the shipped standalone Sandbox toggle + container decoupling, and the forward Sandbox/execution-environment direction
 
 #### CSF - Client-Side Fetch
@@ -28,9 +44,15 @@ Architecture and system documentation is available in the `/kb/` knowledge base,
 - **[LLM-editorial-control.md](modules/LLM-editorial-pubdate.md)** - Where we have editorial control over per-model metadata vs dynamic discovery; `pubDate` field semantics, propagation chain, resolution rules, per-vendor matrix
 - **[LLM-editorial-auto-picks.md](modules/LLM-editorial-auto-picks.md)** - Per-domain Auto model resolution: 3-layer fallback (pin, editorial pick, ELO/cost heuristic), editorial table shape, tolerant matching, compile-time type-safety chain
 - **[LLM-defs-refresh.md](modules/LLM-defs-refresh.md)** - Per-vendor model-defs versioning + selective client refresh: semantic-hashed manifest buckets (generated committed map, bundled with the client - no server surface), per-service `defsV` stamps, `epoch` force-roll lever; replaces routine "roll AIX" for model updates
+- **[LLM-changelog.md](modules/LLM-changelog.md)** - Per-service model changelog (#1204): entry shape and the frozen change-letter table, what is not compared and why, retention (pins, 30 days, 50 entries), the one refresh session (boot and Update All, stop, stamping), the Updates screen and Preferences alert, the future "recently added" home box
+- **[LLM-pricing-pipeline.md](modules/LLM-pricing-pipeline.md)** - price shape (tiers, cache read/write, per-call tools), usage parsing per vendor, cost calculator, served-tier reconciliation, surfaces
+- **[LLM-pricing-direction.md](modules/LLM-pricing-direction.md)** - 🧭 target rate card and usage record (disjoint classes, one tier switch, unit-named fees, cost lines, sub-usage), dedupe contract, incremental path
 
 #### LLM - Vendor APIs
+- **[LLM-openai-responses.md](modules/LLM-openai-responses.md)** - OpenAI direct over Responses: GPT-6 and GPT-5.6 tiers, request contract (effort, pro mode, temperature, tiers, 24h caching), reasoning continuity (what we capture and replay, the silent same-family rule, confabulation after a family switch), Chat Completions limits, OpenRouter and Bedrock notes, shipped-not-adopted features, Multi-agent beta and Sign in with ChatGPT contracts (measured, not adopted)
 - **[LLM-gemini-interactions.md](modules/LLM-gemini-interactions.md)** - Gemini Interactions API (Deep Research): endpoints, status taxonomy, two retrieval paths (SSE replay vs JSON GET), known failure modes (10-min cuts, zombies), UI surface
+- **[LLM-metaai-responses.md](modules/LLM-metaai-responses.md)** - Meta AI (Muse, the Meta Model API) over the Responses dialect: catalog and tiers, request contract (strict params, `tool_choice` auto-only, effort ladder, stateless reasoning replay), stream quirks, errors and CORS, what is deliberately not wired
+- **[LLM-openrouter-responses.md](modules/LLM-openrouter-responses.md)** - 🧭 OpenRouter over the Responses dialect: measured parity matrix vs every Chat Completions customization, reasoning item shapes per vendor, cache marker shapes, losses, port list
 
 ### Systems Documentation
 

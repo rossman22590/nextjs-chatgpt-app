@@ -1,5 +1,5 @@
 import { ANTHROPIC_API_PATHS, anthropicAccess, anthropicBetaFeatures } from '~/modules/llms/server/anthropic/anthropic.access';
-import { OPENAI_API_PATHS, openAIAccess } from '~/modules/llms/server/openai/openai.access';
+import { OPENAI_API_PATHS, openAIAccess, OpenAIDialects } from '~/modules/llms/server/openai/openai.access';
 import { bedrockAccessAsync, bedrockResolveRegion, bedrockURLMantle, bedrockURLRuntime } from '~/modules/llms/server/bedrock/bedrock.access';
 import { geminiAccess } from '~/modules/llms/server/gemini/gemini.access';
 import { ollamaAccess } from '~/modules/llms/server/ollama/ollama.access';
@@ -17,21 +17,30 @@ import { aixToBedrockConverse } from './adapters/bedrock.converse';
 import { aixToGeminiGenerateContent } from './adapters/gemini.generateContent';
 import { aixToGeminiInteractionsCreate } from './adapters/gemini.interactionsCreate';
 import { aixToOpenAIChatCompletions } from './adapters/openai.chatCompletions';
-import { aixToOpenAIResponses } from './adapters/openai.responsesCreate';
+import { aixToOpenAIResponses, openAIDialectToRspVendor } from './adapters/openai.responsesCreate';
+import { OpenAIContainerKeepAlive } from './adapters/openai.companion-containerKeepAlive';
 import { aixToXAIResponses } from './adapters/xai.responsesCreate';
 
 import type { IParticleTransmitter } from './parsers/IParticleTransmitter';
-import { createAnthropicFileInlineTransform } from './parsers/anthropic.transform-fileInline';
-import { createAnthropicMessageParser, createAnthropicMessageParserNS } from './parsers/anthropic.parser';
+import { createAnthropicFileInlineCompanion } from './parsers/anthropic.companion-fileInline';
+import { anthropicThinkingOrigins, createAnthropicMessageParser, createAnthropicMessageParserNS } from './parsers/anthropic.parser';
 import { createBedrockConverseParserNS, createBedrockConverseStreamParser } from './parsers/bedrock-converse.parser';
 import { createGeminiGenerateContentResponseParser } from './parsers/gemini.parser';
 import { createGeminiInteractionsParserNS, createGeminiInteractionsParserSSE } from './parsers/gemini.interactions.parser';
-import { createGeminiInteractionsUsageBackfillTransform } from './parsers/gemini.interactions.transform-usageBackfill';
+import { createGeminiInteractionsUsageBackfillCompanion } from './parsers/gemini.interactions.companion-usageBackfill';
 import { createOpenAIChatCompletionsChunkParser, createOpenAIChatCompletionsParserNS } from './parsers/openai.parser';
 import { createOpenAIResponseParserNS, createOpenAIResponsesEventParser } from './parsers/openai.responses.parser';
 
 
 // -- Dispatch types --
+
+/** OpenAI-compatible dialects that serve ONLY the Responses API (every model), regardless of the per-model vndOaiResponsesAPI flag */
+const RESPONSES_ONLY_DIALECTS: ReadonlySet<OpenAIDialects> = new Set<OpenAIDialects>([
+  'metaai', // Meta Muse models: Responses is the only Meta surface carrying reasoning across turns
+  'sakanaai', // Sakana Fugu models: tools, multimodal, reasoning
+  'xai', // all xAI models (own adapter)
+]);
+
 
 export type ChatGenerateDispatch = {
   request: ChatGenerateDispatchRequest;
@@ -41,7 +50,8 @@ export type ChatGenerateDispatch = {
   /** Source of truth for the consumer mode: null = NS */
   demuxerFormat: null | AixDemuxers.StreamDemuxerFormat;
   chatGenerateParse: ChatGenerateParseFunction;
-  particleTransform?: ChatGenerateParticleTransformFunction;
+  /** attachments living for this dispatch: lifecycle hooks and 1:1 particle mappers, in order (see ChatGenerateDispatchCompanion) */
+  companions?: ChatGenerateDispatchCompanion[];
 };
 
 export type ChatGenerateDispatchRequest =
@@ -49,21 +59,29 @@ export type ChatGenerateDispatchRequest =
   | { url: string, headers: HeadersInit, method: 'GET' };
 
 export type ChatGenerateParseContext = {
-  retriesAvailable: boolean;
+  // whether the operation retrier has attempts left for an error of this class: the HTTP(-equivalent) status, or the upstream code when
+  // one has a profile of its own (upstreamRetryProfile) - parsers throw OperationRetrySignal only if true, carrying the same status and code
+  hasRetriesForHttpStatus: (httpStatus?: number, upstreamCode?: string) => boolean;
 };
 
 export type ChatGenerateParseFunction = (partTransmitter: IParticleTransmitter, eventData: string, eventName?: string, context?: ChatGenerateParseContext) => void;
 
 /**
- * 1->1 particle transform applied by the executor to every emitted particle.
- * Return the input for pass-through, or a new particle to replace it.
- * Thrown errors are caught by the executor and fall back to the original particle.
+ * A dispatch companion: an attachment that lives for one dispatch. In array order, the executor runs `onStart` before
+ * connecting, maps every emitted particle 1:1 through `onParticle` (return the input to pass it through), and runs `onEnd`
+ * in `finally` on every exit: normal end, a thrown retry or continuation signal, a consumer closing the generator. Hooks are
+ * best effort: a throw is logged and never ends the dispatch; a throwing `onParticle` passes its particle through unchanged.
  *
- * Set `csfUnsafe` to true if the transform cannot be performed by CSF (e.g. relies on
- * relies on server-side fetch. The CSF entry point strips these transforms and delegates to the
- * ContentReassembler's transforms instead (which shall operate on the same particles).
+ * `csfUnsafe` marks a companion the browser cannot run (e.g. it fetches vendor files that block CORS): the CSF entry strips it
+ * and the ContentReassembler's client transforms take over on the same particles.
  */
-export type ChatGenerateParticleTransformFunction = ((particle: AixWire_Particles.ChatGenerateOp) => Promise<AixWire_Particles.ChatGenerateOp>) & { csfUnsafe?: true };
+export type ChatGenerateDispatchCompanion = {
+  name: string;
+  csfUnsafe?: true;
+  onStart?: (intakeAbortSignal: AbortSignal) => void;
+  onParticle?: (particle: AixWire_Particles.ChatGenerateOp) => AixWire_Particles.ChatGenerateOp | Promise<AixWire_Particles.ChatGenerateOp>;
+  onEnd?: () => void;
+};
 
 
 // -- Specialized Implementations -- Core of Server-side AI Vendors abstraction --
@@ -93,11 +111,11 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
           body: anthropicBody,
         },
         demuxerFormat: streaming ? 'fast-sse' : null,
-        chatGenerateParse: streaming ? createAnthropicMessageParser() : createAnthropicMessageParserNS(),
-        particleTransform: !model.vndAntTransformInlineFiles ? undefined : createAnthropicFileInlineTransform(
+        chatGenerateParse: (streaming ? createAnthropicMessageParser : createAnthropicMessageParserNS)(() => anthropicThinkingOrigins(chatGenerate.chatSequence, anthropicBody.messages)),
+        companions: !model.vndAntTransformInlineFiles ? undefined : [createAnthropicFileInlineCompanion(
           anthropicAccess(access, ANTHROPIC_API_PATHS.files, hostedFeatures),
-          model.vndAntTransformInlineFiles === 'inline-file-and-delete',
-        ),
+          model.vndAntTransformInlineFiles,
+        )],
       };
     }
 
@@ -125,7 +143,7 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
           const invokeUrl = bedrockURLRuntime(bedrockResolveRegion(access), model.id, 'invoke', streaming);
 
           // body
-          const bedrockHostedFeatures = aixAnthropicHostedFeatures(model, chatGenerate);
+          const bedrockHostedFeatures = aixAnthropicHostedFeatures(model, chatGenerate, 'bedrock');
           // NOTE: the 'bedrock' target already removed the fields Bedrock's schema rejects (effort, speed).
           // What's left below is envelope translation only: the Anthropic schema requires these, Bedrock
           // carries the same information in the URL/body instead - so they cannot be dropped adapter-side.
@@ -147,7 +165,7 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
             },
             bodyTransform: streaming ? 'aws-eventstream-binary' : null,
             demuxerFormat: streaming ? 'fast-sse' : null,
-            chatGenerateParse: streaming ? createAnthropicMessageParser() : createAnthropicMessageParserNS(),
+            chatGenerateParse: (streaming ? createAnthropicMessageParser : createAnthropicMessageParserNS)(() => anthropicThinkingOrigins(chatGenerate.chatSequence, bedrockAnthropicBody.messages)),
           };
 
         // [Bedrock Mantle] OpenAI Chat Completions-compatible API for non-Anthropic models
@@ -168,7 +186,8 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
         // NOTE: these models live on the '/openai/v1/responses' path, distinct from the '/v1/responses' path used by other models (per AWS model cards)
         case 'mantle-responses':
           const mantleResponsesUrl = bedrockURLMantle(bedrockResolveRegion(access), '/openai/v1/responses');
-          const mantleResponsesBody = aixToOpenAIResponses('openai', model, chatGenerate, streaming, false /* no reattach support for the bedrock dialect, don't store upstream */);
+          // speaks the 'openai' dialect but is not OpenAI: it cannot resolve OpenAI's code-interpreter container, so code cells replay container-free
+          const mantleResponsesBody = aixToOpenAIResponses('openai', { ...model, vndOaiContainerId: undefined }, chatGenerate, streaming, false /* no reattach support for the bedrock dialect, don't store upstream */);
           return {
             request: {
               ...await bedrockAccessAsync(access, 'POST', mantleResponsesUrl, mantleResponsesBody),
@@ -217,7 +236,7 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
           // [2026-06-26, Interactions BUG] Interations Deep Research only: the live `interaction.completed` event omits `usage`,
           // so backfill token counts via a one-shot GET of the stored interaction. POST path ONLY - reattach/resume/recover
           // read the stored resource directly (usage already present), so they need no backfill.
-          particleTransform: createGeminiInteractionsUsageBackfillTransform(access),
+          companions: [createGeminiInteractionsUsageBackfillCompanion(access)],
         };
       }
 
@@ -266,6 +285,7 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
     case 'lmstudio':
     case 'localai':
     case 'minimax':
+    case 'metaai':
     case 'mistral':
     case 'modular':
     case 'moonshot':
@@ -278,36 +298,38 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
     case 'xai':
     case 'zai':
 
-      // newer: OpenAI Responses API, for models that support it and all XAI/Sakana models
-      const isSakanaModel = dialect === 'sakanaai'; // All Sakana Fugu models use the Responses API (tools, multimodal, reasoning)
-      const isXAIModel = dialect === 'xai'; // All XAI models are accessed via Responses now
-      const isResponsesAPI = !!model.vndOaiResponsesAPI || isSakanaModel || isXAIModel;
+      // newer: OpenAI Responses API - per model (vndOaiResponsesAPI) or for the dialects served on Responses only
+      const isResponsesAPI = !!model.vndOaiResponsesAPI || RESPONSES_ONLY_DIALECTS.has(dialect);
       if (isResponsesAPI) {
+        // parser namespace for the reasoning continuity blobs (vendor-private keys + server-side ids), see the note below
+        const responsesVendor = openAIDialectToRspVendor(dialect);
+        /**
+         * xAI uses its own Responses API adapter.
+         *
+         * Key differences from OpenAI Responses API:
+         * - No 'instructions' field - system content prepended to first user message
+         * - xAI-native tools: web_search, x_search, code_execution
+         * - Tool calls come in single chunks
+         *
+         * Note: Response format is compatible with OpenAI parser.
+         */
+        const openAIResponsesBody = dialect !== 'xai' ? aixToOpenAIResponses(dialect, model, chatGenerate, streaming, enableResumability) : null;
+        const responsesBody = openAIResponsesBody ?? aixToXAIResponses(model, chatGenerate, streaming, enableResumability); // xAI has its own Responses adapter
         return {
           request: {
             ...openAIAccess(access, model.id, OPENAI_API_PATHS.responses),
             method: 'POST',
-            /**
-             * xAI uses its own Responses API adapter.
-             *
-             * Key differences from OpenAI Responses API:
-             * - No 'instructions' field - system content prepended to first user message
-             * - xAI-native tools: web_search, x_search, code_execution
-             * - Tool calls come in single chunks
-             *
-             * Note: Response format is compatible with OpenAI parser.
-             */
-            body: isXAIModel
-              ? aixToXAIResponses(model, chatGenerate, streaming, enableResumability)
-              : aixToOpenAIResponses(dialect, model, chatGenerate, streaming, enableResumability),
+            body: responsesBody,
           },
           demuxerFormat: streaming ? 'fast-sse' : null,
           // IMPORTANT: tag the parser with the actual vendor so reasoning continuity blobs
           // (encrypted_content + rs_... id) land in the matching _vnd namespace and never leak
           // across providers (different keys + different server-side state).
           chatGenerateParse: streaming
-            ? createOpenAIResponsesEventParser(isXAIModel ? 'xai' : 'openai')
-            : createOpenAIResponseParserNS(isXAIModel ? 'xai' : 'openai'),
+            ? createOpenAIResponsesEventParser(responsesVendor)
+            : createOpenAIResponseParserNS(responsesVendor),
+          // [OpenAI] a pro-mode run with the sandbox declared outlives its containers' 20 minute idle expiry: keep them alive (#1211) - native dialect only, the others serve no containers API
+          ...(dialect === 'openai' && openAIResponsesBody && OpenAIContainerKeepAlive.applies(openAIResponsesBody) ? { companions: [OpenAIContainerKeepAlive.companion(access)] } : {}),
         };
       }
 
@@ -318,6 +340,11 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
       if (dialect === 'openrouter' && access.orRequireParameters)
         chatCompletionsBody.provider = { ...chatCompletionsBody.provider, require_parameters: true };
 
+      // [OpenRouter] its counter of executed server tool calls covers every tool: fetches can be told apart only when
+      // the fetch tool is requested and web search is the only other server tool
+      const ortFetchCountable = dialect === 'openrouter' && !!chatCompletionsBody.tools?.some(tool => tool.type === 'openrouter:web_fetch')
+        && chatCompletionsBody.tools.every(tool => !tool.type.startsWith('openrouter:') || tool.type === 'openrouter:web_search' || tool.type === 'openrouter:web_fetch');
+
       return {
         request: {
           ...openAIAccess(access, model.id, OPENAI_API_PATHS.chatCompletions),
@@ -325,7 +352,7 @@ export async function createChatGenerateDispatch(access: AixAPI_Access, model: A
           body: chatCompletionsBody,
         },
         demuxerFormat: streaming ? 'fast-sse' : null,
-        chatGenerateParse: streaming ? createOpenAIChatCompletionsChunkParser() : createOpenAIChatCompletionsParserNS(),
+        chatGenerateParse: streaming ? createOpenAIChatCompletionsChunkParser(ortFetchCountable) : createOpenAIChatCompletionsParserNS(ortFetchCountable),
       };
 
   }
@@ -389,6 +416,7 @@ export async function createChatGenerateResumeDispatch(access: AixAPI_Access, re
     case 'lmstudio':
     case 'localai':
     case 'minimax':
+    case 'metaai':
     case 'mistral':
     case 'modular':
     case 'moonshot':

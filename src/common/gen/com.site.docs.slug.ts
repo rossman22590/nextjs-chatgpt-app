@@ -19,6 +19,8 @@ export type SiteDocSlug =
   | 'connect-groq'
   | 'connect-lmstudio'
   | 'connect-localai'
+  | 'connect-meta'
+  | 'connect-minimax'
   | 'connect-mistral'
   | 'connect-modular'
   | 'connect-moonshot-ai'

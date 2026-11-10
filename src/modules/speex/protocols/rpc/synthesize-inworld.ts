@@ -10,12 +10,15 @@
  */
 
 import * as z from 'zod/v4';
+import { TRPCError } from '@trpc/server';
 
 import { fetchJsonOrTRPCThrow, fetchResponseOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
+import { modelPickOrAuto } from '~/common/util/modelPickUtils';
+
 import type { SpeexSpeechParticle, SpeexWire_Access_Inworld, SpeexWire_ListVoices_Output } from './rpc.wiretypes';
 import type { SynthesizeBackendFn } from './synthesize.core';
-import { SPEEX_DEBUG, SPEEX_DEFAULTS } from '../../speex.config';
+import { SPEEX_DEBUG, SPEEX_DEFAULTS, SPEEX_MODELS } from '../../speex.config';
 
 
 export namespace InworldWire_TTS_Synthesize {
@@ -101,17 +104,14 @@ export namespace InworldWire_TTS_ListVoices {
 }
 
 
-function _selectModel(priority: 'fast' | 'balanced' | 'quality' | undefined, languageCode: string | undefined): string {
-  const fast = SPEEX_DEFAULTS.INWORLD_MODEL_FAST;
-  const quality = SPEEX_DEFAULTS.INWORLD_MODEL;
-  return priority === 'fast' ? fast               // lowest latency
-    : priority === 'quality' ? quality            // highest quality
-      : languageCode?.toLowerCase() === 'en' ? fast : quality; // 'balanced'/undefined
+// Auto: the quality model (what the picker shows), the fast one only when the caller asks for speed (e.g. calls)
+function _selectModel(priority: 'fast' | 'balanced' | 'quality' | undefined): string {
+  return priority === 'fast' ? SPEEX_DEFAULTS.INWORLD_MODEL_FAST : SPEEX_DEFAULTS.INWORLD_MODEL;
 }
 
 
 export const synthesizeInworld: SynthesizeBackendFn<SpeexWire_Access_Inworld> = async function* (params) {
-  const { access, text: inputText, voice, streaming, languageCode, priority, signal } = params;
+  const { access, text: inputText, voice, streaming, priority, signal } = params;
   if (access.dialect !== 'inworld' || voice.dialect !== 'inworld')
     throw new Error('Mismatched dialect in Inworld synthesize');
 
@@ -128,7 +128,7 @@ export const synthesizeInworld: SynthesizeBackendFn<SpeexWire_Access_Inworld> = 
   const body: InworldWire_TTS_Synthesize.Request = {
     text,
     voiceId: voice.ttsVoiceId || SPEEX_DEFAULTS.INWORLD_VOICE,
-    modelId: voice.ttsModel || _selectModel(priority, languageCode),
+    modelId: modelPickOrAuto(voice.ttsModel, SPEEX_MODELS.inworld) ?? _selectModel(priority),
     ...(voice.ttsTemperature !== undefined && { temperature: voice.ttsTemperature }),
     audioConfig: {
       audioEncoding: 'MP3', // MP3 for browser MediaSource compatibility
@@ -272,7 +272,7 @@ export async function listVoicesInworld(access: SpeexWire_Access_Inworld): Promi
 function _inworldAccess(access: SpeexWire_Access_Inworld, apiPath: string): { headers: HeadersInit; url: string } {
   const apiKey = (access.apiKey || '').trim();
   if (!apiKey)
-    throw new Error('Missing Inworld API key');
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Inworld API key' });
 
   let host = (access.apiHost || 'api.inworld.ai').trim();
   if (!host.startsWith('http'))

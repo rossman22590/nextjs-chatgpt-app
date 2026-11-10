@@ -60,3 +60,7 @@ temp-reset-tokens.json
 
 # Chrome DevTools workspace binding (per-worktree)
 /public/.well-known/appspecific/com.chrome.devtools.json
+
+# Generated service worker (built on some branch lines)
+/public/sw.js
+/public/sw.js.map

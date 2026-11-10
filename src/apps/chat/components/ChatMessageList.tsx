@@ -1,4 +1,5 @@
 import * as React from 'react';
+import type { FileWithHandle } from 'browser-fs-access';
 import { useShallow } from 'zustand/react/shallow';
 
 import type { SxProps } from '@mui/joy/styles/types';
@@ -8,28 +9,37 @@ import type { SystemPurposeExample } from '../../../data';
 
 import type { AixReattachMode } from '~/modules/aix/client/aix.client';
 import type { DiagramConfig } from '~/modules/aifn/digrams/DiagramsModal';
+import { ERCDiffContextProvider } from '~/modules/blocks/enhanced-code/ERCDiffContext';
 import { speakText, speakTextSurfaceFailure } from '~/modules/speex/speex.client';
+import { WhatsNewEmptyChatLine } from '~/modules/news/components/WhatsNewIndicators';
 
 import type { ConversationHandler } from '~/common/chat-overlay/ConversationHandler';
-import type { DLLMContextTokens } from '~/common/stores/llms/llms.types';
-import { DConversationId, excludeSystemMessages } from '~/common/stores/chat/chat.conversation';
+import { getLLMContextTokens, LLM_IF_ANT_PromptCaching, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
 import { ShortcutKey, useGlobalShortcuts } from '~/common/components/shortcuts/useGlobalShortcuts';
 import { clipboardInterceptCtrlCForCleanup } from '~/common/util/clipboardUtils';
 import { convertFilesToDAttachmentFragments } from '~/common/attachment-drafts/attachment.pipeline';
-import { createDMessageFromFragments, createDMessageTextContent, DMessage, DMessageGenerator, DMessageId, DMessageUserFlag, DMetaReferenceItem, MESSAGE_FLAG_AIX_SKIP, messageHasUserFlag } from '~/common/stores/chat/chat.message';
-import { createTextContentFragment, DMessageFragment, DMessageFragmentId } from '~/common/stores/chat/chat.fragments';
+import { getRenderHTMLInitial, useUIContentScaling } from '~/common/stores/store-ui';
 import { openFileForAttaching } from '~/common/components/ButtonAttachFiles';
 import { optimaOpenPreferences } from '~/common/layout/optima/useOptima';
+import { themeMinWidthChatPane } from '~/common/app.theme';
 import { useChatOverlayStore } from '~/common/chat-overlay/store-perchat_vanilla';
-import { useChatStore } from '~/common/stores/chat/store-chats';
 import { useScrollToBottom } from '~/common/scroll-to-bottom/useScrollToBottom';
 
+import { DConversationId, excludeSystemMessages } from '~/common/stores/chat/chat.conversation';
+import { createDMessageFromFragments, createDMessageTextContent, DMessage, DMessageGenerator, DMessageId, DMessagePresentation, DMessageRole, DMessageUserFlag, DMetaReferenceItem } from '~/common/stores/chat/chat.message';
+import { createTextContentFragment, DMessageFragment, DMessageFragmentId } from '~/common/stores/chat/chat.fragments';
+import { messagePatchPresentation } from '~/common/stores/chat/chat.message.presentation';
+import { orderedUserFragments } from '~/common/stores/chat/chat.fragment-order';
+import { useChatStore } from '~/common/stores/chat/store-chats';
+import { useLLM } from '~/common/stores/llms/llms.hooks';
+import { useModelDomain } from '~/common/stores/llms/hooks/useModelDomain';
+
 import { CMLZeroConversation } from './messages-list/CMLZeroConversation';
-import { ChatMessage, ChatMessageMemo } from './message/ChatMessage';
-import { CleanerMessage, MessagesSelectionHeader } from './message/CleanerMessage';
+import { ChatCleanupControls } from './ChatCleanupList';
+import { ChatMessageStreamingMemo } from './message/ChatMessage';
 import { Ephemerals } from './Ephemerals';
 import { PersonaSelector } from './persona-selector/PersonaSelector';
-import { useChatAutoSuggestHTMLUI, useChatShowSystemMessages } from '../store-app-chat';
+import { getUserMessageFragmentPlacement, useChatShowSystemMessages, useChatMessageTimestampMode } from '../store-app-chat';
 
 
 const stableNoMessages: DMessage[] = [];
@@ -41,10 +51,8 @@ export function ChatMessageList(props: {
   conversationId: DConversationId | null,
   conversationHandler: ConversationHandler | null,
   capabilityHasT2I: boolean,
-  chatLLMAntPromptCaching: boolean,
-  chatLLMContextTokens: DLLMContextTokens,
-  chatLLMSupportsImages: boolean,
   fitScreen: boolean,
+  isFocused: boolean,
   isMobile: boolean,
   isMessageSelectionMode: boolean,
   onConversationBranch: (conversationId: DConversationId, messageId: string, addSplitPane: boolean) => void,
@@ -62,9 +70,10 @@ export function ChatMessageList(props: {
   const [selectedMessages, setSelectedMessages] = React.useState<Set<string>>(new Set());
 
   // external state
+  const contentScaling = useUIContentScaling();
   const { notifyBooting } = useScrollToBottom();
-  const danger_experimentalHtmlWebUi = useChatAutoSuggestHTMLUI();
   const [showSystemMessages] = useChatShowSystemMessages();
+  const [messageTimestampMode] = useChatMessageTimestampMode();
   const { conversationMessages, historyTokenCount } = useChatStore(useShallow(({ conversations }) => {
     const conversation = conversations.find(conversation => conversation.id === props.conversationId);
     return {
@@ -72,6 +81,8 @@ export function ChatMessageList(props: {
       historyTokenCount: conversation ? conversation.tokenCount : 0,
     };
   }));
+  const { domainModelId: chatLLMId } = useModelDomain('primaryChat');
+  const chatLLM = useLLM(chatLLMId) ?? null;
   const { _composerInReferenceToCount, ephemerals } = useChatOverlayStore(props.conversationHandler?.conversationOverlayStore ?? null, useShallow(state => ({
     _composerInReferenceToCount: state.inReferenceTo?.length ?? 0,
     ephemerals: state.ephemerals?.length ? state.ephemerals : null,
@@ -79,8 +90,14 @@ export function ChatMessageList(props: {
 
   // derived state
   const { conversationHandler, conversationId, capabilityHasT2I, onConversationBranch, onConversationExecuteHistory, onTextDiagram, onTextImagine } = props;
+  const chatLLMAntPromptCaching = chatLLM?.interfaces?.includes(LLM_IF_ANT_PromptCaching) ?? false;
+  const chatLLMContextTokens = getLLMContextTokens(chatLLM) ?? null;
+  const chatLLMSupportsImages = chatLLM?.interfaces?.includes(LLM_IF_OAI_Vision) ?? false;
   const composerCanAddInReferenceTo = _composerInReferenceToCount < 5;
-  const composerHasInReferenceto = _composerInReferenceToCount > 0;
+  const composerHasInReferenceTo = _composerInReferenceToCount > 0;
+
+  const firstUserMessageId = messageTimestampMode === 'auto' ? conversationMessages.find(message => message.role === 'user')?.id : undefined;
+  const lastMessageId = conversationMessages.at(-1)?.id;
 
   // text actions
 
@@ -101,21 +118,22 @@ export function ChatMessageList(props: {
 
           // Retrieve fully-fledged Attachment Fragments (converted/extracted, with sources, mimes, etc.) from the selected files
           const attachmentFragments = await convertFilesToDAttachmentFragments('file-open', filesWithHandle, {
-            hintAddImages: props.chatLLMSupportsImages,
+            hintAddImages: chatLLMSupportsImages,
           });
 
           // Create a User message with the prompt and the attachment fragments
           if (attachmentFragments.length) {
-            conversationHandler.messageAppend(createDMessageFromFragments('user', [ // [chat] append user:persona question + attachment(s)
-              createTextContentFragment(example.prompt),
-              ...attachmentFragments,
-            ]));
+            const sortedUserFragments = orderedUserFragments([createTextContentFragment(example.prompt), ...attachmentFragments], getUserMessageFragmentPlacement());
+            conversationHandler.messageAppend(createDMessageFromFragments('user', sortedUserFragments)); // [chat] append user:persona question + attachment(s)
             await onConversationExecuteHistory(conversationId);
           }
         });
         break;
+      case undefined:
+        // an example object without an action: nothing to run (string examples are handled above)
+        break;
     }
-  }, [conversationHandler, conversationId, onConversationExecuteHistory, props.chatLLMSupportsImages]);
+  }, [conversationHandler, conversationId, onConversationExecuteHistory, chatLLMSupportsImages]);
 
   const handleMessageContinue = React.useCallback(async (_messageId: DMessageId /* Ignored for now */, continueText: null | string) => {
     if (conversationId && conversationHandler) {
@@ -126,9 +144,10 @@ export function ChatMessageList(props: {
 
 
   // Resume in-flight tracking - lives at this level (NOT inside BlockOpUpstreamResume) so it
-  // survives any remount of the message bubble during a long-running stream (e.g. Deep Research).
+  // survives an unmount of the message bubble during a long-running stream (e.g. Deep Research):
+  // pane switch, cleanup mode, ancestry collapse. Completion itself no longer remounts the message.
   // - `resumeInFlight` (state) drives the loading/Detach UI on BlockOpUpstreamResume via props.
-  // - `resumeAbortersRef` (ref) holds the AbortController so Detach can abort even after a remount.
+  // - `resumeAbortersRef` (ref) holds the AbortController so Detach can abort even after an unmount.
   // Map keyed by messageId so multiple messages could in principle resume concurrently.
   const [resumeInFlight, setResumeInFlight] = React.useState<Record<DMessageId, AixReattachMode>>({});
   const resumeAbortersRef = React.useRef<Map<DMessageId, AbortController>>(new Map());
@@ -258,16 +277,17 @@ export function ChatMessageList(props: {
     conversationHandler?.messagesDelete([messageId]);
   }, [conversationHandler]);
 
-  const handleMessageAppendFragment = React.useCallback((messageId: DMessageId, fragment: DMessageFragment) => {
-    conversationHandler?.messageFragmentAppend(messageId, fragment, false, false);
+  const handleMessageReplaceFragments = React.useCallback((messageId: DMessageId, fragments: DMessageFragment[]) => {
+    conversationHandler?.messageFragmentsReplace(messageId, fragments);
   }, [conversationHandler]);
 
-  const handleMessageDeleteFragment = React.useCallback((messageId: DMessageId, fragmentId: DMessageFragmentId) => {
-    conversationHandler?.messageFragmentDelete(messageId, fragmentId, false, true);
+  const handleMessagePresentationChange = React.useCallback((messageId: DMessageId, update: Partial<DMessagePresentation> | null) => {
+    // The helper rejects pending messages. Persist the change without touching visible timestamps.
+    conversationHandler?.messageEdit(messageId, message => messagePatchPresentation(message, update), true, false);
   }, [conversationHandler]);
 
-  const handleMessageReplaceFragment = React.useCallback((messageId: DMessageId, fragmentId: DMessageFragmentId, newFragment: DMessageFragment) => {
-    conversationHandler?.messageFragmentReplace(messageId, fragmentId, newFragment, true);
+  const handleMessageSetRole = React.useCallback((messageId: DMessageId, role: DMessageRole) => {
+    conversationHandler?.messageEdit(messageId, { role }, false, true);
   }, [conversationHandler]);
 
   const handleMessageToggleUserFlag = React.useCallback((messageId: DMessageId, userFlag: DMessageUserFlag, _maxPerConversation?: number) => {
@@ -280,6 +300,12 @@ export function ChatMessageList(props: {
 
   const handleAddInReferenceTo = React.useCallback((item: DMetaReferenceItem) => {
     conversationHandler?.overlayActions.addInReferenceTo(item);
+  }, [conversationHandler]);
+
+  const handleReattachAsFile = React.useCallback((fileWithHandle: FileWithHandle, overrideFileName?: string) => {
+    conversationHandler?.overlayActions.createAttachmentDraft({
+      media: 'file', origin: 'screencapture', fileWithHandle, refPath: overrideFileName || fileWithHandle.name,
+    }, { hintAddImages: true });
   }, [conversationHandler]);
 
   const handleTextDiagram = React.useCallback(async (messageId: DMessageId, text: string) => {
@@ -311,48 +337,13 @@ export function ChatMessageList(props: {
   }, []);
 
 
-  // operate on the local selection set
-
-  const areAllSelectedMessagesHidden = React.useMemo(() => {
-    if (selectedMessages.size === 0) return false;
-    for (const messageId of selectedMessages) {
-      const message = conversationMessages.find(m => m.id === messageId);
-      if (message && !messageHasUserFlag(message, MESSAGE_FLAG_AIX_SKIP))
-        return false;
-    }
-    return true;
-  }, [selectedMessages, conversationMessages]);
-
-  const handleSelectAll = (selected: boolean) => {
-    const newSelected = new Set<string>();
-    if (selected)
-      for (const message of conversationMessages)
-        newSelected.add(message.id);
-    setSelectedMessages(newSelected);
-  };
-
-  const handleSelectMessage = (messageId: DMessageId, selected: boolean) => {
-    const newSelected = new Set(selectedMessages);
-    selected ? newSelected.add(messageId) : newSelected.delete(messageId);
-    setSelectedMessages(newSelected);
-  };
-
-  const handleSelectionDelete = React.useCallback(() => {
-    conversationHandler?.messagesDelete(Array.from(selectedMessages));
-    setSelectedMessages(new Set());
-  }, [conversationHandler, selectedMessages]);
-
-  const handleSelectionToggleVisibility = React.useCallback(() => {
-    for (let selectedMessage of Array.from(selectedMessages))
-      conversationHandler?.messageSetUserFlag(selectedMessage, MESSAGE_FLAG_AIX_SKIP, !areAllSelectedMessagesHidden, true);
-    setSelectedMessages(new Set());
-  }, [conversationHandler, selectedMessages, areAllSelectedMessagesHidden]);
+  // cleanup mode
 
   const { isMessageSelectionMode, setIsMessageSelectionMode } = props;
 
-  useGlobalShortcuts('ChatMessageList_Selection', React.useMemo(() => !isMessageSelectionMode ? [] : [
+  useGlobalShortcuts('ChatMessageList_Selection', React.useMemo(() => !props.isFocused || !isMessageSelectionMode ? [] : [
     { key: ShortcutKey.Esc, action: () => setIsMessageSelectionMode(false), description: 'Close Cleanup', level: 10 - 1 },
-  ], [isMessageSelectionMode, setIsMessageSelectionMode]));
+  ], [isMessageSelectionMode, props.isFocused, setIsMessageSelectionMode]));
 
 
   // text-diff functionality: only diff the last complete message, and they're similar in size
@@ -384,7 +375,7 @@ export function ChatMessageList(props: {
     ...props.sx,
 
     // we added these after removing the minSize={20} (%) from the containing panel.
-    minWidth: '18rem',
+    minWidth: themeMinWidthChatPane,
     // minHeight: '180px', // not need for this, as it's already an overflow scrolling container, so one can reduce it to a pixel
 
     // fix for the double-border on the last message (one by the composer, one to the bottom of the message)
@@ -407,59 +398,47 @@ export function ChatMessageList(props: {
 
 
   if (!filteredMessages.length)
-    return (
+    return <>
       <Box sx={{ px: { xs: 0.5, md: 1 }, py: { xs: 1, md: 1.5 }, ...props.sx }}>
         <PersonaSelector conversationId={conversationId} isMobile={props.isMobile} runExample={handleRunExample} />
       </Box>
-    );
+      {/* next to the growing box, in the scroller's column: at the bottom, full width */}
+      <WhatsNewEmptyChatLine />
+    </>;
 
-  return (
+  return <ERCDiffContextProvider title='Compare Outputs' isMobile={props.isMobile} contentScaling={contentScaling}>
+
     <List role='chat-messages-list' sx={listSx} onCopy={clipboardInterceptCtrlCForCleanup}>
 
-      {props.isMessageSelectionMode && (
-        <MessagesSelectionHeader
-          hasSelected={selectedMessages.size > 0}
-          sumTokens={historyTokenCount}
+      {props.isMessageSelectionMode ? (
+        <ChatCleanupControls
+          isMobile={props.isMobile}
+          conversationHandler={conversationHandler}
+          conversationMessages={conversationMessages}
+          filteredMessages={filteredMessages}
+          historyTokenCount={historyTokenCount}
+          remainingTokens={chatLLMContextTokens ? (chatLLMContextTokens - historyTokenCount) : undefined}
+          selectedMessages={selectedMessages}
+          setSelectedMessages={setSelectedMessages}
           onClose={() => props.setIsMessageSelectionMode(false)}
-          onSelectAll={handleSelectAll}
-          onDeleteMessages={handleSelectionDelete}
-          onToggleVisibility={handleSelectionToggleVisibility}
-          areAllMessagesHidden={areAllSelectedMessagesHidden}
         />
-      )}
+      ) : filteredMessages.map((message, idx) => {
 
-      {filteredMessages.map((message, idx) => {
+          return (
 
-          // Optimization: only memo complete components, or we'd be memoizing garbage (fragments
-          // change every chunk during streaming, so the equality check would always fail).
-          // CAVEAT: switching between memo and non-memo at the same position causes React to
-          // remount the subtree (different component types). Any state that must survive that
-          // boundary lives on this component (e.g. resumeInFlight, resumeAbortersRef).
-          const ChatMessageMemoOrNot = !message.pendingIncomplete ? ChatMessageMemo : ChatMessage;
-
-          return props.isMessageSelectionMode ? (
-
-            <CleanerMessage
-              key={'sel-' + message.id}
-              message={message}
-              remainingTokens={props.chatLLMContextTokens ? (props.chatLLMContextTokens - historyTokenCount) : undefined}
-              selected={selectedMessages.has(message.id)} onToggleSelected={handleSelectMessage}
-            />
-
-          ) : (
-
-            <ChatMessageMemoOrNot
+            <ChatMessageStreamingMemo
               key={'msg-' + message.id}
               message={message}
               // diffPreviousText={message === diffTargetMessage ? diffPrevText : undefined}
               fitScreen={props.fitScreen}
-              hasInReferenceTo={composerHasInReferenceto}
+              hasInReferenceTo={composerHasInReferenceTo}
+              showTimestamp={messageTimestampMode === 'all' || (messageTimestampMode === 'auto' && (message.id === firstUserMessageId || message.id === lastMessageId))}
               isMobile={props.isMobile}
               isBottom={idx === filteredMessages.length - 1}
               isImagining={isImagining}
               isSpeaking={isSpeaking}
-              showAntPromptCaching={props.chatLLMAntPromptCaching}
-              showUnsafeHtmlCode={danger_experimentalHtmlWebUi}
+              showAntPromptCaching={chatLLMAntPromptCaching}
+              htmlRenderVariant={getRenderHTMLInitial() ? 'render-at-end' : 'show-code'}
               onAddInReferenceTo={!composerCanAddInReferenceTo ? undefined : handleAddInReferenceTo}
               onMessageAssistantFrom={handleMessageAssistantFrom}
               onMessageBeam={handleMessageBeam}
@@ -470,11 +449,12 @@ export function ChatMessageList(props: {
               onMessageUpstreamDelete={handleMessageUpstreamDelete}
               upstreamResumeMode={resumeInFlight[message.id]}
               onMessageDelete={handleMessageDelete}
-              onMessageFragmentAppend={handleMessageAppendFragment}
-              onMessageFragmentDelete={handleMessageDeleteFragment}
-              onMessageFragmentReplace={handleMessageReplaceFragment}
+              onMessageFragmentsReplace={handleMessageReplaceFragments}
+              onMessagePresentationChange={handleMessagePresentationChange}
+              onMessageSetRole={handleMessageSetRole}
               onMessageToggleUserFlag={handleMessageToggleUserFlag}
               onMessageTruncate={handleMessageTruncate}
+              onReattachAsFile={handleReattachAsFile}
               onTextDiagram={handleTextDiagram}
               onTextImagine={capabilityHasT2I ? handleTextImagine : undefined}
               onTextSpeak={handleTextSpeak}
@@ -497,5 +477,13 @@ export function ChatMessageList(props: {
       )}
 
     </List>
-  );
+
+  </ERCDiffContextProvider>;
 }
+
+
+/**
+ * The pane re-renders on focus and layout changes; the list re-renders on its own props and subscriptions only.
+ * Props passed to it must stay stable (primitives, constant sx, stable handlers), or the memo breaks silently.
+ */
+export const ChatMessageListMemo = React.memo(ChatMessageList);

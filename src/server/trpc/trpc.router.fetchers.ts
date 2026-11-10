@@ -2,6 +2,8 @@ import { TRPCError } from '@trpc/server';
 
 import { debugGenerateCurlCommand, safeErrorString, SERVER_DEBUG_WIRE } from '~/server/wire';
 
+import { isBrowserNetworkError, isBrowserOffline } from '~/common/util/fetchFailures';
+
 
 // configuration
 const SERVER_LOG_FETCHERS_ERRORS = !process.env.SUPPRESS_FETCHER_LOGS; // default: true - log all fetcher errors to the console
@@ -66,7 +68,7 @@ type _RequestConfig<TBody extends object | undefined | FormData> = {
  *    - httpStatus: HTTP status code (503, 429, 502, etc.) for upstream HTTP errors
  *
  * RETRY PATTERN MATCHING:
- * - HTTP 503/429/502 (category='http', httpStatus present) → Retry with server profile (1-30s)
+ * - HTTP 429 → rate-limited profile (~50s); 529 → overloaded (~30s); 503/502 → transient (~7s); see RETRY_PROFILES in trpc.fetchers.retrier.ts
  * - Connection errors (category='connection', connErrorName present) → Retry with network profile (0.5-8s)
  * - Abort/Parse (category='abort'/'parse') → Don't retry
  *
@@ -80,11 +82,15 @@ export class TRPCFetcherError extends TRPCError {
   readonly category: TRPCFetcherErrorCategory;
   readonly connErrorName?: string; // [category='connection'] System error code (ECONNREFUSED, ETIMEDOUT, ENOTFOUND, etc.)
   readonly httpStatus?: number;    // [category='http'] HTTP status code (503, 429, 502, etc.)
+  readonly httpErrorCode?: string; // [category='http'] machine-readable code from the upstream error body, when present (e.g. 'credit_balance_exhausted')
+  readonly httpRetryAfterMs?: number; // [category='http'] the wait the upstream asked for, from the Retry-After headers, when present
 
   constructor(opts: {
     category: TRPCFetcherErrorCategory,
     connErrorName?: string,
     httpStatus?: number,
+    httpErrorCode?: string,
+    httpRetryAfterMs?: number,
     // -> TRPCError fields (code, cause)
     // code?: TRPCError['code'], // removed because we decide it based on category
     // cause?: unknown, // removed for security / anti-leakage reasons
@@ -100,10 +106,44 @@ export class TRPCFetcherError extends TRPCError {
     this.category = opts.category;
     this.connErrorName = opts.connErrorName;
     this.httpStatus = opts.httpStatus;
+    this.httpErrorCode = opts.httpErrorCode;
+    this.httpRetryAfterMs = opts.httpRetryAfterMs;
 
     // Maintains proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, TRPCFetcherError.prototype);
   }
+}
+
+/**
+ * The wait the upstream asks for before a retry: `retry-after-ms` (Azure OpenAI, milliseconds), else `retry-after`
+ * (OpenAI, Anthropic, Groq, Perplexity, OpenRouter: seconds; an HTTP date per RFC 9110 is accepted too).
+ * Undefined when absent or invalid. On CSF the browser only shows headers the vendor lists in
+ * Access-Control-Expose-Headers, so there this is often undefined and the retrier falls back to its own backoff.
+ */
+function _retryAfterMsFromHeaders(headers: Headers): number | undefined {
+  const ms = Number(headers.get('retry-after-ms') ?? NaN);
+  if (Number.isFinite(ms) && ms >= 0) return ms;
+  const retryAfter = headers.get('retry-after')?.trim();
+  if (!retryAfter) return undefined;
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds)) return seconds >= 0 ? seconds * 1000 : undefined;
+  const dateMs = Date.parse(retryAfter);
+  return Number.isFinite(dateMs) ? Math.max(0, dateMs - Date.now()) : undefined;
+}
+
+/**
+ * The machine-readable code in the `error` member of an upstream error body, where each vendor puts it: the message
+ * alone cannot tell a temporary 429 from a permanent one. Undefined when the body names none.
+ */
+function _upstreamErrorCode(error: any): string | undefined {
+  const googleDetail = (type: string) => !Array.isArray(error?.details) ? undefined : error.details.find((d: any) => d?.['@type'] === `type.googleapis.com/google.rpc.${type}`);
+  return [
+    error?.details?.error_code,                               // [Anthropic]
+    error?.code,                                              // [OpenAI and compatibles] - OpenRouter and Gemini put the HTTP status here
+    error?.metadata?.limit_source,                            // [OpenRouter] the limit that tripped
+    googleDetail('QuotaFailure')?.violations?.[0]?.quotaId,   // [Gemini] the tripped quota: window and tier
+    googleDetail('ErrorInfo')?.reason,                        // [Gemini] other errors, e.g. API_KEY_INVALID
+  ].find((code): code is string => typeof code === 'string');
 }
 
 /**
@@ -134,10 +174,13 @@ async function _fetchFromTRPC<TBody extends object | undefined | FormData, TOut>
   const body = 'body' in config ? config.body : undefined;
 
   // Cleaner url without query
-  let debugCleanUrl;
+  let debugCleanUrl, debugHost, hiddenHostname: string | undefined;
   try {
-    const { origin, pathname } = new URL(url);
-    debugCleanUrl = decodeURIComponent(origin + pathname);
+    const { protocol, pathname, host, hostname } = new URL(url);
+    // an API key pasted into a host field: a single label holding a long run with digits (names are words, or dotted)
+    hiddenHostname = !hostname.includes('.') && /(?=[a-z0-9]*\d)[a-z0-9]{20,}/.test(hostname) ? hostname : undefined;
+    debugHost = hiddenHostname ? '(hidden: looks like an API key)' : host;
+    debugCleanUrl = decodeURIComponent(`${protocol}//${debugHost}${pathname}`);
   } catch {
     // ...ignore
   }
@@ -207,7 +250,8 @@ async function _fetchFromTRPC<TBody extends object | undefined | FormData, TOut>
     const _cause = !error || !(error instanceof Error) || !('cause' in error) ? null : error.cause ?? null;
     const causeName = !_cause || !(_cause instanceof Error) ? null : _cause.name ?? null;
     const causeCode = !_cause || !(_cause instanceof Error || typeof _cause === 'object') ? null : (_cause as any).code ?? null;
-    const causeMessage = safeErrorString(_cause);
+    // [Node] a DNS failure names the host: 'getaddrinfo ENOTFOUND <host>'
+    const causeMessage = hiddenHostname ? safeErrorString(_cause)?.replaceAll(hiddenHostname, debugHost!) : safeErrorString(_cause);
     // const causeMessage = !_cause ? null : causeName === 'AggregateError' ? safeErrorString(_cause) : _cause?.toString() || safeErrorString(_cause) || null;
     const connErrorName = causeCode || causeName || errorName;
 
@@ -231,21 +275,31 @@ async function _fetchFromTRPC<TBody extends object | undefined | FormData, TOut>
     // NOTE: This may log too much - for instance a 404 not found, etc.. - so we're putting it under the flag
     //       Consider we're also throwing the same, so there will likely be further logging.
     if (SERVER_DEBUG_WIRE || SERVER_LOG_FETCHERS_ERRORS) {
-      if (prettyShowUrl && !SERVER_DEBUG_WIRE)
-        // expected user-misconfig (unreachable/wrong URL): compact line - the thrown error carries the full message to the client
+      if ((prettyShowUrl || hiddenHostname) && !SERVER_DEBUG_WIRE)
+        // expected user-misconfig (unreachable/wrong URL, a key as host): compact line, no raw error objects - the thrown error carries the full message to the client
         console.log(`[${method}] [${moduleName} network issue]: ${connErrorName} -> ${debugCleanUrl || url}`);
       else
         console.log(`[${method}] [${moduleName} network issue]: "${errorString}"`, { error, _cause, debugCleanUrl, urlShown: prettyShowUrl });
     }
 
     // -> throw Connection error: will be a 400 (BAD_REQUEST), with preserved cause
+    let connectionMessage: string;
+    if (isBrowserNetworkError(error)) {
+      // [CSF] a browser fetch failure carries no cause (offline, an extension, CORS, an opaque 401 look the same): name the host and the candidates
+      connectionMessage = `Could not connect to ${debugHost || 'the service'}: ${_period(errorString)}`
+        + (isBrowserOffline() ? ' You appear to be offline.'
+          : ' The browser hides the cause: offline, a blocking extension, or the service refusing browser requests (CORS; some services do this for an invalid API key).');
+    } else {
+      connectionMessage = `Could not connect: ${_period(errorString)}`;
+      if (causeMessage)
+        connectionMessage += ` \nTechnical cause: ${_period(causeMessage)}`;
+      if (prettyShowUrl)
+        connectionMessage += ` \n\nPlease make sure the Server can access -> ${debugCleanUrl}`;
+    }
     throw new TRPCFetcherError({
       category: 'connection',
       connErrorName: connErrorName,
-      message: (!throwWithoutName ? `[${moduleName} network issue]: ` : '')
-        + `Could not connect: ${_period(errorString)}`
-        + (causeMessage ? ` \nTechnical cause: ${_period(causeMessage)}` : '')
-        + (prettyShowUrl ? ` \n\nPlease make sure the Server can access -> ${debugCleanUrl}` : ''),
+      message: (!throwWithoutName ? `[${moduleName} network issue]: ` : '') + connectionMessage,
       // cause: _cause,
     });
   }
@@ -270,6 +324,8 @@ async function _fetchFromTRPC<TBody extends object | undefined | FormData, TOut>
     const s: number = response.status;
     let payloadString = safeErrorString(notOkayPayload);
     if (payloadString) {
+      // [Gemini] some 403 bodies quote the caller's API key: keep it out of logs and messages
+      payloadString = payloadString.replace(/AIza[\w-]{35}/g, 'AIza...');
       // truncate (480 chars: fits typical provider rate-limit/auth/quota messages with org IDs, token counts, and help URLs)
       if (payloadString.length > 480)
         payloadString = payloadString.slice(0, 480) + '...';
@@ -282,18 +338,21 @@ async function _fetchFromTRPC<TBody extends object | undefined | FormData, TOut>
     }
 
     if (SERVER_DEBUG_WIRE || SERVER_LOG_FETCHERS_ERRORS)
-      console.log(`[${method}->${parserName}] [${moduleName} issue] (http ${s}, ${response.statusText}):`, { url, responseOk: response.ok, notOkayPayload: payloadString || notOkayPayload });
+      console.log(`[${method}->${parserName}] [${moduleName} issue] (http ${s}, ${response.statusText}):`, { url: debugCleanUrl || url, responseOk: response.ok, notOkayPayload: payloadString || notOkayPayload });
 
     // -> throw HTTP error: will be a 400 (BAD_REQUEST), with preserved status
     throw new TRPCFetcherError({
       category: 'http',
       httpStatus: s,
+      httpErrorCode: _upstreamErrorCode(notOkayPayload?.error),
+      httpRetryAfterMs: _retryAfterMsFromHeaders(response.headers),
       message: (throwWithoutName ? '' : `[${moduleName} issue]: `)
         + `Upstream responded with HTTP ${s} ${response.statusText}`
         + (payloadString ? `: \n${payloadString}` : '')
         // Custom hints for common issues from select providers
         + (s === 403 && moduleName === 'Gemini' && payloadString?.includes('Requests from referer') ? ' \n\nGemini: Check API key restrictions in Google Cloud Console' : '')
-        + ((s === 404 || (s === 403 && !url.includes('bedrock') /* just a tad more silence */) || s === 502) ? ` \n\nPlease make sure the Server can access -> ${debugCleanUrl}` : ''),
+        // the URL is the likely cause, unless the vendor itself answered and named another one
+        + ((s === 404 || (s === 403 && !url.includes('bedrock') /* just a tad more silence */) || s === 502) && !_upstreamGaveReason(notOkayPayload) ? ` \n\nPlease make sure the Server can access -> ${debugCleanUrl}` : ''),
       // cause: payload, // NOT an Error - do not use even to preserve original error payload as cause
     });
   }
@@ -308,7 +367,7 @@ async function _fetchFromTRPC<TBody extends object | undefined | FormData, TOut>
     // [logging - Parsing error] candidate for the logging system
     if (SERVER_DEBUG_WIRE || SERVER_LOG_FETCHERS_ERRORS) {
       // WARN because we want to understand if something is wrong with the upstream APIs, otherwise HTTP errors are expected and simply logged
-      console.warn(`[${method}] [${moduleName}]: (${parserName} parsing error): ${error?.name}`, { error, url });
+      console.warn(`[${method}] [${moduleName}]: (${parserName} parsing error): ${error?.name}`, { error, url: debugCleanUrl || url });
     }
 
     // Forward already processed Parsing error, adding the module name if required
@@ -396,6 +455,17 @@ async function _jsonResponseParserOrThrow(response: Response) {
 
   }
   // unreachable
+}
+
+/**
+ * Whether an error body is the vendor's own error that names a cause (model, region, content blocks): its errors come in an
+ * `error` member. One that says only "not found" names none - OpenRouter answers a wrong base path that way.
+ */
+function _upstreamGaveReason(payload: any): boolean {
+  const error = payload?.error;
+  if (!error) return false;
+  const text = typeof error === 'string' ? error : typeof error.message === 'string' ? error.message : '';
+  return !/^not found\.?$/i.test(text.trim());
 }
 
 function _period(s: string) {

@@ -10,9 +10,33 @@ export type LlmsDeepseekModelId = typeof _knownDeepseekChatModels[number]['idPre
 
 const IF_4 = [LLM_IF_HOTFIX_StripImages, LLM_IF_OAI_Chat, LLM_IF_OAI_Fn];
 
-// [DeepSeek, 2026-08-31] Verification pass, all unchanged: /models now lists vision-exp too (three ids); release
-// notes end at 08-21; pricing card + MODEL VERSION rows (0731/0813) unchanged; all three system_fingerprints match
-// the baselines below (no in-place swaps); legacy aliases still answer.
+// [DeepSeek, 2026-10-17] V4.1-Flash-1017: re-post-trained, swapped IN PLACE - https://api-docs.deepseek.com/news/news261017/
+// - Same 'deepseek-flash' id, arch and price; the pricing page MODEL VERSION row reads DeepSeek-V4.1-Flash-1017. Self-feedback
+//   RL for end-to-end project work, shorter outputs (Terminal-Bench 4.0 31.2 -> 42.3, DeepSWE v1.1 74.2 -> 77.0, ProgramBench
+//   20.3 -> 29.1). Open weights on HF (deepseek-ai/DeepSeek-V4.1-Flash-1017).
+// - Unpinnable: 'deepseek-flash-1017', 'deepseek-v4.1-flash-1017' and 'deepseek-v4.1-flash' 400. /models still names it
+//   'DeepSeek-V4.1-Flash' (no build tag), and now also returns context_window, max_output_tokens, input_modalities and
+//   effort.supported_levels (low/high/max, default high).
+// - Probed 2026-10-21: flash system_fingerprint e72d3c7f663d3e1383b00b3884cb4501 (was aeb56401ca74e127821c4f9126dcb669);
+//   deepseek-v4-flash, -vision-exp, -chat, -reasoner and the expired 09-08 beta id all return it and report model
+//   'deepseek-flash'. Pro unchanged (a307abda487cd1b463329ccb945ce396). Effort enum gained 'ultra' (docs map it to max);
+//   reasoning tokens rise low < high < max on a proof prompt, prompt_tokens identical at every effort; max_tokens
+//   [1, 393216]; image input with thinking on and off; forced tool_choice still 400s under thinking; /responses and the
+//   Anthropic base serve it.
+// - Off-DeepSeek: OpenRouter 'deepseek/deepseek-v4.1-flash-1017' (DeepSeek, Together, Fireworks, Novita, Baseten, Alibaba and
+//   ~20 more); the undated 'deepseek/deepseek-v4.1-flash' no longer lists DeepSeek as a provider. OR's deepseek/ branch
+//   takes pubDate from `created` and efforts from supported_efforts (none/low/high/max), so no lookup into these defs.
+
+// [DeepSeek, 2026-09-10] V4.1-Flash GA behind a NEW undated id, 'deepseek-flash' - https://api-docs.deepseek.com/news/news260910
+// - 552B MoE, causal encoder-decoder: 8B active on prefill, 16B on decode; native image input; KV cache ~1/4 of V4-Flash.
+//   Open weights MIT on HF (deepseek-ai/DeepSeek-V4.1-Flash). DeepSeek's table puts it ahead of V4-Pro-0813 on the agentic
+//   set (DeepSWE 74.2 vs 62.7, Terminal-Bench 2.1 90.6 vs 87.9, CyberGym 88.1 vs 83.3); no lmarena row yet.
+// - V4-Flash and V4-Flash-Vision-Exp are retired: those ids, deepseek-chat/-reasoner and the expired 09-08 beta id all
+//   route to V4.1-Flash and bill at the flash card.
+// - Price cut, effective 2026-09-10 04:00 UTC: flash peak 0.006/0.3/1.2 (cache-hit/miss/output), off-peak half. Pro card
+//   unchanged. The announced 09-14 pro routing to V4.1-Flash never happened: DeepSeek keeps serving V4 Pro.
+// - The hidden agentic preamble that made 'low' cheaper on V4 is gone (identical prompt_tokens at every effort, with and
+//   without tools).
 
 // [DeepSeek, 2026-08-21] V4-Flash-Vision-Exp: first vision model - https://api-docs.deepseek.com/updates/
 // - Probed 2026-08-24: image input works, with and without thinking; otherwise flash-identical (effort enum + 'low'
@@ -41,9 +65,8 @@ const IF_4 = [LLM_IF_HOTFIX_StripImages, LLM_IF_OAI_Chat, LLM_IF_OAI_Fn];
 //   Bench 2.1 72.1 -> 87.9), raw knowledge barely moved (HLE no-tools 37.7 -> 42.7).
 // - Pro's effort mapping now matches flash: 'low' is a real cheaper tier, skipping the ~79-token hidden agentic preamble
 //   (8 vs 87 prompt tokens on the same request). /responses serves pro too now (was 400 'available starting early August 2026').
-// - Baseline for spotting the NEXT in-place swap, as no other tell exists: system_fingerprint is stable per model,
-//   a307abda487cd1b463329ccb945ce396 (pro) / a26a7955944dc5c60445bff77fac9c8e (flash). Self-report is worthless
-//   (pro claims to be V3, or Claude, or Qwen, depending on the host).
+// - system_fingerprint is stable per model and the only tell of an in-place swap besides the pricing page (current
+//   baselines in the 2026-10-17 block). Self-report is worthless (pro claims to be V3, or Claude, or Qwen, depending on the host).
 
 // [DeepSeek, 2026-07-31] V4-Flash 0731: re-post-trained, swapped IN PLACE - https://api-docs.deepseek.com/updates/
 // - Same 'deepseek-v4-flash' id, same arch/size/pricing, public beta. Reported agentic gains are vs V4-Pro-Preview on
@@ -58,17 +81,31 @@ const IF_4 = [LLM_IF_HOTFIX_StripImages, LLM_IF_OAI_Chat, LLM_IF_OAI_Fn];
 // - V4-Pro: 1.6T total / 49B active params; V4-Flash: 284B total / 13B active params (Novel Attention: token-wise compression + DSA)
 // - Model IDs listed by /models: deepseek-v4-flash, deepseek-v4-pro
 // - 1M context is the default across services; text-only (image parts rejected at the schema level)
-// - Legacy aliases: announced for retirement 2026-07-24 but still answering (on 0731 weights); absent from /models, so
+// - Legacy aliases: announced for retirement 2026-07-24 but still answering (on V4.1-Flash-1017); absent from /models, so
 //   the entries below are documentation only. May die without notice.
 // - Reasoning: two SEPARATE top-level fields, `thinking: { type: 'enabled'|'disabled' }` and `reasoning_effort`
-//   (nesting the effort inside `thinking` is silently ignored). Live enum none|minimal|low|medium|high|xhigh|max;
-//   we expose the documented low/high/max, as 'xhigh' is byte-identical to 'high' on flash
+//   (nesting the effort inside `thinking` is silently ignored). Live enum none|minimal|low|medium|high|xhigh|ultra|max;
+//   docs map minimal->low, medium/xhigh->high, ultra->max, so we expose the documented low/high/max
 //   (the live API also accepts type: 'adaptive', but it is undocumented and empirically behaves the same as 'enabled'
 //    on current builds -- deliberately not exposed here; add it once docs + semantics stabilize)
 // - Forced tool calls 400 while thinking is on ("Thinking mode does not support this tool_choice"), on both v4 models;
 //   only 'auto'/'none' work. Worked around in openai.chatCompletions.ts
 // - V3.2 endpoints no longer accessible via direct model ID (API returns only v4-flash/v4-pro)
 const _knownDeepseekChatModels = llmsDefineManualMappings([
+  {
+    idPrefix: 'deepseek-flash',
+    label: 'DeepSeek V4.1 Flash (1017)', // house-added version: the API id is versionless, the pricing page MODEL VERSION row is the tell
+    pubDate: '20261017', // 1017 checkpoint, swapped in place (V4.1 GA was 2026-09-10)
+    description: 'Multimodal MoE (552B, 8B active on input) with 1M context and native image input; 1017 checkpoint released by DeepSeek on 2026-10-17, with stronger agentic coding and shorter outputs. Ahead of V4 Pro on agentic benchmarks at a fraction of the price. Supports extended thinking modes, JSON output, and function calling.',
+    contextWindow: 1_048_576, // 1M
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Vision, LLM_IF_OAI_Reasoning],
+    parameterSpecs: [
+      { paramId: 'llmVndMiscEffort', enumValues: ['none', 'low', 'high', 'max'] }, // documented low/high/max, live-ablated 2026-10-21
+    ],
+    maxCompletionTokens: 131072, // house cap; live ceiling is 393216 (384K)
+    chatPrice: { input: 0.3, output: 1.2, cache: { read: 0.006 } }, // peak card; images billed as input tokens by dimensions
+    benchmark: { cbaElo: 1476 }, // lmarena: DeepSeek-V4.1-Flash-20260910 (Max); no 1017 row yet
+  },
   {
     idPrefix: 'deepseek-v4-pro',
     label: 'DeepSeek V4 Pro (0813)', // house-added tag: the API id is undated, so this is the only place the build shows
@@ -84,64 +121,53 @@ const _knownDeepseekChatModels = llmsDefineManualMappings([
       { paramId: 'llmVndMiscEffort', enumValues: ['none', 'low', 'high', 'max'] },
     ],
     maxCompletionTokens: 131072, // house cap; live ceiling is 393216 (384K)
-    chatPrice: { input: 1.32, output: 3.96, cache: { cType: 'oai-ac', read: 0.044 } }, // peak card
+    chatPrice: { input: 1.32, output: 3.96, cache: { read: 0.044 } }, // peak card
     benchmark: { cbaElo: 1458 }, // lmarena: deepseek-v4-pro (preview-era votes, 54k since 0424; the only 0813 row, -max-20260813, is AutoEval-only at 1465, unranked)
   },
+  // Retired ids, still accepted: all four route to deepseek-flash (V4.1) and bill at its card. Absent from /models, so
+  // these entries are documentation only, and may die without notice.
   {
     idPrefix: 'deepseek-v4-flash',
-    label: 'DeepSeek V4 Flash (0731)', // house-added tag: the API id is undated, so this is the only place the build shows
-    // note: keeping the former pubdate even tho DeepSeek has rolled the model
-    // - 0731 re-post-trained revision, swapped in place behind the same model id
-    // - 0424 initial launch and the time the benchmark scores were assessed
+    label: 'DeepSeek V4 Flash (legacy)',
     pubDate: '20260424',
-    description: 'Fast general-purpose model with 1M context, re-post-trained by DeepSeek on 2026-07-31 for agentic and coding tasks. Supports extended thinking modes, JSON output, and function calling.',
-    contextWindow: 1_048_576, // 1M
-    interfaces: [...IF_4, LLM_IF_OAI_Reasoning],
-    parameterSpecs: [
-      // 'low' keeps reasoning on yet skips the hidden agentic preamble (5 vs 84 prompt tokens), so it is cheaper per request
-      { paramId: 'llmVndMiscEffort', enumValues: ['none', 'low', 'high', 'max'] },
-    ],
-    maxCompletionTokens: 131072, // house cap; live ceiling is 393216 (384K)
-    chatPrice: { input: 0.44, output: 1.32, cache: { cType: 'oai-ac', read: 0.014 } }, // peak card
-    benchmark: { cbaElo: 1435 }, // lmarena: deepseek-v4-flash (distinct from the -high-preview entry, 1438)
+    description: 'Retired 2026-09-10: requests on this id are served by DeepSeek V4.1 Flash at its price.',
+    contextWindow: 1_048_576,
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Vision, LLM_IF_OAI_Reasoning],
+    parameterSpecs: [{ paramId: 'llmVndMiscEffort', enumValues: ['none', 'low', 'high', 'max'] }],
+    maxCompletionTokens: 131072,
+    chatPrice: { input: 0.3, output: 1.2, cache: { read: 0.006 } }, // peak card
+    isLegacy: true,
   },
   {
     idPrefix: 'deepseek-v4-flash-vision-exp',
-    label: 'DeepSeek V4 Flash Vision (Exp)',
-    isPreview: true,
+    label: 'DeepSeek V4 Flash Vision (legacy)',
     pubDate: '20260821',
-    description: 'Experimental vision variant of V4 Flash with 1M context, released by DeepSeek on 2026-08-21. Adds image understanding while matching V4 Flash text capabilities. Supports extended thinking modes, JSON output, and function calling.',
-    contextWindow: 1_048_576, // 1M
+    description: 'Retired 2026-09-10: requests on this id are served by DeepSeek V4.1 Flash at its price.',
+    contextWindow: 1_048_576,
     interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Vision, LLM_IF_OAI_Reasoning],
-    parameterSpecs: [
-      // 'low' keeps reasoning on yet skips the hidden agentic preamble (6 vs 85 prompt tokens), so it is cheaper per request
-      { paramId: 'llmVndMiscEffort', enumValues: ['none', 'low', 'high', 'max'] },
-    ],
-    maxCompletionTokens: 131072, // house cap; live ceiling is 393216 (384K)
-    chatPrice: { input: 0.44, output: 1.32, cache: { cType: 'oai-ac', read: 0.014 } }, // peak card, same as flash; images billed as input tokens by dimensions
-    // no benchmark: not on lmarena yet (released 2026-08-21)
+    parameterSpecs: [{ paramId: 'llmVndMiscEffort', enumValues: ['none', 'low', 'high', 'max'] }],
+    maxCompletionTokens: 131072,
+    chatPrice: { input: 0.3, output: 1.2, cache: { read: 0.006 } }, // peak card
+    isLegacy: true,
   },
-  // Legacy aliases - API routes both to deepseek-v4-flash with thinking pre-set
   {
     idPrefix: 'deepseek-reasoner',
     label: 'DeepSeek Reasoner (legacy)',
-    description: 'Legacy alias: routes to DeepSeek V4 Flash with thinking enabled. Past its announced 2026-07-24 retirement, still served.',
+    description: 'Legacy alias: routes to DeepSeek V4.1 Flash with thinking enabled. Past its announced 2026-07-24 retirement, still served.',
     contextWindow: 1_048_576,
     interfaces: [...IF_4, LLM_IF_OAI_Reasoning],
     maxCompletionTokens: 65536,
-    chatPrice: { input: 0.44, output: 1.32, cache: { cType: 'oai-ac', read: 0.014 } }, // peak card
-    benchmark: { cbaElo: 1435 - 1 }, // lmarena: deepseek-v4-flash - 1 (yield)
+    chatPrice: { input: 0.3, output: 1.2, cache: { read: 0.006 } }, // peak card
     isLegacy: true,
   },
   {
     idPrefix: 'deepseek-chat',
     label: 'DeepSeek Chat (legacy)',
-    description: 'Legacy alias: routes to DeepSeek V4 Flash with thinking disabled. Past its announced 2026-07-24 retirement, still served.',
+    description: 'Legacy alias: routes to DeepSeek V4.1 Flash with thinking disabled. Past its announced 2026-07-24 retirement, still served.',
     contextWindow: 1_048_576,
     interfaces: IF_4,
     maxCompletionTokens: 65536,
-    chatPrice: { input: 0.44, output: 1.32, cache: { cType: 'oai-ac', read: 0.014 } }, // peak card
-    benchmark: { cbaElo: 1435 - 2 }, // lmarena: deepseek-v4-flash - 2 (yield)
+    chatPrice: { input: 0.3, output: 1.2, cache: { read: 0.006 } }, // peak card
     isLegacy: true,
   },
 ]);
@@ -173,8 +199,3 @@ export function deepseekModelSort(a: ModelDescriptionSchema, b: ModelDescription
     return aIndex - bIndex;
   return a.id.localeCompare(b.id);
 }
-
-
-// [DeepSeek, 2025-12-15] V3.2-Speciale endpoint has expired and been removed
-// The temporary endpoint (v3.2_speciale_expires_on_20251215) was decommissioned on Dec 15, 2025 15:59 UTC
-// To re-enable variants, use createVariantInjector() from llm.server.variants.ts

@@ -1,43 +1,8 @@
 import { Release } from '~/common/app.release';
 
 
-/**
- * Abort an AbortController with a proper DOMException('AbortError') instead of a raw string,
- * so all downstream `error.name === 'AbortError'` checks work correctly.
- */
-export function abortWithReason(controller: AbortController | undefined | null, message: string): void {
-  controller?.abort(new DOMException(message, 'AbortError'));
-}
-
-/**
- * Detect cancellation errors that are expected when users stop generation,
- * navigate away, or an operation is intentionally torn down.
- */
-export function isAbortErrorLike(error: unknown): boolean {
-  if (!error) return false;
-
-  if (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError')
-    return true;
-
-  if (error instanceof Error) {
-    if (error.name === 'AbortError')
-      return true;
-    if (error.cause)
-      return isAbortErrorLike(error.cause);
-  }
-
-  if (typeof error === 'object') {
-    const maybeError = error as { name?: unknown; message?: unknown; cause?: unknown; error?: unknown };
-    if (maybeError.name === 'AbortError')
-      return true;
-    if (maybeError.error)
-      return isAbortErrorLike(maybeError.error);
-    if (maybeError.cause)
-      return isAbortErrorLike(maybeError.cause);
-  }
-
-  return false;
-}
+// moved to abortUtils.ts - transition alias, remove once no importer uses this path (some Beam files, and dev-only files)
+export { abortWithReason, isAbortErrorLike } from './abortUtils';
 
 /**
  * React can throw these when browser extensions or translation tools mutate
@@ -49,14 +14,19 @@ export function isBenignDomMutationError(error: unknown): boolean {
   const message = error.message || '';
   if (error.name !== 'NotFoundError') return false;
 
+  // WebKit throws these with its generic NotFoundError text, which names no call; the DOM call is the innermost stack frame
+  if (message === 'The object can not be found here.')
+    return /^(?:removeChild|insertBefore)@\[native code\]/.test(error.stack || '');
+
   return message.includes('removeChild')
     || message.includes('insertBefore')
     || message.includes('The node before which the new node is to be inserted is not a child of this node');
 }
 
 /**
- * Detect lazy bundle loading failures. These usually happen when a deployment
- * changes chunk filenames while a browser tab is still running the old app.
+ * Detect lazy bundle loading failures: the chunk request failed or timed out (network),
+ * or a deployment removed the chunk files a browser tab still running the old app asks for.
+ * A module that loaded and then threw while evaluating is not one of these.
  */
 export function isChunkLoadError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;

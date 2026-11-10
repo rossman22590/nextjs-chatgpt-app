@@ -18,6 +18,7 @@ import { t2iIsPainterName } from '~/modules/t2i/t2i.config';
 
 import type { MetricsChatGenerateCost_Md } from '~/common/stores/metrics/metrics.chatgenerate';
 import type { DMessage, DMessageGenerator, DMessageRole } from '~/common/stores/chat/chat.message';
+import { messageOutcomeLabel } from '~/common/stores/chat/chat.message.outcome';
 import type { UIComplexityMode } from '~/common/app.theme';
 import { PhPaintBrush } from '~/common/components/icons/phosphor/PhPaintBrush';
 import { animationColorRainbow } from '~/common/util/animUtils';
@@ -65,8 +66,8 @@ export const avatarIconSx: SxProps = {
 // };
 
 const aixSkipBoxSx = {
-  height: 36,
-  width: 36,
+  height: 'var(--AGI-Avatar-size, 36px)',
+  width: 'var(--AGI-Avatar-size, 36px)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -109,14 +110,13 @@ export const tooltipMetricsGridSx: SxProps = {
 };
 
 
-/** Whole message background color, based on the message role and state */
-export function messageBackground(messageRole: DMessageRole | string, userCommand: 'draw' | 'react' | false, wasEdited: boolean, isAssistantIssue: boolean): string {
+/** Whole message background color, based on the message role and state. assistantColor: the outcome's palette key (messageOutcomeColor), undefined for none */
+export function messageBackground(messageRole: DMessageRole | string, userCommand: 'draw' | 'react' | false, wasEdited: boolean, assistantColor: 'danger' | 'warning' | 'neutral' | undefined): string {
   // Theme-aware state tints: Joy's *-softBg palette vars are purpose-built tinted surfaces, redefined
   // per light/dark scheme - pale/warm in light (the cream look), muted-dark in dark. This replaces the
   // old hardcoded light-only cream/green/red/amber that looked wrong in dark mode.
   const drawTint = 'var(--joy-palette-warning-softBg)';   // warm cream in light, muted amber in dark
   const reactTint = 'var(--joy-palette-success-softBg)';  // pale green / muted green
-  const issueTint = 'var(--joy-palette-danger-softBg)';   // pale red / muted red
   const editedTint = 'var(--joy-palette-warning-softBg)'; // pale amber / muted amber
   switch (messageRole) {
     case 'user':
@@ -124,7 +124,7 @@ export function messageBackground(messageRole: DMessageRole | string, userComman
         : userCommand === 'react' ? reactTint
           : 'var(--agi-message-user)';
     case 'assistant':
-      return isAssistantIssue ? issueTint : 'var(--agi-message-assistant)';
+      return assistantColor ? `var(--joy-palette-${assistantColor}-softBg)` : 'var(--agi-message-assistant)';
     case 'system':
       return wasEdited ? editedTint : 'var(--agi-message-system)';
     default:
@@ -287,7 +287,7 @@ export function useMessageAvatarLabel(
         label: prettyName,
         tooltip: (!created || complexity === 'minimal') ? null : (
           <Box sx={tooltipSx}>
-            <TimeAgo date={created} formatter={(value: number, unit: string, _suffix: string) => `Thinking for ${value} ${unit}${value > 1 ? 's' : ''}...`} />
+            <TimeAgo date={created} formatter={(value: number, unit: string, _suffix: string) => !value ? 'Thinking...' : `Thinking for ${value} ${unit}${value > 1 ? 's' : ''}...`} />
             {liveMetrics}
           </Box>
         ),
@@ -342,14 +342,27 @@ export function prettyMessageMetrics(metrics: DMessageGenerator['metrics'], uiCo
   if (!metrics) return null;
 
   const showWaitingTime = metrics?.dtStart !== undefined && (uiComplexityMode === 'extra' || metrics.dtStart >= 10000);
-  const showSpeedSection = uiComplexityMode !== 'minimal' && (showWaitingTime || metrics?.vTOutInner !== undefined);
-  const showTimeSection = uiComplexityMode !== 'minimal' && !!metrics?.dtAll;
-
-  const costCode = metrics.$code ? _prettyCostCode(metrics.$code) : null;
+  // no first-token mark (non-streaming): the end-to-end rate stands in, labeled
+  const vTOutOverall = (metrics.vTOutInner === undefined && metrics.dtStart === undefined && metrics.TOut && metrics.dtAll)
+    ? metrics.TOut / (metrics.dtAll / 1000) : undefined;
+  const showSpeedSection = showWaitingTime || metrics?.vTOutInner !== undefined || vTOutOverall !== undefined;
+  const showTimeSection = !!metrics?.dtAll;
+  // stopped or failed: no vendor-terminated stream, so no dtAll; the client wall clock stands in, labeled
+  const showWallTime = !showTimeSection && metrics?.TsR === 'aborted' && !!metrics?.dtWall;
 
   // the provider-reported (billed) cost is the headline when present; the price-table estimate demotes to a footnote
   const $cHeadline = metrics.$cReported ?? metrics.$c;
   const $cEstimated = (metrics.$cReported !== undefined && metrics.$c !== undefined) ? metrics.$c : undefined;
+  const costCode = metrics.$code ? _prettyCostCode(metrics.$code, $cHeadline !== undefined) : null;
+  // cost by class, when cache or tools are in play
+  const showCostByClass = metrics.$cCacheR !== undefined || metrics.$cCacheW !== undefined || metrics.$cTools !== undefined;
+  // hosted tool calls: counts on their own row; priced only where the vendor bills per call (searches)
+  const toolCountsAll: [count: number | undefined, one: string, many: string][] = [
+    [metrics.nWebSearch, 'search', 'searches'],
+    [metrics.nWebFetch, 'fetch', 'fetches'],
+    [metrics.nCodeExec, 'code execution', 'code executions'],
+  ];
+  const toolCounts = toolCountsAll.filter((t): t is [number, string, string] => !!t[0]);
 
   return <Box sx={tooltipMetricsGridSx}>
 
@@ -364,10 +377,18 @@ export function prettyMessageMetrics(metrics: DMessageGenerator['metrics'], uiCo
       {/*{metrics.TOutA !== undefined && <> (<b>{metrics.TOutA?.toLocaleString() || ''}</b> for audio)</>}*/}
     </div>}
 
+    {/* Tools */}
+    {toolCounts.length > 0 && <div>Tools:</div>}
+    {toolCounts.length > 0 && <div>
+      {' '}{toolCounts.map(([n, one, many], i) => <React.Fragment key={one}>{i > 0 && ' · '}<b>{n.toLocaleString()}</b> {n === 1 ? one : many}</React.Fragment>)}
+    </div>}
+
     {/* Timings */}
     {showSpeedSection && <div>Speed:</div>}
     {showSpeedSection && <div>
       {!!metrics.vTOutInner && <>~<b>{(Math.round(metrics.vTOutInner * 10) / 10).toLocaleString() || ''}</b> tok/s</>}
+      {/* non-streaming: TOut / dtAll, mutually exclusive with vTOutInner and the wait */}
+      {vTOutOverall !== undefined && <>~<b>{(Math.round(vTOutOverall * 10) / 10).toLocaleString()}</b> tok/s <span style={{ opacity: 0.5 }}>overall</span></>}
       {showWaitingTime && (<span style={{ opacity: 0.5 }}>
         {metrics.vTOutInner !== undefined && ' · '}
         <span>{prettyDuration(metrics.dtStart!, true)}</span> wait
@@ -382,9 +403,20 @@ export function prettyMessageMetrics(metrics: DMessageGenerator['metrics'], uiCo
         {' '}<small>(
         {metrics.$cdCache > 0
           ? <>cache savings: <b>{formatModelsCost(metrics.$cdCache / 100)}</b></>
-          : <>cache costs: <b>{formatModelsCost(-metrics.$cdCache / 100)}</b></>
+          : <>cache surcharge: <b>{formatModelsCost(-metrics.$cdCache / 100)}</b></>
         })</small>
       </>}
+      {metrics.$xPrice !== undefined && metrics.$xPrice !== 1 && <>{' '}<small>at <b>{metrics.$xPrice}x</b> tier</small></>}
+    </div>}
+    {showCostByClass && <div></div>}
+    {showCostByClass && <div>
+      <small>
+        {metrics.$cIn !== undefined && <>in {formatModelsCost(metrics.$cIn / 100)}</>}
+        {metrics.$cCacheR !== undefined && <>{' · '}read {formatModelsCost(metrics.$cCacheR / 100)}</>}
+        {metrics.$cCacheW !== undefined && <>{' · '}wrote {formatModelsCost(metrics.$cCacheW / 100)}</>}
+        {metrics.$cOut !== undefined && <>{' · '}out {formatModelsCost(metrics.$cOut / 100)}</>}
+        {metrics.$cTools !== undefined && <>{' · '}tools {formatModelsCost(metrics.$cTools / 100)}</>}
+      </small>
     </div>}
     {/* Add the local price-table estimate underneath, when the headline is the billed cost */}
     {$cEstimated !== undefined && <div></div>}
@@ -397,21 +429,24 @@ export function prettyMessageMetrics(metrics: DMessageGenerator['metrics'], uiCo
 
     {/* Time */}
     {showTimeSection && <div>Time:</div>}
+    {showWallTime && <div>Wall time:</div>}
     {showTimeSection && <div><b>{prettyDuration(metrics.dtAll!, true)}</b></div>}
+    {showWallTime && <div><b>{prettyDuration(metrics.dtWall!, true)}</b> <span style={{ opacity: 0.5 }}>until stop</span></div>}
   </Box>;
 }
 
-function _prettyCostCode(code: MetricsChatGenerateCost_Md['$code']): string | null {
+function _prettyCostCode(code: MetricsChatGenerateCost_Md['$code'], hasCost: boolean): string | null {
   if (!code) return null;
   switch (code) {
     case 'free':
       return 'Free';
     case 'no-tokens':
-      return 'Missing tokens for pricing';
+      return 'Usage not reported by the provider';
     case 'no-pricing':
       return 'Model pricing not available';
     case 'partial-msg':
-      return 'Incomplete Message - Partial Cost';
+      // stopped or failed: some vendors report usage only at the end, so there may be no cost to show
+      return hasCost ? 'Incomplete Message - Partial Cost' : 'Ended before usage was reported';
     case 'partial-price':
       return 'Model pricing is incomplete';
   }
@@ -421,13 +456,13 @@ export function prettyTokenStopReason(reason: DMessageGenerator['tokenStopReason
   if (!reason) return null;
   switch (reason) {
     case 'client-abort':
-      return complexity !== 'minimal' ? 'Stopped' : '';
+      return complexity !== 'minimal' ? messageOutcomeLabel('aborted') : '';
     case 'filter':
       return 'Filtered';
     case 'issue':
       return complexity === 'extra' ? 'Error' : '';
     case 'out-of-tokens':
-      return 'Out of Tokens';
+      return messageOutcomeLabel('truncated');
     default:
       const _exhaustiveCheck: never = reason;
       return null;
@@ -435,7 +470,7 @@ export function prettyTokenStopReason(reason: DMessageGenerator['tokenStopReason
 }
 
 
-const oaiORegex = /gpt-[345](?:o|\.\d+)?-|o[1345]-|osb-|chatgpt-[45]o?|gpt-5-chat|computer-use-/;
+const oaiORegex = /gpt-[3-6](?:o|\.\d+)?-|o[1345]-|osb-|chatgpt-[45]o?|gpt-5-chat|computer-use-/;
 const geminiRegex = /gemini-|gemma-|learnlm-|deep-research-|antigravity-|nano-banana-/;
 
 
@@ -483,6 +518,7 @@ export function prettyShortChatModelName(model: string | undefined): string {
       .replace('-pro', ' Pro')
       .replace('-preview', ' (preview)')
       // GPT-5.6+ capability tiers
+      .replace('-astra', ' Astra')
       .replace('-sol', ' Sol')
       .replace('-terra', ' Terra')
       .replace('-luna', ' Luna')
@@ -557,7 +593,7 @@ export function prettyShortChatModelName(model: string | undefined): string {
     if (model.includes('grok-beta')) return 'Grok Beta';
     if (model.includes('grok-vision-beta')) return 'Grok Vision Beta';
   }
-  // [OpenAI OSS] gpt-oss family (shared across Cerebras/Groq/etc.) - the OpenAI regex above only matches gpt-[345]
+  // [OpenAI OSS] gpt-oss family (shared across Cerebras/Groq/etc.) - the OpenAI regex above only matches gpt-[3-6]
   if (model.includes('gpt-oss')) {
     return model.slice(model.indexOf('gpt-oss'))
       .replace('gpt-oss', 'GPT OSS')
@@ -586,7 +622,7 @@ export function prettyShortChatModelName(model: string | undefined): string {
     return model
       .replace(/^cohere[/-]/, '')                // strip aggregator prefix (e.g. openrouter 'cohere/...')
       .replace(/-\d{2}-20\d{2}$/, '')            // strip -MM-YYYY snapshot date (e.g. -05-2026)
-      .replace('north-mini-code-1-0', 'North Mini Code')
+      .replace(/north-mini-code-1[.-]0/, 'North Mini Code')
       .replace('c4ai-', '')                      // Aya research prefix
       .replace('command-r-plus', 'Command R+')
       .replace('command-r7b', 'Command R7B')
@@ -599,11 +635,17 @@ export function prettyShortChatModelName(model: string | undefined): string {
       .split('-').map(s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s).join(' ')
       .trim();
   }
-  // [Sakana.ai] fugu, fugu-ultra, fugu-ultra-v1.1 / -20260615 (service prefix already stripped by the auto-label heuristic)
+  // [Sakana.ai] fugu, fugu-ultra, fugu-ultra-v2.0 / -20260615, fugu-max-v1.0 (service prefix already stripped by the auto-label heuristic)
   if (model === 'fugu' || model.startsWith('fugu-')) {
     return model
       .replace(/-20\d{6}$/, '') // strip dated snapshot suffix (e.g. -20260615)
       .split('-').map(s => /^v\d/.test(s) ? s : s.charAt(0).toUpperCase() + s.slice(1)).join(' '); // keep version tokens as-is (v1.1, not V1.1)
+  }
+  // [Meta AI] muse-spark-1.3, muse-spark-1.3-contributor, muse-image-1.0 (service prefix already stripped by the auto-label heuristic)
+  if (model.startsWith('muse-')) {
+    return model
+      .replace(/-contributor$/, ' (Contributor)')
+      .split('-').map(s => /^\d/.test(s) ? s : s.charAt(0).toUpperCase() + s.slice(1)).join(' '); // keep version tokens as-is (1.3)
   }
   // [FireworksAI]
   if (model.includes('accounts/')) {
@@ -649,6 +691,7 @@ function _prettyGeminiModelName(cutModel: string): string {
     .replace('flash', 'Flash')
     .replace('max', 'Max')
     .replace('lite', 'Lite')
+    .replace('argon', 'Argon') // Gemini 4 tier name
     .replace(/(\d)b\b/g, '$1B') // size token: '31b' -> '31B' (e.g. Gemma 4 31B)
     // feature variants
     .replace('robotics er', 'Robotics')
@@ -669,16 +712,15 @@ function _prettyGeminiModelName(cutModel: string): string {
 function _prettyAnthropicModelName(modelId: string): string | null {
   if (!modelId.includes('claude-')) return null;
 
-  const subStr = modelId.slice(modelId.indexOf('claude-'));
-  const dotted = subStr.match(/-(\d)\.(\d)(?!\d)/);
-  const dashed = subStr.match(/-(\d)(?:-(\d)(?!\d))?/);
-  const version = dotted ? `${dotted[1]}.${dotted[2]}` : dashed ? (dashed[2] ? `${dashed[1]}.${dashed[2]}` : dashed[1]) : '?';
+  // extract version as N.M (e.g. `-4-7` -> 4.7, `-4-` -> 4); `[-.]` also reads OpenRouter's dotted ids (`-5.1`); (?!\d) guards against date digits
+  const m = modelId.match(/-(\d)(?:[-.](\d)(?!\d))?/);
+  const version = m ? (m[2] ? `${m[1]}.${m[2]}` : m[1]) : '?';
 
-  if (subStr.includes('-fable')) return `Claude Fable ${version}`;
-  if (subStr.includes('-mythos')) return subStr.includes('-preview') ? 'Claude Mythos Preview' : `Claude Mythos ${version}`;
-  if (subStr.includes('-opus')) return `Claude Opus ${version}`;
-  if (subStr.includes('-sonnet')) return `Claude Sonnet ${version}`;
-  if (subStr.includes('-haiku')) return `Claude Haiku ${version}`;
+  if (modelId.includes('-fable')) return `Claude Fable ${version}`;
+  if (modelId.includes('-mythos')) return modelId.includes('-preview') ? 'Claude Mythos Preview' : `Claude Mythos ${version}`;
+  if (modelId.includes('-opus')) return `Claude Opus ${version}`;
+  if (modelId.includes('-sonnet')) return `Claude Sonnet ${version}`;
+  if (modelId.includes('-haiku')) return `Claude Haiku ${version}`;
 
   return `Claude ${version}`;
 }

@@ -96,7 +96,7 @@ export namespace GeminiInteractionsWire_API_Interactions {
   //  - DeepResearchAgentConfig  { type: 'deep-research', ... }
   //    See ./_upstream/gemini.deep-research.guide.md#agent-configuration for defaults and semantics.
   //
-  // Note: the Antigravity Agent (antigravity-preview-05-2026, released 2026-05-19) does NOT use
+  // Note: the Antigravity Agent (antigravity-preview-*) does NOT use
   // `agent_config` - it is configured via the top-level `environment` and `tools` fields instead.
 
   const _DynamicAgentConfig_schema = z.object({
@@ -414,6 +414,8 @@ export namespace GeminiInteractionsWire_API_Interactions {
     'requires_action',
     'incomplete',       // run stopped early (e.g. token limit) - terminate gracefully with a note
     'budget_exceeded',  // new in the steps schema - run hit a spend/compute budget cap; treat as terminal
+    'queued',           // [Gemini, 2026-11-05, hypothesis] in the SDK's status enum, never observed (70 background runs) - handled as in_progress
+    'requires_continuation', // a foreground hop hit its per-request output cap with budget left - handled as incomplete (we send no continuation hop)
   ]);
 
   // -- Usage (populated in the terminal frame) -- UNCHANGED across the steps migration.

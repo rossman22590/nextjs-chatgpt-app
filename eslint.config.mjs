@@ -7,6 +7,12 @@ import pluginCompat from "eslint-plugin-compat";
 // typed linting - rides eslint-config-next's own @typescript-eslint packages
 import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
+// SWC miscompile guard: shapes the Next 15.5 minifier can mis-transform (one entry below)
+import swcMiscompile from "./tools/eslint/swc-miscompile.mjs";
+// outcome guard: no casts to outcome types (one entry below)
+import outcomeTypes from "./tools/eslint/outcome-types.mjs";
+import memoProps from "./tools/eslint/memo-props.mjs";
+import sxComputed from "./tools/eslint/sx-computed.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,6 +32,8 @@ export default defineConfig([{
       ".claude/**",                     // agent tooling, own runtime
       "electron/**",                    // excluded from the type program (root tsconfig)
       "tools/video/**",                 // self-contained package, own toolchain
+      "kb/**",                          // docs and repro scripts (python); excluded from the type program (root tsconfig)
+      "docs/**",                        // brainstorms and notes (md/json/png/py); nothing lintable, kept out explicitly
     ],
 }, {
 //     // eslint's own base layer (no-dupe-keys, no-cond-assign, no-fallthrough, ...) - next/core-web-vitals
@@ -85,6 +93,15 @@ export default defineConfig([{
             selector: "NewExpression[callee.object.name='Intl'][callee.property.name='Segmenter']",
             message: "Intl.Segmenter is absent on older engines and throws. Call textIsSingleEmoji() (which feature-detects + falls back), or guard with `if (Intl.Segmenter)` and provide a fallback.",
         }],
+        // bundle guard: the @mui/icons-material barrel re-exports ~10k icons, and Next's barrel optimizer
+        // does not cover the server compile on every version (15.5 pulled all of them into a 5.4 MB server
+        // chunk). Import icons by path: '@mui/icons-material/Send'.
+        "no-restricted-imports": ["error", {
+            paths: [{
+                name: "@mui/icons-material",
+                message: "Import the icon by path ('@mui/icons-material/Send'): the barrel pulls ~10k icons into the server bundle.",
+            }],
+        }],
     },
 }, {
     // browser API compatibility guard (reads `browserslist` from package.json) - catches
@@ -123,9 +140,8 @@ export default defineConfig([{
       // promises where values belong (conditionals, spreads); void-return check off - async onClick/handlers are idiomatic
       "@typescript-eslint/no-misused-promises": ["warn", { checksVoidReturn: false }],
 
-      // NOTE: Useful
-      // // a switch over a union must name every member - a new union member with a forgotten arm is a silent distributed-contract bug; attest intentional partial switches with a `default`
-      // "@typescript-eslint/switch-exhaustiveness-check": ["warn", { considerDefaultExhaustiveForUnions: true }],
+      // a switch over a union names every member - a new union member with a forgotten arm is a silent distributed-contract bug; attest intentional partial switches with a `default`
+      "@typescript-eslint/switch-exhaustiveness-check": ["warn", { considerDefaultExhaustiveForUnions: true }],
 
       // NOTE: Not very useful, we are already okay with these - may replace the `fire/forget` text with `void`
       // // un-awaited, un-`void`ed promise: rejections become unhandled (= PostHog noise); `void x()` attests fire-and-forget
@@ -156,6 +172,10 @@ export default defineConfig([{
       // "@typescript-eslint/no-deprecated": "warn",
     },
 },
+swcMiscompile.configs.recommended,
+outcomeTypes.configs.recommended,
+memoProps.configs.recommended, // typed: fresh literals into React.memo components (found by type, not by name)
+sxComputed.configs.recommended, // typed: render-computed geometry in sx (a CSS rule per value) -> style
 // // module-cycle detection (`npm run lint:cycles`) - full import-graph traversal, too slow for the
 // // default lint; machine-checks what code comments enforce today ("value imports referenced only
 // // inside function bodies"). Deliberate lazy-value cycles get an eslint-disable with rationale.

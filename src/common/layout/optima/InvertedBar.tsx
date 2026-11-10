@@ -4,7 +4,7 @@ import type { SxProps } from '@mui/joy/styles/types';
 import { Box, Sheet, styled } from '@mui/joy';
 
 
-export const InvertedBarCornerItem = styled(Box)({
+export const InvertedBarCornerItem = styled(Box, { name: 'InvertedBarCornerItem' })({
   width: 'var(--Bar)',
   height: 'var(--Bar)',
   display: 'flex',
@@ -14,7 +14,8 @@ export const InvertedBarCornerItem = styled(Box)({
 });
 
 
-const StyledSheet = styled(Sheet)({
+const StyledSheet = styled(Sheet, { name: 'StyledSheet' })({
+  // customization
   '--Bar': 'var(--AGI-Nav-width)',
   position: 'relative',
   display: 'flex',

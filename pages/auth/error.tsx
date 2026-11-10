@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
 import { Box, Typography, Button, Alert } from '@mui/joy';
-import { Warning } from '@mui/icons-material';
+import Warning from '@mui/icons-material/Warning';
 
 import { AuthLightSurface } from '~/common/components/auth/AuthLightSurface';
 

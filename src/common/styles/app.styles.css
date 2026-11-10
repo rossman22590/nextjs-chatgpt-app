@@ -1,9 +1,8 @@
 :root {
     --AGI-Nav-width: 52px;
-    /*noinspection CssInvalidFunction*/
-    --AGI-Desktop-Drawer-width: round(clamp(260px, 18vw, 350px), 1px);
-    /*noinspection CssInvalidFunction*/
-    --AGI-Desktop-Panel-width: round(clamp(260px, 18vw, 350px), 1px);
+    /* unrounded where CSS round() is missing (Chrome < 125, Firefox < 118) - see the @supports below */
+    --AGI-Desktop-Drawer-width: clamp(260px, 18vw, 350px);
+    --AGI-Desktop-Panel-width: clamp(260px, 18vw, 350px);
     --AGI-Mobile-Drawer-width: 320px;
     --AGI-Mobile-Panel-width: 320px;
     --AGI-overlay-start-opacity: 0;
@@ -203,6 +202,16 @@ body::after {
 ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, rgba(160, 32, 240, 0.48), rgba(224, 64, 160, 0.4));
     background-clip: padding-box;
+}
+
+/*noinspection CssInvalidFunction*/
+@supports (width: round(1px, 1px)) {
+    :root {
+        /*noinspection CssInvalidFunction*/
+        --AGI-Desktop-Drawer-width: round(clamp(260px, 18vw, 350px), 1px);
+        /*noinspection CssInvalidFunction*/
+        --AGI-Desktop-Panel-width: round(clamp(260px, 18vw, 350px), 1px);
+    }
 }
 
 .agi-ellipsize {

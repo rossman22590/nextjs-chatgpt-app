@@ -95,6 +95,7 @@ export function aixToXAIResponses(
   }
 
   // Reasoning
+  // - grok-4.7:                  low/medium/high/xhigh (always-on reasoning, 'none' rejected; vendor default high)
   // - grok-4.6:                  low/medium/high/xhigh (always-on reasoning, 'none' rejected; vendor default high)
   // - grok-4.5:                  low/medium/high/xhigh (always-on reasoning, 'none' rejected)
   // - grok-4.3:                  none/low(default)/medium/high
@@ -300,7 +301,7 @@ function _toXAIResponsesInput(
           const mPt = part.pt;
           switch (mPt) {
             case 'text':
-              getModelMessage().content.push({
+              (getModelMessage().content ??= []).push({
                 type: 'output_text',
                 text: part.text,
               });

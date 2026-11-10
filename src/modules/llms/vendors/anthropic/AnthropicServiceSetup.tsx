@@ -17,6 +17,7 @@ import { SetupFormRefetchButton } from '~/common/components/forms/SetupFormRefet
 import { useToggleableBoolean } from '~/common/util/hooks/useToggleableBoolean';
 
 import { ApproximateCosts } from '../ApproximateCosts';
+import { llmsHostStripV1Suffix } from '../../shared/llm.isomorphic';
 import { useLlmUpdateModels } from '../../llm.client.hooks';
 import { useServiceSetup } from '../useServiceSetup';
 
@@ -51,7 +52,7 @@ export function AnthropicServiceSetup(props: { serviceId: DModelsServiceId }) {
 
     <ApproximateCosts serviceId={service?.id}>
       <Box sx={{ level: 'body-sm' }}>
-        Supports <b>Fable</b>, <b>Opus</b>, <b>Sonnet</b> and <b>Haiku</b>. Experiencing Issues? Check <Link href='https://status.anthropic.com/' level='body-sm' target='_blank'>Anthropic status</Link>.
+        Enjoy <b>Fable</b>, <b>Opus</b>, <b>Sonnet</b> and <b>Haiku</b>. Issues? Check <Link href='https://status.anthropic.com/' level='body-sm' target='_blank'>Anthropic status</Link>.
       </Box>
     </ApproximateCosts>
 
@@ -59,15 +60,15 @@ export function AnthropicServiceSetup(props: { serviceId: DModelsServiceId }) {
       autoCompleteId='anthropic-key' label={!!anthropicHost ? 'API Key' : 'Anthropic API Key'}
       rightLabel={<>{needsUserKey
         ? !anthropicKey && <Link level='body-sm' href='https://www.anthropic.com/earlyaccess' target='_blank'>request Key</Link>
-        : <AlreadySet />
-      } {anthropicKey && keyValid && <Link level='body-sm' href='https://console.anthropic.com/settings/usage' target='_blank'>show tokens usage</Link>}
+        : <AlreadySet overridden={!!anthropicKey} />
+      } {anthropicKey && keyValid && <Link level='body-sm' href='https://console.anthropic.com/settings/usage' target='_blank'>show usage</Link>}
       </>}
       value={anthropicKey} onChange={value => updateSettings({ anthropicKey: value })}
       required={needsUserKey} isError={keyError}
       placeholder='sk-...'
     />
 
-    {showAdvanced && <FormSwitchControl
+    {(showAdvanced || !autoVndAntBreakpoints) && <FormSwitchControl
       title='Auto-Caching' on='Enabled' off='Disabled'
       tooltip='Auto-breakpoints: 3 breakpoints are always set on the System instruction and on the last 2 User messages. This leaves the user with 1 breakpoint of their choice. (max 4)'
       description={autoVndAntBreakpoints ? <>Last 2 user messages</> : 'Disabled'}
@@ -87,14 +88,14 @@ export function AnthropicServiceSetup(props: { serviceId: DModelsServiceId }) {
       </Typography>
     </FormControl>}
 
-    {showAdvanced && <FormTextField
+    {(showAdvanced || !!anthropicHost) && <FormTextField
       autoCompleteId='anthropic-host'
       title='API Host'
       description='Proxies, custom endpoints'
       placeholder='deployment.service.region.amazonaws.com'
       isError={false}
       value={anthropicHost || ''}
-      onChange={text => updateSettings({ anthropicHost: text })}
+      onChange={text => updateSettings({ anthropicHost: llmsHostStripV1Suffix(text) })}
     />}
 
     {(showAdvanced || !!anthropicInferenceGeo) && <FormSwitchControl

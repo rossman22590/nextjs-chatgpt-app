@@ -5,6 +5,7 @@ export type ParticleServerLogLevel = false | 'srv-log' | 'srv-warn';
 
 export type ParticleCGDialectEndReason = Extract<AixWire_Particles.CGEndReason, 'done-dialect' | 'issue-dialect'>;
 
+/** Rule: parsers translate each vendor unit 1:1, presentation is a render concern - kb/modules/AIX-ingestion.md lists where this does not hold yet */
 export interface IParticleTransmitter {
 
   // Parser-initiated Control //
@@ -15,7 +16,10 @@ export interface IParticleTransmitter {
   /** End the current part and flush it, which also calls `setDialectEnded('issue-dialect')` */
   setDialectTerminatingIssue(dialectText: string, symbol: string | null, serverLog: ParticleServerLogLevel): void;
 
-  /** Communicates the finish reason to the client - Data only. Optional `errorText` is a vendor-composed string rendered as a complementary error fragment alongside the generic classification message. */
+  /**
+   * Communicates the finish reason to the client - Data only. Optional `errorText` is a vendor-composed string rendered as a complementary error fragment alongside the generic classification message.
+   * Call it after the response content: after a clean or truncated stop reason, an issue is sent as a notice, not as content.
+   */
   setTokenStopReason(reason: AixWire_Particles.GCTokenStopReason, errorText?: string): void;
 
 
@@ -50,6 +54,9 @@ export interface IParticleTransmitter {
 
   /** Appends a hosted resource (e.g. Anthropic container file) - inline content between text fragments */
   appendHostedResource(hres: Extract<AixWire_Particles.PartParticleOp, { p: 'hres' }>): void;
+
+  /** Appends a void notice - inline, display-only, dismissible, never sent upstream (e.g. replayed thinking dropped, file export discarded) */
+  appendVoidNotice(vnt: Extract<AixWire_Particles.PartParticleOp, { p: 'vnt' }>): void;
 
   /**
    * Creates a FC part, flushing the previous one if needed, and starts adding data to it

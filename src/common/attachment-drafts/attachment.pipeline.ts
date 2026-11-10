@@ -20,7 +20,7 @@ import type { AttachmentCreationOptions, AttachmentDraft, AttachmentDraftConvert
 import type { AttachmentsDraftsStore } from './store-attachment-drafts_slice';
 import { attachmentCloudConverterPrefix, attachmentCloudFetchFile, attachmentCloudGoogleWorkspaceExportMIME, CloudFetchError } from './attachment.cloud';
 import { attachmentGetLiveFileId, attachmentSourceSupportsLiveFile } from './attachment.livefile';
-import { guessInputContentTypeFromMime, heuristicMimeTypeFixup, mimeTypeIsDocX, mimeTypeIsPDF, mimeTypeIsPlainText, mimeTypeIsSupportedImage, reverseLookupMimeType } from './attachment.mimetypes';
+import { guessInputContentTypeFromMime, guessMimeTypeFromFilename, heuristicMimeTypeFixup, mimeTypeIsDocX, mimeTypeIsPDF, mimeTypeIsPlainText, mimeTypeIsSupportedImage, mimeTypeIsXlsx } from './attachment.mimetypes';
 import { imageDataToImageAttachmentFragmentViaDBlob } from './attachment.dblobs';
 
 
@@ -163,8 +163,7 @@ export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftS
       const fileExtension = source.refPath.split('.').pop()?.toLowerCase() || undefined;
       if (!fileMime) {
         // see note on 'attachAppendDataTransfer'; this is a fallback for drag/drop missing Mimes sometimes
-        if (fileExtension)
-          fileMime = reverseLookupMimeType(fileExtension);
+        fileMime = guessMimeTypeFromFilename(source.refPath);
 
         // unknown extension or missing extension and mime: falling back to text/plain
         if (!fileMime) {
@@ -329,7 +328,7 @@ export function attachmentDefineConverters(source: AttachmentDraftSource, input:
     // Images (Known/Unknown)
     case input.mimeType.startsWith('image/'):
       const inputImageMimeSupported = mimeTypeIsSupportedImage(input.mimeType);
-      const visionModelMissing = !getDomainModelConfiguration('imageCaption', true, true);
+      const visionModelMissing = !getDomainModelConfiguration('imageCaption');
       converters.push({ id: 'image-resized-high', name: 'Image (high detail)', disabled: !inputImageMimeSupported });
       converters.push({ id: 'image-resized-low', name: 'Image (low detail)', disabled: !inputImageMimeSupported });
       converters.push({ id: 'image-original', name: 'Image (original quality)', disabled: !inputImageMimeSupported });
@@ -352,6 +351,11 @@ export function attachmentDefineConverters(source: AttachmentDraftSource, input:
     // DOCX
     case mimeTypeIsDocX(input.mimeType):
       converters.push({ id: 'docx-to-html', name: 'DOCX to HTML' });
+      break;
+
+    // XLSX
+    case mimeTypeIsXlsx(input.mimeType):
+      converters.push({ id: 'xlsx-to-text', name: 'Spreadsheet Text' });
       break;
 
     // URL: custom converters because of a custom input structure with multiple inputs
@@ -528,15 +532,16 @@ function _guessDocVDT(inputMimeType: string): DMessageDocPart['vdt'] {
     case 'code':
       return DVMimeType.VndAgiCode;
 
-    // these would have been converted - let's assume to code, but we don't return here as this code path won't happen
-    // case 'doc-pdf': // plain or OCR, or images
-    // case 'doc-msw': // code (html), or images
-    // case 'doc-msxl': // code (html), or images
-    // case 'doc-msppt': // code (html), or images
-    // case 'image': // images won't get in docs
-    // case 'audio': // same for audio
-    // case 'video': // and video
-    // case 'other': // and this even less
+    // converted before reaching here, so this path won't happen: plain text, as below
+    case 'doc-pdf': // plain or OCR, or images
+    case 'doc-msw': // code (html), or images
+    case 'doc-msxl': // code (html), or images
+    case 'doc-msppt': // code (html), or images
+    case 'image': // images won't get in docs
+    case 'audio': // same for audio
+    case 'video': // and video
+    case 'other': // and this even less
+      break;
   }
   return DVMimeType.TextPlain;
 }
@@ -596,6 +601,9 @@ export async function attachmentPerformConversion(
         let textContentMime = input.mimeType || 'text/plain';
 
         switch (converter.id) {
+          case 'text':
+            // as-is
+            break;
           case 'text-cleaner':
             textContent = _cleanPossibleHtmlText(textContent);
             break;
@@ -629,6 +637,9 @@ export async function attachmentPerformConversion(
 
         // html -> cleaner/html or markdown
         switch (converter.id) {
+          case 'rich-text':
+            // as-is
+            break;
           case 'rich-text-cleaner':
             richText = _cleanPossibleHtmlText(richText);
             richTextMimeType = 'text/html';
@@ -944,6 +955,22 @@ export async function attachmentPerformConversion(
           newFragments.push(createDocAttachmentFragment(title, caption, DVMimeType.VndAgiCode, createDMessageDataInlineText(html, 'text/html'), refString, DOCPART_DEFAULT_VERSION, docMeta));
         } catch (error) {
           console.error('Error in DOCX to Markdown conversion:', error);
+        }
+        break;
+
+
+      // XLSX to text (all worksheets)
+      case 'xlsx-to-text':
+        if (!_expectBlob(input.data, 'XLSX converter')) break;
+        try {
+          const { convertXlsxToText } = await import('./file-converters/XlsxToText');
+          const { text, sheetCount } = await convertXlsxToText(await input.data.arrayBuffer());
+          newFragments.push(createDocAttachmentFragment(title, caption, DVMimeType.TextPlain, createDMessageDataInlineText(text, 'text/plain'), refString, DOCPART_DEFAULT_VERSION, docMeta));
+          edit(attachment.id, {
+            outputsHeuristic: { isAuto: false, actualConverterId: 'xlsx-to-text', explain: `${sheetCount} worksheet${sheetCount === 1 ? '' : 's'}` },
+          });
+        } catch (error) {
+          edit(attachment.id, { outputWarnings: [error instanceof Error ? error.message : 'Could not convert this XLSX file.'] });
         }
         break;
 

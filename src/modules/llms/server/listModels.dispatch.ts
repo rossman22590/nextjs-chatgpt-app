@@ -8,7 +8,7 @@ import { createDebugWireLogger } from '~/server/wire';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import type { ModelDescriptionSchema } from './llm.server.types';
-import { llmDevValidateParameterSpecs_DEV, llmsAutoImplyInterfaces } from './models.mappings';
+import { llmDevValidateParameterSpecs_DEV, llmsAutoImplyInterfaces, llmsWireCompatCacheTag } from './models.mappings';
 
 
 // protocol: Anthropic
@@ -45,12 +45,13 @@ import { fireworksAIHeuristic, fireworksAIModelsToModelDescriptions } from './op
 import { groqModelFilter, groqModelSortFn, groqModelToModelDescription, groqValidateModelDefs_DEV } from './openai/models/groq.models';
 import { llmapiHeuristic, llmapiModelsToModelDescriptions } from './openai/models/llmapi.models';
 import { llmsIsNativeOpenAIHost } from '../shared/llm.isomorphic';
-import { minimaxHardcodedModelDescriptions, minimaxHeuristic } from './openai/models/minimax.models';
+import { minimaxHeuristic, minimaxModelsToModelDescriptions } from './openai/models/minimax.models';
 import { nousResearchHeuristic, nousResearchModelsToModelDescriptions } from './openai/models/nousresearch.models';
 import { novitaHeuristic, novitaModelsToModelDescriptions } from './openai/models/novita.models';
 import { nvidiaNIMHeuristic, nvidiaNIMModelsToModelDescriptions } from './openai/models/nvidianim.models';
 import { lmStudioFetchModels, lmStudioModelsToModelDescriptions } from './openai/models/lmstudio.models';
 import { localAIModelSortFn, localAIModelToModelDescription } from './openai/models/localai.models';
+import { metaAIModelsToModelDescriptions } from './openai/models/metaai.models';
 import { mistralModels } from './openai/models/mistral.models';
 import { modularModelsToModelDescriptions } from './openai/models/modular.models';
 import { moonshotModelFilter, moonshotModelSortFn, moonshotModelToModelDescription } from './openai/models/moonshot.models';
@@ -58,7 +59,6 @@ import { openRouterInjectVariants, openRouterModelFamilySortFn, openRouterModelT
 import { openAIInjectVariants, openAIModelFilter, openAIModelToModelDescription, openAISortModels, openaiValidateModelDefs_DEV } from './openai/models/openai.models';
 import { sakanaAIModelsToModelDescriptions } from './openai/models/sakanaai.models';
 import { perplexityHardcodedModelDescriptions, perplexityInjectVariants } from './openai/models/perplexity.models';
-import { tlusApiHeuristic, tlusApiTryParse } from './openai/models/tlusapi.models';
 import { togetherAIModelsToModelDescriptions } from './openai/models/together.models';
 import { xaiFetchModelDescriptions, xaiModelSort } from './openai/models/xai.models';
 import { zaiCuratedModelDescriptions, zaiDiscoverModels, zaiModelSort } from './openai/models/zai.models';
@@ -86,7 +86,8 @@ export async function listModelsRunDispatch(access: AixAPI_Access, signal?: Abor
   const dispatch = _listModelsCreateDispatch(access, signal);
   const wireModels = await dispatch.fetchModels();
   const models = dispatch.convertToDescriptions(wireModels)
-    .map(llmsAutoImplyInterfaces); // auto-inject implied IFs from parameterSpecs
+    .map(llmsAutoImplyInterfaces) // auto-inject implied IFs from parameterSpecs
+    .map(llmsWireCompatCacheTag); // legacy cache tag for older clients - TODO: delete after 2026-12-03
 
   // DEV: validate parameterSpecs (enumValues ⊆ registry values, paramId existence)
   if (process.env.NODE_ENV === 'development')
@@ -99,6 +100,20 @@ export async function listModelsRunDispatch(access: AixAPI_Access, signal?: Abor
 // stub to reduce dependencies - either server/client or both
 function _capitalize(s: string): string {
   return s?.length ? (s.charAt(0).toUpperCase() + s.slice(1)) : s;
+}
+
+/**
+ * Curated-first vendors (Z.ai, MiniMax): /v1/models only adds 0-day ids next to a curated table, so a failed or refused
+ * list (unreliable endpoint, key without list access) yields an empty list - the curated models - instead of failing.
+ * Build the request inside fetchList: a missing key throws while building it, and must fall back the same way.
+ */
+async function _fetchModelsListCuratedFirst(vendorName: string, fetchList: () => Promise<OpenAIWire_API_Models_List.Response>): Promise<OpenAIWire_API_Models_List.Response> {
+  try {
+    return await fetchList();
+  } catch (error) {
+    console.warn(`[${vendorName}] Models list API failed, using curated models only:`, (error as Error)?.message || error);
+    return { object: 'list', data: [] };
+  }
 }
 
 
@@ -169,7 +184,7 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
 
           // construct URLs by region
           const region = bedrockResolveRegion(access);
-          const fmUrl = bedrockURLControlPlane(region, '/foundation-models?byInferenceType=ON_DEMAND');
+          const fmUrl = bedrockURLControlPlane(region, '/foundation-models'); // all inference types: inference profiles are described by their base model, mostly not on-demand
           const ipUrl = bedrockURLControlPlane(region, '/inference-profiles?typeEquals=SYSTEM_DEFINED&maxResults=1000');
           const mantleUrl = bedrockURLMantle(region, '/v1/models');
 
@@ -356,17 +371,14 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
       // Optimistically try the API for 0-day model discovery, but never fail on it.
       return createListModelsDispatch({
         fetchModels: async (): Promise<string[]> => {
-          try {
-            const { headers, url } = openAIAccess(access, null, OPENAI_API_PATHS.models);
+          const wireModels = await _fetchModelsListCuratedFirst('Z.ai', async () => {
+            const { headers, url } = openAIAccess(access, null, OPENAI_API_PATHS.models); // throws without a key: falls back too
             _wire?.logRequest('GET', url, headers);
             const wireModels = await fetchJsonOrTRPCThrow<OpenAIWire_API_Models_List.Response>({ url, headers, name: 'OpenAI/Zai', signal });
             _wire?.logResponse(wireModels);
-            return (wireModels?.data || []).map((m: { id: string }) => m.id);
-          } catch (error) {
-            // API is unreliable - log and continue with curated list only
-            console.warn('[Z.ai] Models list API failed, using curated models only:', (error as Error)?.message || error);
-            return [];
-          }
+            return wireModels;
+          });
+          return (wireModels?.data || []).map((m: { id: string }) => m.id);
         },
         convertToDescriptions: (apiModelIds) => {
           const curated = zaiCuratedModelDescriptions();
@@ -389,6 +401,7 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
     case 'groq':
     case 'localai':
     case 'minimax':
+    case 'metaai':
     case 'mistral':
     case 'modular':
     case 'moonshot':
@@ -406,19 +419,23 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
         // [OpenAI-compatible dialects]: openAI-style fetch models list
         fetchModels: async () => {
 
-          // Bypass fetch for providers that do NOT have the /v1/models API yet - works in conjunction with the hardcoded models below
-          const bypassFetch = dialect === 'minimax' || (dialect === 'openai' && minimaxHeuristic(oaiUrl)); // [MiniMax] no /v1/models API yet
-          if (bypassFetch) return { data: [] }; // dummy response
+          const fetchList = async () => {
+            _wire?.logRequest('GET', oaiUrl, oaiHeaders);
+            const wireModels = await fetchJsonOrTRPCThrow<OpenAIWire_API_Models_List.Response>({
+              url: oaiUrl,
+              headers: oaiHeaders,
+              name: `OpenAI/${_capitalize(dialect)}`,
+              signal,
+            });
+            _wire?.logResponse(wireModels);
+            return wireModels;
+          };
 
-          _wire?.logRequest('GET', oaiUrl, oaiHeaders);
-          const wireModels = await fetchJsonOrTRPCThrow<OpenAIWire_API_Models_List.Response>({
-            url: oaiUrl,
-            headers: oaiHeaders,
-            name: `OpenAI/${_capitalize(dialect)}`,
-            signal,
-          });
-          _wire?.logResponse(wireModels);
-          return wireModels;
+          // [MiniMax] curated-first: the list only adds 0-day ids to the curated table (see minimaxModelsToModelDescriptions)
+          if (dialect === 'minimax' || (dialect === 'openai' && minimaxHeuristic(oaiUrl)))
+            return _fetchModelsListCuratedFirst('MiniMax', fetchList);
+
+          return fetchList();
         },
 
         // OpenAI models conversions: dependent on the dialect
@@ -427,13 +444,6 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
           // [Together] missing the .data property - so we have to do this early
           if (dialect === 'togetherai')
             return togetherAIModelsToModelDescriptions(openAIWireModelsResponse);
-
-          // [TLUS-style API] detect by structure: { data: [{ id, tier, capabilities, ... }] }
-          if (tlusApiHeuristic(openAIWireModelsResponse)) {
-            const tlusModels = tlusApiTryParse(openAIWireModelsResponse);
-            if (tlusModels) return tlusModels;
-            // fall through if failed
-          }
 
           // NOTE: we don't zod here as it would strip unknown properties needed for some dialects - so we proceed optimistically
           // let maybeModels = OpenAIWire_API_Models_List.Response_schema.parse(openAIWireModelsResponse).data || [];
@@ -474,7 +484,7 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
               return maybeModels
                 .filter(({ id }) => deepseekModelFilter(id))
                 .map(({ id }) => deepseekModelToModelDescription(id))
-                // .reduce(deepseekInjectVariants, [] as ModelDescriptionSchema[]) // was used to inject V3.2-Speciale
+                // an inject step lived here twice (V3.2-Speciale, the V4.1-Flash beta) for ids /models never listed
                 .sort(deepseekModelSort);
 
             case 'groq':
@@ -491,8 +501,12 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
                 .sort(localAIModelSortFn);
 
             case 'minimax':
-              // [MiniMax] hardcoded models (no /v1/models API yet, fetch was bypassed)
-              return minimaxHardcodedModelDescriptions();
+              // [MiniMax] curated table + 0-day arrivals from the live list
+              return minimaxModelsToModelDescriptions(maybeModels);
+            case 'metaai':
+              // [Meta AI] ids-only list (created is a constant 0, no type field): caps/pricing/params from the curated
+              // table; the transcription id is filtered out by name, the image model is curated and kept
+              return metaAIModelsToModelDescriptions(maybeModels);
 
             case 'mistral':
               return mistralModels(maybeModels);
@@ -530,9 +544,9 @@ function _listModelsCreateDispatch(access: AixAPI_Access, signal?: AbortSignal):
               if (fireworksAIHeuristic(oaiUrl))
                 return fireworksAIModelsToModelDescriptions(maybeModels);
 
-              // [MiniMax] hardcoded models (no /v1/models API yet)
+              // [MiniMax] curated table + 0-day arrivals from the live list
               if (minimaxHeuristic(oaiUrl))
-                return minimaxHardcodedModelDescriptions();
+                return minimaxModelsToModelDescriptions(maybeModels);
 
               // [Nous Research] Nous Portal gateway - OpenRouter-style catalog, reuses the OpenRouter mapper
               if (nousResearchHeuristic(oaiUrl))

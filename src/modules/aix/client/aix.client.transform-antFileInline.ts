@@ -1,17 +1,17 @@
 import { apiAsync } from '~/common/util/trpc.client';
 import { convert_Base64_To_UInt8Array } from '~/common/util/blobUtils';
 
-import type { AixAPI_Access, AixWire_Particles } from '../server/api/aix.wiretypes';
+import type { AixAPI_Access, AixAPI_Model, AixWire_Particles } from '../server/api/aix.wiretypes';
 
 import type { ReassemblerParticleTransforms } from './ContentReassembler';
 
 
-// configuration - matching the server-side transform (anthropic.transform-fileInline.ts)
+// configuration - matching the server-side transform (anthropic.companion-fileInline.ts)
 const INLINE_TEXT_MAX_BYTES = 256 * 1024; // 256 KB
 const INLINE_IMAGE_MAX_BYTES = 1024 * 1024; // 1 MB
 const INLINE_IMAGE_SKIP_RESIZE_BELOW_BYTES = 500 * 1024; // 500 KB
 
-// Equal to `_isInlineableTextMimeType` in anthropic.transform-fileInline.ts.
+// Equal to `_isInlineableTextMimeType` in anthropic.companion-fileInline.ts.
 function _isInlineableTextMime(mimeType: string): boolean {
   const type = mimeType.split(';')[0].trim().toLowerCase();
   if (type.startsWith('text/')) return true;
@@ -25,7 +25,7 @@ function _isInlineableTextMime(mimeType: string): boolean {
   return false;
 }
 
-// Equal to `_isInlineableImageMimeType` in anthropic.transform-fileInline.ts.
+// Equal to `_isInlineableImageMimeType` in anthropic.companion-fileInline.ts.
 function _isInlineableImageMimeType(mimeType: string): boolean {
   const type = mimeType.split(';')[0].trim().toLowerCase();
   return ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(type);
@@ -35,11 +35,11 @@ function _isInlineableImageMimeType(mimeType: string): boolean {
 
 /**
  * Client-side Anthropic file inline transform - counterpart of the server-side
- * `createAnthropicFileInlineTransform` in anthropic.transform-fileInline.ts.
+ * `createAnthropicFileInlineCompanion` in anthropic.companion-fileInline.ts.
  *
  * The server-side transform fetches files directly from the Anthropic File API using native fetch.
  * This works in Edge Runtime but NOT in the browser (CSF mode) because Anthropic's File API
- * blocks CORS. The server-side transform tags itself `csfUnsafe` and gets stripped at the CSF
+ * blocks CORS. The server-side companion tags itself `csfUnsafe` and gets stripped at the CSF
  * boundary (aix.client.direct-chatGenerate.ts).
  *
  * This client-side transform fills the gap: it fetches files via tRPC endpoints that are always
@@ -48,7 +48,7 @@ function _isInlineableImageMimeType(mimeType: string): boolean {
  */
 export function createClientAnthropicFileInlineTransform(
   access: Extract<AixAPI_Access, { dialect: 'anthropic' }>,
-  deleteAfterInline: boolean,
+  policy: NonNullable<AixAPI_Model['vndAntTransformInlineFiles']>,
 ): ReassemblerParticleTransforms {
 
   return {
@@ -62,6 +62,17 @@ export function createClientAnthropicFileInlineTransform(
         return null; // type guard
 
       const { fileId } = particle;
+
+      // Discard: awaited delete, no embed; a failed delete throws, and the reassembler keeps the original particle (chip)
+      if (policy === 'discard') {
+        const filename = await apiAsync.llmAnthropic.fileApiGetMetadata.query({ access, fileId }).then(m => m.filename).catch(() => undefined);
+        await apiAsync.llmAnthropic.fileApiDelete.mutate({ access: access as any, fileId });
+        return {
+          p: 'vnt', nt: 'hres-discarded', kind: 'vnd.ant.file', fileId, ...(filename ? { filename } : {}),
+          text: `Export discarded: ${filename || fileId}`,
+          detail: 'Deleted from the Anthropic Files API (Anthropic Files: Discard). The file stays in the code sandbox for the model while the container lives.',
+        };
+      }
 
       // 1. Fetch metadata via tRPC (proxied through server - bypasses CORS)
       const { filename, mime_type: mimeType, size_bytes, downloadable } = await apiAsync.llmAnthropic.fileApiGetMetadata.query({ access, fileId });
@@ -110,7 +121,7 @@ export function createClientAnthropicFileInlineTransform(
       }
 
       // 3. Fire-and-forget delete if policy requires
-      if (deleteAfterInline)
+      if (policy === 'inline-file-and-delete')
         apiAsync.llmAnthropic.fileApiDelete.mutate({ access: access as any, fileId })
           .catch(error => console.log('[AIX] CSF file inline: failed to delete file after inlining:', { fileId, error }));
 

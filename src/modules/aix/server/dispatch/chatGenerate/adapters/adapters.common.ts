@@ -20,6 +20,24 @@ const DEFAULT_SPILL_PART_TYPES: AixMessages_SystemMessage['parts'][number]['pt']
  */
 export const AIX_MISSING_TOOL_RESULT_TEXT = '[result omitted]';
 
+/**
+ * Steering hint for a forced tool call (tools policy 'any') that an adapter sends as 'auto', where the vendor rejects or
+ * mishandles the forced choice. Appended to the system instructions, it keeps the forced-call callers
+ * (aix.client.fromSimpleFunction) calling instead of answering in text.
+ */
+export const AIX_FORCED_TOOLS_HINT_TEXT = 'IMPORTANT: You MUST respond by calling one of the provided tools. Do not respond with text.';
+
+
+/** FNV-1a 32-bit hex digest - tiny, deterministic, edge-safe; for short stable wire ids derived from longer ones. */
+export function aixFnv1aHex(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 
 /**
  * CGR Server-side approximate Helper
@@ -88,6 +106,22 @@ export function approxDocPart_To_String({ ref, data }: AixParts_DocPart /*, wrap
  */
 export function approxMediaUrlPart_To_String({ url, mediaKind }: AixParts_MediaUrlPart): string {
   return `[Attached ${mediaKind}: ${url} - this model cannot watch it; only the URL is visible]`;
+}
+
+/**
+ * A stored code cell (vendor-run code and its results) as one text block, for targets that cannot replay it natively:
+ * the code fenced in its own language, then each result. Never an undeclared tool call, which models distrust.
+ * `code` is null for a result stored without its code.
+ */
+export function approxCodeCell_To_String(code: string | null, language: string | undefined, results: readonly { result: string, error?: boolean | string }[]): string {
+  const lines = ['[code execution]'];
+  if (code !== null)
+    lines.push('```' + (language || '').toLowerCase(), code, '```');
+  for (const { result, error } of results)
+    lines.push(!error ? 'output:' : typeof error === 'string' ? `error (${error}):` : 'error:', result);
+  if (!results.length)
+    lines.push('output: not received');
+  return lines.join('\n');
 }
 
 export function approxInReferenceTo_To_XMLString(irt: AixParts_MetaInReferenceToPart): string | null {

@@ -12,11 +12,11 @@ const DEV_DEBUG_MISTRAL_MODELS = Release.IsNodeDevBuild; // not in staging to re
 
 
 // [Mistral]
-// Updated 2026-08-31
-// - models on: https://docs.mistral.ai/models/overview (cards moved to /models/<slug>)
+// Updated 2026-11-05
+// - models on: https://docs.mistral.ai/models/overview (redirects to /models; cards at /models/<slug>)
 // - pricing on: https://docs.mistral.ai/inference/pricing (now server-rendered; cards carry the same numbers)
 // - benchmark elo on CBA
-// - prompt caching: the pricing table publishes a 'Cached input' rate (10% of input) for every priced row, modeled below as cache.read;
+// - prompt caching: the pricing table publishes a 'Cached input' rate (mostly 10% of input) for every priced row, modeled below as cache.read;
 //   it is opt-in, not automatic (2026-08-17 probe on mistral-small-latest, 32617-token prompt: 3 identical requests without
 //   'prompt_cache_key' all returned cached_tokens=0, the same prompt with the key returned cached_tokens=32592), and AIX does not
 //   send 'prompt_cache_key' yet - so the rate is inert until it does, and correct the moment it starts
@@ -24,7 +24,7 @@ const DEV_DEBUG_MISTRAL_MODELS = Release.IsNodeDevBuild; // not in staging to re
 type _MistralModelDef = {
   label?: string; // override the API-provided name
   pubDate: string; // YYYYMMDD - earliest public availability (announcement / La Plateforme / HF upload)
-  chatPrice?: { input: number; output: number; cache?: { cType: 'oai-ac', read: number } };
+  chatPrice?: { input: number; output: number; cache?: { read: number } };
   benchmark?: { cbaElo: number };
   parameterSpecs?: ModelDescriptionSchema['parameterSpecs'];
   hidden?: boolean;
@@ -36,62 +36,89 @@ const _PS_MistralEffort: _MistralModelDef['parameterSpecs'] = [
   { paramId: 'llmVndMiscEffort', enumValues: ['none', 'high'] },
 ];
 
+// [Mistral, 2026-11-05] Large 4 takes low|medium|high and cannot turn thinking off (none|minimal|xhigh|max 400
+// "supported values: [high, low, medium]"; it thinks when the field is omitted).
+const _PS_MistralLarge4Effort: _MistralModelDef['parameterSpecs'] = [
+  { paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high'] },
+];
+
 // [Mistral, 2026-08-24] the third-party GLM 5.2 takes the full API-wide effort enum instead (probed: none|low|high|max
 // all 200, 'none' returns a plain answer with no thinking block, the others return one).
 const _PS_MistralGlmEffort: _MistralModelDef['parameterSpecs'] = [
   { paramId: 'llmVndMiscEffort', enumValues: ['none', 'low', 'high', 'max'] },
 ];
 
+// [Mistral, 2026-10-07] GLM 5.3 drops 'none': thinking is compulsory, as on Z.ai's own API (probed: low|high|max 200,
+// none|minimal|medium|xhigh 400 "supported values: ['low', 'high', 'max']").
+const _PS_MistralGlm53Effort: _MistralModelDef['parameterSpecs'] = [
+  { paramId: 'llmVndMiscEffort', enumValues: ['low', 'high', 'max'] },
+];
+
+// [Mistral, 2026-11-05] DeepSeek V4.1 Flash takes none|low|high|xhigh|max (minimal|medium 400; 'xhigh' is outside our enum),
+// and answers without thinking when the field is omitted.
+const _PS_MistralDeepSeekEffort: _MistralModelDef['parameterSpecs'] = [
+  { paramId: 'llmVndMiscEffort', enumValues: ['none', 'low', 'high', 'max'] },
+];
+
 const _knownMistralModelDetails: Record<string, _MistralModelDef> = {
 
+  // Mistral Large 4 (Oct 2026, Public Preview) - list price
+  'mistral-large-4-0': { pubDate: '20261006', chatPrice: { input: 0.7, output: 2.1, cache: { read: 0.07 } }, parameterSpecs: _PS_MistralLarge4Effort, benchmark: { cbaElo: 1432 } }, // MoE 52B active / 1.05T total + 1.6B vision encoder, open weights announced (leaderboard: mistral-large-4 = 1432)
+  'mistral-large-4': { pubDate: '20261006', chatPrice: { input: 0.7, output: 2.1, cache: { read: 0.07 } }, parameterSpecs: _PS_MistralLarge4Effort, hidden: true }, // symlink
+
   // Premier models - Mistral 3 (Dec 2025)
-  'mistral-large-2512': { pubDate: '20251202', chatPrice: { input: 0.5, output: 1.5, cache: { cType: 'oai-ac', read: 0.05 } }, benchmark: { cbaElo: 1415 } }, // Mistral Large 3 - MoE 41B active / 675B total (leaderboard: mistral-large-3 = 1415)
-  'mistral-large-latest': { pubDate: '20251202', chatPrice: { input: 0.5, output: 1.5, cache: { cType: 'oai-ac', read: 0.05 } }, hidden: true }, // → 2512
+  'mistral-large-2512': { pubDate: '20251202', chatPrice: { input: 0.5, output: 1.5, cache: { read: 0.05 } }, benchmark: { cbaElo: 1415 } }, // Mistral Large 3 - MoE 41B active / 675B total (leaderboard: mistral-large-3 = 1415)
+  'mistral-large-latest': { pubDate: '20251202', chatPrice: { input: 0.5, output: 1.5, cache: { read: 0.05 } }, hidden: true }, // → 2512
 
-  'mistral-medium-2604': { label: 'Mistral Medium (2604)', pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { cType: 'oai-ac', read: 0.15 } }, parameterSpecs: _PS_MistralEffort, benchmark: { cbaElo: 1427 } }, // Mistral Medium 3.5 - frontier-class multimodal, adjustable reasoning (reasoning_effort: none|high), Modified MIT (leaderboard: mistral-medium-3.5 = 1427)
+  'mistral-medium-2604': { label: 'Mistral Medium (2604)', pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { read: 0.15 } }, parameterSpecs: _PS_MistralEffort, benchmark: { cbaElo: 1427 } }, // Mistral Medium 3.5 - frontier-class multimodal, adjustable reasoning (reasoning_effort: none|high), Modified MIT (leaderboard: mistral-medium-3.5 = 1427)
   // RETIRED 2026-08-31 (gone from the API, docs retired table -> Mistral Medium 3.5): mistral-medium-2508 (3.1), mistral-medium-2505 (3)
-  'mistral-medium-latest': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { cType: 'oai-ac', read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604
-  'mistral-medium': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { cType: 'oai-ac', read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604 (the legacy 2312 prototype ID was reassigned)
-  'mistral-medium-3-5': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { cType: 'oai-ac', read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604
-  'mistral-medium-3.5': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { cType: 'oai-ac', read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604
-  'mistral-medium-3': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { cType: 'oai-ac', read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604
-  'mistral-vibe-cli-latest': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { cType: 'oai-ac', read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604 (Vibe CLI alias)
-  'mistral-vibe-cli-with-tools': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { cType: 'oai-ac', read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604 (Vibe CLI alias)
-  'magistral-medium-latest': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { cType: 'oai-ac', read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604 (the Magistral Medium line was folded into Medium 3.5)
+  'mistral-medium-latest': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604
+  'mistral-medium': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604 (the legacy 2312 prototype ID was reassigned)
+  'mistral-medium-3-5': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604
+  'mistral-medium-3.5': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604
+  'mistral-medium-3': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604
+  'mistral-vibe-cli-latest': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604 (Vibe CLI alias)
+  'mistral-vibe-cli-with-tools': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604 (Vibe CLI alias)
+  'magistral-medium-latest': { pubDate: '20260428', chatPrice: { input: 1.5, output: 7.5, cache: { read: 0.15 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2604 (the Magistral Medium line was folded into Medium 3.5)
 
-  // RETIRED 2026-08-31 (gone from the API, docs retired table -> Mistral Medium 3.5): devstral-2512 (Devstral 2) and its
-  // devstral-latest / devstral-medium-latest / mistral-code-agent-latest aliases; labs-devstral-small-2512 also unlisted
+  // RETIRED (gone from the API, docs retired table -> Mistral Medium 3.5): devstral-2512 (Devstral 2), retired 2026-07-31, and its
+  // devstral-latest / devstral-medium-latest / mistral-code-agent-latest aliases; labs-devstral-small-2512 retired 2026-03-31
 
-  'codestral-2508': { pubDate: '20250730', chatPrice: { input: 0.3, output: 0.9, cache: { cType: 'oai-ac', read: 0.03 } } }, // code generation (Codestral 25.08)
-  'codestral-latest': { pubDate: '20250730', chatPrice: { input: 0.3, output: 0.9, cache: { cType: 'oai-ac', read: 0.03 } }, hidden: true }, // symlink
-  'mistral-code-latest': { pubDate: '20250730', chatPrice: { input: 0.3, output: 0.9, cache: { cType: 'oai-ac', read: 0.03 } }, hidden: true }, // symlink
-  'mistral-code-fim-latest': { pubDate: '20250730', chatPrice: { input: 0.3, output: 0.9, cache: { cType: 'oai-ac', read: 0.03 } }, hidden: true }, // symlink
+  'codestral-2508': { pubDate: '20250730', chatPrice: { input: 0.3, output: 0.9, cache: { read: 0.03 } } }, // code generation (Codestral 25.08)
+  'codestral-latest': { pubDate: '20250730', chatPrice: { input: 0.3, output: 0.9, cache: { read: 0.03 } }, hidden: true }, // symlink
+  'mistral-code-latest': { pubDate: '20250730', chatPrice: { input: 0.3, output: 0.9, cache: { read: 0.03 } }, hidden: true }, // symlink
+  'mistral-code-fim-latest': { pubDate: '20250730', chatPrice: { input: 0.3, output: 0.9, cache: { read: 0.03 } }, hidden: true }, // symlink
 
   'voxtral-small-2507': { pubDate: '20250715', chatPrice: { input: 0.1, output: 0.4 } }, // voice (text tokens; audio input billed $0.004/min, not modeled)
   'voxtral-small-latest': { pubDate: '20250715', chatPrice: { input: 0.1, output: 0.4 }, hidden: true }, // symlink
 
   // Ministral 3 family (Dec 2025) - multimodal, multilingual, Apache 2.0
-  'ministral-14b-2512': { pubDate: '20251202', chatPrice: { input: 0.2, output: 0.2, cache: { cType: 'oai-ac', read: 0.02 } } }, // Ministral 3 14B
-  'ministral-14b-latest': { pubDate: '20251202', chatPrice: { input: 0.2, output: 0.2, cache: { cType: 'oai-ac', read: 0.02 } }, hidden: true }, // symlink
+  'ministral-14b-2512': { pubDate: '20251202', chatPrice: { input: 0.2, output: 0.2, cache: { read: 0.02 } } }, // Ministral 3 14B
+  'ministral-14b-latest': { pubDate: '20251202', chatPrice: { input: 0.2, output: 0.2, cache: { read: 0.02 } }, hidden: true }, // symlink
 
-  'ministral-8b-2512': { pubDate: '20251202', chatPrice: { input: 0.15, output: 0.15, cache: { cType: 'oai-ac', read: 0.015 } } }, // Ministral 3 8B
-  'ministral-8b-latest': { pubDate: '20251202', chatPrice: { input: 0.15, output: 0.15, cache: { cType: 'oai-ac', read: 0.015 } }, hidden: true }, // symlink
+  'ministral-8b-2512': { pubDate: '20251202', chatPrice: { input: 0.15, output: 0.15, cache: { read: 0.015 } } }, // Ministral 3 8B
+  'ministral-8b-latest': { pubDate: '20251202', chatPrice: { input: 0.15, output: 0.15, cache: { read: 0.015 } }, hidden: true }, // symlink
 
-  'ministral-3b-2512': { pubDate: '20251202', chatPrice: { input: 0.1, output: 0.1, cache: { cType: 'oai-ac', read: 0.01 } } }, // Ministral 3 3B
-  'ministral-3b-latest': { pubDate: '20251202', chatPrice: { input: 0.1, output: 0.1, cache: { cType: 'oai-ac', read: 0.01 } }, hidden: true }, // symlink
+  'ministral-3b-2512': { pubDate: '20251202', chatPrice: { input: 0.1, output: 0.1, cache: { read: 0.01 } } }, // Ministral 3 3B
+  'ministral-3b-latest': { pubDate: '20251202', chatPrice: { input: 0.1, output: 0.1, cache: { read: 0.01 } }, hidden: true }, // symlink
 
   // Open models
-  'mistral-small-2603': { pubDate: '20260316', chatPrice: { input: 0.15, output: 0.6, cache: { cType: 'oai-ac', read: 0.015 } }, parameterSpecs: _PS_MistralEffort }, // Mistral Small 4 - 119B hybrid (instruct+reasoning+coding), 256k ctx, reasoning_effort: none|high
-  'mistral-small-latest': { pubDate: '20260316', chatPrice: { input: 0.15, output: 0.6, cache: { cType: 'oai-ac', read: 0.015 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2603
-  'magistral-small-latest': { pubDate: '20260316', chatPrice: { input: 0.15, output: 0.6, cache: { cType: 'oai-ac', read: 0.015 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2603 (the Magistral Small line was folded into Small 4)
-  'mistral-vibe-cli-fast': { pubDate: '20260316', chatPrice: { input: 0.15, output: 0.6, cache: { cType: 'oai-ac', read: 0.015 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2603 (Vibe CLI alias)
+  'mistral-small-2603': { pubDate: '20260316', chatPrice: { input: 0.15, output: 0.6, cache: { read: 0.015 } }, parameterSpecs: _PS_MistralEffort }, // Mistral Small 4 - 119B hybrid (instruct+reasoning+coding), 256k ctx, reasoning_effort: none|high
+  'mistral-small-latest': { pubDate: '20260316', chatPrice: { input: 0.15, output: 0.6, cache: { read: 0.015 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2603
+  'magistral-small-latest': { pubDate: '20260316', chatPrice: { input: 0.15, output: 0.6, cache: { read: 0.015 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2603 (the Magistral Small line was folded into Small 4)
+  'mistral-vibe-cli-fast': { pubDate: '20260316', chatPrice: { input: 0.15, output: 0.6, cache: { read: 0.015 } }, parameterSpecs: _PS_MistralEffort, hidden: true }, // → 2603 (Vibe CLI alias)
 
-  'labs-leanstral-1-5-1': { label: 'Leanstral 1.5', pubDate: '20260630', chatPrice: { input: 0, output: 0 } }, // Lean 4 formal proof engineering, Small 4 derivative (Labs, free, retires 2026-09-30)
+  'labs-leanstral-1-5-1': { label: 'Leanstral 1.5', pubDate: '20260630', chatPrice: { input: 0, output: 0 }, hidden: true }, // Lean 4 formal proof engineering, Small 4 derivative (Labs, free; docs: retired 2026-09-30, no replacement - still listed 2026-10-07)
   'labs-leanstral-1-5': { pubDate: '20260630', chatPrice: { input: 0, output: 0 }, hidden: true }, // symlink
 
-  // Third-party hosted - Mistral serves the model unmodified (docs id is 'zai-glm-5-2', listed 2026-08-06)
-  'zai-glm-5-2': { label: 'Z.ai GLM 5.2', pubDate: '20260616', chatPrice: { input: 1.4, output: 4.4, cache: { cType: 'oai-ac', read: 0.14 } }, parameterSpecs: _PS_MistralGlmEffort, benchmark: { cbaElo: 1471 - 2 } }, // 1M ctx, 128k max output (lmarena: glm-5.2-max - 2, yield to native vendor)
-  'glm-5-2': { pubDate: '20260616', chatPrice: { input: 1.4, output: 4.4, cache: { cType: 'oai-ac', read: 0.14 } }, parameterSpecs: _PS_MistralGlmEffort, hidden: true }, // -> zai-glm-5-2
+  // Third-party hosted - Mistral serves the model unmodified
+  'zai-glm-5-3': { label: 'Z.ai GLM 5.3', pubDate: '20260814', chatPrice: { input: 1.4, output: 4.4, cache: { read: 0.14 } }, parameterSpecs: _PS_MistralGlm53Effort, benchmark: { cbaElo: 1487 - 2 } }, // 1M ctx, 128k max output, text-only; GA on Mistral 2026-09-28 (lmarena: glm-5.3-max - 2, yield to native vendor)
+  'zai-glm-5': { pubDate: '20260814', chatPrice: { input: 1.4, output: 4.4, cache: { read: 0.14 } }, parameterSpecs: _PS_MistralGlm53Effort, hidden: true }, // -> zai-glm-5-3
+  'zai-glm-latest': { pubDate: '20260814', chatPrice: { input: 1.4, output: 4.4, cache: { read: 0.14 } }, parameterSpecs: _PS_MistralGlm53Effort, hidden: true }, // -> zai-glm-5-3
+  'zai-glm-5-3-flash': { label: 'Z.ai GLM 5.3 Flash', pubDate: '20260825', chatPrice: { input: 0.15, output: 0.5, cache: { read: 0.03 } }, parameterSpecs: _PS_MistralGlm53Effort, benchmark: { cbaElo: 1477 - 2 } }, // 320B MoE (18B active), 1M ctx, 128k max output, image input; GA on Mistral 2026-10-22 (lmarena: glm-5.3-flash - 2, yield to native vendor)
+  'zai-glm-5-2': { label: 'Z.ai GLM 5.2', pubDate: '20260616', chatPrice: { input: 1.4, output: 4.4, cache: { read: 0.14 } }, parameterSpecs: _PS_MistralGlmEffort, benchmark: { cbaElo: 1471 - 2 }, hidden: true }, // DEPRECATED 2026-09-29, retires 2026-10-31 -> GLM 5.3; 1M ctx, 128k max output (lmarena: glm-5.2-max - 2, yield to native vendor)
+  'glm-5-2': { pubDate: '20260616', chatPrice: { input: 1.4, output: 4.4, cache: { read: 0.14 } }, parameterSpecs: _PS_MistralGlmEffort, hidden: true }, // -> zai-glm-5-2
+  'deepseek-v4-1-flash-1017': { label: 'DeepSeek V4.1 Flash (1017)', pubDate: '20261017', chatPrice: { input: 0.3, output: 1.2, cache: { read: 0.007 } }, parameterSpecs: _PS_MistralDeepSeekEffort, benchmark: { cbaElo: 1476 - 2 } }, // 1M ctx, 128k max output, image input; Public Preview on Mistral (lmarena: DeepSeek-V4.1-Flash-20260910 (Max) - 2, no 1017 row; yield to native vendor)
 
   // Legacy (kept for reference, no longer in API)
   'open-mistral-7b': { pubDate: '20230927', chatPrice: { input: 0.25, output: 0.25 }, hidden: true },
@@ -99,6 +126,7 @@ const _knownMistralModelDetails: Record<string, _MistralModelDef> = {
 
 
 const mistralModelFamilyOrder = [
+  'mistral-large-4',      // Mistral Large 4 - must come before generic 'mistral-large'
   // Mistral 3 (Dec 2025)
   'mistral-large-2512',   // Mistral Large 3 - specific prefix must come before generic 'mistral-large'
   'ministral-14b',
@@ -136,6 +164,7 @@ const mistralModelFamilyOrder = [
   // Third-party hosted
   'zai-glm',
   'glm-',
+  'deepseek-',
   // Legacy (no longer in API, kept for fallback)
   'open-mistral-7b',
   // Deprecated

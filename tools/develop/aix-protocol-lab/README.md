@@ -65,11 +65,12 @@ checks report on top). Replays of a capture are deterministic and diffed automat
 |---|---|---|---|
 | anthropic-messages | typed SSE, explicit block lifecycle | claude-sonnet-4-6 | `codeExec` unlocks via a PTC tool (`allowed_callers: ['code_execution']`) - there is no direct switch |
 | openai-responses | typed events, sequence_number + addressed items | gpt-5.2 | `--oracle` supported; no hosted fetch tool |
+| metaai-responses | same grammar on api.meta.ai, `data: [DONE]` terminator, interleaved items | muse-spark-1.3 | reasoning + hosted `web_search`; no code exec / fetch; `--model muse-image-1.0 --no-stream` for image output |
 | openai-chat | chunked deltas, `[DONE]` terminator | gpt-4.1-mini | degenerate grammar, no hosted tools |
 | gemini-generate | chunked full objects, no event types | gemini-3-flash-preview | spans are parser-inferred |
-| gemini-interactions | typed step events | antigravity-preview-05-2026 | agent-implicit tools; resumable |
+| gemini-interactions | typed step events | antigravity-preview-09-2026 | agent-implicit tools; resumable |
 
-Scenario capability switches (`reasoning`, `webSearch`, `webFetch`, `codeExec`) compile to each
+Scenario capability switches (`reasoning`, `webSearch`, `webFetch`, `codeExec`, `webDynamic`, `fnCall`, `multiFn`) compile to each
 flavor's real knobs in `scenarios.ts`; switches without a mapping are reported, not dropped
 silently. `kitchen-sink` is the canonical gauntlet: reasoning + parallel search + code exec +
 parallel fetch + final text + an in-response reasoning-continuity probe.
@@ -121,11 +122,19 @@ output item (fixed in `outputItemEnter`). The wire is, as of today, strictly ord
 - **Known parser asymmetries found so far**: OpenAI code_interpreter emits a `code-exec`
   op-state only in streaming (NS emits cei/cer without it); Anthropic streaming used to crash
   on PTC pre-populated tool_use input where NS handled it (fixed).
+- **Oracle GET drops code_interpreter outputs**: the resume dispatch sends no `include`, so the
+  same-generation oracle projection lacks `cer` (S: cei -> cer -> text; ORACLE: cei -> text) and any
+  encrypted reasoning part. Lab limitation, not a parser asymmetry - identical on 5.6 Luna and 6 Astra.
 - **Whitespace**: streaming injects `\n\n` spacers between tool blocks and text (both modes,
   slightly different placement); text char counts run a few chars above wire on Anthropic.
 - **Vendor-generated ids** (tool call ids, item ids) differ across generations by definition.
 
 ## Findings already on record (captures of 2026-06-12)
+
+GPT-6 Sol and Luna (2026-09-22, `--model`): `kitchen-sink`, `burst`, `interleave` and `reason` (+ NS twin) are clean on
+`openai-responses`: contiguous sequence numbers, no cross-item interleaving, delta-vs-done and final-output oracles exact,
+full text, reasoning-signature and client-FC translation. `burst` on Sol defers the hosted tools past the client-FC
+turn boundary, as on 5.x.
 
 Fourth session (`interleave` scenario: distinct parallel FC + dynamic filtering + circulation, 2026-06-23):
 
@@ -197,12 +206,56 @@ First captures:
 - Replay is deterministic: capture vs replay projections match exactly (validated on the
   155-event Anthropic gauntlet).
 
+## Chain fidelity (`chain`)
+
+Does the assistant turn we send back on the next request match the turn the vendor generated? `chain`
+captures turn 1 live (or takes an existing run with `--from`), runs the production client path over it
+(ContentReassembler to fragments, as the app persists them), rebuilds turn 2 through the production
+converter and adapter with a follow-up user message (build only), and aligns the assistant turn inside the
+turn-2 body against the vendor's canonical turn-1 content block by block: exact, changed (fields named),
+dropped, added. Loads the client graph, so it runs with the stub preload:
+
+    node --require ./tools/develop/aix-protocol-lab/stub-preload.cjs --import tsx tools/develop/aix-protocol-lab/lab.ts chain anthropic-messages search --model claude-opus-5-5 --live
+    node --require ./tools/develop/aix-protocol-lab/stub-preload.cjs --import tsx tools/develop/aix-protocol-lab/lab.ts chain --from captures/<run>.s.json --live
+
+Canonical turn per flavor: Anthropic from the SSE deltas (or the NS body), OpenAI Responses from the
+`response.output_item.done` items (the terminal event re-encrypts every reasoning item, so those bytes never
+match a client's), Gemini from the aggregated chunk parts (an empty trailing part carrying the thought
+signature folds into the preceding text on replay; reported as equivalent, Gemini checks presence only).
+
+Variants: `--answer-tools` answers the turn's pending client tool calls with synthetic results and sends no
+user text (a tool-loop iteration); `--system-edit "text"` appends to the system prompt on turn 2 (a prefix
+edit); `--to <flavor> [--to-model id]` builds and sends turn 2 for another provider (no fidelity table, the
+output says what the stored turn holds and what the target body carries); `--to-model` alone switches the
+model on the same wire. `chains` prints one row per chain run in captures/.
+
+`--live` sends turn 2 three ways and records the vendor's verdict for each: the turn as the app rebuilds it,
+the same without its reasoning (baseline), and the canonical turn spliced in verbatim (what an exact
+snapshot replay would send). Anthropic's verdict is `input_transformations` read off the wire
+(`prefix_binding_mismatch` on a replayed thinking block, `thinking_dropped` when the request set
+`block_binding`, `thinking_mismatch_allowed` when it did not). OpenAI and Gemini give no such signal;
+the input-token delta over the baseline is printed but, on Responses, replayed encrypted reasoning added
+nothing measurable (gpt-5.2, 2026-09-24), so a zero delta there is inconclusive.
+
+Measured on 2026-09-24 (Opus 5.5, gpt-5.2, gemini-3-flash): a plain reasoning turn replays byte-exact on
+Anthropic; any Anthropic turn with hosted tools loses the `server_tool_use` and result blocks and the
+citations, merges the cited text blocks into one, and its replayed thinking fails the binding check, while
+the verbatim splice of the same turn passes it at the price of re-sending the tool results (about 12K
+tokens for two searches, cache-written once). OpenAI Responses drops `web_search_call` items and message
+ids; Gemini is equivalent. Chain runs write `<base>.chain.json` next to the run.
+
 ## Known gaps
 
 - `[DONE]` (OpenAI CC) and post-termination wire events are consumed by the executor before the
   parse tap, so they appear in raw chunks and coverage findings, not as ledger events.
-- Gemini flavors are implemented but not yet validated live (no GEMINI_API_KEY available at
-  build time); gemini-interactions grammar checks are histogram-only on purpose (still moving).
-- Bedrock (AWS eventstream body transform) is out of scope for now.
+- Gemini flavors validated live only through `chain` on `reason` (2026-09-24); gemini-interactions grammar
+  checks are histogram-only on purpose (still moving).
+- Bedrock (AWS eventstream body transform) is out of scope for now; so are OpenRouter and xAI.
+- `chain` covers one iteration: turn 1, then one turn 2 (a text follow-up, or the tool results with
+  `--answer-tools`). Multi-iteration chains (`--iterations N`) are not built yet. `--to` and `--to-model`
+  cover provider, model and family switches. The campaign of 2026-09-24 over 78 runs, with the verdict
+  matrix and the proposed solution shape, is `kb/reports/replay-fidelity-campaign-2026-09-24.md`.
+- `openai-chat` sends no effort, so tool scenarios (`fc`, `burst`, `interleave`) 400 on GPT-6 there
+  (function tools need effort `none` on Sol and Luna); use `openai-responses`.
 - Trace files store full payloads; image-heavy runs will be large (no clamping on particles).
 - Chrome Trace / Perfetto exporter: planned follow-up (the trace already carries all timestamps).

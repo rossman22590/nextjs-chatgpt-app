@@ -90,7 +90,8 @@ export namespace GeminiWire_ContentParts {
   const InlineDataPart_schema = z.object({
     inlineData: z.object({
       mimeType: z.union([z.string(), ianaStandardMimeType_schema]),
-      data: z.string(), // base64-encoded string
+      data: z.string().default(''), // base64-encoded string; absent for a 0-byte code-execution file
+      displayName: z.string().optional(), // code-execution output files: the sandbox path, e.g. 'out/report.xlsx'
     }),
   });
 
@@ -636,6 +637,10 @@ export namespace GeminiWire_API_Generate_Content {
     ]).optional(),
   });
 
+  /** [Gemini] Image generation: the API-wide sets (2026-10-06) - each model accepts a subset, see gemini.models.ts */
+  export const ImageAspectRatio_enum = z.enum(['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9', '1:4', '4:1', '1:8', '8:1']);
+  export const ImageSize_enum = z.enum(['1K', '2K', '4K']);
+
   const GenerationConfig_schema = z.object({
     /**
      * The set of character sequences (up to 5) that will stop output generation. If specified, the API will stop at the first appearance of a stop sequence.
@@ -702,9 +707,9 @@ export namespace GeminiWire_API_Generate_Content {
     // Image generation configuration
     imageConfig: z.object({
       /** Controls the aspect ratio of generated images */
-      aspectRatio: z.enum(['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9', '21:9']).optional(),
+      aspectRatio: ImageAspectRatio_enum.optional(),
       /** [Gemini, 2025-11-20] Controls output resolution */
-      imageSize: z.enum(['1K', '2K', '4K']).optional(),
+      imageSize: ImageSize_enum.optional(),
       /** [Gemini, 2026-03] 4 new fields - Unused yet */
       personGeneration: z.enum(['DONT_ALLOW', 'ALLOW_ADULT', 'ALLOW_ALL']).optional(),
       prominentPeople: z.enum(['PROMINENT_PEOPLE_UNSPECIFIED', 'ALLOW_PROMINENT_PEOPLE', 'BLOCK_PROMINENT_PEOPLE']).optional(),
@@ -734,13 +739,13 @@ export namespace GeminiWire_API_Generate_Content {
     systemInstruction: GeminiWire_Messages.SystemInstruction_schema.optional(),
     generationConfig: GenerationConfig_schema.optional(),
     cachedContent: z.string().optional(),
-    /** (Not useful to us) Configures the logging behavior for a given request. */
+    /** Logs the request to AI Studio Logs (true) or not (false); unset follows the project setting, on by default for paid projects created on or after 2026-10-26. */
     store: z.boolean().optional(),
   });
 
   // Response
 
-  /** Last synced from https://ai.google.dev/api/generate-content#candidate on 2025-10-13 */
+  /** Last synced from https://ai.google.dev/api/generate-content#candidate on 2026-11-05 */
   const FinishReason_enum = z.enum([
     'FINISH_REASON_UNSPECIFIED',  // unused
     'STOP',                       // Natural stop point of the model or provided stop sequence.
@@ -761,6 +766,10 @@ export namespace GeminiWire_API_Generate_Content {
     'UNEXPECTED_TOOL_CALL',       // Model generated a tool call but no tools were enabled in the request.
     'TOO_MANY_TOOL_CALLS',        // Model called too many tools consecutively, thus the system exited execution.
     'MISSING_THOUGHT_SIGNATURE',  // [Gemini 3, 2025-11] Thinking model validation failed - thoughtSignature missing or invalid.
+    'MALFORMED_RESPONSE',         // Finished due to malformed response.
+    'ESCALATION',                 // Request was filtered by an escalation rule.
+    'PUP_LIMITED_DISABLED',       // Token generation stopped because the user account is limited or disabled due to Prohibited Use Policy (PUP) violations.
+    'CONTINUATION',               // Per-request token limit reached, generation not complete; resumable with Candidate.continuationToken (not used).
   ]);
 
   /** A citation to a source for a portion of a specific response. **/
@@ -854,7 +863,7 @@ export namespace GeminiWire_API_Generate_Content {
      * NOTE: see GenerationConfig_schema.candidateCount, which can only be set to 1, so index is supposed to be 0.
      */
     index: z.number()
-      .optional(), // for `1.5-002` models, on Sept 24, 2024, this became optional
+      .optional(), // absent on the extra toolResponse candidates of a TOO_MANY_TOOL_CALLS response (#1286, folded by the parser)
     /**
      * This seems to be equal to 'STOP' on all streaming chunks.
      * In theory: if empty, the model has not stopped generating the tokens.
@@ -928,7 +937,8 @@ export namespace GeminiWire_API_Generate_Content {
 
   const UsageMetadata_schema = z.object({
     // effective prompt size, including tokens in the cached content
-    promptTokenCount: z.number(),
+    promptTokenCount: z.number()
+      .optional(), // [Gemini, 2026-10-30] a prompt blocked before generation comes with `usageMetadata: {}`
 
     // (usually there: missing on first packets, or 'RECITATION' answers) total tokens across all the generated candidates
     candidatesTokenCount: z.number().optional(),
@@ -946,6 +956,9 @@ export namespace GeminiWire_API_Generate_Content {
     // Output parts
     // (optional: only for thinking models - and not in all packets) tokens of thoughts for thinking models
     thoughtsTokenCount: z.number().optional(),
+
+    // served tier: 'standard' | 'flex' | 'priority' | 'batch'
+    serviceTier: z.string().nullish(),
 
     // Modality breakdowns - mostly commented out because we don't want to spend energy parsing them for now (we don't use them)
     promptTokensDetails: z.array(ModalityTokenCount_schema).optional(),

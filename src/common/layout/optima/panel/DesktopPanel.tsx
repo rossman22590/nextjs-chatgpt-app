@@ -7,11 +7,16 @@ import { adjustContentScaling, themeScalingMap, themeZIndexDesktopPanel } from '
 import { useIsMobile } from '~/common/components/useMatchMedia';
 import { useUIContentScaling } from '~/common/stores/store-ui';
 
+import { WhatsNewPanelRow } from '~/modules/news/components/WhatsNewIndicators';
+
 import { PanelContentPortal } from './PanelContentPortal';
 import { optimaClosePanel, useOptimaPanelOpen } from '../useOptima';
 
 
-const DesktopPanelFixRoot = styled(Box)({
+// Desktop side Panel with the Portal content
+
+const DesktopPanelFixRoot = styled(Box, { name: 'DesktopPanelFixRoot' })({
+  // fix the panel size
   width: 'var(--AGI-Desktop-Panel-width)',
   flexShrink: 0,
   flexGrow: 0,
@@ -25,7 +30,8 @@ const DesktopPanelFixRoot = styled(Box)({
   },
 });
 
-const DesktopPanelTranslatingSheet = styled(Sheet)({
+const DesktopPanelTranslatingSheet = styled(Sheet, { name: 'DesktopPanelTranslatingSheet' })({
+  // layout
   width: '100%',
   height: 'calc(100dvh - 2rem)',
   marginTop: '1rem',
@@ -80,6 +86,8 @@ export function DesktopPanel(props: { component: React.ElementType, currentApp?:
         <List size={themeScalingMap[contentScaling]?.optimaPanelGroupSize} sx={{ '--ListItem-minHeight': '2.5rem', py: 0, flex: 0 }} />
 
         {!panelAsPopup && <PanelContentPortal />}
+
+        <WhatsNewPanelRow />
 
       </DesktopPanelTranslatingSheet>
 

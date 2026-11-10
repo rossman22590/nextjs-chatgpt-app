@@ -10,7 +10,7 @@ import { TRPCError } from '@trpc/server';
 
 import { env } from '~/server/env.server';
 
-import { llmsFixupHost } from '../../shared/llm.isomorphic';
+import { llmsFixupHost, llmsServerKeyForHost } from '../../shared/llm.isomorphic';
 
 
 // configuration
@@ -39,7 +39,7 @@ export const ANTHROPIC_API_PATHS = {
 
 
 const ANTHROPIC_HEADERS_VERSION = {
-  // Latest version hasn't changed (as of Feb 2025)
+  // Latest is 2026-10-21, which 400s on temperature/top_p/top_k - we still send those to older models
   'anthropic-version': '2023-06-01',
 
   // Undocumented app-identity slot, used by Claude Code ('x-app: cli'). Accepted (probe-verified
@@ -74,18 +74,8 @@ const DEFAULT_ANTHROPIC_BETA_FEATURES: string[] = [
 ] as const;
 
 const PER_MODEL_BETA_FEATURES: { [modelId: string]: string[] } = {
-  'claude-3-7-sonnet-20250219': [
-
-    /** enables long output for the 3.7 Sonnet model - no effect on Claude 4+ (native 128k) */
-    'output-128k-2025-02-19',
-
-    /** computer Tools for Sonnet 3.7 [computer_20250124, text_editor_20250124, bash_20250124] */
-    'computer-use-2025-01-24',
-
-  ] as const,
-
   // Computer use on newer models requires a different beta header:
-  //   computer-use-2025-01-24 -> Sonnet 3.7, Sonnet 4, Opus 4, Opus 4.1, Sonnet 4.5, Haiku 4.5
+  //   computer-use-2025-01-24 -> Sonnet 4, Opus 4.1, Sonnet 4.5, Haiku 4.5
   //   computer-use-2025-11-24 -> Opus 4.5, Sonnet 4.6, Opus 4.6, Opus 4.7 (adds enable_zoom)
   // Uncomment and adjust model IDs when computer use is enabled for these models:
   // 'claude-opus-4-7': ['computer-use-2025-11-24'] as const,
@@ -106,6 +96,7 @@ export type AnthropicHostedFeatures = {
   enableSkills?: boolean;
   enableStrictOutputs?: boolean; // [Anthropic, 2025-11-13] Structured Outputs (JSON outputs & strict tool use)
   enableToolAdvanced20251120?: boolean; // [Anthropic, 2025-11-24] Tool Search Tool + Programmatic Tool Calling (umbrella header)
+  enableThinkingBindingControls?: boolean; // [Anthropic, 2026-09-01] preserved thinking: thinking.block_binding + input_transformations
   modelIdForPerModelFeatures?: string;
 };
 
@@ -120,7 +111,7 @@ export const anthropicAccessSchema = z.object({
 
 export function anthropicAccess(access: AnthropicAccessSchema, apiPath: string, options?: AnthropicHostedFeatures): { headers: HeadersInit, url: string } {
   // API key
-  const anthropicKey = access.anthropicKey || env.ANTHROPIC_API_KEY || '';
+  const anthropicKey = access.anthropicKey || llmsServerKeyForHost(access.anthropicHost, env.ANTHROPIC_API_KEY, env.ANTHROPIC_API_HOST || DEFAULT_ANTHROPIC_HOST); // server key: server endpoint only
 
   // break for the missing key only on the default host
   if (!anthropicKey && !(access.anthropicHost || env.ANTHROPIC_API_HOST))
@@ -171,13 +162,13 @@ export function anthropicBetaFeatures(options?: AnthropicHostedFeatures): string
   // Code execution (for Skills, container reuse, Programmatic Tool Calling) + files API for container downloads.
   // NOT enabled for dynamic web tools (_20260209): those have internal code execution managed by Anthropic.
   // Note: SDK defines code-execution-2025-05-22; we use 2025-08-25 (newer iteration, not yet in SDK types).
-  // Code execution may be GA now (most SDK examples skip the beta namespace), but keeping for safety.
+  // Both are GA and the headers optional; files-api keeps the beta Files API response shapes.
   if (options?.enableCodeExecution) {
     bf.add('code-execution-2025-08-25');
     bf.add('files-api-2025-04-14');
   }
 
-  // [Anthropic, fast-mode-2026-02-01] Fast inference mode
+  // [Anthropic, fast-mode-2026-02-01] Fast inference mode - header required on Opus 5 / 4.8, optional on Fable 5.2 and Opus 5.5
   if (options?.enableFastMode)
     bf.add('fast-mode-2026-02-01');
 
@@ -187,8 +178,8 @@ export function anthropicBetaFeatures(options?: AnthropicHostedFeatures): string
 
   // [Anthropic, 2025-11-13] Structured Outputs (JSON outputs & strict tool use)
   // GA on Claude 4.5+ via output_config.format (which we use). SDK auto-injects structured-outputs-2025-12-15.
-  // Keeping older header as safety net for pre-4.5 models; harmless on newer ones.
-  // Bedrock / AWS may still require: https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+  // The header is optional on every platform, Bedrock included; the Claude API still accepts it.
+  // https://platform.claude.com/docs/en/build-with-claude/structured-outputs
   if (options?.enableStrictOutputs)
     bf.add('structured-outputs-2025-11-13');
 
@@ -197,6 +188,10 @@ export function anthropicBetaFeatures(options?: AnthropicHostedFeatures): string
   // Note: advanced-tool-use-2025-11-20 is NOT in the SDK AnthropicBeta type union (possibly private/undocumented).
   if (options?.enableToolAdvanced20251120)
     bf.add('advanced-tool-use-2025-11-20');
+
+  // [Anthropic, 2026-09-01] Preserved-thinking controls: `thinking.block_binding.prefix_mismatch_behavior` + `input_transformations`
+  if (options?.enableThinkingBindingControls)
+    bf.add('thinking-binding-controls-2026-08-01');
 
   return [...bf];
 }

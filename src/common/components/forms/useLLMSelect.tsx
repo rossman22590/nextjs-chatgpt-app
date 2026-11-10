@@ -8,6 +8,7 @@ import BuildCircleIcon from '@mui/icons-material/BuildCircle';
 
 import { LLMVendorIconSprite } from '~/modules/llms/components/LLMVendorIconSprite';
 import { findModelVendor } from '~/modules/llms/vendors/vendors.registry';
+import { openModelsForLLM } from '~/modules/llms/llms.optima';
 
 import type { DModelsServiceId } from '~/common/stores/llms/llms.service.types';
 import { isLLMChatFree_cached } from '~/common/stores/llms/llms.pricing';
@@ -112,7 +113,7 @@ const _slotProps = {
       } as const,
 
       // minWidth: '100%',
-      zIndex: 1300, // on top of ScratchChat
+      zIndex: 'var(--joy-zIndex-modal)', // floating windows leave the modal ceiling available to popups
     } as const,
   } as const,
   button: {
@@ -137,8 +138,8 @@ interface LLMSelectOptions {
   placeholder?: string;
   isHorizontal?: boolean;
   setLlmToAuto?: () => void; // caller-supplied strategy to reset to Auto (e.g. assignDomainModelAuto for domain-backed, or undefined for backends with no Auto concept). When provided, the Auto option/indicator are surfaced.
-  isLlmAuto?: boolean; // when true, render the selected label as "Auto (<resolved name>)" and surface the AutoMode indicator (requires setLlmToAuto)
-  autoModelLabel?: string; // display label of the model Auto resolves to, regardless of the current pin; used to label the Auto option
+  isLlmAuto?: boolean; // when true, render the selected label as "Auto: <resolved name>" and surface the AutoMode indicator (requires setLlmToAuto)
+  autoModelLabel?: string; // caller-controlled label for the Auto option (e.g. what Auto would pick while pinned); when omitted, derived from the resolved model only while in Auto
   appendConfigureModels?: boolean; // appends a bottom option to open the Models panel
   showStarFilter?: boolean; // show a button to filter starred models only
 }
@@ -159,7 +160,7 @@ export function useLLMSelect(
 ): [DLLM | null, React.JSX.Element | null] {
 
   // options
-  const { label, larger = false, disabled = false, placeholder = LLM_TEXT_PLACEHOLDER, isHorizontal = false, isLlmAuto = false, setLlmToAuto, autoModelLabel, appendConfigureModels = false, showStarFilter = false } = options;
+  const { label, larger = false, disabled = false, placeholder = LLM_TEXT_PLACEHOLDER, isHorizontal = false, isLlmAuto = false, setLlmToAuto, appendConfigureModels = false, showStarFilter = false } = options;
 
   // state
   const [controlledOpen, setControlledOpen] = React.useState(false);
@@ -173,6 +174,7 @@ export function useLLMSelect(
   // derived state
   const noIcons = false; //smaller;
   const llm = !llmId ? null : _filteredLLMs.find(llm => llm.id === llmId) ?? null;
+  const autoModelLabel = options.autoModelLabel ?? (isLlmAuto && llm ? getLLMLabel(llm) : undefined); // in Auto the resolved model is the Auto pick; no preview of it while pinned unless the caller provides one
   const isReasoning = !LLM_SELECT_SHOW_REASONING_ICON ? false : llm?.interfaces?.includes(LLM_IF_OAI_Reasoning) ?? false;
 
 
@@ -182,8 +184,9 @@ export function useLLMSelect(
 
   const listboxSlotPropsStable = React.useMemo(() => ({
     ..._slotProps,
-    listbox: { ..._slotProps.listbox, ref: listboxRef },
-  }), []);
+    // MUI can aria-hide this persistent portal when a dialog covers it; reset on reopen.
+    listbox: { ..._slotProps.listbox, ref: listboxRef, 'aria-hidden': !controlledOpen },
+  }), [controlledOpen]);
 
   React.useLayoutEffect(() => {
     // restore scroll after collapse/expand - snapshot before MUI scrolls, restore via double RAF
@@ -221,13 +224,14 @@ export function useLLMSelect(
         return acc;
 
       const serviceVendor = findModelVendor(llm.vId);
-      const isServiceCollapsed = hasMultipleServices && collapsedServices.has(llm.sId);
+      // starred-only bypasses collapse (display-only, the collapsed state is untouched)
+      const isServiceCollapsed = hasMultipleServices && !starredOnly && collapsedServices.has(llm.sId);
 
       // add collapsible service headers when changing services
       if (hasMultipleServices && llm.sId !== prevServiceId) {
         if (!optimizeToSingleVisibleId) {
           const serviceLabel = findModelsServiceOrNull(llm.sId)?.label || serviceVendor?.name || llm.sId;
-          acc.push(<ListItemGroupCollapser key={'SID-' + llm.sId} id={llm.sId} label={serviceLabel} isCollapsed={isServiceCollapsed} onToggleCollapse={toggleServiceCollapse} />);
+          acc.push(<ListItemGroupCollapser key={'SID-' + llm.sId} id={llm.sId} label={serviceLabel} isCollapsed={isServiceCollapsed} onToggleCollapse={toggleServiceCollapse} readOnly={starredOnly} />);
         }
         prevServiceId = llm.sId;
       }
@@ -308,12 +312,12 @@ export function useLLMSelect(
 
   const onSelectChange = React.useCallback((_event: unknown, value: DLLMId | null) => {
     // special: open the Models panel
-    if (value === LLM_SPECIAL_CONFIGURE_ID) return optimaOpenModels();
+    if (value === LLM_SPECIAL_CONFIGURE_ID) return openModelsForLLM(llmId);
     // special: caller-defined reset-to-Auto strategy (no-op if caller didn't provide one)
     if (value === LLM_SPECIAL_AUTO_ID) return setLlmToAuto?.();
     // invoke the explicit-pin setter when we have a non-null id
     value && setLlmId(value);
-  }, [setLlmId, setLlmToAuto]);
+  }, [llmId, setLlmId, setLlmToAuto]);
 
 
   const hasNoModels = _filteredLLMs.length === 0;

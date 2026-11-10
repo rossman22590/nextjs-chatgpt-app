@@ -1,4 +1,4 @@
-import { aixChatGenerateContent_DMessage_FromConversation, AixChatGenerateContent_DMessageGuts } from '~/modules/aix/client/aix.client';
+import { aixChatGenerateContent_DMessage_FromConversation, AixChatGenerateContent_DMessageGuts, aixOutcomeIsSuccess } from '~/modules/aix/client/aix.client';
 import { autoChatFollowUps } from '~/modules/aifn/auto-chat-follow-ups/autoChatFollowUps';
 import { autoConversationTitle } from '~/modules/aifn/autotitle/autoTitle';
 
@@ -116,9 +116,8 @@ export async function runPersonaOnConversationHead(
   // check if aborted
   const hasBeenAborted = abortController.signal.aborted;
 
-  // clear to send, again
-  // FIXME: race condition? (for sure!)
-  cHandler.clearAbortController('chat-persona');
+  // clear to send, again - a no-op if a newer run took over the chat meanwhile
+  cHandler.clearAbortController(abortController);
 
   if (autoTitleChat) {
     // await auto-title generation to ensure it completes before sync
@@ -135,5 +134,5 @@ export async function runPersonaOnConversationHead(
     cHandler.historyStripThinking(0);
 
   // return true if this succeeded
-  return messageStatus.outcome === 'completed';
+  return aixOutcomeIsSuccess(messageStatus.outcome);
 }

@@ -2,9 +2,24 @@ import createCache, { StylisElement, StylisPlugin } from '@emotion/cache';
 
 import { JetBrains_Mono, Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
 import type { SxProps } from '@mui/joy/styles/types';
-import { extendTheme } from '@mui/joy';
+import { extendTheme, PaletteRange } from '@mui/joy';
 
 import { animationEnterBelow, animationOpacityFadeIn } from '~/common/util/animUtils';
+import { joyWindowManagerDefaults } from '~/common/components/dnd-window/joyWindowManager';
+
+
+// TypeScript module augmentation for the custom 'accent' (brand lime) palette
+declare module '@mui/joy/styles' {
+  // noinspection JSUnusedGlobalSymbols
+  interface ColorPalettePropOverrides {
+    accent: true; // enables color='accent' on all Joy UI components
+  }
+
+  // noinspection JSUnusedGlobalSymbols
+  interface Palette {
+    accent: PaletteRange;
+  }
+}
 
 
 // Definitions
@@ -257,7 +272,7 @@ function buildShadow(mainHex: string) {
 export const hideOnMobile = { display: { xs: 'none', md: 'flex' } };
 
 
-// Theme & Fonts
+// Theme & Fonts - weights 400 (default), 500 (md), 600 (lg), 700 (xl); 300 (sm) is not loaded
 
 const bodyFont = Plus_Jakarta_Sans({
   weight: ['400', '500', '600', '700'],
@@ -337,6 +352,7 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
     light: {
       palette: {
         primary: lightPrimary,
+        accent: lightPrimary, // whitelabel: upstream's brand 'accent' follows the selected theme primary
         neutral: {
           ...lightNeutral,
           plainColor: 'var(--joy-palette-neutral-800)',
@@ -358,6 +374,7 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
     dark: {
       palette: {
         primary: darkPrimary,
+        accent: darkPrimary, // whitelabel: upstream's brand 'accent' follows the selected theme primary
         neutral: darkNeutral,
         text: darkText,
         background: darkBackground,
@@ -509,6 +526,7 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
     },
 
     JoyModal: {
+      defaultProps: joyWindowManagerDefaults,
       styleOverrides: {
         backdrop: uiComplexityMinimal ? {
           backdropFilter: 'none',
@@ -517,6 +535,9 @@ export const createAppTheme = (uiComplexityMinimal: boolean, gradientId: ThemeGr
           animation: `${animationOpacityFadeIn} 0.16s ease-out`,
         },
       },
+    },
+    JoyDrawer: {
+      defaultProps: joyWindowManagerDefaults,
     },
     JoyModalDialog: {
       styleOverrides: {
@@ -560,6 +581,7 @@ export const themeBgApp = 'background.body';
 export const themeBgAppDarker = 'background.surface';
 export const themeBgAppChatComposer = 'background.level1';
 
+export const themeMinWidthChatPane = '18rem'; // chat list + chat/beam wrapper floor (was the panel's minSize=20%); below it the message list overflows and the scroll box pans horizontally
 export const lineHeightChatTextMd = 1.75;
 export const lineHeightTextareaMd = 1.75;
 
@@ -683,9 +705,15 @@ const isBrowser = typeof document !== 'undefined';
 const emotionStylisPlugins: StylisPlugin[] = [
 
   /**
-   * 1. remove the default prefixer plugin: probably not needed and bloating
+   * 1. not the stock prefixer plugin (bloating): only the -webkit- prefixes the browser floor still needs -
+   * backdrop-filter until Safari 18, mask-image until Chrome 120, user-select on every Safari.
+   * Also covers Joy's own styles, e.g. the Modal backdrop blur and userSelect: 'none' on Button.
    */
   // prefixer,
+  function prefixFloorDeclarations(element: StylisElement) {
+    if (element.type === 'decl' && (element.props === 'backdrop-filter' || element.props === 'mask-image' || element.props === 'user-select'))
+      element.return = `-webkit-${element.value}${element.value}`; // a declaration's value is the whole 'prop:value;'
+  },
 
   /**
    * 2. add a function to remove wide-matching CSS rules from Joy UI.

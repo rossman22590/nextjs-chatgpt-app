@@ -1,6 +1,7 @@
 import { addDBImageAsset } from '~/common/stores/blob/dblobs-portability';
 
 import type { DMessageGenerator } from '~/common/stores/chat/chat.message';
+import { messageTerminalOutcome } from '~/common/stores/chat/chat.message.outcome';
 import type { MaybePromise } from '~/common/types/useful.types';
 import { convert_Base64WithMimeType_To_Blob } from '~/common/util/blobUtils';
 import { create_CodeExecutionInvocation_ContentFragment, create_CodeExecutionResponse_ContentFragment, create_FunctionCallInvocation_ContentFragment, createAnnotationsVoidFragment, createDMessageDataRefDBlob, createDVoidWebCitation, createErrorContentFragment, createHostedResourceContentFragment, createModelAuxVoidFragment, createPlaceholderVoidFragment, createTextContentFragment, createZyncAssetReferenceContentFragment, DMessageErrorPart, DVoidModelAuxPart, DVoidPlaceholderMOp, isContentFragment, isModelAuxPart, isTextContentFragment, isVoidAnnotationsFragment, isVoidFragment, isVoidPlaceholderFragment } from '~/common/stores/chat/chat.fragments';
@@ -10,12 +11,12 @@ import { imageBlobTransform, PLATFORM_IMAGE_MIMETYPE } from '~/common/util/image
 import { metricsChatGenerateLgToMd, metricsFinishChatGenerateLg, metricsPendChatGenerateLg } from '~/common/stores/metrics/metrics.chatgenerate';
 import { nanoidToUuidV4 } from '~/common/util/idUtils';
 
-import type { AixWire_Particles } from '../server/api/aix.wiretypes';
+import { AixWire_Particles, AixWire_Vendors } from '../server/api/aix.wiretypes';
 
 import type { AixClientDebugger, AixFrameId } from './debugger/memstore-aix-client-debugger';
 import { aixClientDebugger_completeFrame, aixClientDebugger_init, aixClientDebugger_recordParticleReceived, aixClientDebugger_setProfilerMeasurements, aixClientDebugger_setRequest } from './debugger/reassembler-debug';
 
-import { AixChatGenerateContent_LL, AixChatGenerateContent_LL_Result, AixChatGenerateTerminal_LL, DEBUG_PARTICLES } from './aix.client';
+import { AixChatGenerateContent_LL, AixChatGenerateContent_LL_Result, DEBUG_PARTICLES } from './aix.client';
 import { aixClassifyReassemblyError } from './aix.client.errors';
 
 
@@ -23,10 +24,31 @@ import { aixClassifyReassemblyError } from './aix.client.errors';
 const DEBUG_FLOW = false; // logs client-side checkpoint/retry/continuation flow control
 const GENERATED_IMAGES_CONVERT_TO_COMPRESSED = true; // converts PNG to WebP or JPEG to save IndexedDB space
 const GENERATED_IMAGES_COMPRESSION_QUALITY = 0.98;
-const ELLIPSIZE_DEV_ISSUE_MESSAGES = 4096; // for _appendReassemblyDevError
+const ELLIPSIZE_DEV_ISSUE_MESSAGES = 4096; // for _appendReassemblyDevError and _appendUnknownParticleNotice
 const MERGE_ISSUES_INTO_TEXT_PART_IF_OPEN = false; // 2025-10-10: put errors in the dedicated part
 const VP_PERSISTENCE_DELAY = 500; // persistence of vision for voidPlaceholders
 
+/** Placeholders the reassembler manages (progress, follow-ups, controls) - 'notice' placeholders are user-dismissed: never auto-removed or recycled */
+const _isTransientPlaceholder = (f: Parameters<typeof isVoidPlaceholderFragment>[0]) => isVoidPlaceholderFragment(f) && f.part.pType !== 'notice';
+const _isPauseDivider = (f: Parameters<typeof isVoidPlaceholderFragment>[0]) => isVoidPlaceholderFragment(f) && f.part.pNoticeKind === 'flow-cont';
+
+/**
+ * A reasoning fragment that already carries a signature, redacted data or a vendor handle is closed: the next reasoning
+ * text opens a new fragment. A signature signs exactly its block's text, and a vendor item (OpenAI reasoning id and
+ * encrypted content) must not be overwritten - two thinking blocks separated only by hosted tool calls used to merge
+ * into one fragment that kept the last signature only, and lost every earlier item on replay.
+ */
+const _isClosedReasoningFragment = (f: Parameters<typeof isVoidFragment>[0]): boolean =>
+  isVoidFragment(f) && isModelAuxPart(f.part) && (!!f.part.textSignature || !!f.part.redactedData?.length || !!f.vendorState);
+
+/** The status chip of a server retry, see onAixRetryReset */
+const _isRetryStatus = (f: Parameters<typeof isVoidPlaceholderFragment>[0]) => isVoidPlaceholderFragment(f) && f.part.aixControl?.ctl === 'ec-retry';
+const _RETRY_COUNTDOWN = 'Retrying in ';
+/** Output of the attempt a retry status announced, once connected: heartbeats, connect failures and the end are not */
+const _isAttemptOutput = (op: AixWire_Particles.ChatGenerateOp): boolean => !('cg' in op) ? !('p' in op && op.p === '❤')
+  : op.cg === 'issue' ? op.issueId !== 'dispatch-prepare' && op.issueId !== 'dispatch-fetch'
+    : op.cg !== 'end' && op.cg !== 'aix-retry-reset' && op.cg !== '_debugDispatchRequest' && op.cg !== '_debugProfiler';
+const _STREAM_ENDED_EARLY = 'The stream ended before a final response status was received. The answer may be incomplete.';
 
 // Future: Reassembly Policies
 // type ReassemblyPolicyVoidPlaceholder =
@@ -58,7 +80,7 @@ type ReassemblyState = AixChatGenerateContent_LL & {
   /** Cursor: index of the open text fragment for appending, or null if none is open */
   _textFragmentIndex: number | null;
   /** Pending message phase (OpenAI/xAI Responses): set at message-item open, stamped on the NEXT text fragment created */
-  _pendingTextPhase: { vendor: 'openai' | 'xai', phase: 'commentary' | 'final_answer' } | null;
+  _pendingTextPhase: { rspVendor: AixWire_Vendors.RspVendor, phase: 'commentary' | 'final_answer' } | null;
   /** set/overwritten during streaming, consumed by finalizeReassembly() */
   cgMetricsLg: undefined | AixChatGenerateContent_LL_Result['cgMetricsLg'];
   /** Raw termination cause: undetermined yet, client-set, or received from the wire on {cg:'end'} */
@@ -70,11 +92,13 @@ type ReassemblyState = AixChatGenerateContent_LL & {
 
 /**
  * Reassembles the content fragments and more information from the Aix ChatGenerate Particles.
+ * Rule: one fragment per vendor unit, in wire order - kb/modules/AIX-ingestion.md lists where this does not hold yet.
  */
 export class ContentReassembler {
 
   // constructor
   private readonly debuggerFrameId: AixFrameId | null;
+  private readonly wallStartTs: number;
 
   // processing mechanics
   private readonly wireParticlesBacklog: AixWire_Particles.ChatGenerateOp[] = [];
@@ -89,6 +113,7 @@ export class ContentReassembler {
   // settable per-iteration callback
   private onStreamingUpdate?: (accumulator: AixChatGenerateContent_LL, hasContent: boolean) => MaybePromise<void>;
   private updateContentStarted = false; // true (forever) after the first update with content, even if we have resets/continuations in the future
+  private retrySettlesOnOutput = false; // the retry status counts down to a non-final attempt: removed at that attempt's first output
 
 
   constructor(
@@ -101,6 +126,7 @@ export class ContentReassembler {
     private readonly onInlineVideo?: (video: { blob: Blob; mimeType: string; label: string }) => void,
     private readonly wireAbortSignal?: AbortSignal,
   ) {
+    this.wallStartTs = Date.now(); // constructed right before the first wire call, once across client-side retries
     this.initialState = {
       // AixChatGenerateContent_LL fields:
       fragments: [],
@@ -152,27 +178,39 @@ export class ContentReassembler {
 
   finalizeReassembly(): AixChatGenerateContent_LL_Result {
 
-    // Classify termination -> outcome + tokenStopReason + optional error message
-    const { outcome, tsr, errorMessage } = this._classifyTermination();
-    // termination -> legacy UI data pt
-    if (tsr) this.S.generator = { ...this.S.generator, tokenStopReason: tsr };
-    // termination -> User/AI issue message
+    // Termination -> what the stored message carries: the stop reason, and an error fragment or a display-only notice
+    const { tsr, errorMessage, notice } = this._storedTermination();
+    this.S.generator = { ...this.S.generator, tokenStopReason: tsr, endedAt: Date.now() };
     if (errorMessage) this._appendErrorFragment(errorMessage);
+    if (notice) this._pushFragment(createPlaceholderVoidFragment(notice, 'notice', undefined, undefined, undefined, 'no-stop-reason', 'warn'));
 
-    // clean completion -> remove upstreamHandle (SET in onResponseHandle, CLEARED here on clean completion)
-    if (outcome === 'completed' && this.S.generator.upstreamHandle)
+    // The outcome is read back from the message: one function for the LL result, the stored message and every surface
+    const outcome = messageTerminalOutcome({ generator: this.S.generator, fragments: this.S.fragments });
+
+    // a truncated run ended on the vendor's signal like a completed one: the transport-level steps below treat the two alike
+    const vendorEnded = outcome === 'completed' || outcome === 'truncated';
+
+    // vendor-ended -> remove upstreamHandle (SET in onResponseHandle, CLEARED here; a truncated run cannot be resumed either)
+    if (vendorEnded && this.S.generator.upstreamHandle)
       this._clearGeneratorUpstreamHandle();
 
 
     // Fragment finalization heuristics:
 
-    // - remove placeholders for clean exits, leave them for issues or client-aborts
-    if (this.S.terminationReason === 'done-dialect')
+    // - remove placeholders for clean exits, leave them for issues or client-aborts; a vendor stop reason is a clean exit
+    //   even when the end reason is not (a late issue, or a stream closed after the stop chunk)
+    if (vendorEnded || this.S.terminationReason === 'done-dialect')
       this._removeAllVoidPlaceholders(); // [PH-LIFECYCLE]
 
     // - mark active operations as errored on non-clean terminations
-    if (outcome !== 'completed') {
+    if (!vendorEnded) {
       this.S.fragments = this.S.fragments.map(fragment => {
+        // a retry countdown left behind by a stop or by the final failure is no longer true: say what happened
+        if (isVoidPlaceholderFragment(fragment) && fragment.part.aixControl?.ctl === 'ec-retry' && fragment.part.pText.includes(_RETRY_COUNTDOWN)) {
+          const { pText, aixControl: { rAttempt = '-' } } = fragment.part;
+          const ending = outcome === 'aborted' ? `Stopped at attempt ${rAttempt}` : `Gave up after ${rAttempt} attempts`;
+          return { ...fragment, part: { ...fragment.part, pText: pText.slice(0, pText.indexOf(_RETRY_COUNTDOWN)) + ending } };
+        }
         if (!isVoidPlaceholderFragment(fragment) || !fragment.part.opLog?.length) return fragment;
         const updatedOpLog = fragment.part.opLog.map(entry => {
           const trimmedText = entry.text?.endsWith('...') ? entry.text.slice(0, -3) : entry.text;
@@ -188,7 +226,10 @@ export class ContentReassembler {
 
 
     // Metrics
-    metricsFinishChatGenerateLg(this.S.cgMetricsLg, outcome !== 'completed');
+    // dtWall: the vendor-measured dtAll only arrives with a vendor-terminated stream; a stopped or failed run gets the client wall clock instead
+    if (!this.S.cgMetricsLg && !vendorEnded) this.S.cgMetricsLg = {};
+    if (this.S.cgMetricsLg) this.S.cgMetricsLg.dtWall = Date.now() - this.wallStartTs;
+    metricsFinishChatGenerateLg(this.S.cgMetricsLg, !vendorEnded);
 
     // [AI Inspector] Debugging, finalize the frame
     if (this.debuggerFrameId)
@@ -220,6 +261,13 @@ export class ContentReassembler {
   setClientExcepted(errorAsText: string, errorHint?: DMessageErrorPart['hint']): void {
     if (DEBUG_PARTICLES)
       console.log('-> aix.p: issue:', errorAsText);
+
+    // the dialect already ended with a clean or truncated stop reason: the content is final, so a transport error after it
+    // (e.g. the connection dropping before tRPC's closing chunk) is only logged - same rule as the server's late issue (ChatGenerateTransmitter._addIssue)
+    if (this.S.terminationReason === 'done-dialect' && this.S.dialectStopReason !== undefined && AixWire_Particles.gcStopReasonRow(this.S.dialectStopReason)?.class !== 'error') {
+      console.warn(`⚠️ [ContentReassembler] setClientExcepted: transport error after the response ended ('${this.S.dialectStopReason}'), keeping it: ${errorAsText}`);
+      return;
+    }
 
     // add the error fragment with the given message
     this._appendErrorFragment(errorAsText, errorHint);
@@ -331,6 +379,14 @@ export class ContentReassembler {
         }
       }
 
+    // the retried attempt produces output: the retry went through, and a failure from here on is not a give-up - the last
+    // attempt keeps its countdown, as its failure can be the same condition, which finalizeReassembly reports as a give-up
+    if (this.retrySettlesOnOutput && _isAttemptOutput(op)) {
+      this.retrySettlesOnOutput = false;
+      const idx = this.S.fragments.findLastIndex(_isRetryStatus);
+      if (idx >= 0) this._spliceFragment(idx);
+    }
+
     switch (true) {
 
       // TextParticleOp
@@ -342,7 +398,7 @@ export class ContentReassembler {
       // PartParticleOp
       case 'p' in op:
         // heuristics to remove the placeholder if real user-destined content arrives
-        if (op.p !== '❤' && op.p !== 'vp' && op.p !== 'urlc' && op.p !== 'hres' && op.p !== 'svs' && op.p !== 'tr_' && op.p !== 'trs')
+        if (op.p !== '❤' && op.p !== 'vp' && op.p !== 'vnt' && op.p !== 'urlc' && op.p !== 'hres' && op.p !== 'svs' && op.p !== 'tr_' && op.p !== 'trs')
           await this._removeLastVoidPlaceholderDelayed();
         switch (op.p) {
           case '❤':
@@ -387,13 +443,16 @@ export class ContentReassembler {
           case 'hres':
             this.onAppendHostedResource(op);
             break;
+          case 'vnt':
+            this.onAddVoidNotice(op);
+            break;
           case 'svs':
             this.onSetVendorState(op);
             break;
           default:
             // noinspection JSUnusedLocalSymbols
             const _exhaustiveCheck: never = op;
-            this._appendReassemblyDevError(`unexpected PartParticleOp: ${JSON.stringify(op)}`);
+            this._appendUnknownParticleNotice(`unexpected PartParticleOp: ${JSON.stringify(op)}`);
         }
         break;
 
@@ -421,6 +480,10 @@ export class ContentReassembler {
               // Continuation checkpoint: create a snapshot now
               this.checkpointState = structuredClone(this.S);
               if (DEBUG_FLOW) console.log(`[DEV] [flow] checkpoint created: ${this.S.fragments.length} fragments snapshotted`);
+              // the pause divider (a 'flow-cont' notice, yielded just before) already marks this point - no transient chip then
+              const lastFragment = this.S.fragments[this.S.fragments.length - 1];
+              if (lastFragment && isVoidPlaceholderFragment(lastFragment) && lastFragment.part.pNoticeKind === 'flow-cont')
+                break;
             } else
               await this._removeLastVoidPlaceholderDelayed();
             this.onAixInfo(op); // creates a voidPlaceholder
@@ -444,14 +507,14 @@ export class ContentReassembler {
           default:
             // noinspection JSUnusedLocalSymbols
             const _exhaustiveCheck: never = op;
-            this._appendReassemblyDevError(`unexpected ChatGenerateOp: ${JSON.stringify(op)}`);
+            this._appendUnknownParticleNotice(`unexpected ChatGenerateOp: ${JSON.stringify(op)}`);
         }
         break;
 
       default:
         // noinspection JSUnusedLocalSymbols
         const _exhaustiveCheck: never = op;
-        this._appendReassemblyDevError(`unexpected particle: ${JSON.stringify(op)}`);
+        this._appendUnknownParticleNotice(`unexpected particle: ${JSON.stringify(op)}`);
     }
   }
 
@@ -480,7 +543,7 @@ export class ContentReassembler {
 
     // stamp the pending message phase on the new text fragment
     if (this.S._pendingTextPhase) {
-      newTextFragment.vendorState = { [this.S._pendingTextPhase.vendor]: { phase: this.S._pendingTextPhase.phase } };
+      newTextFragment.vendorState = { [this.S._pendingTextPhase.rspVendor]: { phase: this.S._pendingTextPhase.phase } };
       this.S._pendingTextPhase = null;
     }
 
@@ -493,9 +556,9 @@ export class ContentReassembler {
     // Break text accumulation
     this.S._textFragmentIndex = null;
 
-    // append to existing ModelAuxVoidFragment if possible
+    // append to existing ModelAuxVoidFragment if possible - unless it is closed (signed, redacted, or vendor-handled)
     const currentFragment = this.S.fragments[this.S.fragments.length - 1];
-    if (!restart && currentFragment && isVoidFragment(currentFragment) && isModelAuxPart(currentFragment.part)) {
+    if (!restart && currentFragment && isVoidFragment(currentFragment) && isModelAuxPart(currentFragment.part) && !_isClosedReasoningFragment(currentFragment)) {
       const appendedPart = { ...currentFragment.part, aText: (currentFragment.part.aText || '') + _t } satisfies DVoidModelAuxPart;
       this._replaceFragmentAt(this.S.fragments.length - 1, { ...currentFragment, part: appendedPart });
       return;
@@ -791,6 +854,12 @@ export class ContentReassembler {
     }
   }
 
+  private onAddVoidNotice({ nt, text, detail, level }: Extract<AixWire_Particles.PartParticleOp, { p: 'vnt' }>): void {
+    // display-only notice at its stream position: close the open text fragment, so later text starts a new one after it
+    this.S._textFragmentIndex = null;
+    this._pushFragment(createPlaceholderVoidFragment(text, 'notice', undefined, undefined, detail, nt, level));
+  }
+
   private onAddUrlCitation(urlc: Extract<AixWire_Particles.PartParticleOp, { p: 'urlc' }>): void {
 
     const { title, url, num: refNumber, from: startIndex, to: endIndex, text: textSnippet, pubTs } = urlc;
@@ -869,7 +938,18 @@ export class ContentReassembler {
       cts: anchorCts,
     };
 
-    const phIdx = this.S.fragments.findLastIndex(isVoidPlaceholderFragment);
+    let phIdx = this.S.fragments.findLastIndex(_isTransientPlaceholder);
+
+    // A pause divider ('flow-cont' notice) closes the placeholder before it: an op that started before the pause
+    // completes where it started (its result arrives in the continuation), a new op after the divider starts a
+    // new placeholder below it - otherwise the continuation's ops would stack above the divider
+    const dividerIdx = this.S.fragments.findLastIndex(_isPauseDivider);
+    if (phIdx >= 0 && phIdx < dividerIdx) {
+      const ph = this.S.fragments[phIdx];
+      if (!isVoidPlaceholderFragment(ph) || !ph.part.opLog?.some(e => e.opId === opId))
+        phIdx = -1;
+    }
+
     if (phIdx < 0) {
 
       // New placeholder with initial opLog entry (root level = 0)
@@ -961,12 +1041,12 @@ export class ContentReassembler {
       return; // session handle is message-scoped, not fragment-scoped
     }
 
-    // Message phase (OpenAI/xAI Responses): sent at message-item open, before any text. Break text
+    // Message phase (Responses dialects): sent at message-item open, before any text. Break text
     // accumulation so adjacent items (commentary then final_answer) land in distinct fragments, and
     // stamp the phase on the next text fragment created (see onAppendText).
-    if ((vendor === 'openai' || vendor === 'xai') && 'messagePhase' in state && state.messagePhase) {
+    if (AixWire_Vendors.isRspVendor(vendor) && 'messagePhase' in state && state.messagePhase) {
       this.S._textFragmentIndex = null;
-      this.S._pendingTextPhase = { vendor, phase: state.messagePhase };
+      this.S._pendingTextPhase = { rspVendor: vendor, phase: state.messagePhase };
       return;
     }
 
@@ -981,8 +1061,8 @@ export class ContentReassembler {
     // Guard: reasoningItem state must land on the ma (reasoning) fragment that produced it.
     // If no summary was appended during the reasoning item (summary disabled / skipped), the last
     // fragment will belong to an unrelated preceding item - dropping the handle is safer than contaminating.
-    // Applies to both OpenAI and xAI namespaces; each is opaque/private to its producing vendor.
-    if ((vendor === 'openai' || vendor === 'xai') && 'reasoningItem' in state && lastFragment.part.pt !== 'ma') {
+    // Applies to every Responses-dialect namespace; each is opaque/private to its producing vendor.
+    if (AixWire_Vendors.isRspVendor(vendor) && 'reasoningItem' in state && lastFragment.part.pt !== 'ma') {
       console.warn(`[ContentReassembler] ${vendor} reasoningItem state without preceding ma fragment - dropping continuity handle`, { lastFragmentPt: lastFragment.part.pt });
       return;
     }
@@ -998,7 +1078,7 @@ export class ContentReassembler {
   }
 
   private _removeAllVoidPlaceholders(): void {
-    this.S.fragments = this.S.fragments.filter(f => !isVoidPlaceholderFragment(f));
+    this.S.fragments = this.S.fragments.filter(f => !_isTransientPlaceholder(f));
     // _textFragmentIndex may now be invalid - null it since this runs at finalization only
     this.S._textFragmentIndex = null;
   }
@@ -1010,17 +1090,27 @@ export class ContentReassembler {
     //   return isVoidPlaceholderFragment(f) && !f.part.opLog?.length;
     // }
     // skip if none
-    if (this.S.fragments.findLastIndex(isVoidPlaceholderFragment) < 0) return false;
+    if (this._lastRemovableTransientPlaceholderIdx() < 0) return false;
 
     // delay before removal
     await new Promise(resolve => setTimeout(resolve, VP_PERSISTENCE_DELAY));
 
     // for stability, search the fragment Index again - this must not have changed, as any mutation would be queued to
     // this awaited function, but better safe than sorry
-    const idx = this.S.fragments.findLastIndex(isVoidPlaceholderFragment);
+    const idx = this._lastRemovableTransientPlaceholderIdx();
     if (idx < 0) return true; // already removed during the delay
     this._spliceFragment(idx);
     return true;
+  }
+
+  /**
+   * The last transient placeholder, unless a pause divider sits after it: the divider closes the placeholders before
+   * it (they stay until finalization, like onSetOperationState leaves them). Without this bound, every text particle
+   * of the continuation removes one more placeholder walking up the message, and the pre-pause ops list disappears.
+   */
+  private _lastRemovableTransientPlaceholderIdx(): number {
+    const idx = this.S.fragments.findLastIndex(_isTransientPlaceholder);
+    return idx < this.S.fragments.findLastIndex(_isPauseDivider) ? -1 : idx;
   }
 
 
@@ -1041,46 +1131,41 @@ export class ContentReassembler {
     // Vendor-composed stop error, surfaced as a complementary error fragment alongside the generic classification message
     if (tokenStopError)
       this._appendErrorFragment(tokenStopError);
+    // STOPGAP #1288 - REVERT with the typed errors (AIX-TODO-errors.md, "Stream mechanics"): this guesses "an error the vendor reported,
+    // on a stream that then closed without its final event" from three fields of the end. Two facts, neither implies the other;
+    // done properly the error is an issue of its own and the end only says how the read ended
+    if (tokenStopError && tokenStopReason === 'cg-issue' && terminationReason === 'done-dispatch-closed')
+      this._appendErrorFragment(_STREAM_ENDED_EARLY);
   }
 
   /**
-   * Pure classification of termination state - no side effects.
-   * Cross-references terminationReason + dialectStopReason to derive:
-   * - outcome: definitive result of this LL call
-   * - tsr: tokenStopReason for the generator (UI detail, undefined = normal completion)
-   * - errorMessage: optional user/AI-facing message explaining what happened (appended by caller)
+   * Termination -> what the stored message will carry: the stop reason (DMessageGenerator.tokenStopReason), and either an
+   * error fragment text or a display-only notice. No outcome is decided here: finalizeReassembly() reads it back from the
+   * message with messageTerminalOutcome(), so the LL result, the stored message and every surface share one function.
    */
-  private _classifyTermination(): { outcome: AixChatGenerateTerminal_LL; tsr: DMessageGenerator['tokenStopReason']; errorMessage?: string; } {
+  private _storedTermination(): { tsr: DMessageGenerator['tokenStopReason']; errorMessage?: string; notice?: string } {
     const { terminationReason: endReason, dialectStopReason: dialectTokenStopReason } = this.S;
 
     // -- Client-set terminations --
 
     if (endReason === 'done-client-aborted')
-      return { outcome: 'aborted', tsr: 'client-abort' };
+      return { tsr: 'client-abort' };
     if (endReason === 'issue-client-rpc')
-      return { outcome: 'failed', tsr: 'issue' /* error fragment already appended by setClientExcepted() */ };
+      return { tsr: 'issue' /* error fragment already appended by setClientExcepted() */ };
 
     // -- Dialect-set dispatch terminations (model responded with an explicit stop reason at the end) --
 
     if (dialectTokenStopReason) {
-      const classification: Record<AixWire_Particles.GCTokenStopReason, ReturnType<typeof this._classifyTermination>> = {
-        // normal completions - the model responded and stopped cleanly
-        'ok': { outcome: 'completed', tsr: undefined },
-        'ok-tool_invocations': { outcome: 'completed', tsr: undefined },
-        // issues from the dialect/dispatch layer
-        'cg-issue': { outcome: 'failed', tsr: 'issue' },
-        // model completed but with a specific stop condition
-        'out-of-tokens': { outcome: 'completed', tsr: 'out-of-tokens' },
-        // filter-triggered terminations - treated as failures so all surfaces (chat, beam, etc.) render the error state uniformly
-        // emitted by: OpenAI content_filter, Gemini SAFETY/BLOCKLIST/PROHIBITED_CONTENT/SPII/IMAGE_*, Bedrock content filter
-        'filter-content': { outcome: 'failed', tsr: 'filter', errorMessage: 'Response blocked by the provider\'s content filter.' },
-        // emitted by: Gemini RECITATION/IMAGE_RECITATION (note: can be FP-prone on benign content like code/quotes)
-        'filter-recitation': { outcome: 'failed', tsr: 'filter', errorMessage: 'Response blocked - potential copyrighted/recited content.' },
-        // emitted by: Anthropic stop_reason=refusal, Gemini LANGUAGE (unsupported)
-        'filter-refusal': { outcome: 'failed', tsr: 'filter', errorMessage: 'Response refused by the provider\'s safety filter.' },
-      } as const;
-      if (dialectTokenStopReason in classification)
-        return classification[dialectTokenStopReason];
+      // one row per wire reason, shared with the edge: gcStopReasonRow in aix.wiretypes
+      const stopRow = AixWire_Particles.gcStopReasonRow(dialectTokenStopReason);
+      // TODO: port to the new typed errors system, otherwise replace with the following code: the row's message becomes a fallback,
+      //       skipped when the stop arrived with its own text (today a Gemini filter stop, and an Anthropic refusal with details,
+      //       store two error fragments: the vendor's text and this generic one)
+      //   - ReassemblyState, false at init:  dialectStopExplained: boolean;
+      //   - onCGEnd, where dialectStopReason is set:  this.S.dialectStopExplained = !!tokenStopError || terminationReason === 'issue-dialect';
+      //   - here:  return { tsr: stopRow.stored, ...(stopRow.message && !this.S.dialectStopExplained && { errorMessage: stopRow.message }) };
+      if (stopRow)
+        return { tsr: stopRow.stored, ...(stopRow.message && { errorMessage: stopRow.message }) };
       console.warn(`[ContentReassembler] Unmapped dialectStopReason: ${dialectTokenStopReason}. Falling back to terminationReason.`);
     }
 
@@ -1089,35 +1174,37 @@ export class ContentReassembler {
     if (endReason === undefined) {
       // SEVERE - AIX BUG: either client terminations or an 'end' particle must be received
       console.warn(`⚠️ [ContentReassembler] finished without 'terminationReason' - possible missing 'end' particle.`);
-      return { outcome: 'failed', tsr: 'issue', errorMessage: 'Response may be incomplete - missing completion signal.' };
+      return { tsr: 'issue', errorMessage: 'Response may be incomplete - missing completion signal.' };
     }
 
     // -- Dispatch-set terminations: AixWire_Particles.CGEndReason --
 
     switch (endReason) {
       case 'done-dialect':
-        // Acceptable - dialect said done but didn't provide a stop reason - likely a parser gap
+        // the dialect said done without a stop reason (parser gap, or a gateway omitting finish_reason): completeness unknown, assumed
+        // complete - a dismissible warning notice, not an error fragment (error fragments are content and may reach the model)
         console.warn(`⚠️ [ContentReassembler] termination by dialect without 'dialectStopReason' - possible dialect parser issue.`);
-        return { outcome: 'completed', tsr: undefined, errorMessage: 'Note: response may be incomplete - the finish reason was not provided by the model.' };
+        return { tsr: undefined, notice: 'Response may be incomplete - the finish reason was not provided by the model.' };
 
       case 'done-dispatch-closed': // (!) VERY COMMON
         // BROKEN - Stream EOF before the dialect sent a termination signal - provider closed the connection early
         console.warn(`⚠️ [ContentReassembler] done-dispatch-closed without dialectStopReason - possible truncation`);
-        return { outcome: 'failed', tsr: 'issue', errorMessage: 'Response may be truncated - stream ended before completion.' };
+        return { tsr: 'issue', errorMessage: _STREAM_ENDED_EARLY };
 
       case 'done-dispatch-aborted':
         // BROKEN - Infrastructure abort (not user-initiated) - dispatch connection severed
         console.warn(`⚠️ [ContentReassembler] done-dispatch-aborted - connection lost, not user-initiated.`);
-        return { outcome: 'failed', tsr: 'issue', errorMessage: 'Response interrupted - the AI provider connection was lost.' };
+        return { tsr: 'issue', errorMessage: 'Response interrupted - the server cancelled the request.' };
 
       case 'issue-dialect':
       case 'issue-dispatch-rpc':
-        return { outcome: 'failed', tsr: 'issue' /* error fragments already added by upstream issue particles */};
+        return { tsr: 'issue' /* error fragments already added by upstream issue particles */ };
 
       default:
+        // a termination this build does not know (a newer server): completeness unknown, assumed complete, as above
         const _exhaustiveCheck: never = endReason;
         console.warn(`⚠️ [ContentReassembler] unmapped termination reason: ${endReason}`);
-        return { outcome: 'failed', tsr: undefined };
+        return { tsr: undefined, notice: 'Response may be incomplete - the end reason is unknown to this version of the app.' };
     }
   }
 
@@ -1152,7 +1239,7 @@ export class ContentReassembler {
     }));
   }
 
-  private onAixRetryReset({ rScope, rClearStrategy, attempt, maxAttempts, delayMs, reason, causeHttp, causeConn }: Extract<AixWire_Particles.ChatGenerateOp, { cg: 'aix-retry-reset' }>): void {
+  private onAixRetryReset({ rScope, rClearStrategy, attempt, maxAttempts, delayMs, reason, causeHttp, causeConn, calm }: Extract<AixWire_Particles.ChatGenerateOp, { cg: 'aix-retry-reset' }>): void {
     const _prevFragments = DEBUG_FLOW ? this.S.fragments.length : 0;
     switch (rClearStrategy) {
       case 'none':
@@ -1161,9 +1248,8 @@ export class ContentReassembler {
         break;
 
       case 'since-checkpoint':
-        // atomic restore to checkpoint (fall back to initial state if no checkpoint)
-        if (!this.checkpointState)
-          console.warn('[ContentReassembler] since-checkpoint restore with no checkpoint - falling back to full clear');
+        // atomic restore: to the last continuation checkpoint ('flow-cont'), keeping the turns before the failed one; with no
+        // checkpoint this is the first turn, and restarting the answer from the initial state is the intended reset
         Object.assign(this.S, structuredClone(this.checkpointState ?? this.initialState));
         this.wireParticlesBacklog.length = 0; // should have been drained/completed already
         if (DEBUG_FLOW) console.log(`[DEV] [flow] retry-reset ${rScope}: since-checkpoint (${_prevFragments} -> ${this.S.fragments.length} fragments) - ${reason}`);
@@ -1183,22 +1269,29 @@ export class ContentReassembler {
       }
     }
 
+    // one retry status at a time: connect retries clear nothing ('none'), so the previous status would stack
+    for (let idx; (idx = this.S.fragments.findLastIndex(_isRetryStatus)) >= 0;)
+      this._spliceFragment(idx);
+
     // -> ph: show retry status
     const retryMessage =  delayMs > 0
-      ? `${reason ? `${reason} - ` : ''}Retrying in ${Math.round(delayMs / 100) / 10}s - ${attempt}/${maxAttempts}`
-      : `Connection failed (${attempt} retries)`;
+      ? `${reason ? `${reason} - ` : ''}${_RETRY_COUNTDOWN}${Math.round(delayMs / 100) / 10}s - ${attempt}/${maxAttempts}`
+      : `Connection failed (${attempt} attempts)`;
     this._pushFragment(createPlaceholderVoidFragment(retryMessage, undefined, {
       ctl: 'ec-retry',
       rScope: rScope,
       rAttempt: attempt,
       ...(causeHttp ? { rCauseHttp: causeHttp } : undefined),
       ...(causeConn ? { rCauseConn: causeConn } : undefined),
+      ...(calm && { rCalm: true }),
     }));
+    this.retrySettlesOnOutput = delayMs > 0 && attempt < maxAttempts;
   }
 
   private onMetrics({ metrics }: Extract<AixWire_Particles.ChatGenerateOp, { cg: 'set-metrics' }>): void {
     // type check point for AixWire_Particles.CGSelectMetrics -> DMetricsChatGenerate_Lg
-    this.S.cgMetricsLg = metrics;
+    // copy: we mutate cgMetricsLg (TsR, T, dtWall), while the particle is shared with the AI Inspector and, in CSF, with the server's transmitter
+    this.S.cgMetricsLg = { ...metrics };
     metricsPendChatGenerateLg(this.S.cgMetricsLg); // sets TsR='pending'
     // Reflect preliminary token counts on the generator during streaming, so the UI (avatar tooltip,
     // Message Info modal) can show input/output tokens early. Costs are intentionally omitted here -
@@ -1266,6 +1359,13 @@ export class ContentReassembler {
         errorText = ellipsizeMiddle(errorText, ELLIPSIZE_DEV_ISSUE_MESSAGES - truncationMessage.length, truncationMessage);
     }
     this._appendErrorFragment((omitPrefix ? '' : 'AIX Content Reassembler: ') + errorText);
+  }
+
+  /** A particle this build does not know (a newer server): a warn notice, not an error fragment - the response may well be complete. */
+  private _appendUnknownParticleNotice(particleText: string): void {
+    console.warn(`⚠️ [ContentReassembler] ${particleText}`);
+    this.S._textFragmentIndex = null;
+    this._pushFragment(createPlaceholderVoidFragment('Part of the response is unknown to this version of the app.', 'notice', undefined, undefined, ellipsizeMiddle(particleText, ELLIPSIZE_DEV_ISSUE_MESSAGES, ' ... '), undefined, 'warn'));
   }
 
   private _appendErrorFragment(errorText: string, errorHint?: DMessageErrorPart['hint']): void {

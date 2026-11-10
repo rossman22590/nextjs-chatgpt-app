@@ -75,7 +75,7 @@ const _styles = {
     justifyContent: 'flex-start',
     borderRadius: '18px',
     pointerEvents: 'none',
-    '[data-joy-color-scheme="light"] &': { bgcolor: '#d5ec31' },
+    '[data-joy-color-scheme="light"] &': { bgcolor: 'accent.solidBg' },
     boxShadow: 'inset 0 2px 4px -1px rgba(0,0,0,0.15)',
     textWrap: 'nowrap',
   } as const,
@@ -198,17 +198,16 @@ function renderSection(nodeId: SettingsNavId, isMobile: boolean, onSelect: (id: 
     case 'voice-out':
       return <VoiceOutputBlock isMobile={isMobile} />;
 
-    // Draw: engine Select doubles as active engine + configuration focus (ASRx-style)
-    case 'draw':
-      return <Box sx={_styles.block}><T2IConfigureEngines isMobile={isMobile} /></Box>;
-
-    // Tools parent (hub): common search info, then links into Browsing / Custom Search
+    // Tools parent (hub): common search info, then links into Draw / Browsing / Custom Search
     case 'tools':
       return <>
         <ToolsSearchBanner />
         <ChildNav parentId='tools' onSelect={onSelect} />
         <ToolsDiagnostics />
       </>;
+    // Draw: engine Select doubles as active engine + configuration focus (ASRx-style)
+    case 'tools-draw':
+      return <Box sx={_styles.block}><T2IConfigureEngines isMobile={isMobile} /></Box>;
     case 'tools-browse':
       return <Box sx={_styles.block}><BrowseSettings /></Box>;
     case 'tools-search':

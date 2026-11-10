@@ -6,10 +6,13 @@ import CodeIcon from '@mui/icons-material/Code';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
 import ShortcutIcon from '@mui/icons-material/Shortcut';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
+import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import SpeedIcon from '@mui/icons-material/Speed';
 import WidthWideIcon from '@mui/icons-material/WidthWide';
 
 import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
+import { FormSelectControl, FormSelectOption } from '~/common/components/forms/FormSelectControl';
 import { FormSwitchControl } from '~/common/components/forms/FormSwitchControl';
 import { Link } from '~/common/components/Link';
 import { PhImageSquare } from '~/common/components/icons/phosphor/PhImageSquare';
@@ -18,21 +21,39 @@ import { useUIPreferencesStore } from '~/common/stores/store-ui';
 import { useUXLabsStore } from '~/common/stores/store-ux-labs';
 
 
+const _adaptiveRenderingOptions: FormSelectOption<'auto' | 'on' | 'off' | 'debug'>[] = [
+  { value: 'auto', label: 'Auto', description: 'When heavy' },
+  { value: 'on', label: 'On', description: 'Always' },
+  { value: 'off', label: 'Off', description: 'Never' },
+  { value: 'debug', label: 'Auto (Debug)', description: 'Highlight' },
+];
+
+
 export function UxLabsSettings() {
 
   // external state
   const isMobile = useIsMobile();
   const {
-    labsHighPerformance, setLabsHighPerformance,
     labsLosslessImages, setLabsPreserveLosslessImages,
     labsAutoHideComposer, setLabsAutoHideComposer,
     labsShowShortcutBar, setLabsShowShortcutBar,
     labsComposerAttachmentsInline, setLabsComposerAttachmentsInline,
     labsSingleDollarLatex, setLabsSingleDollarLatex,
+    labsUserMarkdown, setLabsUserMarkdown,
+    labsUngroupedFragments, setLabsUngroupedFragments,
+    labsAdaptiveRendering, setLabsAdaptiveRendering,
   } = useUXLabsStore();
   const [messageFullWidth, setMessageFullWidth] = useUIPreferencesStore(useShallow(state => [state.messageFullWidth, state.setMessageFullWidth]));
 
   return <>
+
+    <FormSelectControl
+      title={<><SpeedIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Adaptive Rendering</>}
+      tooltip='Keeps long replies smooth: the part still being written may show simpler formatting until the reply finishes.'
+      options={_adaptiveRenderingOptions}
+      value={labsAdaptiveRendering}
+      onChange={setLabsAdaptiveRendering}
+    />
 
     <FormSwitchControl
       title={<><PhImageSquare sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Lossless Images</>} description={labsLosslessImages ? 'Large storage use' : 'Compress'}
@@ -45,21 +66,22 @@ export function UxLabsSettings() {
       checked={labsLosslessImages} onChange={setLabsPreserveLosslessImages}
     />
 
-    <FormSwitchControl
-      title={<><SpeedIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Unlock Refresh</>} description={labsHighPerformance ? 'Unlocked' : 'Default'}
-      tooltipWarning={labsHighPerformance}
-      tooltip={<>
-        Unlocks the maximum UI refresh rate for Chats and Beams, and will draw every single token as they come in.
-        <hr />
-        THIS MAY CAUSE HIGH CPU USAGE, BATTERY DRAIN, AND STUTTERING WITH FAST MODELS.
-      </>}
-      checked={labsHighPerformance} onChange={setLabsHighPerformance}
-    />
-
     {!isMobile && <FormSwitchControl
       title={<><ShortcutIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Shortcuts Bar</>} description={labsShowShortcutBar ? 'Status Bar' : 'Disabled'}
       checked={labsShowShortcutBar} onChange={setLabsShowShortcutBar}
     />}
+
+    <FormSwitchControl
+      title={<><TextFieldsIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Markdown in User Messages</>} description={labsUserMarkdown ? 'Markdown' : 'Plain text'}
+      tooltip='Renders your messages as markdown, keeping your line breaks. Any message can switch between text and markdown from its menu.'
+      checked={labsUserMarkdown} onChange={setLabsUserMarkdown}
+    />
+
+    <FormSwitchControl
+      title={<><UnfoldMoreIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Ungrouped fragments</>} description={labsUngroupedFragments ? 'Stored order' : 'Grouped'}
+      tooltip='Show every message fragment on its own, in stored order. Disables fusing, tool call pairing and citation hoisting.'
+      checked={labsUngroupedFragments} onChange={setLabsUngroupedFragments}
+    />
 
     <FormSwitchControl
       title={<><CodeIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Dollar Inline LaTeX</>} description={labsSingleDollarLatex ? 'Enabled' : 'Disabled'}

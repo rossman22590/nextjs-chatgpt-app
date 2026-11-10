@@ -1,13 +1,13 @@
 ---
 description: Verify model parameterSpecs match API-validated sweep data
-argument-hint: openai | anthropic | gemini | xai (or empty for all)
+argument-hint: openai | anthropic | gemini | xai | metaai (or empty for all)
 ---
 
 # Verify LLM Parameters
 
 Compare model `parameterSpecs` in definition files against API-validated sweep data.
 
-If `$ARGUMENTS` provided, verify only that dialect, which includes reading the pair of sweep results and model defintions. Otherwise verify all four, and read the pairs in sequence.
+If `$ARGUMENTS` provided, verify only that dialect, which includes reading the pair of sweep results and model definitions. Otherwise verify all five, and read the pairs in sequence.
 
 ## Files
 
@@ -15,11 +15,12 @@ If `$ARGUMENTS` provided, verify only that dialect, which includes reading the p
 - `tools/develop/llm-parameter-sweep/llm-{dialect}-parameters-sweep.json`
   By the time you see these files, the repo owner has already updated them via `tools/develop/llm-parameter-sweep/sweep.sh` (very long running, 15 min per vendor).
 
-**Model definitions (source of truth for model defintions for the user and application, including constants, interfaces, supported parameters and sometimes allowed parameter values)**:
+**Model definitions (source of truth for model definitions for the user and application, including constants, interfaces, supported parameters and sometimes allowed parameter values)**:
 - OpenAI: `src/modules/llms/server/openai/models/openai.models.ts`
 - Anthropic: `src/modules/llms/server/anthropic/anthropic.models.ts`
 - Gemini: `src/modules/llms/server/gemini/gemini.models.ts`
 - xAI: `src/modules/llms/server/openai/models/xai.models.ts`
+- Meta AI: `src/modules/llms/server/openai/models/metaai.models.ts`
 
 ## Task
 
@@ -51,6 +52,8 @@ and need to be carefully updated, otherwise thousands of clients may break.
 | Gemini    | `gemini-thinking-level`  | `llmVndGemEffort`            |
 | Gemini    | `gemini-thinking-budget` | `llmVndGeminiThinkingBudget` |
 | xAI       | `xai-web-search`         | `llmVndXaiWebSearch`         |
+| Meta      | `metaai-reasoning-effort`| `llmVndOaiEffort`            |
+| Meta      | `metaai-web-search`      | `llmVndOaiWebSearchContext`  |
 
 ## Function-Calling Capability (`fn`)
 
