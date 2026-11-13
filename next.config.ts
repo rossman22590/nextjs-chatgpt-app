@@ -229,5 +229,27 @@ if (process.env.POSTHOG_API_KEY && process.env.POSTHOG_ENV_ID) {
 }
 
 
+// Sentry error reporting - off unless NEXT_PUBLIC_SENTRY_DSN is set at build time
+// ORDER: outermost wrapper (accepts PostHog's function-form config)
+import { withSentryConfig } from '@sentry/nextjs/config';
+if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  log('- building with Sentry error reporting...');
+  // app/ holds API routes only, so no app/global-error.tsx: render errors go through pages/_error.tsx and ErrorBoundary
+  process.env.SENTRY_SUPPRESS_GLOBAL_ERROR_HANDLER_FILE_WARNING ||= '1';
+  nextConfig = withSentryConfig(nextConfig, {
+    org: process.env.SENTRY_ORG || 'tsi-36',
+    project: process.env.SENTRY_PROJECT || 'beam',
+    // org token (upload-only) from the environment only - this repo is public; without it the build skips the upload
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+    release: { name: process.env.NEXT_PUBLIC_BUILD_HASH },
+    widenClientFileUpload: true, // also map Next's own client chunks
+    // browser events go through the app so ad-blockers don't drop them; static exports have no server for it
+    ...(buildType !== 'export' && { tunnelRoute: '/monitoring' }),
+    silent: !process.env.CI,
+  });
+}
+
+
 log(); // blank line after the sync part of the config runs
 export default nextConfig;

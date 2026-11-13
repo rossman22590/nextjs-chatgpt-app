@@ -19,6 +19,7 @@ export default withAuth({
 export const config = {
   matcher: [
     // Protect app routes only; public files with extensions must bypass auth.
-    '/((?!api|_next|auth|link/callback_openrouter|.*\\..*).*)',
+    // monitoring: the Sentry tunnel route (next.config.ts), which browsers POST to without a session
+    '/((?!api|_next|auth|monitoring|link/callback_openrouter|.*\\..*).*)',
   ],
 };

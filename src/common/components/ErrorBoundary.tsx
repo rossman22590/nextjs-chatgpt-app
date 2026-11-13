@@ -1,4 +1,5 @@
 import * as React from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 import { BaseProduct } from '~/common/app.release';
 import { logger } from '~/common/logger';
@@ -71,6 +72,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         component: componentName,
         chunk_reload_failed: true,
       });
+      Sentry.captureException(error, { tags: { component: componentName, chunk_reload_failed: true } });
       return; // keep hasError=true so the "Update Required" fallback renders
     }
 
@@ -91,6 +93,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       agi_runtime: 'browser',
       component: componentName,
       component_stack: errorInfo.componentStack,
+    });
+
+    // Capture in Sentry: a caught render error never reaches its global handlers (no-op when Sentry is off)
+    Sentry.captureException(error, {
+      tags: { component: componentName },
+      contexts: { react: { componentStack: errorInfo.componentStack } },
     });
 
     // Call the optional onError callback for external reporting
